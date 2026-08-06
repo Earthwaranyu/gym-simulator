@@ -4,7 +4,13 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 60 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
+**Progress: 58 built / 60** — every phase complete. #22 (stamina) and #24 (training
+anti-exploit) were withdrawn by design, not skipped: training became automatic with no
+client remote to exploit.
+
+**Before this ships**, see [`docs/PLAYTEST.md`](docs/PLAYTEST.md). Two things are stubbed
+on purpose: `DataService` uses the Studio mock store, and every product `AssetId` is `0`
+until they exist in the Creator Dashboard.
 
 ---
 
