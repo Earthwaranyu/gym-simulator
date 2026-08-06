@@ -180,9 +180,9 @@ function LeaderboardService:GetBoards(): { any }
 end
 
 function LeaderboardService:Start()
-	Net.Function("GetLeaderboard").OnServerInvoke = function()
+	Net.BindFunction("GetLeaderboard", 1, function()
 		return self:GetBoards()
-	end
+	end)
 
 	-- Publish a departing player's final numbers while their profile is still loaded.
 	DataService.ProfileReleasing:Connect(function(player: Player)

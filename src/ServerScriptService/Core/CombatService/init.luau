@@ -378,7 +378,8 @@ function CombatService:_applyVitals(player: Player)
 end
 
 function CombatService:Start()
-	Net.Event("AbilityActivate").OnServerEvent:Connect(function(player: Player, abilityId: any, target: any)
+	-- Comfortably above the fastest ability cooldown, so honest play never trips it.
+	Net.BindEvent("AbilityActivate", 8, function(player: Player, abilityId: any, target: any)
 		if type(abilityId) ~= "string" then
 			return
 		end

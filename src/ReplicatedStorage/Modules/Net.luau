@@ -6,14 +6,17 @@
 	Adding one means adding a string; no other file changes, and nothing else in the
 	codebase is allowed to call Instance.new("RemoteEvent").
 
-	Keeping them in one list is also what makes a global rate limiter possible later
-	(checklist #53) — there is a single choke point to wrap.
+	Keeping them in one list is what makes the global rate limiter possible: BindEvent
+	and BindFunction wrap every server handler in a per-player token bucket, so no
+	individual system has to remember to defend itself. A client that floods a remote
+	gets its extra calls dropped here and never reaches game logic.
 
 	The server creates the instances at require time; clients wait for them. Because
 	the server bootstrap requires this module before any client code runs, the folder
 	is always present by the time a client asks.
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -89,6 +92,49 @@ build(FUNCTION_NAMES, "RemoteFunction")
 
 local Net = {}
 
+-- player -> remote name -> { tokens, lastRefillAt }
+local buckets: { [Player]: { [string]: { tokens: number, at: number } } } = {}
+
+if IS_SERVER then
+	Players.PlayerRemoving:Connect(function(player: Player)
+		buckets[player] = nil
+	end)
+end
+
+--[[
+	Token-bucket rate limit. Returns false when the caller has spent its allowance.
+
+	A bucket refills continuously rather than resetting on a window boundary, so a
+	client cannot burst double its rate by straddling two windows.
+]]
+local function allow(player: Player, name: string, perSecond: number): boolean
+	local playerBuckets = buckets[player]
+	if playerBuckets == nil then
+		playerBuckets = {}
+		buckets[player] = playerBuckets
+	end
+
+	local now = os.clock()
+	local bucket = playerBuckets[name]
+
+	if bucket == nil then
+		bucket = { tokens = perSecond, at = now }
+		playerBuckets[name] = bucket
+	end
+
+	-- Burst allowance is one second's worth, which absorbs normal latency jitter
+	-- without letting a client bank minutes of unused budget.
+	bucket.tokens = math.min(perSecond, bucket.tokens + (now - bucket.at) * perSecond)
+	bucket.at = now
+
+	if bucket.tokens < 1 then
+		return false
+	end
+
+	bucket.tokens -= 1
+	return true
+end
+
 local function resolve(name: string, className: string): Instance
 	local instance = if IS_SERVER then folder:FindFirstChild(name) else folder:WaitForChild(name, 10)
 
@@ -115,6 +161,38 @@ end
 ]]
 function Net.Function(name: string): RemoteFunction
 	return resolve(name, "RemoteFunction") :: RemoteFunction
+end
+
+--[[
+	Server-side: attaches a rate-limited handler to a RemoteEvent.
+
+	Prefer this over Net.Event(name).OnServerEvent for anything a client can trigger.
+	Calls beyond `perSecond` are dropped silently — telling a flooder they were
+	throttled just gives them a signal to tune against.
+]]
+function Net.BindEvent(name: string, perSecond: number, handler: (Player, ...any) -> ())
+	Net.Event(name).OnServerEvent:Connect(function(player: Player, ...)
+		if not allow(player, name, perSecond) then
+			return
+		end
+		handler(player, ...)
+	end)
+end
+
+--[[
+	Server-side: attaches a rate-limited handler to a RemoteFunction.
+
+	Unlike events, a throttled invoke must still return something, or the caller
+	yields until timeout. It answers with the standard (false, message) shape every
+	purchase path already uses.
+]]
+function Net.BindFunction(name: string, perSecond: number, handler: (Player, ...any) -> ...any)
+	Net.Function(name).OnServerInvoke = function(player: Player, ...)
+		if not allow(player, name, perSecond) then
+			return false, "You are doing that too quickly."
+		end
+		return handler(player, ...)
+	end
 end
 
 return Net

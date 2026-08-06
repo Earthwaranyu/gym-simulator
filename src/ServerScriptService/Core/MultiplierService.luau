@@ -36,12 +36,12 @@ function MultiplierService:Init()
 	StatService = Loader.Get("StatService")
 	TokenService = Loader.Get("TokenService")
 
-	Net.Function("PurchaseMultiplier").OnServerInvoke = function(player: Player, statId: any)
+	Net.BindFunction("PurchaseMultiplier", 4, function(player: Player, statId: any)
 		if type(statId) ~= "string" then
 			return false, "Invalid request."
 		end
 		return self:Purchase(player, statId)
-	end
+	end)
 end
 
 function MultiplierService:Start()

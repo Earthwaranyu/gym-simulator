@@ -110,12 +110,12 @@ function ShopService:Purchase(player: Player, itemId: string): (boolean, string)
 end
 
 function ShopService:Start()
-	Net.Function("PurchaseShopItem").OnServerInvoke = function(player: Player, itemId: any)
+	Net.BindFunction("PurchaseShopItem", 4, function(player: Player, itemId: any)
 		if type(itemId) ~= "string" then
 			return false, "Invalid request."
 		end
 		return self:Purchase(player, itemId)
-	end
+	end)
 end
 
 return ShopService

@@ -170,7 +170,7 @@ function PurchaseService:Start()
 		return self:_processReceipt(receiptInfo)
 	end
 
-	Net.Function("PromptProduct").OnServerInvoke = function(player: Player, productId: any)
+	Net.BindFunction("PromptProduct", 2, function(player: Player, productId: any)
 		if type(productId) ~= "string" then
 			return false, "Invalid request."
 		end
@@ -190,7 +190,7 @@ function PurchaseService:Start()
 		end
 
 		return true, nil
-	end
+	end)
 
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
 		function(player: Player, gamePassId: number, wasPurchased: boolean)
