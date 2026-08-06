@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 57 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
+**Progress: 58 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
 
 ---
 
@@ -122,7 +122,7 @@ system that consumes it:
 ## Phase 9 — Polish & Launch
 
 - [x] 56. SFX/VFX — rep clanks, hit impacts, level-up bursts, immortality barrier shader, multiplier-purchase flourish.
-- [ ] 57. Analytics events on the funnel (first rep, first kill, first multiplier buy, first purchase).
+- [x] 57. Analytics events on the funnel (first rep, first kill, first multiplier buy, first purchase).
 - [x] 58. Full anti-cheat sweep + global remote rate limiting.
 - [ ] 59. Performance pass — StreamingEnabled, animation budget, part count at high player counts.
 - [ ] 60. Playtest pass and launch checklist.
