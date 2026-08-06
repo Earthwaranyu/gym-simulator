@@ -43,6 +43,9 @@
       "$properties": {
         "FilteringEnabled": true
       },
+      "Gym": {
+        "$path": "src/Workspace/Gym.model.json"
+      },
       "Baseplate": {
         "$className": "Part",
         "$properties": {
