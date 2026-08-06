@@ -40,6 +40,14 @@ export type ProfileData = {
 
 	OwnedEquipment: { [EquipmentId]: boolean },
 	QuestProgress: { [QuestId]: number },
+	-- Quest id -> the UTC day it was last completed, or "once" for one-shot quests.
+	-- Daily quests compare this against today to decide whether to reset progress.
+	QuestCompletions: { [QuestId]: string },
+
+	-- Roblox PurchaseId -> true for every receipt already granted. Roblox retries
+	-- ProcessReceipt until it is acknowledged, so without this a network blip would
+	-- hand out the same product twice.
+	PurchaseHistory: { [string]: boolean },
 
 	-- Signed score. Negative trends Criminal, positive trends Hero; ReputationConfig
 	-- maps ranges to tier names so the bands can be retuned without a migration.
@@ -129,6 +137,48 @@ export type Ability = {
 	Validate: ((AbilityContext) -> (boolean, string?))?,
 	-- Second argument is CombatService; typed loosely to avoid a circular reference.
 	Execute: (AbilityContext, any) -> (),
+}
+
+--[[
+	The contract every purchasable implements. Modules in PurchaseService/Products/ that
+	return one of these register themselves — adding a product is a new file, never a
+	branch in the receipt handler.
+
+	AssetId must be filled in from the Roblox Creator Dashboard. A product left at 0 is
+	skipped at load with a warning rather than silently matching receipt id 0.
+]]
+export type Product = {
+	Id: string,
+	Kind: "DevProduct" | "Gamepass",
+	AssetId: number,
+	DisplayName: string,
+	Description: string,
+	RobuxPrice: number,
+	-- DevProducts: called once per purchase, after the receipt is confirmed new.
+	-- Gamepasses: called on join and immediately on purchase. Must be idempotent.
+	Grant: (Player) -> boolean,
+}
+
+--[[
+	The contract every quest module implements. Modules in QuestService/Quests/ that
+	return one of these register themselves.
+
+	Track is called once at startup with a callback the quest uses to report progress.
+	Each quest wires its own listener, so the quest engine never needs to know what
+	kinds of objective exist — adding "win 5 fights" is a new file, not a new branch.
+]]
+export type Quest = {
+	Id: QuestId,
+	DisplayName: string,
+	Description: string,
+	-- Progress needed to complete.
+	Goal: number,
+	TokenReward: number,
+	-- "Once" never resets; "Daily" resets at UTC midnight.
+	Repeat: "Once" | "Daily",
+	-- Returns ...any rather than () for the same reason as Loader's System.Init: with
+	-- a () return, pcall's result arity is 1 and the error string cannot be captured.
+	Track: (report: (Player, number) -> ()) -> ...any,
 }
 
 -- Key meaning "applies to every stat" inside Modifier.Multipliers.

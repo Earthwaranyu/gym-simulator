@@ -32,6 +32,8 @@ local ProfileTemplate: Types.ProfileData = {
 
 	OwnedEquipment = {},
 	QuestProgress = {},
+	QuestCompletions = {},
+	PurchaseHistory = {},
 
 	Reputation = 0,
 

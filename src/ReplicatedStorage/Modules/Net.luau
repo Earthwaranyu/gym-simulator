@@ -34,11 +34,26 @@ local EVENT_NAMES: { string } = {
 	"CombatFeedback",
 	-- Server -> client: transient toast/notification text.
 	"Notify",
+	-- Server -> ALL clients: someone was knocked out. Drives the kill feed.
+	"KillFeed",
+	-- Server -> client: the public roster (power, rank, reputation, bounty) for the
+	-- custom tab bar. Sent as a whole list rather than per-player deltas.
+	"RosterChanged",
+	-- Server -> client: quest list with current progress.
+	"QuestsChanged",
 }
 
 local FUNCTION_NAMES: { string } = {
 	-- Client -> server: buy one multiplier level for a stat. Returns ok, message.
 	"PurchaseMultiplier",
+	-- Client -> server: buy a catalogue item with cash. Returns ok, message.
+	"PurchaseShopItem",
+	-- Client -> server: prompt a Robux purchase by product id. Returns ok, message.
+	"PromptProduct",
+	-- Client -> server: claim the VIP daily potion. Returns ok, message.
+	"ClaimVipDaily",
+	-- Client -> server: read the global leaderboards. Returns a list.
+	"GetLeaderboard",
 }
 
 local folder: Folder
