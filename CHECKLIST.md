@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 7 / 60** — Phase 0 complete.
+**Progress: 8 / 60** — Phase 0 complete.
 
 ---
 
@@ -48,7 +48,7 @@ system that consumes it:
 
 ## Phase 1 — Data Layer
 
-- [ ] 8. `ProfileTemplate` schema: stats, tokens, per-stat multiplier levels, cash, owned equipment, quest progress, **reputation**, **immortality expiry**, kill/death record, settings, `SchemaVersion`.
+- [x] 8. `ProfileTemplate` schema: stats, tokens, per-stat multiplier levels, cash, owned equipment, quest progress, **reputation**, **immortality expiry**, kill/death record, settings, `SchemaVersion`.
 - [ ] 9. `DataService` — session locking, release on leave, `BindToClose` flush.
 - [ ] 10. Migration system: ordered list of version-bump functions, so the schema grows without breaking live saves.
 - [ ] 11. Replication: server pushes an authoritative read-only profile view to the owning client; client never writes.

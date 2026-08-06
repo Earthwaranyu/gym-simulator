@@ -41,6 +41,15 @@ export type ProfileData = {
 	OwnedEquipment: { [EquipmentId]: boolean },
 	QuestProgress: { [QuestId]: number },
 
+	-- Signed score. Negative trends Criminal, positive trends Hero; ReputationConfig
+	-- maps ranges to tier names so the bands can be retuned without a migration.
+	Reputation: number,
+
+	-- os.time() at which purchased PvP immunity lapses. 0 means never bought one.
+	ImmortalUntil: number,
+	-- os.date "%Y-%m-%d" of the last VIP daily potion claim. Empty means never claimed.
+	VipLastClaimDay: string,
+
 	Kills: number,
 	Deaths: number,
 
