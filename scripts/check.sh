@@ -36,11 +36,17 @@ echo "==> rojo sourcemap"
 rojo sourcemap default.project.json -o sourcemap.json
 
 echo "==> luau-lsp analyze (--!strict)"
-if ! luau-lsp analyze --sourcemap=sourcemap.json --definitions="$DEFS" src 2>&1 |
-	grep -v '^\[INFO\]' | grep -v '^\[WARN\]' | grep .; then
-	echo "no type errors"
-else
+# Capture rather than test the pipeline directly: luau-lsp exits non-zero when it
+# finds errors, and under `set -o pipefail` that status masks grep's, which silently
+# inverted this check and reported success while errors were printed.
+analysis=$(luau-lsp analyze --sourcemap=sourcemap.json --definitions="$DEFS" src 2>&1 |
+	grep -v '^\[INFO\]' | grep -v '^\[WARN\]' || true)
+
+if [[ -n "$analysis" ]]; then
+	echo "$analysis"
 	status=1
+else
+	echo "no type errors"
 fi
 
 if [[ $status -eq 0 ]]; then
