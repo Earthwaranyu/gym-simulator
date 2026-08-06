@@ -174,6 +174,19 @@ function TrainingService:Interrupt(player: Player)
 end
 
 --[[
+	Whether a machine is usable: either the player has out-levelled its power gate, or
+	they bought the pass for it in the shop.
+]]
+function TrainingService:_isUnlocked(player: Player, definition: EquipmentConfig.EquipmentDefinition): boolean
+	if StatService:GetTotalPower(player) >= definition.UnlockPower then
+		return true
+	end
+
+	local data = DataService:GetData(player)
+	return data ~= nil and data.OwnedEquipment[definition.Id] == true
+end
+
+--[[
 	Finds the nearest tagged station the player is close enough to use, or nil.
 
 	Stations are shared: several players can train at the same machine. Making them
@@ -205,7 +218,7 @@ function TrainingService:_findStation(player: Player): (Instance?, EquipmentConf
 		if definition == nil then
 			continue
 		end
-		if StatService:GetTotalPower(player) < definition.UnlockPower then
+		if not self:_isUnlocked(player, definition) then
 			continue
 		end
 

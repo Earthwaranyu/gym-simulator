@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 44 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
+**Progress: 45 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
 
 ---
 
@@ -97,7 +97,7 @@ system that consumes it:
 ## Phase 6 — Economy & Monetisation
 
 - [x] 40. `CurrencyService` — cash from reps, kills, and bounties. Kept distinct from Tokens.
-- [ ] 41. Data-driven shop catalogue: gym-tier unlocks, supplements (timed multipliers), abilities.
+- [x] 41. Data-driven shop catalogue: gym-tier unlocks, supplements (timed multipliers), abilities.
 - [x] 42. `MarketplaceService` handler — gamepasses + dev products, **idempotent** receipt processing.
 - [x] 43. **Immortal potions** as dev products: 1 hour for 19 R$, 1 day for 79 R$. Expiry stored on the profile so it survives rejoin.
 - [x] 44. **VIP gamepass** at 199 R$ — grants one 1-hour immortal potion per day, with a daily-claim reset.
