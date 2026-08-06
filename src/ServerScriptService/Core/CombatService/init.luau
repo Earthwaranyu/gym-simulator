@@ -29,6 +29,9 @@ local Types = require(ReplicatedStorage.Modules.Types)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 local SAFE_ZONE_TAG = "SafeZone"
+-- Killing the same victim again inside this window still works — griefing is the
+-- point of the game — but pays nothing, so farming one person is not a strategy.
+local REPEAT_KILL_WINDOW = 120
 -- How often stat-derived health and speed are re-applied to living characters.
 local VITALS_REFRESH_SECONDS = 1
 -- Generosity on the client's claimed range, to absorb latency.
@@ -41,6 +44,8 @@ local CombatService = {
 
 local abilities: { [Types.AbilityId]: Types.Ability } = {}
 local cooldowns: { [Player]: { [Types.AbilityId]: number } } = {}
+-- victim -> killer -> os.clock() of the last kill, for the repeat-farm check.
+local recentKills: { [Player]: { [Player]: number } } = {}
 
 local DataService: any = nil
 local StatService: any = nil
@@ -48,7 +53,9 @@ local TrainingService: any = nil
 
 -- (victim, attacker, damage, isKill)
 CombatService.DamageDealt = Signal.new()
--- (victim, killer)
+-- (victim, killer, isRepeatKill) — isRepeatKill is true when the same killer already
+-- knocked this victim out inside REPEAT_KILL_WINDOW. Listeners that hand out rewards
+-- must skip those; the kill itself still counts and still annoys the victim.
 CombatService.PlayerKilled = Signal.new()
 
 function CombatService:Init()
@@ -224,7 +231,30 @@ function CombatService:ApplyDamage(attacker: Player, victim: Player, rawDamage: 
 	return damage
 end
 
+--[[
+	True when this killer already knocked this victim out recently. Used to withhold
+	rewards from someone camping a single player, without preventing the kill itself.
+]]
+function CombatService:IsRepeatKill(killer: Player, victim: Player): boolean
+	local byKiller = recentKills[victim]
+	if byKiller == nil then
+		return false
+	end
+
+	local lastAt = byKiller[killer]
+	return lastAt ~= nil and (os.clock() - lastAt) < REPEAT_KILL_WINDOW
+end
+
 function CombatService:_recordKill(killer: Player, victim: Player)
+	local isRepeat = self:IsRepeatKill(killer, victim)
+
+	local byKiller = recentKills[victim]
+	if byKiller == nil then
+		byKiller = {}
+		recentKills[victim] = byKiller
+	end
+	byKiller[killer] = os.clock()
+
 	DataService:Update(killer, function(data: Types.ProfileData)
 		data.Kills += 1
 	end)
@@ -235,10 +265,15 @@ function CombatService:_recordKill(killer: Player, victim: Player)
 		data.Deaths += 1
 	end)
 
-	CombatService.PlayerKilled:Fire(victim, killer)
+	CombatService.PlayerKilled:Fire(victim, killer, isRepeat)
 
 	Net.Event("Notify"):FireClient(victim, `{killer.Name} knocked you out.`)
-	Net.Event("Notify"):FireClient(killer, `You knocked out {victim.Name}.`)
+
+	if isRepeat then
+		Net.Event("Notify"):FireClient(killer, `{victim.Name} again — no reward for farming.`)
+	else
+		Net.Event("Notify"):FireClient(killer, `You knocked out {victim.Name}.`)
+	end
 end
 
 --[[
@@ -369,6 +404,10 @@ function CombatService:Start()
 
 	Players.PlayerRemoving:Connect(function(player: Player)
 		cooldowns[player] = nil
+		recentKills[player] = nil
+		for _, byKiller in recentKills do
+			byKiller[player] = nil
+		end
 	end)
 
 	-- Stats change constantly while training, so vitals are refreshed on a slow timer

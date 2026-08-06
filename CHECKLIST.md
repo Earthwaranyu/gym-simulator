@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 37 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
+**Progress: 38 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
 
 ---
 
@@ -91,7 +91,7 @@ system that consumes it:
 - [ ] 35. **Immortality + barrier** — `CombatService` nullifies all damage while a potion is active, and the player wears a visible body barrier so attackers can see it before swinging.
 - [ ] 36. Bounty / killstreak system with a revenge incentive so victims get a comeback path.
 - [x] 37. Safe zones — tagged parts at spawn, shop, and quest board where damage is nullified. Everywhere else, including every training station, is live.
-- [ ] 38. Anti-grief balance: damage falloff on large power gaps, and a cooldown blocking repeat-farming the same victim.
+- [x] 38. Anti-grief balance: damage falloff on large power gaps, and a cooldown blocking repeat-farming the same victim.
 - [ ] 39. Kill feed + on-screen combat notifications.
 
 ## Phase 6 — Economy & Monetisation
