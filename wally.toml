@@ -1,0 +1,15 @@
+[package]
+name = "waranyu/gym-simulator"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+# Shared realm — installed to ReplicatedStorage.Packages, usable from both realms.
+[dependencies]
+Signal = "sleitnick/signal@2.0.3"
+Promise = "evaera/promise@4.0.0"
+
+# Server realm — installed to ServerScriptService.ServerPackages, never replicated.
+# ProfileStore is loleris's supported successor to ProfileService, which was archived.
+[server-dependencies]
+ProfileStore = "lm-loleris/profilestore@1.0.3"

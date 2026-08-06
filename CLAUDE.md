@@ -4,7 +4,7 @@
 - Language: Luau (`--!strict` mode required on all scripts)
 - Environment: Rojo sync to Roblox Studio
 - Version Control: Git 
-- Data Management: ProfileService
+- Data Management: ProfileStore (loleris's supported successor to ProfileService, which is archived)
 
 ## Core Game Mechanics & Architecture
 1. **The 5 Core Stats**: Arms, Chest, Back, Core, Legs.

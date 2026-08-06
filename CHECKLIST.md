@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 6 / 60**
+**Progress: 7 / 60** — Phase 0 complete.
 
 ---
 
@@ -39,7 +39,7 @@ system that consumes it:
 ## Phase 0 — Foundations
 
 - [x] 1. Realign `default.project.json` to the `CLAUDE.md` structure; delete the template stubs. Correct "9 Core Stats" → "5 Core Stats".
-- [ ] 2. Add Wally (`wally.toml`) + register it in `rokit.toml`; pull in the data library, Signal, and Promise. *(Wally 0.3.2, StyLua, Selene, and Luau are pinned in `rokit.toml`; data library choice pending.)*
+- [x] 2. Add Wally (`wally.toml`) + register it in `rokit.toml`; pull in the data library, Signal, and Promise. → ProfileStore 1.0.3 (server realm), Signal 2.0.3, Promise 4.0.0
 - [x] 3. Add StyLua + Selene configs; enforce `--!strict` on every `.luau` file.
 - [x] 4. `ServiceLoader` / `ControllerLoader`: auto-require every module in a folder, `Init()` all, then `Start()` all. **This is the OCP backbone.** → `Modules/Loader.luau`
 - [x] 5. `Types.luau` — shared exported type definitions.
