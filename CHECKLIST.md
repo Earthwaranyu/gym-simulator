@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 54 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
+**Progress: 55 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
 
 ---
 
@@ -78,7 +78,7 @@ system that consumes it:
 - [x] 25. Character rig prep + a stat→body-scale mapping table. `NumberValue` instances inside the character model drive server-side MeshPart scaling.
 - [x] 26. `MuscleService` — server writes the `NumberValue`s; replication is automatic.
 - [x] 27. Client-side lerp so growth animates smoothly instead of popping.
-- [ ] 28. Scale caps + collision/animation sanity checks at extreme sizes.
+- [x] 28. Scale caps + collision/animation sanity checks at extreme sizes.
 
 ## Phase 5 — PvP (the differentiator)
 

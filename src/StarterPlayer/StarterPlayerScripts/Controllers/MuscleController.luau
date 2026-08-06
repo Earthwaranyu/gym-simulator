@@ -10,9 +10,10 @@
 	players see the same bodies. Nothing here is authoritative — a tampered client can
 	only lie to itself about how big someone looks.
 
-	Known limitation: this resizes MeshParts without re-fitting their Motor6D joints,
-	so at extreme scales limbs pull away from their sockets. Joint correction and
-	collision sanity are checklist item 28.
+	Resizing alone is not enough: a Motor6D keeps its offset from each part's centre, so
+	growing a limb without re-seating its joints leaves arms visibly detached from
+	shoulders. Both offsets are rescaled from cached originals, and hip height tracks
+	leg growth so characters stand on the floor instead of sinking into it.
 ]]
 
 local Players = game:GetService("Players")
@@ -32,6 +33,10 @@ local MuscleController = {
 
 -- Original mesh sizes, captured before we ever resize anything.
 local baseSizes: { [BasePart]: Vector3? } = {}
+-- Original joint offsets, likewise. Scaling from the current value each frame would
+-- compound the error until limbs drifted off entirely.
+local baseJoints: { [Motor6D]: { c0: CFrame, c1: CFrame }? } = {}
+local baseHipHeights: { [Humanoid]: number? } = {}
 
 local function getBaseSize(part: BasePart): Vector3
 	local stored = baseSizes[part]
@@ -44,6 +49,72 @@ local function getBaseSize(part: BasePart): Vector3
 	return captured
 end
 
+--[[
+	The factor a part has actually grown by, per axis, right now.
+]]
+local function currentScale(part: BasePart): Vector3
+	local base = getBaseSize(part)
+	return Vector3.new(part.Size.X / base.X, part.Size.Y / base.Y, part.Size.Z / base.Z)
+end
+
+--[[
+	Re-seats every joint after its parts have been resized.
+
+	Without this, growing a limb leaves the joint where the original mesh's surface was,
+	so arms visibly detach from shoulders at high scale. A Motor6D's C0 and C1 are
+	offsets from each part's centre, so both have to scale with the part they belong to
+	— position only, since rotating the offset would twist the limb.
+]]
+local function refitJoints(character: Model)
+	for _, descendant in character:GetDescendants() do
+		if not descendant:IsA("Motor6D") then
+			continue
+		end
+
+		local part0 = descendant.Part0
+		local part1 = descendant.Part1
+		if part0 == nil or part1 == nil then
+			continue
+		end
+
+		local stored = baseJoints[descendant]
+		if stored == nil then
+			stored = { c0 = descendant.C0, c1 = descendant.C1 }
+			baseJoints[descendant] = stored
+		end
+
+		local c0 = (stored :: { c0: CFrame, c1: CFrame }).c0
+		local c1 = (stored :: { c0: CFrame, c1: CFrame }).c1
+
+		descendant.C0 = CFrame.new(c0.Position * currentScale(part0)) * (c0 - c0.Position)
+		descendant.C1 = CFrame.new(c1.Position * currentScale(part1)) * (c1 - c1.Position)
+	end
+end
+
+--[[
+	Keeps the character standing on the floor rather than sinking into it as legs grow,
+	and keeps collisions sane at the top of the scale range.
+]]
+local function refitHumanoid(character: Model)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid == nil then
+		return
+	end
+
+	local leg = character:FindFirstChild("LeftUpperLeg")
+	if leg == nil or not leg:IsA("BasePart") then
+		return
+	end
+
+	local stored = baseHipHeights[humanoid]
+	if stored == nil then
+		stored = humanoid.HipHeight
+		baseHipHeights[humanoid] = stored
+	end
+
+	humanoid.HipHeight = (stored :: number) * currentScale(leg).Y
+end
+
 local function applyCharacter(character: Model, deltaTime: number)
 	local folder = character:FindFirstChild(FOLDER_NAME)
 	if folder == nil then
@@ -52,6 +123,7 @@ local function applyCharacter(character: Model, deltaTime: number)
 
 	-- Exponential smoothing, so the rate is the same at 30fps and 240fps.
 	local alpha = 1 - math.exp(-LERP_RATE * deltaTime)
+	local moved = false
 
 	for _, value in folder:GetChildren() do
 		if not value:IsA("NumberValue") then
@@ -63,12 +135,22 @@ local function applyCharacter(character: Model, deltaTime: number)
 			continue
 		end
 
+		-- Clamped here as well as server-side: this is the last line of defence
+		-- before a bad value reaches collision geometry.
 		local scale = math.clamp(value.Value, 1, Formulas.MAX_MUSCLE_SCALE)
 		local target = getBaseSize(part) * scale
 
 		if (part.Size - target).Magnitude > 0.001 then
 			part.Size = part.Size:Lerp(target, alpha)
+			moved = true
 		end
+	end
+
+	-- Only re-seat joints on frames where something actually resized; walking the
+	-- descendants of every character every frame would be the expensive part.
+	if moved then
+		refitJoints(character)
+		refitHumanoid(character)
 	end
 end
 
@@ -78,9 +160,13 @@ function MuscleController:Start()
 		if character == nil then
 			return
 		end
-		for _, part in character:GetDescendants() do
-			if part:IsA("BasePart") then
-				baseSizes[part] = nil
+		for _, descendant in character:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				baseSizes[descendant] = nil
+			elseif descendant:IsA("Motor6D") then
+				baseJoints[descendant] = nil
+			elseif descendant:IsA("Humanoid") then
+				baseHipHeights[descendant] = nil
 			end
 		end
 	end)
