@@ -2,7 +2,6 @@
   "name": "gym-simulator",
   "tree": {
     "$className": "DataModel",
-
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
       "Modules": {
@@ -12,7 +11,6 @@
         "$path": "Packages"
       }
     },
-
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "Core": {
@@ -25,7 +23,6 @@
         "$path": "ServerPackages"
       }
     },
-
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "StarterPlayerScripts": {
@@ -38,10 +35,12 @@
         }
       }
     },
-
     "Workspace": {
       "$properties": {
-        "FilteringEnabled": true
+        "FilteringEnabled": true,
+        "StreamingEnabled": true,
+        "StreamingTargetRadius": 512,
+        "StreamingMinRadius": 128
       },
       "Gym": {
         "$path": "src/Workspace/Gym.model.json"
