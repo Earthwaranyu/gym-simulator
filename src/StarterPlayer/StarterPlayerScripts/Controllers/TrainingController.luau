@@ -1,25 +1,21 @@
 --!strict
 --[[
-	TrainingController — input and prompts for training stations.
+	TrainingController — the client's view of what the player is training.
 
-	Purely presentational. It sends intent and mirrors whatever state the server pushes
-	back; it never predicts a rep or a stat gain, because the server can reject either.
+	Training is automatic and entirely server-driven: walking near a machine starts it,
+	walking away stops it. So this controller sends nothing at all. It exists purely so
+	the HUD has somewhere to read current state from, and so a panel built later still
+	shows correct values if it loads after the first push.
 
-	Prompts are created client-side, one per tagged station, so they cost the server
-	nothing and appear automatically for stations streamed in later.
+	There is no prompt to trigger and no rep input to bind — with no remote to call,
+	there is nothing here for an exploiter to abuse.
 ]]
 
-local CollectionService = game:GetService("CollectionService")
-local ContextActionService = game:GetService("ContextActionService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Signal = require(ReplicatedStorage.Packages.Signal)
 local Net = require(ReplicatedStorage.Modules.Net)
 local Types = require(ReplicatedStorage.Modules.Types)
-local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
-
-local REP_ACTION = "GymSimulatorRep"
 
 local TrainingController = {
 	Name = "TrainingController",
@@ -29,12 +25,12 @@ local TrainingController = {
 local state: Types.TrainingState = {
 	StationId = nil,
 	Combo = 0,
-	Stamina = 0,
-	MaxStamina = 100,
+	StaggerSeconds = 0,
 }
 
-local prompts: { [Instance]: ProximityPrompt? } = {}
-local activeStation: Instance? = nil
+-- os.clock() when the current state arrived, so the stagger can be counted down
+-- locally rather than the server streaming a timer.
+local receivedAt = 0
 
 -- (state) — fired whenever the server pushes new training state.
 TrainingController.Changed = Signal.new()
@@ -47,123 +43,21 @@ function TrainingController:IsTraining(): boolean
 	return state.StationId ~= nil
 end
 
-local function findPromptParent(station: Instance): BasePart?
-	if station:IsA("BasePart") then
-		return station
-	end
-	if station:IsA("Model") then
-		local primary = station.PrimaryPart
-		if primary ~= nil then
-			return primary
-		end
-		return station:FindFirstChildWhichIsA("BasePart", true)
-	end
-	return nil
-end
-
-function TrainingController:_bindStation(station: Instance)
-	if prompts[station] ~= nil then
-		return
-	end
-
-	local definition, reason = EquipmentConfig.Resolve(station)
-	if definition == nil then
-		warn(`[TrainingController] Ignoring station {station:GetFullName()}: {reason}`)
-		return
-	end
-
-	local parent = findPromptParent(station)
-	if parent == nil then
-		warn(`[TrainingController] Station {station:GetFullName()} has no BasePart to hold a prompt`)
-		return
-	end
-
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ObjectText = definition.DisplayName
-	prompt.ActionText = definition.ActionText
-	prompt.HoldDuration = 0
-	prompt.MaxActivationDistance = 12
-	prompt.RequiresLineOfSight = false
-	prompt.Parent = parent
-
-	prompt.Triggered:Connect(function()
-		if activeStation == station and state.StationId ~= nil then
-			activeStation = nil
-			Net.Event("TrainingStop"):FireServer()
-		else
-			-- Optimistic only for prompt toggling. If the server rejects the start it
-			-- never pushes a training state, and the next push clears this.
-			activeStation = station
-			Net.Event("TrainingStart"):FireServer(station)
-		end
-	end)
-
-	prompts[station] = prompt
-end
-
-function TrainingController:_unbindStation(station: Instance)
-	local prompt = prompts[station]
-	if prompt ~= nil then
-		prompt:Destroy()
-		prompts[station] = nil
-	end
-end
-
 --[[
-	While a set is running, any of click / space / gamepad A sends one rep. The server
-	rate-limits, so holding the button down gains nothing over tapping at the machine's
-	own interval.
+	Seconds left before the player can train again after being hit. Zero when free.
 ]]
-function TrainingController:_setRepInputBound(isBound: boolean)
-	if isBound then
-		ContextActionService:BindAction(REP_ACTION, function(_, inputState: Enum.UserInputState)
-			if inputState == Enum.UserInputState.Begin then
-				Net.Event("TrainingRep"):FireServer()
-			end
-			return Enum.ContextActionResult.Pass
-		end, false, Enum.UserInputType.MouseButton1, Enum.KeyCode.Space, Enum.KeyCode.ButtonA)
-	else
-		ContextActionService:UnbindAction(REP_ACTION)
+function TrainingController:GetStaggerRemaining(): number
+	if state.StaggerSeconds <= 0 then
+		return 0
 	end
+	return math.max(0, state.StaggerSeconds - (os.clock() - receivedAt))
 end
 
 function TrainingController:Init()
 	Net.Event("TrainingChanged").OnClientEvent:Connect(function(newState: Types.TrainingState)
-		local wasTraining = state.StationId ~= nil
 		state = newState
-
-		local isTraining = state.StationId ~= nil
-		if isTraining ~= wasTraining then
-			self:_setRepInputBound(isTraining)
-		end
-
-		-- Cleared unconditionally rather than only on transition, so a rejected start
-		-- or a server-side Stop cannot leave the prompt stuck in "stop" mode.
-		if not isTraining then
-			activeStation = nil
-		end
-
+		receivedAt = os.clock()
 		TrainingController.Changed:Fire(state)
-	end)
-end
-
-function TrainingController:Start()
-	for _, station in CollectionService:GetTagged(EquipmentConfig.STATION_TAG) do
-		self:_bindStation(station)
-	end
-
-	CollectionService:GetInstanceAddedSignal(EquipmentConfig.STATION_TAG):Connect(function(station)
-		self:_bindStation(station)
-	end)
-
-	CollectionService:GetInstanceRemovedSignal(EquipmentConfig.STATION_TAG):Connect(function(station)
-		self:_unbindStation(station)
-	end)
-
-	local player = Players.LocalPlayer
-	player.CharacterRemoving:Connect(function()
-		self:_setRepInputBound(false)
-		activeStation = nil
 	end)
 end
 

@@ -2,8 +2,8 @@
 --[[
 	HudController — the in-game heads-up display.
 
-	Covers checklist 47 (stats, power, tokens, stamina, combo) and 49 (health and the
-	ability cooldown), because they share one ScreenGui and one update pass.
+	Covers checklist 47 (stats, power, tokens, combo) and 49 (health and the ability
+	cooldown), because they share one ScreenGui and one update pass.
 
 	Stat rows are generated from StatConfig rather than hand-written, so adding a
 	sixth stat makes a sixth row appear with no edit here. Values come from
@@ -38,7 +38,6 @@ local CombatController: any = nil
 local statLabels: { [Types.StatId]: TextLabel } = {}
 local powerLabel: TextLabel
 local tokenLabel: TextLabel
-local staminaBar: UI.Bar
 local healthBar: UI.Bar
 local comboLabel: TextLabel
 local abilityLabel: TextLabel
@@ -101,25 +100,22 @@ function HudController:_build()
 	local vitals = UI.Panel("Vitals", screen)
 	vitals.AnchorPoint = Vector2.new(0.5, 1)
 	vitals.Position = UDim2.new(0.5, 0, 1, -16)
-	vitals.Size = UDim2.fromOffset(380, 116)
+	vitals.Size = UDim2.fromOffset(380, 94)
 
 	UI.VerticalList(vitals, 6)
 
 	healthBar = UI.Bar("Health", UI.Palette.Health, vitals)
 	healthBar.Root.LayoutOrder = 1
 
-	staminaBar = UI.Bar("Stamina", UI.Palette.Stamina, vitals)
-	staminaBar.Root.LayoutOrder = 2
-
 	comboLabel = UI.Label("Combo", vitals)
 	comboLabel.Size = UDim2.new(1, 0, 0, 20)
 	comboLabel.TextColor3 = UI.Palette.Combo
-	comboLabel.LayoutOrder = 3
+	comboLabel.LayoutOrder = 2
 
 	abilityLabel = UI.Label("Ability", vitals)
 	abilityLabel.Size = UDim2.new(1, 0, 0, 20)
 	abilityLabel.TextColor3 = UI.Palette.TextMuted
-	abilityLabel.LayoutOrder = 4
+	abilityLabel.LayoutOrder = 3
 
 	-- Bottom-right: combat feed.
 	local feed = UI.Panel("Feed", screen)
@@ -175,19 +171,19 @@ end
 
 function HudController:_refreshVitals()
 	local state = TrainingController:GetState()
+	local stagger = TrainingController:GetStaggerRemaining()
 
-	local maxStamina = math.max(1, state.MaxStamina)
-	staminaBar.Set(
-		state.Stamina / maxStamina,
-		`STAMINA  {math.floor(state.Stamina)} / {math.floor(state.MaxStamina)}`
-	)
-
-	if state.StationId ~= nil then
+	if stagger > 0 then
+		comboLabel.Text = `Knocked off the machine — {string.format("%.1f", stagger)}s`
+		comboLabel.TextColor3 = UI.Palette.Danger
+	elseif state.StationId ~= nil then
 		local combo = math.min(2, 1 + state.Combo * 0.02)
 		comboLabel.Text =
 			`Training {state.StationId}  —  combo x{string.format("%.2f", combo)} ({state.Combo} reps)`
+		comboLabel.TextColor3 = UI.Palette.Combo
 	else
-		comboLabel.Text = "Walk up to a machine and press E to train"
+		comboLabel.Text = "Walk up to a machine to start training"
+		comboLabel.TextColor3 = UI.Palette.TextMuted
 	end
 
 	local character = Players.LocalPlayer.Character

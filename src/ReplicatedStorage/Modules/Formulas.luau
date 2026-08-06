@@ -32,35 +32,12 @@ Formulas.SoftScale = softScale
 -- === Training ===============================================================
 
 --[[
-	Stat awarded for one rep. The equipment supplies the base; the multiplier is the
-	product of the player's whole modifier stack. Kept deliberately trivial — all the
-	growth comes from equipment tiers and multipliers, which are both data.
+	Stat awarded for one automatic rep. The equipment supplies the base; the multiplier
+	is the product of the player's whole modifier stack. Kept deliberately trivial — all
+	the growth comes from equipment tiers and multipliers, which are both data.
 ]]
 function Formulas.GainPerRep(baseGain: number, multiplier: number): number
 	return baseGain * multiplier
-end
-
---[[
-	Stamina a rep costs. Heavier machines cost more; a bigger Core makes every rep
-	slightly cheaper, so Core is worth training even though it is not a damage stat.
-]]
-function Formulas.StaminaCost(baseCost: number, coreStat: number): number
-	local discount = 1 - math.min(0.5, softScale(coreStat, 0.03))
-	return baseCost * discount
-end
-
---[[
-	Max stamina. Floor of 100 so a fresh player can train immediately.
-]]
-function Formulas.MaxStamina(coreStat: number): number
-	return 100 + softScale(coreStat, 12)
-end
-
---[[
-	Stamina regained per second while not training.
-]]
-function Formulas.StaminaRegen(coreStat: number): number
-	return 8 + softScale(coreStat, 1.5)
 end
 
 -- === Token multipliers ======================================================
@@ -216,9 +193,6 @@ function Formulas.RunSelfTest(): { string }
 	check("no falloff when equal", Formulas.PowerGapFalloff(1000, 1000) == 1)
 	check("falloff when far stronger", Formulas.PowerGapFalloff(1e12, 1e3) < 0.5)
 	check("falloff never fully blocks", Formulas.PowerGapFalloff(1e30, 1) >= 0.25)
-
-	check("stamina floor", Formulas.MaxStamina(0) == 100)
-	check("stamina cost discount is capped", Formulas.StaminaCost(10, 1e30) >= 5)
 
 	check("total power sums", Formulas.TotalPower({ a = 2, b = 3 }) == 5)
 

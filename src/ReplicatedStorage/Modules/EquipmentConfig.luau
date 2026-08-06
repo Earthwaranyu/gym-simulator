@@ -11,6 +11,9 @@
 	  2. Tag it "TrainingStation" (CollectionService).
 	  3. Set a string attribute "EquipmentId" to one of the ids below.
 
+	Players train automatically when they walk within range — there is no prompt to
+	configure and nothing for them to press.
+
 	A single shared tag plus an attribute — rather than a tag per machine — means new
 	equipment never needs a new tag registered anywhere.
 ]]
@@ -25,14 +28,11 @@ export type EquipmentDefinition = {
 	-- Stat awarded per rep before multipliers. Tiers scale this exponentially, which
 	-- is where the billions and trillions actually come from.
 	BaseGain: number,
-	StaminaCost: number,
-	-- Minimum seconds between reps. The server rejects anything faster, so this
-	-- doubles as the anti-autoclicker rate limit.
+	-- Seconds between automatic reps. Training runs on its own, so this is the
+	-- machine's pace rather than a cap on how fast a player can click.
 	RepInterval: number,
 	-- Total power needed before this machine can be used. 0 is the starter machine.
 	UnlockPower: number,
-	-- Text shown on the interaction prompt.
-	ActionText: string,
 }
 
 -- The shared tag every station carries.
@@ -46,50 +46,40 @@ local definitions: { EquipmentDefinition } = {
 		DisplayName = "Bench Press",
 		StatId = "Chest",
 		BaseGain = 5,
-		StaminaCost = 8,
 		RepInterval = 0.45,
 		UnlockPower = 0,
-		ActionText = "Bench",
 	},
 	{
 		Id = "Dumbbells",
 		DisplayName = "Dumbbells",
 		StatId = "Arms",
 		BaseGain = 4,
-		StaminaCost = 6,
 		RepInterval = 0.35,
 		UnlockPower = 0,
-		ActionText = "Curl",
 	},
 	{
 		Id = "PullUpBar",
 		DisplayName = "Pull-Up Bar",
 		StatId = "Back",
 		BaseGain = 6,
-		StaminaCost = 10,
 		RepInterval = 0.55,
 		UnlockPower = 500,
-		ActionText = "Pull Up",
 	},
 	{
 		Id = "SitUpBench",
 		DisplayName = "Sit-Up Bench",
 		StatId = "Core",
 		BaseGain = 4.5,
-		StaminaCost = 7,
 		RepInterval = 0.4,
 		UnlockPower = 500,
-		ActionText = "Sit Up",
 	},
 	{
 		Id = "Treadmill",
 		DisplayName = "Treadmill",
 		StatId = "Legs",
 		BaseGain = 5.5,
-		StaminaCost = 9,
 		RepInterval = 0.5,
 		UnlockPower = 2000,
-		ActionText = "Run",
 	},
 }
 

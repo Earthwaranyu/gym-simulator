@@ -70,12 +70,15 @@ export type ProfileView = ProfileData
 
 --[[
 	What a player is currently doing at a training station. Nil StationId means idle.
+
+	StaggerSeconds is how long they are locked off machines after being hit, measured
+	at the moment the state was sent — the client counts it down locally rather than
+	the server streaming a timer.
 ]]
 export type TrainingState = {
 	StationId: EquipmentId?,
 	Combo: number,
-	Stamina: number,
-	MaxStamina: number,
+	StaggerSeconds: number,
 }
 
 --[[
@@ -113,9 +116,9 @@ export type AbilityContext = {
 export type Ability = {
 	Id: AbilityId,
 	DisplayName: string,
-	-- Seconds before this ability can be used again.
+	-- Seconds before this ability can be used again. With stamina removed, this is the
+	-- only thing rate-limiting an ability.
 	Cooldown: number,
-	StaminaCost: number,
 	-- Max studs between attacker and target.
 	Range: number,
 	-- Scales the stat-derived base damage from Formulas.AttackDamage.

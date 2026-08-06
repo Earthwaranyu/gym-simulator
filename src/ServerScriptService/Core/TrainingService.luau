@@ -1,38 +1,45 @@
 --!strict
 --[[
-	TrainingService — server-authoritative training sets.
+	TrainingService — automatic, server-authoritative training.
 
-	The client sends intent only ("I want to start", "I did a rep"). Every gain, every
-	stamina cost, and every validity check happens here, so a modified client can at
-	best spam remotes and get rejected.
+	Walking up to a machine starts training; walking away stops it. There is no input
+	to press and no stamina to spend, so the loop is idle-style: stand near equipment
+	and the stat climbs on its own.
+
+	Everything still happens server-side. The client sends nothing at all now — it only
+	receives state to display — so there is no remote for an exploiter to spam and no
+	rep rate to forge.
 
 	Stations are bound by CollectionService tag, so a level designer adds machines
-	without touching code — see EquipmentConfig for the tag and attribute contract.
+	without touching code (see EquipmentConfig for the tag and attribute contract).
 
-	This also owns the combo, which is what makes the PvP hook bite: reps build a
-	multiplier up to 2x, and Interrupt() drops it back to zero. Being punched mid-set
-	costs a player their built-up rate, not their saved progress.
+	The combo is what the PvP hook attacks. Reps build a multiplier up to 2x, and
+	Interrupt() both resets it and knocks the player off the machine for a few seconds.
+	Since training is automatic and free, that stagger is now the entire cost of being
+	attacked mid-set — without it, being punched would cost a victim nothing at all.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local Types = require(ReplicatedStorage.Modules.Types)
-local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 
--- How far a player may drift from a station before the set is cancelled.
-local MAX_STATION_DISTANCE = 18
--- Reps land slightly early under lag; allow a margin before treating it as cheating.
-local REP_INTERVAL_TOLERANCE = 0.85
+-- How close a player must be for a machine to pick them up.
+local AUTO_TRAIN_RANGE = 12
+-- How long being hit keeps a player off the machine.
+local STAGGER_SECONDS = 3
 -- Combo grows this much per rep...
 local COMBO_STEP = 0.02
 -- ...up to this multiplier.
 local MAX_COMBO_MULTIPLIER = 2
+-- Ceiling on how often mid-set combo updates are pushed to a client.
+local PUSH_INTERVAL = 0.25
 
 type Session = {
 	station: Instance,
@@ -47,10 +54,11 @@ local TrainingService = {
 }
 
 local sessions: { [Player]: Session } = {}
+local staggeredUntil: { [Player]: number } = {}
+local lastPushAt: { [Player]: number } = {}
 
 local DataService: any = nil
 local StatService: any = nil
-local StaminaService: any = nil
 
 -- (player, session-or-nil) — fired whenever a player starts, stops, or reps.
 TrainingService.TrainingChanged = Signal.new()
@@ -58,7 +66,6 @@ TrainingService.TrainingChanged = Signal.new()
 function TrainingService:Init()
 	DataService = Loader.Get("DataService")
 	StatService = Loader.Get("StatService")
-	StaminaService = Loader.Get("StaminaService")
 end
 
 local function getRoot(player: Player): BasePart?
@@ -110,77 +117,31 @@ function TrainingService:IsTraining(player: Player): boolean
 	return sessions[player] ~= nil
 end
 
+function TrainingService:GetStaggerRemaining(player: Player): number
+	local until_ = staggeredUntil[player]
+	if until_ == nil then
+		return 0
+	end
+	return math.max(0, until_ - os.clock())
+end
+
 local function buildState(player: Player, session: Session?): Types.TrainingState
 	return {
 		StationId = if session ~= nil then session.definition.Id else nil,
 		Combo = if session ~= nil then session.combo else 0,
-		Stamina = StaminaService:Get(player),
-		MaxStamina = StaminaService:GetMax(player),
+		StaggerSeconds = TrainingService:GetStaggerRemaining(player),
 	}
 end
 
 function TrainingService:_push(player: Player)
+	lastPushAt[player] = os.clock()
 	local session = sessions[player]
 	Net.Event("TrainingChanged"):FireClient(player, buildState(player, session))
 	TrainingService.TrainingChanged:Fire(player, session)
 end
 
 --[[
-	Begins a set. Returns false when rejected; the client is told via TrainingChanged
-	rather than a return value, since the request arrives over a RemoteEvent.
-
-	Named BeginSet rather than Start so it cannot collide with the Loader's Start()
-	lifecycle method on this same table.
-]]
-function TrainingService:BeginSet(player: Player, station: Instance): boolean
-	if not CollectionService:HasTag(station, EquipmentConfig.STATION_TAG) then
-		return false
-	end
-
-	local definition, reason = EquipmentConfig.Resolve(station)
-	if definition == nil then
-		warn(`[TrainingService] Station {station:GetFullName()} is misconfigured: {reason}`)
-		return false
-	end
-
-	local root = getRoot(player)
-	local position = getStationPosition(station)
-	if root == nil or position == nil then
-		return false
-	end
-	if (root.Position - position).Magnitude > MAX_STATION_DISTANCE then
-		return false
-	end
-
-	if DataService:GetData(player) == nil then
-		return false
-	end
-	if StatService:GetTotalPower(player) < definition.UnlockPower then
-		return false
-	end
-
-	-- One player per station, so a machine cannot be shared or camped.
-	for otherPlayer, session in sessions do
-		if session.station == station and otherPlayer ~= player then
-			return false
-		end
-	end
-
-	sessions[player] = {
-		station = station,
-		definition = definition,
-		combo = 0,
-		lastRepAt = 0,
-	}
-
-	StaminaService:SetRegenSuppressed(player, true)
-	self:_push(player)
-
-	return true
-end
-
---[[
-	Ends a set cleanly. Safe to call for a player who is not training.
+	Ends a set. Safe to call for a player who is not training.
 ]]
 function TrainingService:Stop(player: Player)
 	if sessions[player] == nil then
@@ -188,65 +149,120 @@ function TrainingService:Stop(player: Player)
 	end
 
 	sessions[player] = nil
-	StaminaService:SetRegenSuppressed(player, false)
 	self:_push(player)
 end
 
 --[[
-	Breaks the combo without ending the set, and drains stamina.
+	Knocks a player off their machine and resets their combo.
 
-	This is the training interrupt — the mechanic the whole game is built around.
-	CombatService calls it when a training player is hit, so attacking someone
-	mid-set costs them their built-up rate and their stamina buffer.
+	This is the training interrupt, and the whole reason PvP exists in this game.
+	CombatService calls it whenever a training player is hit. Because training is
+	otherwise automatic and costless, the stagger is what makes attacking someone
+	mid-set actually annoying.
 ]]
-function TrainingService:Interrupt(player: Player, staminaPenalty: number?)
-	local session = sessions[player]
-	if session == nil then
+function TrainingService:Interrupt(player: Player)
+	local wasTraining = sessions[player] ~= nil
+
+	staggeredUntil[player] = os.clock() + STAGGER_SECONDS
+	sessions[player] = nil
+
+	if wasTraining then
+		Net.Event("Notify"):FireClient(player, "Knocked off the machine!")
+	end
+
+	self:_push(player)
+end
+
+--[[
+	Finds the nearest tagged station the player is close enough to use, or nil.
+
+	Stations are shared: several players can train at the same machine. Making them
+	exclusive would mean walking up and silently getting nothing, which reads as a bug
+	when there is no button to press.
+]]
+function TrainingService:_findStation(player: Player): (Instance?, EquipmentConfig.EquipmentDefinition?)
+	local root = getRoot(player)
+	if root == nil then
+		return nil, nil
+	end
+
+	local bestStation: Instance? = nil
+	local bestDefinition: EquipmentConfig.EquipmentDefinition? = nil
+	local bestDistance = AUTO_TRAIN_RANGE
+
+	for _, station in CollectionService:GetTagged(EquipmentConfig.STATION_TAG) do
+		local position = getStationPosition(station)
+		if position == nil then
+			continue
+		end
+
+		local distance = (root.Position - position).Magnitude
+		if distance > bestDistance then
+			continue
+		end
+
+		local definition = EquipmentConfig.Resolve(station)
+		if definition == nil then
+			continue
+		end
+		if StatService:GetTotalPower(player) < definition.UnlockPower then
+			continue
+		end
+
+		bestStation = station
+		bestDefinition = definition
+		bestDistance = distance
+	end
+
+	return bestStation, bestDefinition
+end
+
+--[[
+	One tick of the automatic loop for a single player: pick up a nearby machine, drop
+	one they walked away from, and award reps at the machine's own interval.
+]]
+function TrainingService:_step(player: Player, now: number)
+	if self:GetStaggerRemaining(player) > 0 then
+		if sessions[player] ~= nil then
+			self:Stop(player)
+		end
 		return
 	end
 
-	session.combo = 0
-
-	if staminaPenalty ~= nil and staminaPenalty > 0 then
-		StaminaService:Drain(player, staminaPenalty)
+	if DataService:GetData(player) == nil then
+		return
 	end
 
-	self:_push(player)
-end
-
---[[
-	Processes one rep. Rejects reps that are too fast, too far away, or unaffordable,
-	then awards the stat through StatService so the multiplier stack applies.
-]]
-function TrainingService:PerformRep(player: Player): boolean
+	local foundStation, foundDefinition = self:_findStation(player)
 	local session = sessions[player]
-	if session == nil then
-		return false
+
+	if foundStation == nil or foundDefinition == nil then
+		if session ~= nil then
+			self:Stop(player)
+		end
+		return
 	end
 
-	local definition = session.definition
-	local now = os.clock()
+	-- Rebound through explicitly typed locals: the type checker does not carry the
+	-- nil-narrowing above across a multiple-return assignment.
+	local station: Instance = foundStation
+	local definition: EquipmentConfig.EquipmentDefinition = foundDefinition
 
-	-- Rate limit. Doubles as the anti-autoclicker check, so there is no separate
-	-- exploit path to close here.
-	if now - session.lastRepAt < definition.RepInterval * REP_INTERVAL_TOLERANCE then
-		return false
+	if session == nil or session.station ~= station then
+		-- Switching machines starts a fresh combo, so a player cannot carry a built-up
+		-- multiplier between stations.
+		sessions[player] = {
+			station = station,
+			definition = definition,
+			combo = 0,
+			lastRepAt = now,
+		}
+		self:_push(player)
+		return
 	end
 
-	local root = getRoot(player)
-	local position = getStationPosition(session.station)
-	if root == nil or position == nil or (root.Position - position).Magnitude > MAX_STATION_DISTANCE then
-		self:Stop(player)
-		return false
-	end
-
-	local coreStat = StatService:GetStat(player, "Core")
-	local staminaCost = Formulas.StaminaCost(definition.StaminaCost, coreStat)
-
-	if not StaminaService:TrySpend(player, staminaCost) then
-		-- Out of gas: end the set rather than silently dropping inputs.
-		self:Stop(player)
-		return false
+	if now - session.lastRepAt < definition.RepInterval then
+		return
 	end
 
 	session.lastRepAt = now
@@ -255,29 +271,18 @@ function TrainingService:PerformRep(player: Player): boolean
 	local baseGain = definition.BaseGain * self:GetComboMultiplier(player)
 	StatService:AddStat(player, definition.StatId, baseGain)
 
-	self:_push(player)
-	return true
+	-- Reps land several times a second; the client does not need every one.
+	if now - (lastPushAt[player] or 0) >= PUSH_INTERVAL then
+		self:_push(player)
+	end
 end
 
 function TrainingService:Start()
-	Net.Event("TrainingStart").OnServerEvent:Connect(function(player: Player, station: any)
-		if typeof(station) == "Instance" then
-			self:BeginSet(player, station)
-		end
-	end)
-
-	Net.Event("TrainingStop").OnServerEvent:Connect(function(player: Player)
-		self:Stop(player)
-	end)
-
-	Net.Event("TrainingRep").OnServerEvent:Connect(function(player: Player)
-		self:PerformRep(player)
-	end)
-
-	Players.PlayerAdded:Connect(function(player)
+	Players.PlayerAdded:Connect(function(player: Player)
 		player.CharacterAdded:Connect(function(character: Model)
 			-- Dying always ends the set, which is what forfeits the combo on death.
 			self:Stop(player)
+			staggeredUntil[player] = nil
 
 			local humanoid = character:WaitForChild("Humanoid", 10)
 			if humanoid ~= nil and humanoid:IsA("Humanoid") then
@@ -288,8 +293,17 @@ function TrainingService:Start()
 		end)
 	end)
 
-	Players.PlayerRemoving:Connect(function(player)
+	Players.PlayerRemoving:Connect(function(player: Player)
 		sessions[player] = nil
+		staggeredUntil[player] = nil
+		lastPushAt[player] = nil
+	end)
+
+	RunService.Heartbeat:Connect(function()
+		local now = os.clock()
+		for _, player in Players:GetPlayers() do
+			self:_step(player, now)
+		end
 	end)
 end
 

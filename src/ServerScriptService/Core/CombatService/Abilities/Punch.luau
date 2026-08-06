@@ -20,7 +20,6 @@ local Punch: Types.Ability = {
 	Id = "Punch",
 	DisplayName = "Punch",
 	Cooldown = 0.6,
-	StaminaCost = 4,
 	Range = 12,
 	DamageMultiplier = DAMAGE_MULTIPLIER,
 	RequiresTarget = true,

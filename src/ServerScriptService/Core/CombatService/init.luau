@@ -29,8 +29,6 @@ local Types = require(ReplicatedStorage.Modules.Types)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 local SAFE_ZONE_TAG = "SafeZone"
--- Stamina a victim loses when hit mid-set, on top of losing their combo.
-local INTERRUPT_STAMINA_PENALTY = 20
 -- How often stat-derived health and speed are re-applied to living characters.
 local VITALS_REFRESH_SECONDS = 1
 -- Generosity on the client's claimed range, to absorb latency.
@@ -46,7 +44,6 @@ local cooldowns: { [Player]: { [Types.AbilityId]: number } } = {}
 
 local DataService: any = nil
 local StatService: any = nil
-local StaminaService: any = nil
 local TrainingService: any = nil
 
 -- (victim, attacker, damage, isKill)
@@ -57,7 +54,6 @@ CombatService.PlayerKilled = Signal.new()
 function CombatService:Init()
 	DataService = Loader.Get("DataService")
 	StatService = Loader.Get("StatService")
-	StaminaService = Loader.Get("StaminaService")
 	TrainingService = Loader.Get("TrainingService")
 
 	self:_loadAbilities()
@@ -208,10 +204,11 @@ function CombatService:ApplyDamage(attacker: Player, victim: Player, rawDamage: 
 	humanoid:TakeDamage(damage)
 	local isKill = humanoid.Health <= 0
 
-	-- The hook. Losing the combo and a chunk of stamina is what makes being attacked
-	-- mid-set genuinely irritating, without costing any saved progress.
+	-- The hook. Training is automatic and costs nothing, so knocking the victim off
+	-- the machine and resetting their combo is the entire penalty for being attacked
+	-- mid-set — and the entire reason attacking a trainer is worth doing.
 	if TrainingService:IsTraining(victim) then
-		TrainingService:Interrupt(victim, INTERRUPT_STAMINA_PENALTY)
+		TrainingService:Interrupt(victim)
 	end
 
 	Net.Event("CombatFeedback"):FireClient(attacker, { Kind = "Hit", Damage = damage, Victim = victim.Name })
@@ -305,10 +302,6 @@ function CombatService:Activate(
 		if not allowed then
 			return false, reason or "You cannot do that."
 		end
-	end
-
-	if not StaminaService:TrySpend(attacker, ability.StaminaCost) then
-		return false, "Too tired."
 	end
 
 	playerCooldowns[abilityId] = now + ability.Cooldown

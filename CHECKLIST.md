@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 34 / 60** — Phases 0 and 1 complete.
+**Progress: 34 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
 
 ---
 
@@ -17,6 +17,7 @@ mid-training-set, interrupting reps to annoy them.
 | Death cost | **Time + broken combo only.** No stat, cash, or token loss |
 | Progression sink | **Tokens → per-stat multiplier upgrades.** No rebirth system |
 | Token accrual | Passive per-tick, **only while alive and inside a gym zone**, plus quest rewards |
+| Training | **Automatic on proximity.** No stamina, no clicking — walk to a machine and the stat climbs |
 | PvP opt-out | **Paid only** — immortal potions (19 R$ / 1h, 79 R$ / 1 day) and VIP (199 R$, 1h daily) |
 | Reputation | Criminal → Neutral → Guardian → Hero, driven by who you kill |
 | Git | One commit per checklist item. No co-author trailer. |
@@ -67,10 +68,10 @@ system that consumes it:
 
 - [x] 19. `EquipmentConfig.luau` — one entry per machine: stat trained, base gain, stamina cost, animation id, interaction type, unlock requirement, price.
 - [x] 20. Place machines in Studio tagged via `CollectionService`; the server binds behaviour by tag, so new machines need **no code change**.
-- [x] 21. `TrainingService` — server-authoritative: claim/release a station, proximity validation, rep tick loop, award stats via `StatService`.
-- [x] 22. Stamina system — drain per rep, passive regen, consumables that restore it.
-- [x] 23. `TrainingController` (client) — input handling (click / hold / rhythm-timing minigame), animation playback, station UI. Presentational only; server owns truth.
-- [ ] 24. Anti-exploit on training: remote rate limits, distance re-checks, per-second gain ceiling.
+- [x] 21. `TrainingService` — server-authoritative: **auto-starts on proximity**, server-driven rep loop, awards stats via `StatService`. The client sends nothing.
+- [~] 22. ~~Stamina system~~ — **removed by design.** Training is automatic and free; nothing paces a set. Being hit staggers you off the machine instead (see #32).
+- [x] 23. `TrainingController` (client) — mirrors server training state for the HUD. No input to bind, since training is automatic.
+- [~] 24. ~~Anti-exploit on training~~ — **largely moot.** Training has no client remote at all now; the server drives the loop and re-checks distance every tick. Revisit only if a training remote is ever reintroduced.
 
 ## Phase 4 — Muscle Deformation
 
@@ -84,7 +85,7 @@ system that consumes it:
 - [x] 29. `CombatService` — server-authoritative damage, hit validation, cooldowns, i-frames.
 - [x] 30. Damage/health model derived from stats (Arms + Chest → damage, Core → max HP, Legs → walkspeed).
 - [x] 31. **Ability registry** — folder of ability modules sharing one interface (`Cost`, `Cooldown`, `Validate`, `Execute`). Punch, Slam, Dash ship first; new abilities are new files only.
-- [x] 32. **Training interrupt** — the core hook. Being hit while training staggers you, breaks the rep combo, and drains stamina. This is what makes killing trainers *annoying*, by design.
+- [x] 32. **Training interrupt** — the core hook. Being hit knocks you off the machine for 3s and resets the rep combo. With training otherwise free, this stagger is the *entire* cost of being attacked — and the whole reason to attack a trainer.
 - [x] 33. Death & respawn — respawn timer, rep-streak reset, in-flight token tick forfeited. **No stat, cash, or token loss on death.** *(ragdoll deferred to #56 VFX)*
 - [ ] 34. **Reputation system** — data-driven tiers (Criminal → Neutral → Guardian → Hero). Killing peaceful trainers pushes you toward Criminal; killing Criminals pushes you toward Hero. Tier table is config, not code.
 - [ ] 35. **Immortality + barrier** — `CombatService` nullifies all damage while a potion is active, and the player wears a visible body barrier so attackers can see it before swinging.
@@ -105,7 +106,7 @@ system that consumes it:
 ## Phase 7 — UI
 
 - [x] 46. UI base components: glassmorphism, custom typography, mandatory `UICorner` / `UIPadding` / `UIAspectRatioConstraint`.
-- [x] 47. HUD — stat panel, total power, stamina bar, rank badge, token counter, active-potion timer.
+- [x] 47. HUD — stat panel, total power, rank badge, token counter, combo/stagger readout, active-potion timer.
 - [ ] 48. Training interaction + minigame UI.
 - [x] 49. Combat HUD — health bar, ability bar with cooldown sweeps, kill feed.
 - [ ] 50. **Custom tab bar / player list** — replaces the default Roblox list, showing each player's overall power and reputation.

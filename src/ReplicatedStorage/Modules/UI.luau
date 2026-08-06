@@ -27,7 +27,6 @@ UI.Palette = {
 	Token = Color3.fromRGB(126, 231, 255),
 
 	Health = Color3.fromRGB(239, 83, 80),
-	Stamina = Color3.fromRGB(102, 210, 140),
 	Combo = Color3.fromRGB(255, 138, 61),
 
 	Danger = Color3.fromRGB(255, 92, 92),

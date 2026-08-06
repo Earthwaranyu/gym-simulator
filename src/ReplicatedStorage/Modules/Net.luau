@@ -25,13 +25,9 @@ local IS_SERVER = RunService:IsServer()
 local EVENT_NAMES: { string } = {
 	-- Server -> client: the authoritative profile view changed.
 	"ProfileChanged",
-	-- Server -> client: training state (combo, stamina, station) changed.
+	-- Server -> client: training state (station, combo, stagger) changed. Training is
+	-- automatic, so there is no client -> server counterpart.
 	"TrainingChanged",
-	-- Client -> server: asks to begin/stop using the station it is standing at.
-	"TrainingStart",
-	"TrainingStop",
-	-- Client -> server: one rep input. Server validates rate, distance, and stamina.
-	"TrainingRep",
 	-- Client -> server: fire an ability by id at an optional target.
 	"AbilityActivate",
 	-- Server -> client: combat feedback (hit landed, staggered, killed).
