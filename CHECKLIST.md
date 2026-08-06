@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 18 / 60** — Phases 0 and 1 complete.
+**Progress: 19 / 60** — Phases 0 and 1 complete.
 
 ---
 
@@ -68,7 +68,7 @@ system that consumes it:
 - [x] 19. `EquipmentConfig.luau` — one entry per machine: stat trained, base gain, stamina cost, animation id, interaction type, unlock requirement, price.
 - [x] 20. Place machines in Studio tagged via `CollectionService`; the server binds behaviour by tag, so new machines need **no code change**.
 - [ ] 21. `TrainingService` — server-authoritative: claim/release a station, proximity validation, rep tick loop, award stats via `StatService`.
-- [ ] 22. Stamina system — drain per rep, passive regen, consumables that restore it.
+- [x] 22. Stamina system — drain per rep, passive regen, consumables that restore it.
 - [ ] 23. `TrainingController` (client) — input handling (click / hold / rhythm-timing minigame), animation playback, station UI. Presentational only; server owns truth.
 - [ ] 24. Anti-exploit on training: remote rate limits, distance re-checks, per-second gain ceiling.
 
