@@ -86,6 +86,12 @@
       "$properties": {
         "RespectFilteringEnabled": true
       }
+    },
+    "Players": {
+      "$properties": {
+        "RespawnTime": 4,
+        "CharacterAutoLoads": true
+      }
     }
   }
 }
