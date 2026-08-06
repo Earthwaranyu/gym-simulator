@@ -1,0 +1,12 @@
+# Project place file
+/gym-simulator.rbxlx
+
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+
+sourcemap.json
+game.rbxlx
+*.lock
+node_modules/
+.DS_Store
