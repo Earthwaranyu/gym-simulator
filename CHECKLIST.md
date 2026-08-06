@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 11 / 60** — Phases 0 and 1 complete.
+**Progress: 12 / 60** — Phases 0 and 1 complete.
 
 ---
 
@@ -55,7 +55,7 @@ system that consumes it:
 
 ## Phase 2 — Stats, Tokens & Progression
 
-- [ ] 12. `StatConfig.luau` — one entry per core stat (id, display name, colour, icon, body parts it inflates). The 5 stats live here and **only** here.
+- [x] 12. `StatConfig.luau` — one entry per core stat (id, display name, colour, icon, body parts it inflates). The 5 stats live here and **only** here.
 - [ ] 13. `StatService` — `AddStat` / `GetStat` / `GetTotalPower`, all gains passed through a **modifier stack** (`base * product(multipliers)`).
 - [ ] 14. `Formulas.luau` — gain-per-rep, token accrual rate, multiplier cost curve, soft-cap / diminishing returns. Pure functions, no side effects.
 - [ ] 15. Rank/Title system driven by a threshold table (Newbie → Lifter → … → Titan).
