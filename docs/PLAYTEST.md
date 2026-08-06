@@ -3,6 +3,28 @@
 Everything static is already enforced by `./scripts/check.sh` — build, lints, and
 `--!strict` types. This file covers what only a running game can answer.
 
+## Already verified in a live Studio session (2026-08-07)
+
+Driven through the Roblox Studio MCP bridge, single player:
+
+- Server boots: `[Loader/Server] Ignited 21 systems`, `[Loader/Client] Ignited 10 systems`
+- All 19 module self-tests and config validations pass in Roblox's own Luau VM
+- All 9 tagged stations, 2 gates and 2 spawns resolve
+- Proximity auto-training works — Chest climbed 0 → 597 on walking to the bench
+- Combo reaches x2.00 and the HUD tracks it live (356 → 364 reps)
+- Token accrual works: 2 → 3 → 5 → 6 on the HUD
+- Muscle deformation applies client-side: UpperTorso 1.839 → 2.288 at scale 1.2446
+- All five ScreenGuis build; HUD, tab bar and station billboards render correctly
+- Analytics funnel and economy events fire
+
+Two real bugs were found and fixed this way — a DataStore error aborting the whole
+server boot, and gym zones tagged on floor slabs so tokens never accrued. Neither was
+reachable by static analysis.
+
+**Still unverified**, and the reason the rest of this document exists: anything needing
+two players (PvP, the training interrupt, kill feed, bounties), real DataStore
+persistence, Robux purchases, and whether any of the balance numbers feel right.
+
 Run a **two-client Studio playtest** (Test → Clients and Servers → 2 players) unless a
 step says otherwise.
 
