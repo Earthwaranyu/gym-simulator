@@ -1,0 +1,7 @@
+std = "roblox"
+
+[lints]
+# Rojo-synced ModuleScripts are required by path, so unscoped globals are the real risk.
+global_usage = "deny"
+# Shadowing is idiomatic in Luau callbacks (e.g. `player`), and the type checker covers the rest.
+shadowing = "allow"
