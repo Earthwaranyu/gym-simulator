@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 50 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
+**Progress: 51 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
 
 ---
 
@@ -107,7 +107,7 @@ system that consumes it:
 
 - [x] 46. UI base components: glassmorphism, custom typography, mandatory `UICorner` / `UIPadding` / `UIAspectRatioConstraint`.
 - [x] 47. HUD — stat panel, total power, rank badge, token counter, combo/stagger readout, active-potion timer.
-- [ ] 48. Training interaction + minigame UI.
+- [x] 48. Training interaction + minigame UI.
 - [x] 49. Combat HUD — health bar, ability bar with cooldown sweeps, kill feed.
 - [x] 50. **Custom tab bar / player list** — replaces the default Roblox list, showing each player's overall power and reputation.
 - [ ] 51. Menus — token/multiplier upgrade panel, quest log, shop, leaderboard, settings.
