@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 46 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
+**Progress: 48 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
 
 ---
 
@@ -92,7 +92,7 @@ system that consumes it:
 - [x] 36. Bounty / killstreak system with a revenge incentive so victims get a comeback path.
 - [x] 37. Safe zones — tagged parts at spawn, shop, and quest board where damage is nullified. Everywhere else, including every training station, is live.
 - [x] 38. Anti-grief balance: damage falloff on large power gaps, and a cooldown blocking repeat-farming the same victim.
-- [ ] 39. Kill feed + on-screen combat notifications.
+- [x] 39. Kill feed + on-screen combat notifications.
 
 ## Phase 6 — Economy & Monetisation
 
@@ -109,7 +109,7 @@ system that consumes it:
 - [x] 47. HUD — stat panel, total power, rank badge, token counter, combo/stagger readout, active-potion timer.
 - [ ] 48. Training interaction + minigame UI.
 - [x] 49. Combat HUD — health bar, ability bar with cooldown sweeps, kill feed.
-- [ ] 50. **Custom tab bar / player list** — replaces the default Roblox list, showing each player's overall power and reputation.
+- [x] 50. **Custom tab bar / player list** — replaces the default Roblox list, showing each player's overall power and reputation.
 - [ ] 51. Menus — token/multiplier upgrade panel, quest log, shop, leaderboard, settings.
 - [ ] 52. Toast/notification system.
 
