@@ -96,6 +96,25 @@ function Formulas.TokensPerTick(): number
 	return 1
 end
 
+-- === Muscle deformation =====================================================
+
+-- Nothing may exceed this many times its original size, or limbs detach from their
+-- joints and characters stop fitting through doorways.
+Formulas.MAX_MUSCLE_SCALE = 2.5
+
+--[[
+	How much a body part swells for a given stat value. Log-scaled and hard-capped, so
+	the visual difference between a new player and a trillion-stat player is dramatic
+	but still a playable humanoid rather than a building.
+
+	`weight` comes from StatConfig.BodyScales and decides how strongly this particular
+	part responds relative to others driven by the same stat.
+]]
+function Formulas.MuscleScale(statValue: number, weight: number): number
+	local growth = softScale(statValue, 0.12) * weight
+	return 1 + math.min(Formulas.MAX_MUSCLE_SCALE - 1, growth)
+end
+
 -- === Combat =================================================================
 
 --[[
