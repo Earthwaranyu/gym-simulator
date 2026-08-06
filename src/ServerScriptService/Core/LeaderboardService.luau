@@ -18,7 +18,6 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
@@ -76,8 +75,21 @@ function LeaderboardService:Init()
 		},
 	}
 
+	-- GetOrderedDataStore itself throws in an unpublished place ("You must publish
+	-- this place to the web to access DataStore"), not just the Async calls on it.
+	-- Unwrapped, that error propagated out of Init and the Loader's fail-fast aborted
+	-- the entire server boot — leaderboards are optional, so they must degrade to
+	-- "no boards" instead of taking the game down.
 	for _, board in boards do
-		stores[board.Id] = DataStoreService:GetOrderedDataStore(board.StoreKey)
+		local ok, store = pcall(function()
+			return DataStoreService:GetOrderedDataStore(board.StoreKey)
+		end)
+
+		if ok then
+			stores[board.Id] = store
+		else
+			warn(`[LeaderboardService] "{board.Id}" unavailable, board disabled: {store}`)
+		end
 	end
 end
 
@@ -188,14 +200,6 @@ function LeaderboardService:Start()
 	DataService.ProfileReleasing:Connect(function(player: Player)
 		self:_publish(player)
 	end)
-
-	if RunService:IsStudio() then
-		-- Studio has no reliable DataStore access by default, and a failing board on
-		-- every playtest is noise rather than signal.
-		warn(
-			"[LeaderboardService] Studio session — global boards will be empty unless API access is enabled."
-		)
-	end
 
 	task.spawn(function()
 		while true do
