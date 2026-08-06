@@ -5,9 +5,6 @@
       "name": "GymFloor",
       "className": "Part",
       "properties": {
-        "Tags": [
-          "GymZone"
-        ],
         "Anchored": true,
         "Locked": true,
         "Size": [
@@ -28,9 +25,6 @@
         "Material": "Concrete",
         "TopSurface": "Smooth",
         "BottomSurface": "Smooth"
-      },
-      "attributes": {
-        "ZoneId": "Starter"
       }
     },
     {
@@ -270,13 +264,7 @@
         "Material": "Concrete",
         "TopSurface": "Smooth",
         "BottomSurface": "Smooth",
-        "Tags": [
-          "GymZone"
-        ],
         "Locked": true
-      },
-      "attributes": {
-        "ZoneId": "Iron"
       }
     },
     {
@@ -498,6 +486,60 @@
       },
       "attributes": {
         "ZoneId": "Starter"
+      }
+    },
+    {
+      "name": "StarterZoneVolume",
+      "className": "Part",
+      "attributes": {
+        "ZoneId": "Starter"
+      },
+      "properties": {
+        "Tags": [
+          "GymZone"
+        ],
+        "Anchored": true,
+        "CanCollide": false,
+        "Transparency": 1,
+        "Locked": true,
+        "Size": [
+          80,
+          40,
+          60
+        ],
+        "Position": [
+          0,
+          20,
+          0
+        ],
+        "Material": "SmoothPlastic"
+      }
+    },
+    {
+      "name": "IronZoneVolume",
+      "className": "Part",
+      "attributes": {
+        "ZoneId": "Iron"
+      },
+      "properties": {
+        "Tags": [
+          "GymZone"
+        ],
+        "Anchored": true,
+        "CanCollide": false,
+        "Transparency": 1,
+        "Locked": true,
+        "Size": [
+          80,
+          40,
+          60
+        ],
+        "Position": [
+          0,
+          20,
+          -90
+        ],
+        "Material": "SmoothPlastic"
       }
     }
   ]

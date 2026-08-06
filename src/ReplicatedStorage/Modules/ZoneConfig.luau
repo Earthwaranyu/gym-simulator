@@ -20,6 +20,12 @@ export type Zone = {
 }
 
 -- Tag on the volume a player stands in.
+--
+-- This must be a genuine VOLUME the player's HumanoidRootPart ends up inside, not the
+-- floor they walk on. Tagging a 1-stud floor slab looks right and silently breaks all
+-- token accrual: a standing player's root sits several studs above it, so the
+-- containment test never passes. Zone volumes are invisible, tall, and cover the whole
+-- playable height of their area.
 local ZONE_TAG = "GymZone"
 -- Tag on a part that teleports the toucher into a zone.
 local GATE_TAG = "ZoneGate"
