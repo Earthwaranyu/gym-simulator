@@ -92,6 +92,42 @@ export type Modifier = {
 	ExpiresAt: number?,
 }
 
+--[[
+	What an ability receives when it fires. The server resolves every field before
+	calling Execute, so abilities never have to re-validate that a character exists.
+]]
+export type AbilityContext = {
+	Attacker: Player,
+	AttackerCharacter: Model,
+	AttackerRoot: BasePart,
+	Target: Player?,
+	TargetCharacter: Model?,
+	TargetRoot: BasePart?,
+}
+
+--[[
+	The contract every ability module implements. Dropping a file into
+	CombatService/Abilities/ that returns one of these registers a new attack — there
+	is no list to append to and no branch in CombatService to extend.
+]]
+export type Ability = {
+	Id: AbilityId,
+	DisplayName: string,
+	-- Seconds before this ability can be used again.
+	Cooldown: number,
+	StaminaCost: number,
+	-- Max studs between attacker and target.
+	Range: number,
+	-- Scales the stat-derived base damage from Formulas.AttackDamage.
+	DamageMultiplier: number,
+	-- When true the server refuses to fire without a living target in range.
+	RequiresTarget: boolean,
+	-- Optional extra gate. Return false plus a player-facing reason to block.
+	Validate: ((AbilityContext) -> (boolean, string?))?,
+	-- Second argument is CombatService; typed loosely to avoid a circular reference.
+	Execute: (AbilityContext, any) -> (),
+}
+
 -- Key meaning "applies to every stat" inside Modifier.Multipliers.
 Types.ALL_STATS = "*" :: StatId
 

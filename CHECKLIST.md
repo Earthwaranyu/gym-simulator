@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 21 / 60** — Phases 0 and 1 complete.
+**Progress: 22 / 60** — Phases 0 and 1 complete.
 
 ---
 
@@ -83,7 +83,7 @@ system that consumes it:
 
 - [ ] 29. `CombatService` — server-authoritative damage, hit validation, cooldowns, i-frames.
 - [ ] 30. Damage/health model derived from stats (Arms + Chest → damage, Core → max HP, Legs → walkspeed).
-- [ ] 31. **Ability registry** — folder of ability modules sharing one interface (`Cost`, `Cooldown`, `Validate`, `Execute`). Punch, Slam, Dash ship first; new abilities are new files only.
+- [x] 31. **Ability registry** — folder of ability modules sharing one interface (`Cost`, `Cooldown`, `Validate`, `Execute`). Punch, Slam, Dash ship first; new abilities are new files only.
 - [ ] 32. **Training interrupt** — the core hook. Being hit while training staggers you, breaks the rep combo, and drains stamina. This is what makes killing trainers *annoying*, by design.
 - [ ] 33. Death & respawn — ragdoll, respawn timer, rep-streak reset, in-flight token tick forfeited. **No stat, cash, or token loss on death.**
 - [ ] 34. **Reputation system** — data-driven tiers (Criminal → Neutral → Guardian → Hero). Killing peaceful trainers pushes you toward Criminal; killing Criminals pushes you toward Hero. Tier table is config, not code.
