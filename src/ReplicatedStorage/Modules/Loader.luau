@@ -32,11 +32,14 @@
 
 local RunService = game:GetService("RunService")
 
+-- Init and Start are typed as returning `...any` rather than `()` so that xpcall's
+-- result arity includes the error branch. With `()` the type checker sees xpcall as
+-- returning only the success boolean, and the error string cannot be captured.
 export type System = {
 	Name: string?,
 	Priority: number?,
-	Init: ((any) -> ())?,
-	Start: ((any) -> ())?,
+	Init: ((any) -> ...any)?,
+	Start: ((any) -> ...any)?,
 }
 
 type Entry = {

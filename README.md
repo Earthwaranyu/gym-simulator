@@ -32,12 +32,23 @@ Open `gym-simulator.rbxlx` in Roblox Studio and start the Rojo server to live-sy
 ## Checks
 
 ```bash
-selene src           # lint
-stylua --check src   # formatting
-stylua src           # apply formatting
+./scripts/check.sh         # formatting, lints, and --!strict type analysis
+./scripts/check.sh --fix   # same, but applies StyLua formatting
 ```
 
-Pure modules that touch no Roblox API can be self-tested without Studio:
+That runs StyLua, Selene, and `luau-lsp analyze` against a freshly generated Rojo
+sourcemap, which is what actually enforces the `--!strict` rule outside Studio. It fetches
+the Roblox type definitions into `.luau-defs/` on first run.
+
+Individual tools, if you want them separately:
+
+```bash
+selene src
+stylua --check src
+```
+
+Pure modules that touch no Roblox API can be self-tested without Studio. `NumberFormat` and
+`Formulas` both expose `RunSelfTest()`:
 
 ```bash
 luau path/to/script.luau
