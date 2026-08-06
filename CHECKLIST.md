@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 52 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
+**Progress: 54 / 60** (2 items withdrawn: #22, #24) — Phases 0 and 1 complete.
 
 ---
 
@@ -115,9 +115,9 @@ system that consumes it:
 
 ## Phase 8 — World & Leaderboards
 
-- [ ] 53. Gym zones — starter gym through elite tiers, gated by total power. Zones double as the token-accrual regions from #16.
+- [x] 53. Gym zones — starter gym through elite tiers, gated by total power. Zones double as the token-accrual regions from #16.
 - [x] 54. `OrderedDataStore` global leaderboards (Strongest, Most Kills, Highest Bounty) + physical in-world boards.
-- [ ] 55. Zone gates / teleporters honouring unlock requirements.
+- [x] 55. Zone gates / teleporters honouring unlock requirements.
 
 ## Phase 9 — Polish & Launch
 

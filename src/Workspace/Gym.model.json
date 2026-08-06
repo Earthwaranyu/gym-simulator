@@ -5,15 +5,32 @@
       "name": "GymFloor",
       "className": "Part",
       "properties": {
-        "Tags": ["GymZone"],
+        "Tags": [
+          "GymZone"
+        ],
         "Anchored": true,
         "Locked": true,
-        "Size": [80, 1, 60],
-        "Position": [0, 0.5, 0],
-        "Color": [0.16, 0.17, 0.21],
+        "Size": [
+          80,
+          1,
+          60
+        ],
+        "Position": [
+          0,
+          0.5,
+          0
+        ],
+        "Color": [
+          0.16,
+          0.17,
+          0.21
+        ],
         "Material": "Concrete",
         "TopSurface": "Smooth",
         "BottomSurface": "Smooth"
+      },
+      "attributes": {
+        "ZoneId": "Starter"
       }
     },
     {
@@ -23,11 +40,25 @@
         "EquipmentId": "BenchPress"
       },
       "properties": {
-        "Tags": ["TrainingStation"],
+        "Tags": [
+          "TrainingStation"
+        ],
         "Anchored": true,
-        "Size": [6, 2, 3],
-        "Position": [-24, 2, 0],
-        "Color": [0.937, 0.325, 0.314],
+        "Size": [
+          6,
+          2,
+          3
+        ],
+        "Position": [
+          -24,
+          2,
+          0
+        ],
+        "Color": [
+          0.937,
+          0.325,
+          0.314
+        ],
         "Material": "Metal",
         "TopSurface": "Smooth",
         "BottomSurface": "Smooth"
@@ -40,11 +71,25 @@
         "EquipmentId": "Dumbbells"
       },
       "properties": {
-        "Tags": ["TrainingStation"],
+        "Tags": [
+          "TrainingStation"
+        ],
         "Anchored": true,
-        "Size": [4, 2, 3],
-        "Position": [-12, 2, 0],
-        "Color": [1.0, 0.655, 0.149],
+        "Size": [
+          4,
+          2,
+          3
+        ],
+        "Position": [
+          -12,
+          2,
+          0
+        ],
+        "Color": [
+          1.0,
+          0.655,
+          0.149
+        ],
         "Material": "Metal",
         "TopSurface": "Smooth",
         "BottomSurface": "Smooth"
@@ -57,11 +102,25 @@
         "EquipmentId": "PullUpBar"
       },
       "properties": {
-        "Tags": ["TrainingStation"],
+        "Tags": [
+          "TrainingStation"
+        ],
         "Anchored": true,
-        "Size": [6, 6, 3],
-        "Position": [0, 4, 0],
-        "Color": [0.4, 0.733, 0.416],
+        "Size": [
+          6,
+          6,
+          3
+        ],
+        "Position": [
+          0,
+          4,
+          0
+        ],
+        "Color": [
+          0.4,
+          0.733,
+          0.416
+        ],
         "Material": "Metal",
         "TopSurface": "Smooth",
         "BottomSurface": "Smooth"
@@ -74,11 +133,25 @@
         "EquipmentId": "SitUpBench"
       },
       "properties": {
-        "Tags": ["TrainingStation"],
+        "Tags": [
+          "TrainingStation"
+        ],
         "Anchored": true,
-        "Size": [5, 2, 3],
-        "Position": [12, 2, 0],
-        "Color": [0.259, 0.647, 0.961],
+        "Size": [
+          5,
+          2,
+          3
+        ],
+        "Position": [
+          12,
+          2,
+          0
+        ],
+        "Color": [
+          0.259,
+          0.647,
+          0.961
+        ],
         "Material": "Metal",
         "TopSurface": "Smooth",
         "BottomSurface": "Smooth"
@@ -91,11 +164,25 @@
         "EquipmentId": "Treadmill"
       },
       "properties": {
-        "Tags": ["TrainingStation"],
+        "Tags": [
+          "TrainingStation"
+        ],
         "Anchored": true,
-        "Size": [5, 3, 3],
-        "Position": [24, 2.5, 0],
-        "Color": [0.671, 0.278, 0.737],
+        "Size": [
+          5,
+          3,
+          3
+        ],
+        "Position": [
+          24,
+          2.5,
+          0
+        ],
+        "Color": [
+          0.671,
+          0.278,
+          0.737
+        ],
         "Material": "Metal",
         "TopSurface": "Smooth",
         "BottomSurface": "Smooth"
@@ -105,14 +192,312 @@
       "name": "SpawnSafeZone",
       "className": "Part",
       "properties": {
-        "Tags": ["SafeZone"],
+        "Tags": [
+          "SafeZone"
+        ],
         "Anchored": true,
         "CanCollide": false,
         "Transparency": 0.75,
-        "Size": [20, 12, 20],
-        "Position": [0, 6, 26],
-        "Color": [0.4, 0.8, 1.0],
+        "Size": [
+          20,
+          12,
+          20
+        ],
+        "Position": [
+          0,
+          6,
+          26
+        ],
+        "Color": [
+          0.4,
+          0.8,
+          1.0
+        ],
         "Material": "ForceField"
+      }
+    },
+    {
+      "name": "StarterSpawnPad",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "Size": [
+          10,
+          1,
+          10
+        ],
+        "Position": [
+          0,
+          1.2,
+          20
+        ],
+        "Color": [
+          0.494,
+          0.827,
+          0.608
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Tags": [
+          "ZoneSpawn"
+        ]
+      },
+      "attributes": {
+        "ZoneId": "Starter"
+      }
+    },
+    {
+      "name": "IronFloor",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "Size": [
+          80,
+          1,
+          60
+        ],
+        "Position": [
+          0,
+          0.5,
+          -90
+        ],
+        "Color": [
+          0.13,
+          0.15,
+          0.2
+        ],
+        "Material": "Concrete",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Tags": [
+          "GymZone"
+        ],
+        "Locked": true
+      },
+      "attributes": {
+        "ZoneId": "Iron"
+      }
+    },
+    {
+      "name": "IronSpawnPad",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "Size": [
+          10,
+          1,
+          10
+        ],
+        "Position": [
+          0,
+          1.2,
+          -70
+        ],
+        "Color": [
+          0.259,
+          0.647,
+          0.961
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Tags": [
+          "ZoneSpawn"
+        ]
+      },
+      "attributes": {
+        "ZoneId": "Iron"
+      }
+    },
+    {
+      "name": "IronGate",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "Size": [
+          14,
+          6,
+          2
+        ],
+        "Position": [
+          0,
+          3,
+          -34
+        ],
+        "Color": [
+          0.259,
+          0.647,
+          0.961
+        ],
+        "Material": "ForceField",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Tags": [
+          "ZoneGate"
+        ],
+        "CanCollide": false,
+        "Transparency": 0.4
+      },
+      "attributes": {
+        "ZoneId": "Iron"
+      }
+    },
+    {
+      "name": "IronBench",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "Size": [
+          6,
+          2,
+          3
+        ],
+        "Position": [
+          -24,
+          2,
+          -90
+        ],
+        "Color": [
+          0.937,
+          0.325,
+          0.314
+        ],
+        "Material": "Metal",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Tags": [
+          "TrainingStation"
+        ]
+      },
+      "attributes": {
+        "EquipmentId": "BenchPress"
+      }
+    },
+    {
+      "name": "IronDumbbells",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "Size": [
+          4,
+          2,
+          3
+        ],
+        "Position": [
+          -8,
+          2,
+          -90
+        ],
+        "Color": [
+          1.0,
+          0.655,
+          0.149
+        ],
+        "Material": "Metal",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Tags": [
+          "TrainingStation"
+        ]
+      },
+      "attributes": {
+        "EquipmentId": "Dumbbells"
+      }
+    },
+    {
+      "name": "IronPullUp",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "Size": [
+          6,
+          6,
+          3
+        ],
+        "Position": [
+          8,
+          4,
+          -90
+        ],
+        "Color": [
+          0.4,
+          0.733,
+          0.416
+        ],
+        "Material": "Metal",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Tags": [
+          "TrainingStation"
+        ]
+      },
+      "attributes": {
+        "EquipmentId": "PullUpBar"
+      }
+    },
+    {
+      "name": "IronTreadmill",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "Size": [
+          5,
+          3,
+          3
+        ],
+        "Position": [
+          24,
+          2.5,
+          -90
+        ],
+        "Color": [
+          0.671,
+          0.278,
+          0.737
+        ],
+        "Material": "Metal",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Tags": [
+          "TrainingStation"
+        ]
+      },
+      "attributes": {
+        "EquipmentId": "Treadmill"
+      }
+    },
+    {
+      "name": "ReturnGate",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "Size": [
+          14,
+          6,
+          2
+        ],
+        "Position": [
+          0,
+          3,
+          -60
+        ],
+        "Color": [
+          0.494,
+          0.827,
+          0.608
+        ],
+        "Material": "ForceField",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Tags": [
+          "ZoneGate"
+        ],
+        "CanCollide": false,
+        "Transparency": 0.4
+      },
+      "attributes": {
+        "ZoneId": "Starter"
       }
     }
   ]
