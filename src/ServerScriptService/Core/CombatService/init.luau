@@ -208,7 +208,14 @@ function CombatService:ApplyDamage(attacker: Player, victim: Player, rawDamage: 
 
 	local falloff =
 		Formulas.PowerGapFalloff(StatService:GetTotalPower(attacker), StatService:GetTotalPower(victim))
-	local damage = rawDamage * falloff
+
+	-- What Back is for. Contested against the attacker's Arms, so two players who
+	-- trained evenly cancel out and this changes nothing about a fair fight — it
+	-- only answers somebody who out-levelled you on Arms alone.
+	local resistance =
+		Formulas.DamageResistance(StatService:GetStat(victim, "Back"), StatService:GetStat(attacker, "Arms"))
+
+	local damage = rawDamage * falloff * (1 - resistance)
 
 	humanoid:TakeDamage(damage)
 	local isKill = humanoid.Health <= 0

@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 84 built / 90** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 85 built / 90** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -444,8 +444,17 @@ one job with Chest, and Legs only affected running.
       milliseconds, `check.sh` runs it before every commit, and Bootstrap runs it too for
       a build that reached Studio anyway. Verified by deliberately breaking a weight and
       watching four checks fail.
-- [ ] 87. **Back finally does something.** Damage resistance, contested against the
-      attacker's Arms.
+- [x] 87. **Back finally does something.** `Formulas.DamageResistance`, applied in
+      `ApplyDamage` between the falloff and the hit. **Contested against the attacker's
+      Arms**, and that choice is the design: a flat reduction read off your own Back would
+      stack on the power-gap falloff and make veteran fights drag, and it would tax every
+      attacker regardless of what they trained. Contested, two players who invested equally
+      cancel out *exactly* — a fair fight is identical to one where Back does not exist,
+      and time-to-kill is untouched at every scale. What it buys is an answer to somebody
+      who out-levelled you on Arms alone: −8% per 10× of Back over their Arms, capped at
+      half, because a stat that could reach immunity is not a stat. The self-test now
+      asserts equal investment cancels, and that resistance and falloff together still
+      leave a hit that lands.
 - [ ] 88. **Core hits back.** Retaliation onto whoever hit you, routed through the same
       damage path so every PvP rule applies to it.
 - [ ] 89. **Legs flies.** Flight speed scales with Legs instead of being flat for everyone.

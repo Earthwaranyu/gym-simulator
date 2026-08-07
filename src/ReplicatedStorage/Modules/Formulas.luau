@@ -120,6 +120,28 @@ function Formulas.AttackDamage(armsStat: number): number
 end
 
 --[[
+	Damage reduction from the victim's Back, as a fraction in [0, 0.5].
+
+	Contested against the attacker's Arms rather than read off Back alone, and that
+	choice is the whole design. A flat reduction from your own Back would stack on
+	top of the power-gap falloff and make veteran fights drag; worse, it would be a
+	tax every attacker pays regardless of what they trained. Contested, two players
+	who invested equally cancel out exactly — so a fair fight is identical to one in
+	a world where Back did not exist, and time-to-kill is untouched at every scale.
+
+	What Back buys is an answer to somebody who out-levelled you on Arms alone.
+	Capped at half, because a stat that could reach immunity is not a stat.
+]]
+function Formulas.DamageResistance(backStat: number, attackerArmsStat: number): number
+	-- Orders of magnitude the defender's Back leads the attacker's Arms by.
+	local advantage = softScale(backStat, 1) - softScale(attackerArmsStat, 1)
+	if advantage <= 0 then
+		return 0
+	end
+	return math.min(advantage * 0.08, 0.5)
+end
+
+--[[
 	Ground speed. Legs is the traversal stat: this is the "run" rung of the
 	walk-run-fly ladder, and the reason a map thousands of studs across is a
 	progression curve rather than a tax.
@@ -218,6 +240,23 @@ function Formulas.RunSelfTest(): { string }
 	-- Crossing the map has to visibly improve, or Legs is not a traversal stat and
 	-- the outer tiers are a permanent walk.
 	check("walkspeed rewards Legs", Formulas.WalkSpeed(1e9) > Formulas.WalkSpeed(1e3) * 1.5)
+
+	-- Back is a counter to Arms, not a tax on everyone. If equal investment ever
+	-- stops cancelling, every balance number above it silently changes meaning.
+	check("back does nothing against equal arms", Formulas.DamageResistance(1e9, 1e9) == 0)
+	check("back does nothing against stronger arms", Formulas.DamageResistance(1e6, 1e12) == 0)
+	check("back reduces a weaker attacker", Formulas.DamageResistance(1e12, 1e6) > 0.4)
+	check(
+		"back grows with the gap",
+		Formulas.DamageResistance(1e12, 1e3) > Formulas.DamageResistance(1e12, 1e9)
+	)
+	check("back caps at half", Formulas.DamageResistance(1e30, 0) <= 0.5)
+	-- Resistance stacks with falloff, so the two together must still leave a hit
+	-- that lands. A defensive build should be expensive to kill, never impossible.
+	local vsTank = Formulas.AttackDamage(1e12)
+		* Formulas.PowerGapFalloff(1e12, 1e30)
+		* (1 - Formulas.DamageResistance(1e30, 1e12))
+	check("nothing is immune", vsTank > 0)
 
 	check("no falloff when weaker", Formulas.PowerGapFalloff(100, 1000) == 1)
 	check("no falloff when equal", Formulas.PowerGapFalloff(1000, 1000) == 1)
