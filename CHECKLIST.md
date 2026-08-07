@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 79 built / 85** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 80 built / 85** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -369,8 +369,18 @@ Roblox UI.
       each Frame's laid-out geometry and mirrors it into Parts the capture *can* see. Two
       icons were wrong the first time it was pointed at them: Shop was a rotated square and
       so the same silhouette as Map, and Settings' round knobs merged into their rails.
-- [ ] 82. **A button that behaves like one.** `UI.Pressable` — hover, press, release — plus
-      a click sound through the existing `EffectsController:Play`.
+- [x] 82. **A button that behaves like one.** `UI.Pressable` grows a button under the
+      pointer and shrinks it under a press, springing back on release — or when a finger
+      slides off it, which never sends a release and would otherwise leave the tile stuck
+      shrunk. It listens on `InputBegan` rather than `MouseButton1Down`: the mouse events
+      do fire for touch, but a control that has to work on a phone should be listening to
+      the phone. `AutoButtonColor` is switched off, because it tints by a few percent —
+      invisible on a dark theme, which is exactly why the old bar felt like it had not
+      registered the press — and because left on it fights the tween on the same events.
+      Lives in `UI.luau` beside the palette for the reason `UI.Panel` does: how hard a
+      button presses is styling, and a restyle should stay one file. Plus a blank
+      `EffectsConfig.Sounds.UiClick`, quieter and pitch-jittered because it is the one
+      sound a player can trigger as fast as they can tap.
 - [ ] 83. **The bar, rebuilt.** Left edge, icon tile plus label, real touch size, and an
       active-tab highlight driven by a new `MenuController.Changed` signal.
 - [ ] 84. **Room on the left.** The HUD's Summary and Stats panels merge into one compact
