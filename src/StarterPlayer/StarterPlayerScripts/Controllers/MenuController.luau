@@ -329,6 +329,23 @@ function MenuController:_renderMap(parent: Frame)
 	count.Text = `{unlockedCount} of {#ZoneConfig.List} districts open  ·  travel is free from the plaza`
 
 	self:_renderDestination(parent, power)
+
+	-- Point of sale for the pass that lifts the "from the plaza only" rule. The
+	-- price is left to Roblox's own prompt rather than repeated here: the product
+	-- lives on the server, so any number written in the client is a copy that can
+	-- drift. Until the gamepass exists in the dashboard the server answers "not
+	-- available yet", which the toast shows verbatim.
+	local upsell = row(parent, 44, 6)
+	local pitch = UI.Label("Pitch", upsell)
+	pitch.Size = UDim2.new(1, -120, 1, 0)
+	pitch.TextSize = 13
+	pitch.TextColor3 = UI.Palette.TextMuted
+	pitch.Text = "<b>Fast Travel</b>  —  go from anywhere, not just the plaza"
+
+	button(upsell, "Get", UI.Palette.Token, function()
+		local _, message = Net.Function("PromptProduct"):InvokeServer("FastTravel")
+		toast(message)
+	end)
 end
 
 --[[

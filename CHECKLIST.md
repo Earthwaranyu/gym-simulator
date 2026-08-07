@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 71 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+**Progress: 72 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
 and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
 server-driven with no client remote to exploit.
 
@@ -260,7 +260,15 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       than from `Workspace`: with streaming on, a district 1,500 studs away is not
       replicated, so a client measuring for itself would draw only what happened to be
       loaded.
-- [ ] 74. **Fast Travel gamepass.** Travel from anywhere instead of only from the plaza.
+- [x] 74. **Fast Travel gamepass.** 149 R$ to travel from wherever you are standing
+      instead of only from the plaza. One new file implementing `Types.Product`, no service
+      edits — and its `Grant` deliberately does nothing: `TravelService` asks whether the
+      player owns the pass at the moment they travel, so ownership is read live rather than
+      mirrored onto the profile. That makes it trivially idempotent and makes a refund take
+      effect at once. It sells the walk back, never the grind; every district's power
+      requirement applies to owners exactly as it does to everyone else. The Map tab is its
+      point of sale, and with `AssetId` still `0` the server answers "not available yet",
+      which the toast shows verbatim.
 - [ ] 75. **NPCs that do something.** `NpcConfig` plus a client controller; the prompt opens
       the menu on a named tab.
 - [ ] 76. **The boards read.** The monuments render the `OrderedDataStore` boards #54 has
