@@ -142,6 +142,25 @@ function Formulas.DamageResistance(backStat: number, attackerArmsStat: number): 
 end
 
 --[[
+	Damage dealt back to an attacker by the victim's Core, as a share of the damage
+	that just landed. Capped at just over a third.
+
+	Expressed as a fraction of the incoming hit rather than as a flat number on
+	purpose: it means a heavy hitter takes more back than a light one, so Core is a
+	deterrent proportional to what is being done to you, and it can never punish
+	somebody for a hit that barely scratched you.
+
+	The cap is where it is because of what it costs over a whole fight. An evenly
+	matched attacker needs five hits to win and takes 35% back on each, spending
+	about a third of their own health to do it — expensive, survivable, and not an
+	inversion. A defender who wants to actually win on retaliation has to out-train
+	the attacker on Chest as well, which is a build rather than a free ride.
+]]
+function Formulas.Retaliation(coreStat: number, damageTaken: number): number
+	return damageTaken * math.min(0.35, softScale(coreStat, 0.03))
+end
+
+--[[
 	Ground speed. Legs is the traversal stat: this is the "run" rung of the
 	walk-run-fly ladder, and the reason a map thousands of studs across is a
 	progression curve rather than a tax.
@@ -257,6 +276,20 @@ function Formulas.RunSelfTest(): { string }
 		* Formulas.PowerGapFalloff(1e12, 1e30)
 		* (1 - Formulas.DamageResistance(1e30, 1e12))
 	check("nothing is immune", vsTank > 0)
+
+	check("no core, no retaliation", Formulas.Retaliation(0, 100) == 0)
+	check("retaliation grows with core", Formulas.Retaliation(1e9, 100) > Formulas.Retaliation(1e3, 100))
+	check("retaliation caps", Formulas.Retaliation(1e30, 100) <= 35.001)
+	check("retaliation never exceeds the hit", Formulas.Retaliation(1e30, 100) < 100)
+	-- Thorns must not invert a fair fight: winning an even duel should cost the
+	-- attacker a chunk of health, never more than they have.
+	for _, stat in { 1e3, 1e6, 1e12 } do
+		local damage = Formulas.AttackDamage(stat)
+		local hits = Formulas.MaxHealth(stat) / damage
+		local cost = Formulas.Retaliation(stat, damage) * hits
+		check(`retaliation cannot win an even fight at {stat}`, cost < Formulas.MaxHealth(stat))
+		check(`retaliation still hurts at {stat}`, cost > 0)
+	end
 
 	check("no falloff when weaker", Formulas.PowerGapFalloff(100, 1000) == 1)
 	check("no falloff when equal", Formulas.PowerGapFalloff(1000, 1000) == 1)

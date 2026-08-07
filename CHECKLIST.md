@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 85 built / 90** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 86 built / 90** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -455,8 +455,17 @@ one job with Chest, and Legs only affected running.
       half, because a stat that could reach immunity is not a stat. The self-test now
       asserts equal investment cancels, and that resistance and falloff together still
       leave a hit that lands.
-- [ ] 88. **Core hits back.** Retaliation onto whoever hit you, routed through the same
-      damage path so every PvP rule applies to it.
+- [x] 88. **Core hits back.** `Formulas.Retaliation` sends a share of every landed hit
+      back at whoever threw it — a fraction of the incoming damage rather than a flat
+      number, so a heavy hitter takes more back than a light one and Core can never punish
+      somebody for a scratch. Capped at 35%, which costs an evenly matched attacker about
+      a third of their own health to win a duel: expensive, survivable, not an inversion.
+      **Routed back through `ApplyDamage` itself**, so safe zones, immortality and the
+      power-gap falloff all apply to it without being written a second time — and because
+      the arguments go the other way round, a retaliation kill is credited to the player
+      who was being attacked. Two guards it needs: none on the blow that kills, since a
+      dead player does not hit back, and an `isRetaliation` flag so two players with Core
+      do not bounce one punch between them until somebody falls over.
 - [ ] 89. **Legs flies.** Flight speed scales with Legs instead of being flat for everyone.
 - [ ] 90. **Tell the player what a muscle does.** Nothing in the game says what any stat
       is for; the HUD shows numbers and no meaning.

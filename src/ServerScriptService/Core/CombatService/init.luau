@@ -180,11 +180,24 @@ end
 
 --[[
 	Applies damage from one player to another, with every PvP rule in one place:
-	safe zones, immortality, power-gap falloff, and the training interrupt.
+	safe zones, immortality, power-gap falloff, Back's resistance and Core's
+	retaliation.
+
+	`isRetaliation` marks a hit that Core sent back at an attacker. It exists for
+	one reason: to stop retaliation triggering retaliation, which would bounce a
+	single punch between two players until one of them died. Retaliation otherwise
+	goes through this same function deliberately — safe zones, immortality and the
+	power-gap falloff all have to apply to it, and routing it here is how they do
+	that without being written twice.
 
 	Returns the damage actually dealt, which is zero for any blocked hit.
 ]]
-function CombatService:ApplyDamage(attacker: Player, victim: Player, rawDamage: number): number
+function CombatService:ApplyDamage(
+	attacker: Player,
+	victim: Player,
+	rawDamage: number,
+	isRetaliation: boolean?
+): number
 	if attacker == victim or rawDamage <= 0 then
 		return 0
 	end
@@ -239,6 +252,22 @@ function CombatService:ApplyDamage(attacker: Player, victim: Player, rawDamage: 
 
 	if isKill then
 		self:_recordKill(attacker, victim)
+	end
+
+	-- What Core is for. Skipped on the blow that kills — a dead player does not
+	-- hit back — and skipped when this hit was itself retaliation, or two players
+	-- with Core would trade a single punch until one of them fell over.
+	--
+	-- Sent back through this same function so it inherits every rule above: it
+	-- cannot land in a safe zone, it cannot touch an immortal attacker, and the
+	-- falloff protects a beginner who punched somebody enormous. It can kill, and
+	-- because the arguments are the other way round, _recordKill credits the kill
+	-- to the player who was being attacked.
+	if not isKill and not isRetaliation then
+		local retaliation = Formulas.Retaliation(StatService:GetStat(victim, "Core"), damage)
+		if retaliation > 0 then
+			self:ApplyDamage(victim, attacker, retaliation, true)
+		end
 	end
 
 	return damage
