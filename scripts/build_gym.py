@@ -180,11 +180,15 @@ def anchor_standing(frame):
 
 
 def machine(name, equipment_id, origin, children):
+    # Atomic streaming: a machine arrives whole or not at all. Under the default
+    # mode Roblox streams a model's parts in one at a time, and a bench press
+    # missing its rack — or worse, missing the TrainAnchor the server pivots you
+    # onto — is what a 2,800-stud map with StreamingEnabled hands you otherwise.
     return {
         "name": name,
         "className": "Model",
         "attributes": {"EquipmentId": equipment_id},
-        "properties": {"Tags": ["TrainingStation"]},
+        "properties": {"Tags": ["TrainingStation"], "ModelStreamingMode": "Atomic"},
         "children": [place(origin, child) for child in children],
     }
 
@@ -1478,6 +1482,7 @@ def npc(name, npc_id, x, z, accent):
     return tagged({
         "name": name,
         "className": "Model",
+        "properties": {"ModelStreamingMode": "Atomic"},
         "children": [place(frame, piece) for piece in body],
     }, tags=["Npc"], attributes={"NpcId": npc_id})
 
@@ -1501,6 +1506,7 @@ def leaderboard_monument(name, board_id, x, z, accent):
     return tagged({
         "name": name,
         "className": "Model",
+        "properties": {"ModelStreamingMode": "Atomic"},
         "children": [place(frame, piece) for piece in pieces],
     }, tags=["LeaderboardBoard"], attributes={"BoardId": board_id})
 

@@ -40,7 +40,8 @@
         "FilteringEnabled": true,
         "StreamingEnabled": true,
         "StreamingTargetRadius": 512,
-        "StreamingMinRadius": 128
+        "StreamingMinRadius": 128,
+        "StreamingIntegrityMode": "PauseOutsideLoadedArea"
       },
       "Gym": {
         "$path": "src/Workspace/Gym"

@@ -27859,6 +27859,12 @@
         {
           "name": "Coach",
           "className": "Model",
+          "properties": {
+            "ModelStreamingMode": "Atomic",
+            "Tags": [
+              "Npc"
+            ]
+          },
           "children": [
             {
               "name": "LeftLeg",
@@ -28169,11 +28175,6 @@
               }
             }
           ],
-          "properties": {
-            "Tags": [
-              "Npc"
-            ]
-          },
           "attributes": {
             "NpcId": "Coach"
           }
@@ -28181,6 +28182,12 @@
         {
           "name": "StrongestBoard",
           "className": "Model",
+          "properties": {
+            "ModelStreamingMode": "Atomic",
+            "Tags": [
+              "LeaderboardBoard"
+            ]
+          },
           "children": [
             {
               "name": "Plinth",
@@ -28320,11 +28327,6 @@
               }
             }
           ],
-          "properties": {
-            "Tags": [
-              "LeaderboardBoard"
-            ]
-          },
           "attributes": {
             "BoardId": "Power"
           }
@@ -28332,6 +28334,12 @@
         {
           "name": "KnockoutsBoard",
           "className": "Model",
+          "properties": {
+            "ModelStreamingMode": "Atomic",
+            "Tags": [
+              "LeaderboardBoard"
+            ]
+          },
           "children": [
             {
               "name": "Plinth",
@@ -28471,11 +28479,6 @@
               }
             }
           ],
-          "properties": {
-            "Tags": [
-              "LeaderboardBoard"
-            ]
-          },
           "attributes": {
             "BoardId": "Kills"
           }

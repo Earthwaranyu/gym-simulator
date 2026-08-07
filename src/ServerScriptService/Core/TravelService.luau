@@ -43,6 +43,8 @@ local FAST_TRAVEL_PRODUCT = "FastTravel"
 -- Studs above the pad to land on, so a character arrives standing rather than
 -- intersecting it.
 local LANDING_CLEARANCE = 4
+-- How long to wait for the destination to stream in before going anyway.
+local STREAM_WAIT = 1
 
 local TravelService = {
 	Name = "TravelService",
@@ -197,7 +199,22 @@ function TravelService:Travel(player: Player, zoneId: string): (boolean, string)
 	end
 
 	nextTravelAt[player] = now + TRAVEL_COOLDOWN
-	character:PivotTo(pad.CFrame + Vector3.new(0, pad.Size.Y / 2 + LANDING_CLEARANCE, 0))
+
+	local landing = pad.CFrame + Vector3.new(0, pad.Size.Y / 2 + LANDING_CLEARANCE, 0)
+
+	-- Load the destination before dropping anyone into it. Travel crosses up to
+	-- 1,500 studs, far outside StreamingTargetRadius, so the arrival point is a
+	-- region the client has never seen — and a character placed on ground that does
+	-- not exist yet falls through it.
+	--
+	-- This yields, which is why the timeout is short: a second of "travelling" is
+	-- fine, and Workspace.StreamingIntegrityMode holds the client if the ground is
+	-- still not there. Wrapped because it throws if the player leaves mid-wait, and
+	-- somebody disconnecting should not error a remote handler.
+	pcall(function()
+		player:RequestStreamAroundAsync(landing.Position, STREAM_WAIT)
+	end)
+	character:PivotTo(landing)
 
 	return true, `Welcome to {zone.DisplayName}.`
 end

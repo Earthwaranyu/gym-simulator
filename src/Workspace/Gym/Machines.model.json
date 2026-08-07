@@ -14,7 +14,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -846,7 +847,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -2557,7 +2559,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -3061,7 +3064,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -3424,7 +3428,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -3897,7 +3902,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -4729,7 +4735,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -6440,7 +6447,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -6944,7 +6952,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -7307,7 +7316,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -7780,7 +7790,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -8612,7 +8623,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -10323,7 +10335,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -10827,7 +10840,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -11190,7 +11204,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -11663,7 +11678,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -12495,7 +12511,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -14206,7 +14223,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -14710,7 +14728,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -15073,7 +15092,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -15546,7 +15566,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -16378,7 +16399,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -18089,7 +18111,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -18593,7 +18616,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -18956,7 +18980,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -19429,7 +19454,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -20261,7 +20287,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -21972,7 +21999,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -22476,7 +22504,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -22839,7 +22868,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -23312,7 +23342,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -24144,7 +24175,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -25855,7 +25887,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -26359,7 +26392,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -26722,7 +26756,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -27195,7 +27230,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -28027,7 +28063,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -29738,7 +29775,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -30242,7 +30280,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -30605,7 +30644,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -31078,7 +31118,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -31910,7 +31951,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -33621,7 +33663,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -34125,7 +34168,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -34488,7 +34532,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -34961,7 +35006,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -35793,7 +35839,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -37504,7 +37551,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -38008,7 +38056,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -38371,7 +38420,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -38844,7 +38894,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -39676,7 +39727,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -41387,7 +41439,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -41891,7 +41944,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {
@@ -42254,7 +42308,8 @@
           "properties": {
             "Tags": [
               "TrainingStation"
-            ]
+            ],
+            "ModelStreamingMode": "Atomic"
           },
           "children": [
             {

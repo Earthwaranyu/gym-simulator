@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 74 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+**Progress: 75 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
 and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
 server-driven with no client remote to exploit.
 
@@ -287,8 +287,19 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       is that the side you approach from is local +Z, and Roblox's `Front` is -Z. An empty
       board says "no entries yet" rather than going blank, which is the normal state in
       Studio, where `OrderedDataStore` is unreachable.
-- [ ] 77. **Don't fall forever.** A void catcher, and a part-budget pass on a map that is
-      now a city.
+- [x] 77. **Don't fall forever.** `VoidService` returns anyone below -250 to the plaza —
+      no death, no lost combo, no forfeited token tick, because stepping off an edge is a
+      mistake rather than a play. That height is below the lowest geometry in the game
+      (Downtown's rock underside bottoms out at -136) and above `FallenPartsDestroyHeight`,
+      so it fires before Roblox kills them.
+      Then the streaming pass, which found the real problem with travel: **it crosses up
+      to 1,500 studs into a region the client has never loaded**, and a character placed
+      on ground that does not exist falls straight through it. Three fixes — Workspace
+      gets `StreamingIntegrityMode = PauseOutsideLoadedArea`, `TravelService` waits up to
+      a second on `RequestStreamAroundAsync` before it pivots, and every tagged model
+      (55 machines, the Coach, both monuments) is `ModelStreamingMode = Atomic`, so a
+      bench arrives whole instead of one part at a time with the `TrainAnchor` still
+      missing. 2,867 instances across the whole map, one folder per district.
 
 ---
 
