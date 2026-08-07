@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 68 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+**Progress: 69 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
 and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
 server-driven with no client remote to exploit.
 
@@ -223,8 +223,17 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       and a monument with nothing to show is worse than no monument. Benches, palms and
       lamps ring it. All of it is inert geometry carrying a tag and an id; #75 and #76 give
       it behaviour, which keeps the world file free of anything a controller should own.
-- [ ] 71. **Eight themed districts.** A `PROPS` registry: docks, beach, quarry, rooftop,
-      peak, void, lava, nebula, celestial.
+- [x] 71. **Nine themed districts.** A `PROPS` registry beside `BUILDERS`, one function per
+      theme, named by a district row: **docks** (stacked containers, a gantry crane,
+      bollards) · **beach** (boardwalk tower, palms, loungers, a volleyball net) ·
+      **quarry** (boulders, a climbing conveyor, floodlights, tyre stacks) · **rooftop**
+      (helipad, plant rooms, dishes, water tanks) · **peak** (snowdrifts, cable pylons
+      strung together, weather masts) · **void** (veined monoliths, light strips) ·
+      **solar** (magma channels lit from below, obsidian, braziers) · **nebula** (trusses,
+      solar panels, antennae) · **celestial** (marble colonnade, reflecting pool). Props
+      go in their own folder per district, and `rim_spots` skips a 28° arc around every
+      spawn pad — otherwise travel drops you inside a shipping container, and the gap
+      doubles as a clear walk onto the island.
 - [ ] 72. **Travel is a button.** `ZoneGate` and its `Touched` handler go; `TravelService`
       validates power, origin and combat state instead. Removing the gates means *mounting*
       has to check the zone's `RequiredPower` too — geometry stops being the gate, config is.

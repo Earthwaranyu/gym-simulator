@@ -502,6 +502,7 @@ DISTRICTS = [
         "zone": "Powerhouse",
         "bearing": 90, "radius": 570, "altitude": 0,
         "shape": "slab", "half": 128, "layout": "rows",
+        "props": "docks",
         "ground": [0.30, 0.30, 0.31], "ground_material": "Concrete",
         "rock": [0.16, 0.16, 0.17], "rock_material": "Rock",
         "accent": [0.94, 0.42, 0.24], "pad": [0.42, 0.16, 0.10],
@@ -510,6 +511,7 @@ DISTRICTS = [
         "zone": "Strongman",
         "bearing": 200, "radius": 680, "altitude": 130,
         "shape": "round", "half": 138, "layout": "ring",
+        "props": "beach",
         "ground": [0.82, 0.72, 0.51], "ground_material": "Sand",
         "rock": [0.45, 0.39, 0.30], "rock_material": "Sandstone",
         "accent": [0.75, 0.47, 0.27], "pad": [0.34, 0.22, 0.13],
@@ -518,6 +520,7 @@ DISTRICTS = [
         "zone": "Titan",
         "bearing": 300, "radius": 800, "altitude": 270,
         "shape": "mesa", "half": 142, "layout": "ring",
+        "props": "quarry",
         "ground": [0.62, 0.50, 0.34], "ground_material": "Sandstone",
         "rock": [0.38, 0.31, 0.22], "rock_material": "Rock",
         "accent": [1.0, 0.77, 0.24], "pad": [0.40, 0.28, 0.08],
@@ -526,6 +529,7 @@ DISTRICTS = [
         "zone": "Skydeck",
         "bearing": 20, "radius": 920, "altitude": 430,
         "shape": "slab", "half": 126, "layout": "rows",
+        "props": "rooftop",
         "ground": [0.24, 0.26, 0.30], "ground_material": "Concrete",
         "rock": [0.15, 0.17, 0.20], "rock_material": "Slate",
         "accent": [0.47, 0.82, 1.0], "pad": [0.13, 0.30, 0.42],
@@ -534,6 +538,7 @@ DISTRICTS = [
         "zone": "Storm",
         "bearing": 140, "radius": 1040, "altitude": 610,
         "shape": "crag", "half": 136, "layout": "ring",
+        "props": "peak",
         "ground": [0.36, 0.38, 0.44], "ground_material": "Slate",
         "rock": [0.22, 0.24, 0.30], "rock_material": "Rock",
         "accent": [0.59, 0.63, 1.0], "pad": [0.18, 0.20, 0.40],
@@ -542,6 +547,7 @@ DISTRICTS = [
         "zone": "Void",
         "bearing": 255, "radius": 1150, "altitude": 810,
         "shape": "slab", "half": 130, "layout": "rows",
+        "props": "void",
         "ground": [0.07, 0.06, 0.10], "ground_material": "Basalt",
         "rock": [0.04, 0.03, 0.06], "rock_material": "Basalt",
         "accent": [0.63, 0.43, 0.92], "pad": [0.20, 0.12, 0.34],
@@ -550,6 +556,7 @@ DISTRICTS = [
         "zone": "Solar",
         "bearing": 345, "radius": 1260, "altitude": 1030,
         "shape": "crag", "half": 140, "layout": "ring",
+        "props": "solar",
         "ground": [0.24, 0.13, 0.10], "ground_material": "Basalt",
         "rock": [0.14, 0.07, 0.06], "rock_material": "CrackedLava",
         "accent": [1.0, 0.55, 0.24], "pad": [0.42, 0.20, 0.08],
@@ -558,6 +565,7 @@ DISTRICTS = [
         "zone": "Nebula",
         "bearing": 175, "radius": 1370, "altitude": 1270,
         "shape": "slab", "half": 144, "layout": "rows",
+        "props": "nebula",
         "ground": [0.16, 0.11, 0.20], "ground_material": "Metal",
         "rock": [0.10, 0.07, 0.14], "rock_material": "Slate",
         "accent": [1.0, 0.43, 0.75], "pad": [0.40, 0.14, 0.30],
@@ -566,6 +574,7 @@ DISTRICTS = [
         "zone": "Ascendant",
         "bearing": 285, "radius": 1480, "altitude": 1530,
         "shape": "round", "half": 152, "layout": "ring",
+        "props": "celestial",
         "ground": [0.86, 0.84, 0.78], "ground_material": "Marble",
         "rock": [0.55, 0.53, 0.48], "rock_material": "Limestone",
         "accent": [1.0, 0.96, 0.78], "pad": [0.38, 0.36, 0.28],
@@ -802,6 +811,386 @@ SHAPES = {
     "mesa": island_mesa,
     "crag": island_crag,
     "lot": island_lot,
+}
+
+
+# --------------------------------------------------------------------------
+# Props. What makes a district a docks rather than a grey rectangle.
+#
+# Every set is one function returning local-space children, registered in
+# PROPS and named by a district row. Adding a theme is a function and a key;
+# no district code changes, and no other theme is touched.
+#
+# All of them keep clear of the machines: `ring` districts leave the middle
+# free and props go to the rim, `rows` districts fill the middle so props stay
+# outside RIM. The generator checks this rather than trusting it.
+# --------------------------------------------------------------------------
+
+# Fraction of an island's half-size that props must stay beyond, on a district
+# whose machines are laid out in rows across the middle.
+RIM = 0.76
+
+
+# Every district's spawn pad sits on local +Z. Props ringing the rim skip this
+# arc around it, which stops travel dropping arrivals inside a shipping
+# container and leaves them a clear walk onto the island.
+SPAWN_ARC = 28
+
+
+def rim_spots(count, radius, rng, jitter=0.0):
+    """Evenly spaced points on a circle, each yawed to face the middle.
+
+    The half-step offset means an even count never puts a prop exactly on the
+    spawn pad's bearing, and anything that still lands in the arc is dropped —
+    so a set occasionally returns one fewer point than asked for.
+    """
+    out = []
+    for index in range(count):
+        angle = 360.0 * index / count + 180.0 / count + rng.uniform(-jitter, jitter)
+        if abs((angle + 180) % 360 - 180) < SPAWN_ARC:
+            continue
+        spot = mul(rot_y(angle), cf(0, 0, radius))
+        out.append((spot[0][0], spot[0][2], angle + 180))
+    return out
+
+
+def props_docks(row, rng):
+    """Stacked containers, a gantry crane and bollards. An industrial quay."""
+    half = row["half"]
+    out = []
+    colours = [[0.62, 0.24, 0.18], [0.20, 0.36, 0.50], [0.55, 0.48, 0.16],
+               [0.24, 0.42, 0.28], [0.45, 0.45, 0.47]]
+
+    # Right out at the quay edge: a container is 26 studs deep radially, and a
+    # `rows` layout puts machines within 0.6 of the half-size.
+    for x, z, yaw in rim_spots(9, half * 0.9, rng, 6):
+        stack = rng.randint(1, 3)
+        for level in range(stack):
+            frame = mul(mul(cf(x, FLOOR_TOP + 6.5 + level * 12.4, z), rot_y(yaw)),
+                        rot_y(rng.uniform(-4, 4)))
+            out.append(part("Container", [12, 12, 26], frame,
+                            rng.choice(colours), "CorrodedMetal"))
+            out.append(part("ContainerRib", [12.4, 12.4, 1.0],
+                            mul(frame, cf(0, 0, 8)), [0.14, 0.14, 0.15], "Metal",
+                            CanCollide=False))
+
+    # A gantry straddling one edge: legs, beam, trolley.
+    gx, gz = 0, -half * RIM
+    for side in (-1, 1):
+        out.append(part("CraneLeg", [4, 62, 4], cf(gx + side * 26, FLOOR_TOP + 31, gz),
+                        [0.55, 0.36, 0.14], "CorrodedMetal"))
+    out.append(part("CraneBeam", [64, 5, 5], cf(gx, FLOOR_TOP + 64, gz),
+                    [0.55, 0.36, 0.14], "CorrodedMetal"))
+    out.append(part("CraneTrolley", [9, 6, 8], cf(gx + 14, FLOOR_TOP + 58, gz),
+                    [0.20, 0.21, 0.24], "Metal"))
+    out.append(part("CraneCable", [0.6, 22, 0.6], cf(gx + 14, FLOOR_TOP + 44, gz),
+                    [0.10, 0.10, 0.11], "Metal", CanCollide=False))
+    out.append(part("CraneHook", [4, 3, 4], cf(gx + 14, FLOOR_TOP + 32, gz),
+                    [0.30, 0.30, 0.32], "Metal", CanCollide=False))
+
+    for x, z, _ in rim_spots(16, half * 0.94, rng):
+        out.append(cylinder("Bollard", 3.4, 3.0,
+                            mul(cf(x, FLOOR_TOP + 1.7, z), rot_z(90)),
+                            [0.16, 0.17, 0.19], "Metal"))
+    return out
+
+
+def props_beach(row, rng):
+    """Boardwalk, lifeguard tower, palms and a volleyball net. Muscle Beach."""
+    half = row["half"]
+    out = []
+
+    for x, z, yaw in rim_spots(11, half * 0.88, rng, 8):
+        out.extend(palm(x, z, rng))
+
+    # The tower, on the far side from the spawn pad.
+    tx, tz = -half * 0.62, -half * 0.52
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            out.append(part("TowerLeg", [1.4, 18, 1.4],
+                            cf(tx + sx * 4, FLOOR_TOP + 9, tz + sz * 4),
+                            [0.52, 0.38, 0.24], "Wood"))
+    out.append(part("TowerDeck", [12, 1.2, 12], cf(tx, FLOOR_TOP + 18.6, tz),
+                    [0.60, 0.45, 0.28], "WoodPlanks"))
+    out.append(part("TowerHut", [10, 7, 8], cf(tx, FLOOR_TOP + 22.7, tz - 1),
+                    [0.86, 0.82, 0.72], "WoodPlanks"))
+    out.append(part("TowerRoof", [13, 0.8, 11], cf(tx, FLOOR_TOP + 26.5, tz - 1),
+                    row["accent"], "Fabric", CanCollide=False))
+
+    # Volleyball net across one side, and loungers along the rim.
+    nx, nz = -half * 0.5, half * 0.62
+    for side in (-1, 1):
+        out.append(part("NetPost", [0.8, 14, 0.8],
+                        cf(nx + side * 13, FLOOR_TOP + 7, nz), [0.50, 0.36, 0.22], "Wood"))
+    out.append(part("Net", [26, 5, 0.2], cf(nx, FLOOR_TOP + 11, nz),
+                    [0.90, 0.88, 0.80], "Fabric", CanCollide=False, Transparency=0.35))
+
+    for x, z, yaw in rim_spots(6, half * 0.72, rng, 10):
+        frame = mul(cf(x, 0, z), rot_y(yaw))
+        out.append(part("Lounger", [4, 0.4, 9],
+                        mul(frame, mul(cf(0, FLOOR_TOP + 1.6, 0), rot_x(-14))),
+                        [0.88, 0.86, 0.78], "Fabric"))
+        for side in (-1, 1):
+            out.append(part("LoungerLeg", [0.4, 1.4, 0.4],
+                            mul(frame, cf(side * 1.6, FLOOR_TOP + 0.7, 0)),
+                            [0.30, 0.30, 0.32], "Metal"))
+    return out
+
+
+def props_quarry(row, rng):
+    """Cut faces, a conveyor, rusted rigs and floodlights. A working pit."""
+    half = row["half"]
+    out = []
+
+    for x, z, yaw in rim_spots(12, half * RIM * 1.1, rng, 9):
+        size = rng.uniform(10, 22)
+        out.append(part("Boulder", [size, size * 0.8, size],
+                        mul(mul(cf(x, FLOOR_TOP + size * 0.3, z), rot_y(yaw)),
+                            rot_z(rng.uniform(-10, 10))),
+                        [c * rng.uniform(0.85, 1.15) for c in row["rock"]],
+                        row["rock_material"]))
+
+    # Conveyor climbing out of the pit.
+    cx, cz = half * 0.62, -half * 0.66
+    belt = mul(mul(cf(cx, FLOOR_TOP + 14, cz), rot_y(34)), rot_x(-22))
+    out.append(part("Conveyor", [7, 1.2, 54], belt, [0.24, 0.20, 0.16], "CorrodedMetal"))
+    out.append(part("ConveyorRail", [8, 3, 54], mul(belt, cf(0, 1.6, 0)),
+                    [0.42, 0.28, 0.14], "CorrodedMetal", CanCollide=False,
+                    Transparency=0.5))
+    for offset in (-20, 0, 20):
+        out.append(part("ConveyorLeg", [1.6, 22, 1.6],
+                        mul(mul(cf(cx, FLOOR_TOP, cz), rot_y(34)),
+                            cf(0, 11, offset)), [0.42, 0.28, 0.14], "CorrodedMetal"))
+
+    for x, z, yaw in rim_spots(4, half * 0.9, rng):
+        out.append(part("FloodPole", [1.6, 30, 1.6], cf(x, FLOOR_TOP + 15, z),
+                        [0.30, 0.24, 0.16], "CorrodedMetal"))
+        head = part("Flood", [5, 3.4, 2], mul(mul(cf(x, FLOOR_TOP + 30, z), rot_y(yaw)),
+                                              rot_x(24)),
+                    [1.0, 0.94, 0.72], "Neon", CanCollide=False)
+        head["children"] = [{
+            "name": "Glow", "className": "SpotLight",
+            "properties": {"Brightness": 4, "Range": 60, "Angle": 70},
+        }]
+        out.append(head)
+
+    for x, z, _ in rim_spots(5, half * 0.5, rng, 20):
+        for level in range(rng.randint(2, 4)):
+            out.append(cylinder("Tyre", 2.2, 7.5,
+                                mul(cf(x, FLOOR_TOP + 1.2 + level * 2.3, z), rot_z(90)),
+                                [0.07, 0.07, 0.08], "Rubber"))
+    return out
+
+
+def props_rooftop(row, rng):
+    """Helipad, plant rooms, aircon and dishes. The top of a tower nobody built."""
+    half = row["half"]
+    out = [
+        disc("Helipad", 0.3, 46, FLOOR_TOP + 1.15, [0.10, 0.11, 0.13], "Asphalt",
+             CanCollide=False),
+        disc("HelipadRing", 0.35, 38, FLOOR_TOP + 1.3, [0.92, 0.92, 0.88], "Neon",
+             CanCollide=False),
+        disc("HelipadCentre", 0.4, 30, FLOOR_TOP + 1.35, [0.10, 0.11, 0.13], "Asphalt",
+             CanCollide=False),
+    ]
+    # The helipad sits in the middle, which on a rows district is where the
+    # machines are — so it goes to one corner instead.
+    for node in out:
+        node["properties"]["CFrame"] = serialise_cf(
+            cf(-half * 0.62, FLOOR_TOP + 1.15, -half * 0.62))
+
+    for x, z, yaw in rim_spots(7, half * RIM * 1.12, rng, 10):
+        w, d, h = rng.uniform(10, 18), rng.uniform(8, 14), rng.uniform(6, 13)
+        frame = mul(cf(x, FLOOR_TOP + h / 2, z), rot_y(yaw))
+        out.append(part("PlantRoom", [w, h, d], frame, [0.30, 0.32, 0.36], "Concrete"))
+        out.append(part("Vent", [w * 0.6, 1.2, d * 0.6],
+                        mul(frame, cf(0, h / 2 + 0.6, 0)), [0.42, 0.44, 0.48], "Metal"))
+
+    for x, z, yaw in rim_spots(5, half * 0.88, rng, 14):
+        out.append(part("DishMast", [1.2, 9, 1.2], cf(x, FLOOR_TOP + 4.5, z),
+                        [0.28, 0.30, 0.34], "Metal"))
+        out.append(part("Dish", [8, 8, 1.2],
+                        mul(mul(cf(x, FLOOR_TOP + 10, z), rot_y(yaw)), rot_x(38)),
+                        [0.80, 0.80, 0.78], "Metal", CanCollide=False))
+
+    for sx in (-1, 1):
+        out.append(cylinder("WaterTank", 14, 16,
+                            mul(cf(sx * half * 0.8, FLOOR_TOP + 12, half * 0.34), rot_z(90)),
+                            [0.44, 0.40, 0.34], "Metal"))
+    return out
+
+
+def props_peak(row, rng):
+    """Snow, cable pylons and weather masts. Somewhere the wind is a problem."""
+    half = row["half"]
+    out = []
+
+    for x, z, yaw in rim_spots(10, half * 0.86, rng, 12):
+        size = rng.uniform(12, 24)
+        out.append(part("Snowdrift", [size, size * 0.35, size * 0.8],
+                        mul(cf(x, FLOOR_TOP + size * 0.14, z), rot_y(yaw)),
+                        [0.90, 0.92, 0.96], "Snow", CanCollide=False))
+
+    # Pylons with a cable strung between them, right across the island.
+    pylons = rim_spots(4, half * 0.78, rng)
+    for x, z, _ in pylons:
+        out.append(part("PylonMast", [3, 46, 3], cf(x, FLOOR_TOP + 23, z),
+                        [0.34, 0.36, 0.42], "Metal"))
+        for level in (16, 30, 42):
+            out.append(part("PylonArm", [18, 1.4, 1.4], cf(x, FLOOR_TOP + level, z),
+                            [0.34, 0.36, 0.42], "Metal", CanCollide=False))
+    for index in range(len(pylons)):
+        ax, az, _ = pylons[index]
+        bx, bz, _ = pylons[(index + 1) % len(pylons)]
+        length = math.hypot(bx - ax, bz - az)
+        yaw = math.degrees(math.atan2(bx - ax, bz - az))
+        out.append(part("Cable", [0.5, 0.5, length],
+                        mul(cf((ax + bx) / 2, FLOOR_TOP + 41, (az + bz) / 2), rot_y(yaw)),
+                        [0.09, 0.09, 0.10], "Metal", CanCollide=False))
+
+    for x, z, yaw in rim_spots(3, half * 0.94, rng, 20):
+        out.append(part("MastPole", [0.9, 24, 0.9], cf(x, FLOOR_TOP + 12, z),
+                        [0.70, 0.72, 0.78], "Metal"))
+        out.append(part("Anemometer", [5, 0.4, 0.4],
+                        mul(cf(x, FLOOR_TOP + 24, z), rot_y(yaw)),
+                        row["accent"], "Neon", CanCollide=False))
+    return out
+
+
+def props_void(row, rng):
+    """Monoliths and light strips. Nothing grows here, so nothing does."""
+    half = row["half"]
+    out = []
+
+    for x, z, yaw in rim_spots(8, half * RIM * 1.14, rng, 8):
+        height = rng.uniform(30, 70)
+        out.append(part("Monolith", [8, height, 8],
+                        mul(mul(cf(x, FLOOR_TOP + height / 2, z), rot_y(yaw)),
+                            rot_z(rng.uniform(-5, 5))),
+                        [0.05, 0.04, 0.08], "Slate"))
+        out.append(part("MonolithVein", [1.2, height * 0.8, 1.2],
+                        cf(x, FLOOR_TOP + height / 2, z + 4.2),
+                        row["accent"], "Neon", CanCollide=False))
+
+    for index in range(6):
+        angle = 60.0 * index
+        length = half * 1.5
+        out.append(part("LightStrip", [1.6, 0.2, length],
+                        mul(rot_y(angle), cf(0, FLOOR_TOP + 0.15, 0)),
+                        row["accent"], "Neon", CanCollide=False, CastShadow=False))
+
+    for x, z, _ in rim_spots(5, half * 0.92, rng, 16):
+        out.append(part("Shard", [3, rng.uniform(10, 20), 3],
+                        mul(cf(x, FLOOR_TOP + 14, z), rot_z(rng.uniform(-24, 24))),
+                        row["accent"], "Neon", CanCollide=False))
+    return out
+
+
+def props_solar(row, rng):
+    """Magma channels and obsidian. Lit from below, which nothing else here is."""
+    half = row["half"]
+    out = []
+
+    for index in range(5):
+        angle = 72.0 * index + 20
+        channel = mul(rot_y(angle), cf(0, FLOOR_TOP + 0.1, half * 0.45))
+        out.append(part("Magma", [7, 0.4, half * 0.9], channel,
+                       [1.0, 0.42, 0.10], "Neon", CanCollide=False, CastShadow=False))
+        glow = part("Ember", [5, 0.3, 8],
+                    mul(channel, cf(0, 0.3, rng.uniform(-20, 20))),
+                    [1.0, 0.76, 0.30], "Neon", CanCollide=False)
+        glow["children"] = [{
+            "name": "Glow", "className": "PointLight",
+            "properties": {"Brightness": 2.5, "Range": 40, "Color": [1.0, 0.45, 0.12]},
+        }]
+        out.append(glow)
+
+    for x, z, yaw in rim_spots(10, half * RIM * 1.1, rng, 10):
+        height = rng.uniform(14, 34)
+        out.append(part("Obsidian", [rng.uniform(6, 12), height, rng.uniform(6, 12)],
+                        mul(mul(cf(x, FLOOR_TOP + height / 2, z), rot_y(yaw)),
+                            rot_x(rng.uniform(-12, 12))),
+                        [0.06, 0.04, 0.05], "Slate"))
+
+    for x, z, _ in rim_spots(6, half * 0.92, rng):
+        out.append(cylinder("Brazier", 5, 6,
+                            mul(cf(x, FLOOR_TOP + 2.5, z), rot_z(90)),
+                            [0.20, 0.13, 0.10], "Basalt"))
+        out.append(part("Flame", [4, 4, 4], cf(x, FLOOR_TOP + 6, z),
+                        [1.0, 0.55, 0.16], "Neon", CanCollide=False))
+    return out
+
+
+def props_nebula(row, rng):
+    """Trusses, solar panels and antennae. A station, not an island."""
+    half = row["half"]
+    out = []
+
+    for x, z, yaw in rim_spots(8, half * RIM * 1.12, rng, 6):
+        frame = mul(cf(x, 0, z), rot_y(yaw))
+        out.append(part("TrussPost", [2.2, 26, 2.2], mul(frame, cf(0, FLOOR_TOP + 13, 0)),
+                        [0.42, 0.44, 0.52], "Metal"))
+        out.append(part("PanelArm", [1.2, 1.2, 14], mul(frame, cf(0, FLOOR_TOP + 24, 6)),
+                        [0.42, 0.44, 0.52], "Metal", CanCollide=False))
+        out.append(part("SolarPanel", [22, 0.5, 13],
+                        mul(mul(frame, cf(0, FLOOR_TOP + 26, 12)), rot_x(26)),
+                        [0.10, 0.12, 0.30], "Glass", Reflectance=0.4, CanCollide=False))
+        out.append(part("PanelEdge", [22.6, 0.9, 1.0],
+                        mul(mul(frame, cf(0, FLOOR_TOP + 25.4, 17.6)), rot_x(26)),
+                        row["accent"], "Neon", CanCollide=False))
+
+    for x, z, yaw in rim_spots(5, half * 0.92, rng, 14):
+        out.append(part("Antenna", [0.8, 30, 0.8], cf(x, FLOOR_TOP + 15, z),
+                        [0.50, 0.52, 0.58], "Metal"))
+        for level in (12, 20, 26):
+            out.append(part("AntennaRing", [4, 0.4, 4], cf(x, FLOOR_TOP + level, z),
+                            row["accent"], "Neon", CanCollide=False))
+    return out
+
+
+def props_celestial(row, rng):
+    """Columns, arches and a reflecting pool. The end of the map should feel
+    like an arrival, not another platform."""
+    half = row["half"]
+    out = [disc("Pool", 0.5, half * 0.5, FLOOR_TOP + 0.9,
+                [0.55, 0.80, 0.92], "Glass", CanCollide=False,
+                Transparency=0.35, Reflectance=0.5)]
+
+    for x, z, yaw in rim_spots(12, half * RIM * 1.12, rng):
+        out.append(cylinder("Column", 42, 8,
+                            mul(cf(x, FLOOR_TOP + 21, z), rot_z(90)),
+                            [0.90, 0.88, 0.82], "Marble"))
+        out.append(part("Capital", [11, 3, 11], cf(x, FLOOR_TOP + 43.5, z),
+                        [0.94, 0.92, 0.86], "Marble", CanCollide=False))
+        out.append(part("ColumnBase", [11, 2.4, 11], cf(x, FLOOR_TOP + 1.2, z),
+                        [0.94, 0.92, 0.86], "Marble"))
+
+    # Inside the machine ring, not on it: a `ring` layout leaves the middle free
+    # and the pool only takes the innermost quarter of it.
+    for x, z, _ in rim_spots(8, half * 0.36, rng):
+        out.append(cylinder("Brazier", 4, 5,
+                            mul(cf(x, FLOOR_TOP + 2, z), rot_z(90)),
+                            [0.82, 0.76, 0.60], "Marble"))
+        flame = part("Flame", [3.4, 3.4, 3.4], cf(x, FLOOR_TOP + 5, z),
+                     row["accent"], "Neon", CanCollide=False)
+        flame["children"] = [{
+            "name": "Glow", "className": "PointLight",
+            "properties": {"Brightness": 2, "Range": 34, "Color": row["accent"]},
+        }]
+        out.append(flame)
+    return out
+
+
+PROPS = {
+    "docks": props_docks,
+    "beach": props_beach,
+    "quarry": props_quarry,
+    "rooftop": props_rooftop,
+    "peak": props_peak,
+    "void": props_void,
+    "solar": props_solar,
+    "nebula": props_nebula,
+    "celestial": props_celestial,
 }
 
 
@@ -1269,7 +1658,17 @@ def build_world():
         pieces = SHAPES[row["shape"]](row, rng)
         pieces.append(spawn_pad(row))
         pieces.append(zone_volume(row))
-        structure.append(folder(row["zone"], [place(origin, piece) for piece in pieces]))
+        children = [place(origin, piece) for piece in pieces]
+
+        # Props live in their own folder: it keeps Studio navigable, and it is
+        # what lets the layout check tell scenery from the island itself.
+        theme = row.get("props")
+        if theme is not None:
+            children.append(folder("Props", [
+                place(origin, piece) for piece in PROPS[theme](row, rng)
+            ]))
+
+        structure.append(folder(row["zone"], children))
 
         spots = LAYOUTS[row["layout"]](row["half"], len(MACHINE_ORDER))
         machines.append(folder(row["zone"], [
