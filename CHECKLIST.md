@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 81 built / 85** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 82 built / 85** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -390,8 +390,18 @@ Roblox UI.
       `MenuController.Changed` signal rather than set at click time — Escape and the ✕
       never touch the bar, so a click-time highlight would stay lit after them.
       This leaves the bar overlapping the stat panel, which #84 is for.
-- [ ] 84. **Room on the left.** The HUD's Summary and Stats panels merge into one compact
-      block so the bar can have the left column.
+- [x] 84. **Room on the left.** The Summary and Stats panels were two stacks 250px tall
+      owning the whole left column, which left the bar nowhere to go. They merge into one
+      block 84px tall: power and tokens on one line, the five stats as a wrapping grid of
+      coloured chips underneath. Still generated from `StatConfig.List`, so a sixth stat
+      still needs no edit here, and chips truncate rather than run over their neighbour
+      because these numbers reach the trillions.
+      It also fixed something older. Both ScreenGuis had `IgnoreGuiInset = true`, which
+      puts y = 0 at the true top of the screen — *underneath* Roblox's own top bar — so
+      the summary panel at y = 16 had been clipped by it on every device. The first attempt
+      was a `TOP_INSET = 44` constant; the real inset measured 58 and is not a constant
+      across devices, so the answer is to stop ignoring it and let Roblox place the origin.
+      Verified in a live session: zero overlaps between any two panels or the bar.
 - [ ] 85. **Fits a phone.** A viewport-driven `UIScale`, checked against the three zones
       Roblox reserves: thumbstick, jump button, and its own menu.
 ---

@@ -100,7 +100,9 @@ function MenuBarController:_build()
 	local screen = Instance.new("ScreenGui")
 	screen.Name = "GymMenuBar"
 	screen.ResetOnSpawn = false
-	screen.IgnoreGuiInset = true
+	-- Matches the HUD, so both live in the same coordinate space and "vertically
+	-- centred" means centred in the area the player can actually see.
+	screen.IgnoreGuiInset = false
 	-- Below the menu itself, so an open panel is never covered by its own buttons.
 	screen.DisplayOrder = 4
 	screen.Parent = playerGui

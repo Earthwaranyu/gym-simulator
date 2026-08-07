@@ -26,6 +26,10 @@ local Types = require(ReplicatedStorage.Modules.Types)
 -- authority; this only decides when the pip looks ready.
 local PUNCH_COOLDOWN = 0.6
 local FEED_LINES = 4
+-- Wide enough for the worst case a chip has to hold: a stat in the trillions with
+-- a multiplier beside it, which is about 110px of text at this size.
+local CHIP_WIDTH = 116
+local STATS_WIDTH = CHIP_WIDTH * 3 + 8 + 24
 
 local HudController = {
 	Name = "HudController",
@@ -59,42 +63,74 @@ function HudController:_build()
 	local screen = Instance.new("ScreenGui")
 	screen.Name = "GymHud"
 	screen.ResetOnSpawn = false
-	screen.IgnoreGuiInset = true
+	-- Respect the inset rather than ignore it. Ignoring it puts y = 0 at the true
+	-- top of the screen, which is *underneath* Roblox's own top bar — the summary
+	-- panel used to sit at y = 16 and was clipped by it on every device. The inset
+	-- is 58px here and is not a constant across devices, so the fix is to let
+	-- Roblox place the origin rather than to guess an offset.
+	screen.IgnoreGuiInset = false
 	screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screen.Parent = playerGui
 
-	-- Top-left: identity block — power and tokens.
+	-- Top-left: power, tokens, and every stat, in one block.
+	--
+	-- This was two stacked panels 250px tall, which owned the whole left column and
+	-- left the button bar nowhere to go. Stats are a wrapping row of chips now
+	-- instead of five full-width rows: the numbers are the same, they are read at a
+	-- glance rather than studied, and the block is a third of the height.
+	--
+	-- y = 16 is 16 below Roblox's own top bar, not 16 below the screen edge, because
+	-- this ScreenGui no longer ignores the inset — see the note where it is built.
 	local summary = UI.Panel("Summary", screen)
 	summary.Position = UDim2.fromOffset(16, 16)
-	summary.Size = UDim2.fromOffset(230, 74)
+	summary.Size = UDim2.fromOffset(STATS_WIDTH, 84)
 
 	UI.VerticalList(summary, 4)
 
-	powerLabel = UI.Label("Power", summary)
-	powerLabel.Size = UDim2.new(1, 0, 0, 26)
+	local headline = Instance.new("Frame")
+	headline.Name = "Headline"
+	headline.BackgroundTransparency = 1
+	headline.Size = UDim2.new(1, 0, 0, 26)
+	headline.LayoutOrder = 1
+	headline.Parent = summary
+
+	powerLabel = UI.Label("Power", headline)
+	powerLabel.Size = UDim2.fromScale(0.6, 1)
 	powerLabel.Font = UI.Font.Numeric
-	powerLabel.TextSize = 22
+	powerLabel.TextSize = 21
 	powerLabel.TextColor3 = UI.Palette.Power
-	powerLabel.LayoutOrder = 1
 
-	tokenLabel = UI.Label("Tokens", summary)
-	tokenLabel.Size = UDim2.new(1, 0, 0, 20)
+	tokenLabel = UI.Label("Tokens", headline)
+	tokenLabel.AnchorPoint = Vector2.new(1, 0)
+	tokenLabel.Position = UDim2.fromScale(1, 0)
+	tokenLabel.Size = UDim2.fromScale(0.4, 1)
+	tokenLabel.TextXAlignment = Enum.TextXAlignment.Right
 	tokenLabel.TextColor3 = UI.Palette.Token
-	tokenLabel.LayoutOrder = 2
 
-	-- Left: one row per stat, generated from config.
-	local stats = UI.Panel("Stats", screen)
-	stats.Position = UDim2.fromOffset(16, 102)
-	stats.Size = UDim2.fromOffset(230, 26 * StatConfig.Count() + 20)
+	-- One chip per stat, generated from config, wrapping onto as many lines as it
+	-- takes. A sixth stat still needs no edit here.
+	local chips = Instance.new("Frame")
+	chips.Name = "Stats"
+	chips.BackgroundTransparency = 1
+	chips.Size = UDim2.new(1, 0, 0, 44)
+	chips.LayoutOrder = 2
+	chips.Parent = summary
 
-	UI.VerticalList(stats, 2)
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.fromOffset(CHIP_WIDTH, 20)
+	grid.CellPadding = UDim2.fromOffset(4, 2)
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = chips
 
 	for index, definition in StatConfig.List do
-		local row = UI.Label(definition.Id, stats)
-		row.Size = UDim2.new(1, 0, 0, 24)
-		row.LayoutOrder = index
-		row.TextColor3 = definition.Color
-		statLabels[definition.Id] = row
+		local chip = UI.Label(definition.Id, chips)
+		chip.LayoutOrder = index
+		chip.TextSize = 13
+		chip.TextColor3 = definition.Color
+		-- Numbers here run to the trillions. Truncating keeps a long one inside its
+		-- own chip rather than letting it run over the stat next to it.
+		chip.TextTruncate = Enum.TextTruncate.AtEnd
+		statLabels[definition.Id] = chip
 	end
 
 	-- Bottom-centre: the vitals the player watches while training and fighting.
@@ -161,12 +197,14 @@ function HudController:_refreshProfile()
 		local definition = StatConfig.Get(statId)
 		local name = if definition ~= nil then definition.DisplayName else statId
 		local level = data.MultiplierLevels[statId] or 0
-		local multiplier = Formulas.MultiplierValue(level)
 
+		-- A chip has room for the name and the number. The multiplier moves to the
+		-- tooltip-ish second line only when there is one to show, so an unupgraded
+		-- stat is not carrying a permanent "x1.00".
 		local suffix = if level > 0
-			then ` <font color="#8A93A8">x{string.format("%.2f", multiplier)}</font>`
+			then ` <font color="#8A93A8">x{string.format("%.1f", Formulas.MultiplierValue(level))}</font>`
 			else ""
-		label.Text = `{name}  {NumberFormat.Format(data.Stats[statId] or 0)}{suffix}`
+		label.Text = `<b>{name}</b> {NumberFormat.Format(data.Stats[statId] or 0)}{suffix}`
 	end
 end
 
@@ -182,7 +220,7 @@ function HudController:_refreshVitals()
 		local name = if definition ~= nil then definition.DisplayName else state.StationId
 		local combo = math.min(2, 1 + state.Combo * 0.02)
 		comboLabel.Text =
-			`{name}  —  combo x{string.format("%.2f", combo)} ({state.Combo} reps)  —  hold E to stop`
+			`{name}  —  combo x{string.format("%.2f", combo)} ({state.Combo} reps)  —  Space or hold E to stop`
 		comboLabel.TextColor3 = UI.Palette.Combo
 	else
 		comboLabel.Text = "Hold E at a machine to start training"
