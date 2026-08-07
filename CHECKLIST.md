@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 73 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+**Progress: 74 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
 and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
 server-driven with no client remote to exploit.
 
@@ -278,8 +278,15 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       streaming unloads the plaza while you are out at a district; a one-shot pass at
       startup leaves the quest giver mute for the rest of the session. Adding a shopkeeper
       is an entry plus a tagged model.
-- [ ] 76. **The boards read.** The monuments render the `OrderedDataStore` boards #54 has
-      been serving to nothing.
+- [x] 76. **The boards read.** `LeaderboardBoardController` puts a `SurfaceGui` on every
+      monument's `Screen` and fills it from the `GetLeaderboard` remote #54 has been
+      serving to a menu tab nobody opens. **One call feeds every monument on screen** —
+      the remote returns all boards at once and is rate-limited to one a second at the
+      other end — on a 30-second cycle, because the boards themselves only move every two
+      minutes. The face is named `Enum.NormalId.Back` explicitly: this script's convention
+      is that the side you approach from is local +Z, and Roblox's `Front` is -Z. An empty
+      board says "no entries yet" rather than going blank, which is the normal state in
+      Studio, where `OrderedDataStore` is unreachable.
 - [ ] 77. **Don't fall forever.** A void catcher, and a part-budget pass on a map that is
       now a city.
 
