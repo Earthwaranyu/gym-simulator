@@ -1,0 +1,1935 @@
+{
+  "className": "Folder",
+  "children": [
+    {
+      "name": "StarterFloor",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          0.5,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          80,
+          1,
+          60
+        ],
+        "Color": [
+          0.16,
+          0.17,
+          0.21
+        ],
+        "Material": "Concrete",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterRug",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          1.05,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          46,
+          0.1,
+          34
+        ],
+        "Color": [
+          0.392,
+          0.664,
+          0.488
+        ],
+        "Material": "Pebble",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false,
+        "Transparency": 0.55
+      }
+    },
+    {
+      "name": "StarterWallX",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -40.0,
+          12.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          1,
+          22.0,
+          60
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterWallX",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          40.0,
+          12.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          1,
+          22.0,
+          60
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterWallZ",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -26.0,
+          12.0,
+          -30.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          28,
+          22.0,
+          1
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterWallZ",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          26.0,
+          12.0,
+          -30.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          28,
+          22.0,
+          1
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterLintel",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          17.0,
+          -30.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          24,
+          12.0,
+          1
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterWallZ",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -26.0,
+          12.0,
+          30.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          28,
+          22.0,
+          1
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterWallZ",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          26.0,
+          12.0,
+          30.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          28,
+          22.0,
+          1
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterLintel",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          17.0,
+          30.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          24,
+          12.0,
+          1
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterMirror",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -39.3,
+          8.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          0.3,
+          10,
+          44
+        ],
+        "Color": [
+          0.55,
+          0.6,
+          0.66
+        ],
+        "Material": "Glass",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Reflectance": 0.55
+      }
+    },
+    {
+      "name": "StarterMirrorTrim",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -39.25,
+          2.9,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          0.5,
+          0.6,
+          44
+        ],
+        "Color": [
+          0.49,
+          0.83,
+          0.61
+        ],
+        "Material": "Metal",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterCeiling",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          23.5,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          80,
+          1,
+          60
+        ],
+        "Color": [
+          0.16799999999999998,
+          0.175,
+          0.21
+        ],
+        "Material": "Concrete",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -24.0,
+          22.6,
+          -16.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "StarterLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -24.0,
+          22.6,
+          16.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "StarterLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          22.6,
+          -16.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "StarterLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          22.6,
+          16.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "StarterLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          24.0,
+          22.6,
+          -16.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "StarterLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          24.0,
+          22.6,
+          16.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "IronFloor",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          0.5,
+          -90.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          80,
+          1,
+          60
+        ],
+        "Color": [
+          0.11,
+          0.13,
+          0.17
+        ],
+        "Material": "Concrete",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronRug",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          1.05,
+          -90.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          46,
+          0.1,
+          34
+        ],
+        "Color": [
+          0.20800000000000002,
+          0.52,
+          0.768
+        ],
+        "Material": "Pebble",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false,
+        "Transparency": 0.55
+      }
+    },
+    {
+      "name": "IronWallX",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -40.0,
+          12.0,
+          -90.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          1,
+          22.0,
+          60
+        ],
+        "Color": [
+          0.16,
+          0.18,
+          0.24
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronWallX",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          40.0,
+          12.0,
+          -90.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          1,
+          22.0,
+          60
+        ],
+        "Color": [
+          0.16,
+          0.18,
+          0.24
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronWallZ",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -26.0,
+          12.0,
+          -120.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          28,
+          22.0,
+          1
+        ],
+        "Color": [
+          0.16,
+          0.18,
+          0.24
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronWallZ",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          26.0,
+          12.0,
+          -120.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          28,
+          22.0,
+          1
+        ],
+        "Color": [
+          0.16,
+          0.18,
+          0.24
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronLintel",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          17.0,
+          -120.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          24,
+          12.0,
+          1
+        ],
+        "Color": [
+          0.16,
+          0.18,
+          0.24
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronWallZ",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -26.0,
+          12.0,
+          -60.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          28,
+          22.0,
+          1
+        ],
+        "Color": [
+          0.16,
+          0.18,
+          0.24
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronWallZ",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          26.0,
+          12.0,
+          -60.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          28,
+          22.0,
+          1
+        ],
+        "Color": [
+          0.16,
+          0.18,
+          0.24
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronLintel",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          17.0,
+          -60.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          24,
+          12.0,
+          1
+        ],
+        "Color": [
+          0.16,
+          0.18,
+          0.24
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronMirror",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -39.3,
+          8.0,
+          -90.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          0.3,
+          10,
+          44
+        ],
+        "Color": [
+          0.55,
+          0.6,
+          0.66
+        ],
+        "Material": "Glass",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "Reflectance": 0.55
+      }
+    },
+    {
+      "name": "IronMirrorTrim",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -39.25,
+          2.9,
+          -90.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          0.5,
+          0.6,
+          44
+        ],
+        "Color": [
+          0.26,
+          0.65,
+          0.96
+        ],
+        "Material": "Metal",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronCeiling",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          23.5,
+          -90.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          80,
+          1,
+          60
+        ],
+        "Color": [
+          0.11199999999999999,
+          0.126,
+          0.16799999999999998
+        ],
+        "Material": "Concrete",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "IronLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -24.0,
+          22.6,
+          -106.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "IronLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -24.0,
+          22.6,
+          -74.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "IronLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          22.6,
+          -106.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "IronLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          22.6,
+          -74.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "IronLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          24.0,
+          22.6,
+          -106.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "IronLight",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          24.0,
+          22.6,
+          -74.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          14,
+          0.4,
+          3
+        ],
+        "Color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false
+      },
+      "children": [
+        {
+          "name": "Glow",
+          "className": "SurfaceLight",
+          "properties": {
+            "Face": "Bottom",
+            "Brightness": 2.5,
+            "Range": 26,
+            "Angle": 150,
+            "Color": [
+              1,
+              0.96,
+              0.88
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Corridor",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          0.5,
+          -45.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          24,
+          1,
+          32
+        ],
+        "Color": [
+          0.16,
+          0.17,
+          0.21
+        ],
+        "Material": "Concrete",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "CorridorWall",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          -12.0,
+          12.0,
+          -45.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          1,
+          22,
+          32
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "CorridorWall",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          12.0,
+          12.0,
+          -45.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          1,
+          22,
+          32
+        ],
+        "Color": [
+          0.24,
+          0.25,
+          0.3
+        ],
+        "Material": "Brick",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "CorridorCeiling",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          23.5,
+          -45.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          24,
+          1,
+          32
+        ],
+        "Color": [
+          0.16799999999999998,
+          0.175,
+          0.21
+        ],
+        "Material": "Concrete",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth"
+      }
+    },
+    {
+      "name": "StarterZoneVolume",
+      "className": "Part",
+      "attributes": {
+        "ZoneId": "Starter"
+      },
+      "properties": {
+        "Tags": [
+          "GymZone"
+        ],
+        "Anchored": true,
+        "Locked": true,
+        "CanCollide": false,
+        "Transparency": 1,
+        "CastShadow": false,
+        "Size": [
+          80,
+          40,
+          60
+        ],
+        "CFrame": [
+          0.0,
+          20.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Material": "SmoothPlastic"
+      }
+    },
+    {
+      "name": "StarterSpawnPad",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          1.2,
+          22.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          12,
+          1,
+          12
+        ],
+        "Color": [
+          0.49,
+          0.83,
+          0.61
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": true,
+        "Tags": [
+          "ZoneSpawn"
+        ]
+      },
+      "attributes": {
+        "ZoneId": "Starter"
+      }
+    },
+    {
+      "name": "ReturnGate",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          6.0,
+          -60.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          22,
+          10,
+          2
+        ],
+        "Color": [
+          0.49,
+          0.83,
+          0.61
+        ],
+        "Material": "ForceField",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false,
+        "Transparency": 0.45,
+        "Tags": [
+          "ZoneGate"
+        ]
+      },
+      "attributes": {
+        "ZoneId": "Starter"
+      }
+    },
+    {
+      "name": "IronZoneVolume",
+      "className": "Part",
+      "attributes": {
+        "ZoneId": "Iron"
+      },
+      "properties": {
+        "Tags": [
+          "GymZone"
+        ],
+        "Anchored": true,
+        "Locked": true,
+        "CanCollide": false,
+        "Transparency": 1,
+        "CastShadow": false,
+        "Size": [
+          80,
+          40,
+          60
+        ],
+        "CFrame": [
+          0.0,
+          20.0,
+          -90.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Material": "SmoothPlastic"
+      }
+    },
+    {
+      "name": "IronSpawnPad",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          1.2,
+          -70.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          12,
+          1,
+          12
+        ],
+        "Color": [
+          0.26,
+          0.65,
+          0.96
+        ],
+        "Material": "Neon",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": true,
+        "Tags": [
+          "ZoneSpawn"
+        ]
+      },
+      "attributes": {
+        "ZoneId": "Iron"
+      }
+    },
+    {
+      "name": "IronGate",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          6.0,
+          -34.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          22,
+          10,
+          2
+        ],
+        "Color": [
+          0.26,
+          0.65,
+          0.96
+        ],
+        "Material": "ForceField",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false,
+        "Transparency": 0.45,
+        "Tags": [
+          "ZoneGate"
+        ]
+      },
+      "attributes": {
+        "ZoneId": "Iron"
+      }
+    },
+    {
+      "name": "SpawnSafeZone",
+      "className": "Part",
+      "properties": {
+        "Anchored": true,
+        "CFrame": [
+          0.0,
+          8.0,
+          22.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "Size": [
+          24,
+          14,
+          24
+        ],
+        "Color": [
+          0.4,
+          0.8,
+          1.0
+        ],
+        "Material": "ForceField",
+        "TopSurface": "Smooth",
+        "BottomSurface": "Smooth",
+        "CanCollide": false,
+        "Transparency": 0.85,
+        "CastShadow": false,
+        "Tags": [
+          "SafeZone"
+        ]
+      }
+    }
+  ]
+}

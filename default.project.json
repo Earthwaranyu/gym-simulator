@@ -43,7 +43,7 @@
         "StreamingMinRadius": 128
       },
       "Gym": {
-        "$path": "src/Workspace/Gym.model.json"
+        "$path": "src/Workspace/Gym"
       },
       "Baseplate": {
         "$className": "Part",
