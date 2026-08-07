@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 78 built / 80** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 79 built / 85** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -345,6 +345,38 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       Verified live: 34 seconds stood at spawn earns nothing, the same 34 seconds at a
       machine earns, and every training spot sits 17 studs outside the shelter so the PvP
       hook still reaches it.
+
+## Phase 13 — A UI that survives a phone
+
+#79 put the menu on screen and solved discoverability. It did not solve the buttons:
+five identical dark text rectangles, on the edge of the screen mobile uses to drag the
+camera, at 38px against a ~48px touch floor, with no feedback on press. This phase takes
+the genre's **ergonomics** — icon first, left column, big targets, immediate feedback —
+and keeps the project's **styling**, because `CLAUDE.md` asks for GTA V over bubbly
+Roblox UI.
+
+- [x] 81. **Icons drawn, not uploaded.** `Icons.luau`: one builder per glyph, each
+      assembled from Frames with `UICorner`, `UIStroke` and `Rotation`. Interface art was
+      the last place the everything-original rule had not reached, and a Toolbox icon pack
+      would have broken it for five small pictures. Everything inside a builder is in
+      **scale, never offset**, so an icon is whatever size its tile is — which is what lets
+      #85 resize the bar without touching this file.
+      Shapes are picked for what survives 28px on a phone: no gear and no shopping cart,
+      because a circle of teeth costs a dozen Frames and reads as a grey blob at that size.
+      **Studio's screen capture does not render GUIs at all** — a SurfaceGui filled edge to
+      edge with bright green photographs as a black rectangle — so these were being written
+      blind. `scripts/preview_icons.luau` fixes that: it draws the real glyph, reads back
+      each Frame's laid-out geometry and mirrors it into Parts the capture *can* see. Two
+      icons were wrong the first time it was pointed at them: Shop was a rotated square and
+      so the same silhouette as Map, and Settings' round knobs merged into their rails.
+- [ ] 82. **A button that behaves like one.** `UI.Pressable` — hover, press, release — plus
+      a click sound through the existing `EffectsController:Play`.
+- [ ] 83. **The bar, rebuilt.** Left edge, icon tile plus label, real touch size, and an
+      active-tab highlight driven by a new `MenuController.Changed` signal.
+- [ ] 84. **Room on the left.** The HUD's Summary and Stats panels merge into one compact
+      block so the bar can have the left column.
+- [ ] 85. **Fits a phone.** A viewport-driven `UIScale`, checked against the three zones
+      Roblox reserves: thumbstick, jump button, and its own menu.
 ---
 
 ## Milestone 1 — Vertical Slice
