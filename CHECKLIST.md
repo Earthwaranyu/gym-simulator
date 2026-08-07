@@ -22,7 +22,7 @@ until they exist in the Creator Dashboard.
 | PvP zoning | **Open PvP everywhere**, except safe spawn, shop, and quest board |
 | Death cost | **Time + broken combo only.** No stat, cash, or token loss |
 | Progression sink | **Tokens → per-stat multiplier upgrades.** No rebirth system |
-| Token accrual | Passive per-tick, **only while alive and inside a gym zone**, plus quest rewards |
+| Token accrual | Passive per-tick, **only while alive, inside a gym zone, and somewhere you can be attacked**, plus quest rewards |
 | Training | **Hold E to mount.** You teleport onto the machine, lock into it, and reps tick on their own — no stamina, no clicking. Hold E again to get off |
 | Assets | **Everything original.** Part-built machines, animations generated from joint angles. No Toolbox models, no uploaded animation ids |
 | PvP opt-out | **Paid only** — immortal potions (19 R$ / 1h, 79 R$ / 1 day) and VIP (199 R$, 1h daily) |
@@ -329,6 +329,22 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       itself, defaulting to true, so the bar never names a screen and a new tab arrives
       with a button already. `Toggle(tabId)` closes on a second press, because a button
       that is always on screen has to put you back where you were.
+- [x] 80. **Spawn where you train.** Garage Gym *is* the spawn now: five machines on
+      painted bays ringing the plaza you appear on, 92 studs out — the first thing a new
+      player can see from where they land is the thing the game is about. Its old city
+      block became another block of buildings, Iron Hall moved to a corner plot, and the
+      street grid widened from ±140 to ±170 to make room.
+      The interesting part is what had to change to allow it. A gym built *around* the
+      shelter means its zone volume covers the shelter, and **no arrangement of boxes wraps
+      a ring without covering its middle** — so a plaza inside a gym zone would have been a
+      safe AFK farm, the exact thing token accrual exists to prevent. Trying to dodge it
+      with geometry pushed the machines out past 115 studs and still only just worked. So
+      the rule moved into `TokenService` instead: **no pay where you cannot be hit.** That
+      is both simpler and more honest than the volumes it replaces — it holds for every
+      safe zone that will ever exist, not just the ones somebody remembered to draw around.
+      Verified live: 34 seconds stood at spawn earns nothing, the same 34 seconds at a
+      machine earns, and every training spot sits 17 studs outside the shelter so the PvP
+      hook still reaches it.
 ---
 
 ## Milestone 1 — Vertical Slice

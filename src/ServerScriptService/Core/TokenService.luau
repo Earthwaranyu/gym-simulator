@@ -2,11 +2,21 @@
 --[[
 	TokenService — awards the currency that buys stat multipliers.
 
-	Tokens accrue for time spent playing, but only while the player is ALIVE and INSIDE
-	a gym zone. That condition is what wires the economy into the PvP hook: parking a
-	character in a corner earns nothing, and a player who does idle in the gym to farm
-	is standing in an open-PvP area as a free kill. Dying also forfeits the tick in
-	progress, which is the entire cost of dying in this game.
+	Tokens accrue for time spent playing, but only while the player is ALIVE, INSIDE
+	a gym zone, and SOMEWHERE THEY CAN BE ATTACKED. That condition is what wires the
+	economy into the PvP hook: parking a character in a corner earns nothing, and a
+	player who does idle in the gym to farm is standing in an open-PvP area as a free
+	kill. Dying also forfeits the tick in progress, which is the entire cost of dying
+	in this game.
+
+	The safe-zone half of that rule used to be enforced by geometry — zone volumes
+	were simply drawn so they never covered the spawn plaza. That worked while the
+	gyms were somewhere else, and stopped working the moment the starter gym was
+	built around the plaza: a zone volume big enough to hold a ring of machines is
+	also big enough to hold the shelter in the middle of it, and no arrangement of
+	boxes covers a ring without covering its centre. Enforcing it here instead is
+	both simpler and a better rule — it now holds for every safe zone that will ever
+	be added, rather than for the ones somebody remembered to draw around.
 
 	Zones are BaseParts tagged "GymZone" in Studio, so the accrual area is level design
 	rather than code. Until any exist, the whole map counts — otherwise nothing would
@@ -29,6 +39,7 @@ local TokenService = {
 }
 
 local DataService: any = nil
+local CombatService: any = nil
 local warnedNoZones = false
 
 -- (player, amountAwarded, newTotal)
@@ -36,6 +47,9 @@ TokenService.TokensAwarded = Signal.new()
 
 function TokenService:Init()
 	DataService = Loader.Get("DataService")
+	-- Asking CombatService rather than testing the tag here keeps one definition of
+	-- "safe", so a change to how safe zones are shaped cannot make the two disagree.
+	CombatService = Loader.Get("CombatService")
 end
 
 local function isPointInPart(point: Vector3, part: BasePart): boolean
@@ -47,7 +61,7 @@ local function isPointInPart(point: Vector3, part: BasePart): boolean
 end
 
 --[[
-	True when the player is alive and standing in a gym zone, i.e. earning.
+	True when the player is alive, in a gym zone, and attackable — i.e. earning.
 	Also used by the HUD to explain why the token counter has stalled.
 ]]
 function TokenService:IsAccruing(player: Player): boolean
@@ -63,6 +77,13 @@ function TokenService:IsAccruing(player: Player): boolean
 
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if root == nil or not root:IsA("BasePart") then
+		return false
+	end
+
+	-- No pay where you cannot be hit. The starter gym's zone covers the spawn
+	-- plaza it is built around, so without this an AFK body would earn in the one
+	-- place nobody can punish it for being AFK.
+	if CombatService:IsInSafeZone(player) then
 		return false
 	end
 

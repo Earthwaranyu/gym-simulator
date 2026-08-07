@@ -483,21 +483,33 @@ def folder(name, children):
 # new district be one entry: the shape says what an island looks like, the row
 # says what it is made of.
 DISTRICTS = [
-    # Garage and Iron are city blocks, not islands: they take two of Downtown's
-    # twelve plots. `facing` overrides the usual "point back at the origin", because
-    # a gym sitting at 45 degrees to the street it is on looks like a mistake.
+    # Garage Gym IS the spawn. Its machines ring the plaza you appear on, so the
+    # first thing a new player can see from where they land is the thing the game
+    # is about — no walk, no directions, no wondering where the gym is.
+    #
+    # Its zone volume covers the plaza in the middle of the ring, which would once
+    # have made the plaza a safe AFK farm. TokenService refuses to pay inside a
+    # safe zone now, so the geometry no longer has to dodge the shelter.
+    #
+    # The ring radius is set by the safe zone, not by taste: a five-point ring
+    # always puts a machine 36 degrees off an axis, where a box of half H reaches
+    # H / cos(36) = 1.24H. At H = 58 the nearest machine has to sit past 72 for the
+    # whole of it to be attackable, and 92 leaves room to walk between them.
     {
         "zone": "Garage",
-        "bearing": 135, "radius": 338, "altitude": 0, "facing": 0,
-        "shape": "lot", "half": 81, "layout": "rows",
+        "bearing": 0, "radius": 0, "altitude": 0, "facing": 0,
+        "shape": "plaza", "half": 104, "layout": "ring", "ring_radius": 92,
+        "pad_at": 40, "pad_size": 18,
         "ground": [0.19, 0.19, 0.21], "ground_material": "Asphalt",
         "rock": [0.13, 0.13, 0.15], "rock_material": "Rock",
         "accent": ACCENT_STARTER, "pad": PAD_RED,
     },
+    # Iron Hall is still a city block. `facing` overrides the usual "point back at
+    # the origin", because a gym at 45 degrees to its street looks like a mistake.
     {
         "zone": "Iron",
-        "bearing": 315, "radius": 338, "altitude": 0, "facing": 180,
-        "shape": "lot", "half": 81, "layout": "rows",
+        "bearing": 315, "radius": 359, "altitude": 0, "facing": 180,
+        "shape": "lot", "half": 66, "layout": "rows",
         "ground": [0.17, 0.18, 0.21], "ground_material": "Concrete",
         "rock": [0.12, 0.13, 0.16], "rock_material": "Rock",
         "accent": ACCENT_IRON, "pad": PAD_BLUE,
@@ -588,7 +600,13 @@ DISTRICTS = [
 # The city island everything starts on. Big enough to hold a street grid, the
 # first two gyms and a plaza with room to stand around in.
 DOWNTOWN_HALF = 330
-PLAZA_RADIUS = 92
+# Small enough that Garage Gym's machine ring clears the safe zone around it, and
+# still big enough to hold Coach, the monuments and somewhere to stand.
+PLAZA_RADIUS = 56
+# The safe volume is a BOX and the plaza is a disc, so this covers the disc rather
+# than being inscribed in it: every part of the plaza you can stand on is sheltered,
+# with nothing sheltered that is not visibly on it.
+SAFE_ZONE_HALF = 58
 # Bearing of the causeway out to the Docks. Due east so it runs straight off
 # the end of the east avenue — a bridge you have to go looking for is not a
 # bridge anyone walks.
@@ -661,8 +679,9 @@ def spawn_pad(row):
     on your side. Unrotated in local space, its LookVector points at the middle
     of the island, so you arrive facing the gym rather than the drop.
     """
-    half = row["half"]
-    pad = part("SpawnPad", [30, 1, 30], cf(0, FLOOR_TOP + 0.5, half * 0.74),
+    size = row.get("pad_size", 30)
+    at = row.get("pad_at", row["half"] * 0.74)
+    pad = part("SpawnPad", [size, 1, size], cf(0, FLOOR_TOP + 0.5, at),
                row["accent"], "Neon")
     return tagged(pad, tags=["ZoneSpawn"], attributes={"ZoneId": row["zone"]})
 
@@ -817,7 +836,53 @@ def island_lot(row, _rng):
     return out
 
 
+def island_plaza(row, _rng):
+    """No ground of its own — Downtown already paved this.
+
+    Garage Gym rings the spawn plaza, so all it needs is an apron marking where
+    the gym is and posts to give the ring an edge. Anything more would be a
+    second floor laid on top of the first.
+    """
+    radius = row["ring_radius"]
+    # Poured concrete, lighter than the asphalt around it. The machines are steel
+    # and rubber; on a dark pad they disappear into it from any distance.
+    out = [disc("Apron", 0.3, (radius + 24) * 2, FLOOR_TOP + 0.15,
+                [0.46, 0.46, 0.47], "Concrete", CanCollide=False)]
+    out.append(disc("ApronEdge", 0.35, (radius + 26) * 2, FLOOR_TOP + 0.1,
+                    [c * 0.5 for c in row["accent"]], "Neon", CanCollide=False))
+
+    # A painted bay under each machine — the cheapest thing that turns a slab into
+    # a floor somebody planned. Angles come from ring_angle, not from a second
+    # copy of the formula: the first version restated it and landed 18 degrees off,
+    # which put every bay in the gap beside its machine.
+    for index in range(MACHINE_COUNT):
+        angle = ring_angle(index, MACHINE_COUNT)
+        spot = mul(rot_y(angle), cf(0, 0, radius))
+        out.append(part("Bay", [26, 0.2, 26],
+                        mul(cf(spot[0][0], FLOOR_TOP + 0.3, spot[0][2]), rot_y(angle)),
+                        [0.30, 0.30, 0.32], "Concrete", CanCollide=False))
+        out.append(part("BayLine", [26, 0.25, 1.2],
+                        mul(cf(spot[0][0], FLOOR_TOP + 0.35, spot[0][2]), rot_y(angle)),
+                        [c * 0.7 for c in row["accent"]], "Neon", CanCollide=False))
+
+    # Posts between the machines rather than behind them, so they read as the
+    # gym's corners instead of as clutter.
+    # Posts land halfway between machines, which is what "between" has to mean once
+    # the machine angles are a function rather than a number.
+    for index in range(MACHINE_COUNT):
+        angle = ring_angle(index, MACHINE_COUNT) + 180.0 / MACHINE_COUNT
+        spot = mul(rot_y(angle), cf(0, 0, radius + 16))
+        out.append(part("GymPost", [3, 15, 3],
+                        cf(spot[0][0], FLOOR_TOP + 7.5, spot[0][2]),
+                        [0.17, 0.17, 0.19], "Metal"))
+        out.append(part("GymPostLamp", [4.4, 1.6, 4.4],
+                        cf(spot[0][0], FLOOR_TOP + 15.8, spot[0][2]),
+                        row["accent"], "Neon", CanCollide=False))
+    return out
+
+
 SHAPES = {
+    "plaza": island_plaza,
     "slab": island_slab,
     "round": island_round,
     "mesa": island_mesa,
@@ -986,7 +1051,9 @@ def props_quarry(row, rng):
         }]
         out.append(head)
 
-    for x, z, _ in rim_spots(5, half * 0.5, rng, 20):
+    # Well inside the machine ring, which sits at 0.54 of the half-size: at 0.5
+    # these stacks were standing in the middle of the equipment.
+    for x, z, _ in rim_spots(5, half * 0.28, rng, 20):
         for level in range(rng.randint(2, 4)):
             out.append(cylinder("Tyre", 2.2, 7.5,
                                 mul(cf(x, FLOOR_TOP + 1.2 + level * 2.3, z), rot_z(90)),
@@ -1206,17 +1273,15 @@ PROPS = {
 }
 
 
-def zone_volume(row):
-    """The invisible box token accrual and machine tiering both test against.
+def volume(zone_id, name, size, frame):
+    """One invisible box token accrual and machine tiering test against.
 
-    Must be a genuine volume the standing HumanoidRootPart ends up inside —
-    see the warning in ZoneConfig. Tall enough to cover a district's whole
-    playable height, and no wider than the district, so the plaza next door
-    stays outside every zone and therefore pays nothing.
+    Must be a genuine volume the standing HumanoidRootPart ends up inside — see
+    the warning in ZoneConfig. Tall enough to cover a district's whole playable
+    height.
     """
-    half = row["half"]
     return tagged({
-        "name": f"{row['zone']}Volume",
+        "name": name,
         "className": "Part",
         "properties": {
             "Anchored": True,
@@ -1224,11 +1289,25 @@ def zone_volume(row):
             "CanCollide": False,
             "Transparency": 1,
             "CastShadow": False,
-            "Size": [half * 2 + 8, 120, half * 2 + 8],
-            "CFrame": serialise_cf(cf(0, 55, 0)),
+            "Size": [round(v, 4) for v in size],
+            "CFrame": serialise_cf(frame),
             "Material": "SmoothPlastic",
         },
-    }, tags=["GymZone"], attributes={"ZoneId": row["zone"]})
+    }, tags=["GymZone"], attributes={"ZoneId": zone_id})
+
+
+def zone_volume(row):
+    """The volume token accrual and machine tiering both test against.
+
+    One box per district, sized to cover its machines. It may overlap the spawn
+    plaza's safe zone — Garage Gym's does, because it is built around it — and
+    that is fine now: TokenService refuses to pay inside a safe zone regardless
+    of which gym zone also covers it.
+    """
+    half = row["half"]
+    return [volume(row["zone"], f"{row['zone']}Volume",
+                   [half * 2 + 8, 120, half * 2 + 8], cf(0, 55, 0))]
+
 
 
 # --------------------------------------------------------------------------
@@ -1237,23 +1316,31 @@ def zone_volume(row):
 # --------------------------------------------------------------------------
 
 MACHINE_ORDER = ["BenchPress", "Dumbbells", "PullUpBar", "SitUpBench", "Treadmill"]
+MACHINE_COUNT = len(MACHINE_ORDER)
 
 
-def layout_ring(half, count):
+def ring_angle(index, count):
+    """Where a ring layout puts its Nth item. Anything decorating a ring — a
+    painted bay, a post between two of them — has to ask this rather than
+    restate it, or it ends up describing a different ring."""
+    return 360.0 * index / count + 180.0 / count
+
+
+def layout_ring(row, count):
     """Evenly around a circle, every machine facing the middle. Reads as a
     deliberate arrangement on a round island, where a grid reads as a car park."""
     out = []
-    radius = half * 0.54
+    radius = row.get("ring_radius", row["half"] * 0.54)
     for index in range(count):
-        angle = 360.0 * index / count + 18
-        out.append(mul(mul(rot_y(angle), cf(0, 0, radius)), rot_y(180)))
+        spot = mul(rot_y(ring_angle(index, count)), cf(0, 0, radius))
+        out.append(mul(spot, rot_y(180)))
     return out
 
 
-def layout_rows(half, count):
+def layout_rows(row, count):
     """Two alternating rows facing each other across an aisle — a gym floor."""
     out = []
-    span = half * 0.6
+    span = row["half"] * 0.6
     for index in range(count):
         x = -span + (2 * span) * (index / max(1, count - 1))
         near = index % 2 == 0
@@ -1284,7 +1371,9 @@ ROAD_LINE = [0.76, 0.70, 0.36]
 SIDEWALK = [0.40, 0.40, 0.41]
 KERB = [0.53, 0.53, 0.54]
 
-GRID = 140
+# Pushed out from 140 so the central block can hold the plaza AND the starter
+# gym ringing it, with room to walk between them.
+GRID = 170
 ROAD_WIDTH = 36
 # Plots run from the grid roads out to here; past it is promenade and railing.
 PLOT_EDGE = 320
@@ -1530,16 +1619,16 @@ def bench(x, z):
 
 def plaza_furniture():
     """The quest giver, the standings, and something to sit on."""
-    out = [npc("Coach", "Coach", 0, -46, ACCENT_STARTER)]
+    out = [npc("Coach", "Coach", 0, -34, ACCENT_STARTER)]
 
     # Two monuments, because LeaderboardService defines two boards. A third
     # board would be a third entry here and nothing else.
-    out.append(leaderboard_monument("StrongestBoard", "Power", -48, 44, [1.0, 0.77, 0.24]))
-    out.append(leaderboard_monument("KnockoutsBoard", "Kills", 48, 44, [1.0, 0.36, 0.36]))
+    out.append(leaderboard_monument("StrongestBoard", "Power", -34, 30, [1.0, 0.77, 0.24]))
+    out.append(leaderboard_monument("KnockoutsBoard", "Kills", 34, 30, [1.0, 0.36, 0.36]))
 
     for index in range(4):
         angle = 90 * index + 45
-        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS - 26))
+        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS - 16))
         out.extend(bench(spot[0][0], spot[0][2]))
     return out
 
@@ -1614,7 +1703,7 @@ def downtown():
     # both the PvP shelter and the origin check for free travel, so its extent
     # is a gameplay number, not decoration.
     out.append(tagged(
-        part("SpawnSafeZone", [PLAZA_RADIUS * 2 + 12, 44, PLAZA_RADIUS * 2 + 12],
+        part("SpawnSafeZone", [SAFE_ZONE_HALF * 2, 44, SAFE_ZONE_HALF * 2],
              cf(0, FLOOR_TOP + 22, 0), [0.4, 0.8, 1.0], "ForceField",
              CanCollide=False, Transparency=0.94, CastShadow=False),
         tags=["SafeZone"],
@@ -1649,10 +1738,11 @@ def downtown():
             out.extend(palm(along, sign * (DOWNTOWN_HALF - 16), rng))
             out.extend(palm(sign * (DOWNTOWN_HALF - 16), along, rng))
 
-    # Palms ringing the plaza, between the lamps.
+    # Palms ring the starter gym rather than the plaza: between the two is where
+    # players walk, and a tree there is something to walk around.
     for index in range(8):
         angle = 360.0 * index / 8 + 22.5
-        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS + 14))
+        spot = mul(rot_y(angle), cf(0, 0, 130))
         out.extend(palm(spot[0][0], spot[0][2], rng))
 
     out.extend(plaza_furniture())
@@ -1671,7 +1761,7 @@ def build_world():
 
         pieces = SHAPES[row["shape"]](row, rng)
         pieces.append(spawn_pad(row))
-        pieces.append(zone_volume(row))
+        pieces.extend(zone_volume(row))
         children = [place(origin, piece) for piece in pieces]
 
         # Props live in their own folder: it keeps Studio navigable, and it is
@@ -1684,7 +1774,7 @@ def build_world():
 
         structure.append(folder(row["zone"], children))
 
-        spots = LAYOUTS[row["layout"]](row["half"], len(MACHINE_ORDER))
+        spots = LAYOUTS[row["layout"]](row, len(MACHINE_ORDER))
         machines.append(folder(row["zone"], [
             machine(f"{row['zone']}{equipment_id}", equipment_id, mul(origin, spot),
                     BUILDERS[equipment_id](row["pad"], row["accent"]))
