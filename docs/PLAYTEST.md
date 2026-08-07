@@ -21,6 +21,10 @@ Two real bugs were found and fixed this way — a DataStore error aborting the w
 server boot, and gym zones tagged on floor slabs so tokens never accrued. Neither was
 reachable by static analysis.
 
+That session predates checklist 61–63, which replaced the coloured-box gym with built
+machines and swapped proximity auto-training for hold-E mounting. **Everything in step 2
+below needs re-running from scratch**, and the training poses have never been seen move.
+
 **Still unverified**, and the reason the rest of this document exists: anything needing
 two players (PvP, the training interrupt, kill feed, bounties), real DataStore
 persistence, Robux purchases, and whether any of the balance numbers feel right.
@@ -44,12 +48,19 @@ step says otherwise.
 
 ## 2. Training loop
 
-- [ ] Walk near the Bench Press. Training starts with no input.
+- [ ] Walk up to the Bench Press. A "Hold E to Bench" prompt appears.
+- [ ] Hold **E**. You are placed on the machine, locked there, and start pressing.
 - [ ] Chest climbs in the HUD; total power climbs with it.
-- [ ] The combo readout rises toward x2.00 the longer you stand there.
-- [ ] Walk away. Training stops and the combo resets.
+- [ ] The combo readout rises toward x2.00 the longer you stay on.
+- [ ] Hold **E** again. You are put down beside the machine and the combo resets.
+- [ ] **Watch the pose on each machine.** The angles in `PoseConfig` are the one thing
+      here that has never been seen running: check you are lying on the bench rather than
+      through it, hanging from the pull-up bar rather than above it, and that arms and
+      legs bend the way a body bends. Every number is tunable in that one file.
+- [ ] Mount all three spots on the Dumbbell Rack with three characters. The fourth is
+      refused with "in use", and the billboard counts down free spots.
 - [ ] Billboards show each machine's stat and its per-second rate.
-- [ ] Pull-Up Bar and Sit-Up Bench read "Locked" until 500 power; Treadmill until 2000.
+- [ ] Pull-Up Bar and Ab Bench read "Locked" until 500 power; Treadmill until 2000.
 - [ ] Your arms and chest visibly thicken as the stats climb.
 - [ ] **Watch the joints** at high scale — limbs should stay in their sockets, and the
       character should stand on the floor rather than sinking. This is the part most
@@ -59,8 +70,11 @@ step says otherwise.
 
 - [ ] Player B presses **F** near player A. A takes damage; both see feed lines.
 - [ ] Hitting A *while A is training* knocks A off the machine for ~3 seconds and shows
-      "Knocked off the machine!". **This is the whole game — if it does not feel
-      annoying, tune `STAGGER_SECONDS` in `TrainingService`.**
+      "Knocked off the machine!". A cannot remount until the stagger expires, and has to
+      hold E again to restart. **This is the whole game — if it does not feel annoying,
+      tune `STAGGER_SECONDS` in `TrainingService`.**
+- [ ] A mounted player cannot dodge — confirm B can walk up and hit a benching A freely,
+      and that A is genuinely stuck rather than sliding off under the hit.
 - [ ] Kill A. A respawns after ~4s with stats, cash, and tokens **fully intact**.
 - [ ] Both players' kill/death counts update in the tab bar.
 - [ ] Stand inside the blue spawn bubble — damage is nullified for attacker and victim.
@@ -115,8 +129,9 @@ Nothing is purchasable until these are filled in.
 - [ ] Paste real asset ids into `EffectsConfig.Sounds`. The game is deliberately silent
       until then; every entry with a blank id is skipped.
 - [ ] Playtest with 10+ players and watch the server's script activity. The per-frame
-      loops to watch are `TrainingService` (per player per frame) and `MuscleController`
-      (per character per frame, client-side).
+      loops to watch are `TrainingService` (per *mounted* player per frame),
+      `MuscleController` and `TrainingPoseController` (both per character per frame,
+      client-side).
 - [ ] Confirm StreamingEnabled does not pop machines in late — if it does, raise
       `StreamingMinRadius` in `default.project.json`.
 
