@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 76 built / 78** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 78 built / 80** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -317,6 +317,18 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       district's own frame. And discs are cylinders stood on end, so their two equal axes
       are a circle, not a square.
 
+## Phase 12 — Reachable without being told
+
+- [x] 79. **Buttons, not a hotkey.** Map, Upgrades, Shop, Top and Settings get a permanent
+      bar down the right of the screen. Everything the menu holds used to be behind either
+      the M key or a walk back to the plaza, and neither is discoverable: a player who
+      never presses M never learns the game has upgrades, and one out on Storm Peak cannot
+      reach the shop without travelling home first. **Quests deliberately has no button** —
+      Coach standing in the plaza is how you are meant to find those, and a sixth button
+      beside the others would make him scenery. Which tabs appear is `OnBar` on the tab
+      itself, defaulting to true, so the bar never names a screen and a new tab arrives
+      with a button already. `Toggle(tabId)` closes on a second press, because a button
+      that is always on screen has to put you back where you were.
 ---
 
 ## Milestone 1 — Vertical Slice

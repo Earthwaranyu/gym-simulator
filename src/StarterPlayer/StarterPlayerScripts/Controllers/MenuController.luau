@@ -50,6 +50,10 @@ type Tab = {
 	Id: string,
 	DisplayName: string,
 	Render: (parent: Frame) -> (),
+	-- Whether MenuBarController gives this tab an on-screen button. Defaults to
+	-- true, so a new screen is reachable without touching the bar; Quests opts
+	-- out because Coach in the plaza is how you are meant to find it.
+	OnBar: boolean?,
 }
 
 local tabs: { Tab } = {}
@@ -125,6 +129,7 @@ function MenuController:Init()
 		{
 			Id = "Quests",
 			DisplayName = "Quests",
+			OnBar = false,
 			Render = function(parent)
 				self:_renderQuests(parent)
 			end,
@@ -594,12 +599,39 @@ function MenuController:_renderTabStrip()
 	end
 end
 
-function MenuController:Toggle()
+--[[
+	Toggles the menu. With a tab id, toggles *that* screen: opens on it, or closes
+	if it is already the one showing — which is what a button in a bar has to do,
+	because pressing it twice should put you back where you were.
+]]
+function MenuController:Toggle(tabId: string?)
+	if tabId ~= nil and isOpen and activeTab ~= tabId then
+		self:Open(tabId)
+		return
+	end
+
 	isOpen = not isOpen
 	screen.Enabled = isOpen
+
 	if isOpen then
+		if tabId ~= nil then
+			activeTab = tabId
+		end
 		self:_refresh()
 	end
+end
+
+--[[
+	The tabs that should appear as on-screen buttons, in declaration order.
+]]
+function MenuController:GetBarTabs(): { { Id: string, DisplayName: string } }
+	local out = {}
+	for _, tab in tabs do
+		if tab.OnBar ~= false then
+			table.insert(out, { Id = tab.Id, DisplayName = tab.DisplayName })
+		end
+	end
+	return out
 end
 
 --[[
