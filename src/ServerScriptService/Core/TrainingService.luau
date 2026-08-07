@@ -287,6 +287,14 @@ function TrainingService:_mount(player: Player, station: Instance, record: Stati
 	character:PivotTo(anchorCFrame)
 	root.Anchored = true
 
+	-- Which spot they are on, so clients can find the weights parked beside it and
+	-- put them in this lifter's hands. Published before the pose attributes below,
+	-- so a client reacting to the pose already has the anchor to work from.
+	local anchorValue = Instance.new("ObjectValue")
+	anchorValue.Name = EquipmentConfig.ANCHOR_VALUE_NAME
+	anchorValue.Value = anchor
+	anchorValue.Parent = character
+
 	-- Every client animates every training player it can see, so which pose to run
 	-- travels as a character attribute rather than a remote to one owner.
 	character:SetAttribute(PoseConfig.POSE_ATTRIBUTE, definition.PoseId)
@@ -320,6 +328,12 @@ function TrainingService:_dismount(player: Player, moveToExit: boolean)
 	if character.Parent ~= nil then
 		character:SetAttribute(PoseConfig.POSE_ATTRIBUTE, nil)
 		character:SetAttribute(PoseConfig.INTERVAL_ATTRIBUTE, nil)
+
+		-- Clearing this is what sends the weights back to their rack.
+		local anchorValue = character:FindFirstChild(EquipmentConfig.ANCHOR_VALUE_NAME)
+		if anchorValue ~= nil then
+			anchorValue:Destroy()
+		end
 	end
 
 	local root = session.root

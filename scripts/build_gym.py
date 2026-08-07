@@ -188,12 +188,21 @@ def machine(name, equipment_id, origin, children):
     }
 
 
+def group(name, children, class_name="Model"):
+    """A container with no geometry of its own — a training spot, or a held prop."""
+    return {"name": name, "className": class_name, "children": children}
+
+
 def place(origin, child):
-    """Re-expresses a locally-built child in world space."""
-    local = child["properties"]["CFrame"]
-    (px, py, pz) = local[0:3]
-    m = (tuple(local[3:6]), tuple(local[6:9]), tuple(local[9:12]))
-    child["properties"]["CFrame"] = serialise_cf(mul(origin, ((px, py, pz), m)))
+    """Re-expresses a locally-built child, and everything under it, in world space."""
+    properties = child.get("properties", {})
+    if "CFrame" in properties:
+        local = properties["CFrame"]
+        (px, py, pz) = local[0:3]
+        m = (tuple(local[3:6]), tuple(local[6:9]), tuple(local[9:12]))
+        properties["CFrame"] = serialise_cf(mul(origin, ((px, py, pz), m)))
+    for sub in child.get("children", []):
+        place(origin, sub)
     return child
 
 
@@ -244,15 +253,23 @@ def bench_press(pad_color, accent):
     out.append(part("HeadPad", [2.7, 0.35, 1.6],
                     cf(0, FLOOR_TOP + 1.75, -2.9), pad_color, "Fabric"))
 
-    # Loaded barbell sitting in the hooks, above the chest.
+    # The barbell is a held prop rather than scenery: while a set runs it leaves the
+    # hooks and tracks the lifter's hands, so a press moves the weight instead of
+    # miming underneath it. It is authored resting in the hooks, which is where it
+    # sits whenever nobody is on the bench.
     bar_y = FLOOR_TOP + 4.55
-    out.append(cylinder("Bar", 7.6, 0.32, cf(0, bar_y, -0.45), CHROME, "Metal",
-                        Reflectance=0.3))
-    plates("Bar", bar_y, -0.45, (2.35, 2.85), 1.25, 0.4, out)
+    bar = [cylinder("Bar", 7.6, 0.32, cf(0, bar_y, -0.45), CHROME, "Metal",
+                    Reflectance=0.3, CanCollide=False)]
+    plates("Bar", bar_y, -0.45, (2.35, 2.85), 1.25, 0.4, bar)
+    for piece in bar:
+        piece["properties"]["CanCollide"] = False
 
-    # Lying on the back: head toward the rack (-Z), face toward the ceiling.
-    out.append(marker("TrainAnchor", [2, 2, 1],
-                      axes((0, FLOOR_TOP + 2.85, 0.1), (-1, 0, 0), (0, 0, -1))))
+    out.append(group("Spot", [
+        # Lying on the back: head toward the rack (-Z), face toward the ceiling.
+        marker("TrainAnchor", [2, 2, 1],
+               axes((0, FLOOR_TOP + 2.85, 0.1), (-1, 0, 0), (0, 0, -1))),
+        group("HeldBoth", bar),
+    ]))
     out.append(marker("TrainExit", [2, 2, 1],
                       mul(cf(3.6, FLOOR_TOP + ROOT_HEIGHT, 1.5), rot_y(-90))))
     return out
@@ -269,24 +286,44 @@ def dumbbell_rack(pad_color, accent):
     out.append(part("AccentStripe", [13.0, 0.35, 0.15],
                     cf(0, FLOOR_TOP + 3.4, -2.28), accent, "Neon"))
 
-    # Two shelves, the lower one further forward so both are reachable.
-    for tier, (shelf_y, shelf_z) in enumerate(((1.05, -1.0), (2.55, -1.75))):
-        out.append(part("Shelf", [12.6, 0.3, 1.9],
-                        cf(0, FLOOR_TOP + shelf_y, shelf_z), STEEL, "DiamondPlate"))
-        for index in range(6):
-            x = -5.25 + index * 2.1
-            size = 0.62 + tier * 0.16
-            y = FLOOR_TOP + shelf_y + 0.15 + size
-            out.append(cylinder("DumbbellHandle", 1.5, 0.3,
-                                cf(x, y, shelf_z), CHROME, "Metal", Reflectance=0.25))
-            for side in (-1, 1):
-                out.append(cylinder("DumbbellHead", 0.75, size * 2,
-                                    cf(x + side * 0.95, y, shelf_z), RUBBER, "Pebble"))
+    # Lower shelf: scenery, six fixed dumbbells.
+    shelf_y, shelf_z = 1.05, -1.0
+    out.append(part("Shelf", [12.6, 0.3, 1.9],
+                    cf(0, FLOOR_TOP + shelf_y, shelf_z), STEEL, "DiamondPlate"))
+    for index in range(6):
+        x = -5.25 + index * 2.1
+        y = FLOOR_TOP + shelf_y + 0.15 + 0.62
+        out.append(cylinder("DumbbellHandle", 1.5, 0.3,
+                            cf(x, y, shelf_z), CHROME, "Metal", Reflectance=0.25))
+        for side in (-1, 1):
+            out.append(cylinder("DumbbellHead", 0.75, 1.24,
+                                cf(x + side * 0.95, y, shelf_z), RUBBER, "Pebble"))
+
+    # Upper shelf: the three pairs that are actually picked up. Each pair belongs to
+    # one spot and is authored resting on the shelf, which is where it sits until
+    # somebody curls with it.
+    top_y, top_z = 2.55, -1.75
+    out.append(part("Shelf", [12.6, 0.3, 1.9],
+                    cf(0, FLOOR_TOP + top_y, top_z), STEEL, "DiamondPlate"))
+
+    def dumbbell(name, x, y, z):
+        pieces = [cylinder("Handle", 1.5, 0.3, cf(x, y, z), CHROME, "Metal",
+                           Reflectance=0.25, CanCollide=False)]
+        for side in (-1, 1):
+            pieces.append(cylinder("Head", 0.75, 1.56, cf(x + side * 0.95, y, z),
+                                   RUBBER, "Pebble", CanCollide=False))
+        return group(name, pieces)
 
     # Three curl spots facing the rack (a CFrame's look is its -Z, so an
     # unrotated anchor in front of the rack already faces back into it).
+    rest_y = FLOOR_TOP + top_y + 0.15 + 0.78
     for x in (-4.2, 0.0, 4.2):
-        out.append(anchor_standing(cf(x, FLOOR_TOP, 1.6)))
+        out.append(group("Spot", [
+            anchor_standing(cf(x, FLOOR_TOP, 1.6)),
+            dumbbell("HeldRight", x, rest_y, top_z + 0.55),
+            dumbbell("HeldLeft", x, rest_y, top_z - 0.55),
+        ]))
+
     out.append(marker("TrainExit", [2, 2, 1],
                       cf(0, FLOOR_TOP + ROOT_HEIGHT, 4.5)))
     return out

@@ -37,6 +37,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local PoseConfig = require(ReplicatedStorage.Modules.PoseConfig)
+local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 
 -- Seconds spent easing from wherever the body was into the pose, so mounting a
 -- machine does not snap.
@@ -44,6 +45,11 @@ local BLEND_SECONDS = 0.3
 
 -- Bound once: the blend-in lerps out of this, and clearing a joint restores it.
 local IDENTITY: CFrame = CFrame.identity
+
+-- How a single-handed weight sits relative to the hand holding it. A dumbbell is
+-- authored with its handle along its own X, and a hand's X runs across the palm,
+-- so the two already agree; this only lifts it into the grip.
+local GRIP_OFFSET = CFrame.new(0, -0.35, 0)
 
 --[[
 	A rig joint, described by the one thing this controller needs from it.
@@ -61,10 +67,26 @@ type Bound = {
 	joint: Joint,
 }
 
+--[[
+	A weight that follows the lifter's hands, and where it belongs when they let go.
+
+	Props are moved on the client only. Nothing about them is replicated: every client
+	independently puts the same weight in the same hands, and a client that never sees
+	the lifter leaves it racked. That also means `rest` is read straight off the
+	instance the first time it is bound, when it is guaranteed to still be at rest,
+	and remembered from then on.
+]]
+type HeldProp = {
+	prop: PVInstance,
+	hand: string,
+	rest: CFrame,
+}
+
 type Entry = {
 	pose: PoseConfig.Pose,
 	interval: number,
 	joints: { Bound },
+	props: { HeldProp },
 	startedAt: number,
 }
 
@@ -74,6 +96,19 @@ local TrainingPoseController = {
 }
 
 local active: { [Model]: Entry } = {}
+
+-- Where every prop ever bound sits when nobody is holding it. Kept globally and
+-- written once, so a prop always has somewhere honest to go back to even if the
+-- lifter holding it disconnects mid-rep.
+local restCFrames: { [PVInstance]: CFrame? } = {}
+
+--[[
+	The part a hand's weight should follow, on either rig generation.
+]]
+local function findHand(character: Model, hand: string): BasePart?
+	local part = character:FindFirstChild(`{hand}Hand`) or character:FindFirstChild(`{hand} Arm`)
+	return if part ~= nil and part:IsA("BasePart") then part else nil
+end
 
 --[[
 	Finds the joint a motion drives, translating R15 joint names to their R6
@@ -107,6 +142,52 @@ local function findJoint(character: Model, rigType: Enum.HumanoidRigType, jointN
 end
 
 --[[
+	Collects the weights parked beside the anchor a character is training on.
+
+	The anchor arrives as an ObjectValue the server puts in the character; the props
+	are its siblings, so a machine declares them purely by where it puts them in the
+	model. A machine with none — a treadmill, an ab bench — yields an empty list and
+	costs nothing further.
+]]
+local function collectProps(character: Model): { HeldProp }
+	local props: { HeldProp } = {}
+
+	local anchorValue = character:FindFirstChild(EquipmentConfig.ANCHOR_VALUE_NAME)
+	if anchorValue == nil or not anchorValue:IsA("ObjectValue") then
+		return props
+	end
+
+	local anchor = anchorValue.Value
+	if anchor == nil or anchor.Parent == nil then
+		return props
+	end
+
+	for hand, name in EquipmentConfig.HELD_NAMES do
+		local found = anchor.Parent:FindFirstChild(name)
+		if found ~= nil and found:IsA("PVInstance") then
+			local remembered = restCFrames[found]
+			local rest: CFrame = if remembered ~= nil then remembered else found:GetPivot()
+			restCFrames[found] = rest
+			table.insert(props, { prop = found, hand = hand, rest = rest })
+		end
+	end
+
+	return props
+end
+
+--[[
+	Puts every weight back where the machine keeps it.
+]]
+local function releaseProps(entry: Entry)
+	for _, held in entry.props do
+		if held.prop.Parent ~= nil then
+			held.prop:PivotTo(held.rest)
+		end
+	end
+	table.clear(entry.props)
+end
+
+--[[
 	Stops posing a character and hands its joints back.
 
 	Clearing Transform matters for joints no animation happens to be driving: the
@@ -120,6 +201,7 @@ function TrainingPoseController:_clear(character: Model)
 	end
 
 	active[character] = nil
+	releaseProps(entry)
 
 	for _, bound in entry.joints do
 		if bound.joint.Parent ~= nil then
@@ -174,8 +256,25 @@ function TrainingPoseController:_sync(character: Model)
 		pose = pose,
 		interval = interval :: number,
 		joints = joints,
+		props = collectProps(character),
 		startedAt = os.clock(),
 	}
+end
+
+--[[
+	Re-reads which weights a character is holding.
+
+	Separate from _sync because the anchor ObjectValue and the pose attribute are two
+	instances replicating independently: whichever lands second has to be able to
+	complete the picture on its own.
+]]
+function TrainingPoseController:_syncProps(character: Model)
+	local entry = active[character]
+	if entry == nil then
+		return
+	end
+	releaseProps(entry)
+	entry.props = collectProps(character)
 end
 
 local function poseAt(motion: PoseConfig.JointMotion, alpha: number): CFrame
@@ -217,6 +316,55 @@ function TrainingPoseController:_apply()
 
 			bound.joint.Transform = IDENTITY:Lerp(poseAt(bound.motion, alpha), blend)
 		end
+
+		self:_carry(character, entry)
+	end
+end
+
+--[[
+	Moves a lifter's weights into their hands for this frame.
+
+	Reads hand positions rather than recomputing them from the pose, so a weight
+	follows whatever the body is actually doing — including the idle animation
+	underneath, and the blend on the way in. The hands are a frame behind the joint
+	writes just made, which at 60fps nobody can see.
+]]
+function TrainingPoseController:_carry(character: Model, entry: Entry)
+	for _, held in entry.props do
+		if held.prop.Parent == nil then
+			continue
+		end
+
+		if held.hand == "Both" then
+			-- A barbell spans the grip: centred between the hands and lying along the
+			-- line joining them, so the plates stay upright however the arms move.
+			local right = findHand(character, "Right")
+			local left = findHand(character, "Left")
+			if right == nil or left == nil then
+				continue
+			end
+
+			local span = right.Position - left.Position
+			if span.Magnitude < 0.1 then
+				continue
+			end
+
+			local axis = span.Unit
+			local back = axis:Cross(Vector3.yAxis)
+			if back.Magnitude < 0.01 then
+				continue
+			end
+			back = back.Unit
+
+			held.prop:PivotTo(
+				CFrame.fromMatrix((right.Position + left.Position) / 2, axis, back:Cross(axis).Unit, back)
+			)
+		else
+			local hand = findHand(character, held.hand)
+			if hand ~= nil then
+				held.prop:PivotTo(hand.CFrame * GRIP_OFFSET)
+			end
+		end
 	end
 end
 
@@ -226,6 +374,16 @@ function TrainingPoseController:_watch(character: Model)
 	character:GetAttributeChangedSignal(PoseConfig.POSE_ATTRIBUTE):Connect(function()
 		self:_sync(character)
 	end)
+
+	-- The anchor reference and the pose attribute replicate independently, so the
+	-- weights are rebound whenever the reference itself appears or disappears.
+	local function onAnchorValue(child: Instance)
+		if child.Name == EquipmentConfig.ANCHOR_VALUE_NAME then
+			self:_syncProps(character)
+		end
+	end
+	character.ChildAdded:Connect(onAnchorValue)
+	character.ChildRemoved:Connect(onAnchorValue)
 
 	character.AncestryChanged:Connect(function()
 		if character.Parent == nil then

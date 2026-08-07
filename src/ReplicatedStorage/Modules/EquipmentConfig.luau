@@ -23,6 +23,13 @@
 	    oriented, so a bench lays them on their back and a bar leaves them hanging,
 	    with no per-machine code. More than one anchor means more than one player can
 	    use the machine at once.
+	  * HeldBoth / HeldRight / HeldLeft (optional). Weights the lifter picks up. Put
+	    them beside a TrainAnchor — inside a "Spot" model holding both — and while
+	    somebody trains on that anchor the part tracks their hands: HeldBoth spans
+	    both (a barbell), HeldRight and HeldLeft take one each (dumbbells). Author
+	    them where they belong at rest, racked or on the shelf, because that is where
+	    they sit whenever the spot is empty. Without this a lifter mimes the exercise
+	    under a weight that never moves.
 	  * TrainExit (optional). Where a player is put down when they leave. Without
 	    one they stand up where they trained, which on some machines means standing
 	    inside it.
@@ -61,6 +68,19 @@ local ID_ATTRIBUTE = "EquipmentId"
 local ANCHOR_NAME = "TrainAnchor"
 local EXIT_NAME = "TrainExit"
 local BASE_NAME = "Base"
+
+-- Weights that follow a lifter's hands, found beside the anchor they belong to.
+-- Keyed by which hand carries them, which is all the client needs to place them.
+local HELD_NAMES: { [string]: string } = {
+	Both = "HeldBoth",
+	Right = "HeldRight",
+	Left = "HeldLeft",
+}
+
+-- ObjectValue the server puts in a training character, pointing at the anchor they
+-- are on. Held props hang off that anchor, and an ObjectValue is used because an
+-- attribute cannot hold an instance reference.
+local ANCHOR_VALUE_NAME = "TrainingAnchor"
 
 -- Attributes the server writes back onto a station so clients can label it
 -- without asking. Set on the model, so they replicate like any other attribute.
@@ -134,6 +154,8 @@ EquipmentConfig.ID_ATTRIBUTE = ID_ATTRIBUTE
 EquipmentConfig.ANCHOR_NAME = ANCHOR_NAME
 EquipmentConfig.EXIT_NAME = EXIT_NAME
 EquipmentConfig.BASE_NAME = BASE_NAME
+EquipmentConfig.HELD_NAMES = HELD_NAMES
+EquipmentConfig.ANCHOR_VALUE_NAME = ANCHOR_VALUE_NAME
 EquipmentConfig.OCCUPANCY_ATTRIBUTE = OCCUPANCY_ATTRIBUTE
 EquipmentConfig.CAPACITY_ATTRIBUTE = CAPACITY_ATTRIBUTE
 EquipmentConfig.PROMPT_HOLD_SECONDS = PROMPT_HOLD_SECONDS

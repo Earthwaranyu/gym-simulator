@@ -491,289 +491,308 @@
           }
         },
         {
-          "name": "Bar",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -26.0,
-              5.55,
-              -4.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              7.6,
-              0.32,
-              0.32
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.3
-          }
-        },
-        {
-          "name": "BarPlate",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -28.35,
-              5.55,
-              -4.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.4,
-              2.5,
-              2.5
-            ],
-            "Color": [
-              0.1,
-              0.11,
-              0.13
-            ],
-            "Material": "DiamondPlate",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "BarPlate",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -28.85,
-              5.55,
-              -4.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.4,
-              2.5,
-              2.5
-            ],
-            "Color": [
-              0.1,
-              0.11,
-              0.13
-            ],
-            "Material": "DiamondPlate",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "BarCollar",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -29.3,
-              5.55,
-              -4.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.35,
-              0.75,
-              0.75
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "BarPlate",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -23.65,
-              5.55,
-              -4.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.4,
-              2.5,
-              2.5
-            ],
-            "Color": [
-              0.1,
-              0.11,
-              0.13
-            ],
-            "Material": "DiamondPlate",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "BarPlate",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -23.15,
-              5.55,
-              -4.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.4,
-              2.5,
-              2.5
-            ],
-            "Color": [
-              0.1,
-              0.11,
-              0.13
-            ],
-            "Material": "DiamondPlate",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "BarCollar",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -22.7,
-              5.55,
-              -4.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.35,
-              0.75,
-              0.75
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "TrainAnchor",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -26.0,
-              3.85,
-              -3.9,
-              -1.0,
-              0.0,
-              0.0,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              -1.0,
-              0.0
-            ],
-            "Size": [
-              2,
-              2,
-              1
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          }
+          "name": "Spot",
+          "className": "Model",
+          "children": [
+            {
+              "name": "TrainAnchor",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  -26.0,
+                  3.85,
+                  -3.9,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -1.0,
+                  0.0
+                ],
+                "Size": [
+                  2,
+                  2,
+                  1
+                ],
+                "Color": [
+                  1,
+                  1,
+                  1
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Transparency": 1,
+                "CanCollide": false,
+                "CastShadow": false
+              }
+            },
+            {
+              "name": "HeldBoth",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Bar",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -26.0,
+                      5.55,
+                      -4.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      7.6,
+                      0.32,
+                      0.32
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.3,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarPlate",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -28.35,
+                      5.55,
+                      -4.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.4,
+                      2.5,
+                      2.5
+                    ],
+                    "Color": [
+                      0.1,
+                      0.11,
+                      0.13
+                    ],
+                    "Material": "DiamondPlate",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarPlate",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -28.85,
+                      5.55,
+                      -4.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.4,
+                      2.5,
+                      2.5
+                    ],
+                    "Color": [
+                      0.1,
+                      0.11,
+                      0.13
+                    ],
+                    "Material": "DiamondPlate",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarCollar",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -29.3,
+                      5.55,
+                      -4.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.35,
+                      0.75,
+                      0.75
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarPlate",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -23.65,
+                      5.55,
+                      -4.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.4,
+                      2.5,
+                      2.5
+                    ],
+                    "Color": [
+                      0.1,
+                      0.11,
+                      0.13
+                    ],
+                    "Material": "DiamondPlate",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarPlate",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -23.15,
+                      5.55,
+                      -4.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.4,
+                      2.5,
+                      2.5
+                    ],
+                    "Color": [
+                      0.1,
+                      0.11,
+                      0.13
+                    ],
+                    "Material": "DiamondPlate",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarCollar",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -22.7,
+                      5.55,
+                      -4.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.35,
+                      0.75,
+                      0.75
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "name": "TrainExit",
@@ -1668,751 +1687,823 @@
           }
         },
         {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -25.25,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
+          "name": "Spot",
+          "className": "Model",
+          "children": [
+            {
+              "name": "TrainAnchor",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  30.4,
+                  4.0,
+                  -24.2,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "Size": [
+                  2,
+                  2,
+                  1
+                ],
+                "Color": [
+                  1,
+                  1,
+                  1
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Transparency": 1,
+                "CanCollide": false,
+                "CastShadow": false
+              }
+            },
+            {
+              "name": "HeldRight",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -24.2,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -25.15,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -23.25,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            },
+            {
+              "name": "HeldLeft",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -24.2,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -25.15,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -23.25,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -26.2,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
+          "name": "Spot",
+          "className": "Model",
+          "children": [
+            {
+              "name": "TrainAnchor",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  30.4,
+                  4.0,
+                  -20.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "Size": [
+                  2,
+                  2,
+                  1
+                ],
+                "Color": [
+                  1,
+                  1,
+                  1
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Transparency": 1,
+                "CanCollide": false,
+                "CastShadow": false
+              }
+            },
+            {
+              "name": "HeldRight",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -20.0,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -20.95,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -19.05,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            },
+            {
+              "name": "HeldLeft",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -20.0,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -20.95,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -19.05,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -24.3,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -23.15,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -24.1,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -22.2,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -21.05,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -22.0,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -20.1,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -18.95,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -19.9,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -18.0,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -16.85,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -17.8,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -15.9,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -14.75,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -15.7,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -13.8,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "TrainAnchor",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              30.4,
-              4.0,
-              -24.2,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              2,
-              2,
-              1
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          }
-        },
-        {
-          "name": "TrainAnchor",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              30.4,
-              4.0,
-              -20.0,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              2,
-              2,
-              1
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          }
-        },
-        {
-          "name": "TrainAnchor",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              30.4,
-              4.0,
-              -15.8,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              2,
-              2,
-              1
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          }
+          "name": "Spot",
+          "className": "Model",
+          "children": [
+            {
+              "name": "TrainAnchor",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  30.4,
+                  4.0,
+                  -15.8,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "Size": [
+                  2,
+                  2,
+                  1
+                ],
+                "Color": [
+                  1,
+                  1,
+                  1
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Transparency": 1,
+                "CanCollide": false,
+                "CastShadow": false
+              }
+            },
+            {
+              "name": "HeldRight",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -15.8,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -16.75,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -14.85,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            },
+            {
+              "name": "HeldLeft",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -15.8,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -16.75,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -14.85,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "name": "TrainExit",
@@ -4277,289 +4368,308 @@
           }
         },
         {
-          "name": "Bar",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -26.0,
-              5.55,
-              -94.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              7.6,
-              0.32,
-              0.32
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.3
-          }
-        },
-        {
-          "name": "BarPlate",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -28.35,
-              5.55,
-              -94.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.4,
-              2.5,
-              2.5
-            ],
-            "Color": [
-              0.1,
-              0.11,
-              0.13
-            ],
-            "Material": "DiamondPlate",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "BarPlate",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -28.85,
-              5.55,
-              -94.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.4,
-              2.5,
-              2.5
-            ],
-            "Color": [
-              0.1,
-              0.11,
-              0.13
-            ],
-            "Material": "DiamondPlate",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "BarCollar",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -29.3,
-              5.55,
-              -94.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.35,
-              0.75,
-              0.75
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "BarPlate",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -23.65,
-              5.55,
-              -94.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.4,
-              2.5,
-              2.5
-            ],
-            "Color": [
-              0.1,
-              0.11,
-              0.13
-            ],
-            "Material": "DiamondPlate",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "BarPlate",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -23.15,
-              5.55,
-              -94.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.4,
-              2.5,
-              2.5
-            ],
-            "Color": [
-              0.1,
-              0.11,
-              0.13
-            ],
-            "Material": "DiamondPlate",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "BarCollar",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -22.7,
-              5.55,
-              -94.45,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "Size": [
-              0.35,
-              0.75,
-              0.75
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "TrainAnchor",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              -26.0,
-              3.85,
-              -93.9,
-              -1.0,
-              0.0,
-              0.0,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              -1.0,
-              0.0
-            ],
-            "Size": [
-              2,
-              2,
-              1
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          }
+          "name": "Spot",
+          "className": "Model",
+          "children": [
+            {
+              "name": "TrainAnchor",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  -26.0,
+                  3.85,
+                  -93.9,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -1.0,
+                  0.0
+                ],
+                "Size": [
+                  2,
+                  2,
+                  1
+                ],
+                "Color": [
+                  1,
+                  1,
+                  1
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Transparency": 1,
+                "CanCollide": false,
+                "CastShadow": false
+              }
+            },
+            {
+              "name": "HeldBoth",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Bar",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -26.0,
+                      5.55,
+                      -94.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      7.6,
+                      0.32,
+                      0.32
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.3,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarPlate",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -28.35,
+                      5.55,
+                      -94.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.4,
+                      2.5,
+                      2.5
+                    ],
+                    "Color": [
+                      0.1,
+                      0.11,
+                      0.13
+                    ],
+                    "Material": "DiamondPlate",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarPlate",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -28.85,
+                      5.55,
+                      -94.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.4,
+                      2.5,
+                      2.5
+                    ],
+                    "Color": [
+                      0.1,
+                      0.11,
+                      0.13
+                    ],
+                    "Material": "DiamondPlate",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarCollar",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -29.3,
+                      5.55,
+                      -94.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.35,
+                      0.75,
+                      0.75
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarPlate",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -23.65,
+                      5.55,
+                      -94.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.4,
+                      2.5,
+                      2.5
+                    ],
+                    "Color": [
+                      0.1,
+                      0.11,
+                      0.13
+                    ],
+                    "Material": "DiamondPlate",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarPlate",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -23.15,
+                      5.55,
+                      -94.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.4,
+                      2.5,
+                      2.5
+                    ],
+                    "Color": [
+                      0.1,
+                      0.11,
+                      0.13
+                    ],
+                    "Material": "DiamondPlate",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "BarCollar",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      -22.7,
+                      5.55,
+                      -94.45,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "Size": [
+                      0.35,
+                      0.75,
+                      0.75
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "name": "TrainExit",
@@ -5454,751 +5564,823 @@
           }
         },
         {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -115.25,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
+          "name": "Spot",
+          "className": "Model",
+          "children": [
+            {
+              "name": "TrainAnchor",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  30.4,
+                  4.0,
+                  -114.2,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "Size": [
+                  2,
+                  2,
+                  1
+                ],
+                "Color": [
+                  1,
+                  1,
+                  1
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Transparency": 1,
+                "CanCollide": false,
+                "CastShadow": false
+              }
+            },
+            {
+              "name": "HeldRight",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -114.2,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -115.15,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -113.25,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            },
+            {
+              "name": "HeldLeft",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -114.2,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -115.15,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -113.25,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -116.2,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
+          "name": "Spot",
+          "className": "Model",
+          "children": [
+            {
+              "name": "TrainAnchor",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  30.4,
+                  4.0,
+                  -110.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "Size": [
+                  2,
+                  2,
+                  1
+                ],
+                "Color": [
+                  1,
+                  1,
+                  1
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Transparency": 1,
+                "CanCollide": false,
+                "CastShadow": false
+              }
+            },
+            {
+              "name": "HeldRight",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -110.0,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -110.95,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -109.05,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            },
+            {
+              "name": "HeldLeft",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -110.0,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -110.95,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -109.05,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -114.3,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -113.15,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -114.1,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -112.2,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -111.05,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -112.0,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -110.1,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -108.95,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -109.9,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -108.0,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -106.85,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -107.8,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -105.9,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHandle",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -104.75,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              1.5,
-              0.3,
-              0.3
-            ],
-            "Color": [
-              0.78,
-              0.8,
-              0.84
-            ],
-            "Material": "Metal",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder",
-            "Reflectance": 0.25
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -105.7,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "DumbbellHead",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              33.75,
-              4.48,
-              -103.8,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              0.75,
-              1.56,
-              1.56
-            ],
-            "Color": [
-              0.07,
-              0.07,
-              0.08
-            ],
-            "Material": "Pebble",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Shape": "Cylinder"
-          }
-        },
-        {
-          "name": "TrainAnchor",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              30.4,
-              4.0,
-              -114.2,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              2,
-              2,
-              1
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          }
-        },
-        {
-          "name": "TrainAnchor",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              30.4,
-              4.0,
-              -110.0,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              2,
-              2,
-              1
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          }
-        },
-        {
-          "name": "TrainAnchor",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              30.4,
-              4.0,
-              -105.8,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0
-            ],
-            "Size": [
-              2,
-              2,
-              1
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          }
+          "name": "Spot",
+          "className": "Model",
+          "children": [
+            {
+              "name": "TrainAnchor",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  30.4,
+                  4.0,
+                  -105.8,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "Size": [
+                  2,
+                  2,
+                  1
+                ],
+                "Color": [
+                  1,
+                  1,
+                  1
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Transparency": 1,
+                "CanCollide": false,
+                "CastShadow": false
+              }
+            },
+            {
+              "name": "HeldRight",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -105.8,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -106.75,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      33.2,
+                      4.48,
+                      -104.85,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            },
+            {
+              "name": "HeldLeft",
+              "className": "Model",
+              "children": [
+                {
+                  "name": "Handle",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -105.8,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      1.5,
+                      0.3,
+                      0.3
+                    ],
+                    "Color": [
+                      0.78,
+                      0.8,
+                      0.84
+                    ],
+                    "Material": "Metal",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "Reflectance": 0.25,
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -106.75,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                },
+                {
+                  "name": "Head",
+                  "className": "Part",
+                  "properties": {
+                    "Anchored": true,
+                    "CFrame": [
+                      34.3,
+                      4.48,
+                      -104.85,
+                      0.0,
+                      0.0,
+                      -1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      0.0
+                    ],
+                    "Size": [
+                      0.75,
+                      1.56,
+                      1.56
+                    ],
+                    "Color": [
+                      0.07,
+                      0.07,
+                      0.08
+                    ],
+                    "Material": "Pebble",
+                    "TopSurface": "Smooth",
+                    "BottomSurface": "Smooth",
+                    "Shape": "Cylinder",
+                    "CanCollide": false
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "name": "TrainExit",

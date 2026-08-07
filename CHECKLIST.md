@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 62 built / 64** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 63 built / 65** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -168,6 +168,12 @@ for machines, and training that happened *to* you as you walked past.
         studs above them. Both now meet the hands the pose actually reaches.
       - Players spawned on `Workspace.SpawnLocation` at the origin — mid-floor, in open
         PvP — rather than the safe-zone bubble. The project now owns that instance.
+- [x] 65. **The weights move.** A lifter posed under a barbell that never budges reads as
+      miming, not lifting. A training spot can now own props — `HeldBoth` for a barbell,
+      `HeldRight`/`HeldLeft` for dumbbells — parked beside its `TrainAnchor`. While
+      somebody trains there the prop tracks their hands, and on release it goes back to
+      the rack it was authored in. Client-side only and unreplicated: every viewer puts
+      the same weight in the same hands from the pose they can already see.
 
 ---
 
