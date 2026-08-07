@@ -2,10 +2,10 @@
 --[[
 	StationBillboardController — floating labels over training machines.
 
-	With training automatic and no prompt to press, a machine has nothing to explain
-	itself. These labels are what tell a player which stat a machine trains, how fast,
-	and whether they are allowed to use it yet — the job the interaction prompt used to
-	do before auto-training replaced it.
+	The proximity prompt tells you a machine can be used and which key does it. This
+	tells you whether it is worth using: which stat it trains, what rate you
+	personally would get with your multipliers applied, whether you have the power to
+	unlock it, and whether anyone is already on it.
 
 	Built client-side per tagged station, so they cost the server nothing and appear
 	for machines added or streamed in later.
@@ -22,6 +22,8 @@ local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 
 local REFRESH_SECONDS = 1
+-- How far above the machine the label floats.
+local HEADROOM = 2.5
 
 local StationBillboardController = {
 	Name = "StationBillboardController",
@@ -31,6 +33,7 @@ local StationBillboardController = {
 local ProfileController: any = nil
 
 type Entry = {
+	station: Instance,
 	definition: EquipmentConfig.EquipmentDefinition,
 	label: TextLabel,
 	gui: BillboardGui,
@@ -42,18 +45,18 @@ function StationBillboardController:Init()
 	ProfileController = Loader.Get("ProfileController")
 end
 
-local function findAdornee(station: Instance): BasePart?
-	if station:IsA("BasePart") then
-		return station
-	end
+--[[
+	Where to float the label so it clears the machine rather than the one part it
+	happens to be adorning — a pull-up rig's Base is its top bar, a bench's is the
+	pad five studs lower.
+]]
+local function headroomOffset(station: Instance, adornee: BasePart): Vector3
 	if station:IsA("Model") then
-		local primary = station.PrimaryPart
-		if primary ~= nil then
-			return primary
-		end
-		return station:FindFirstChildWhichIsA("BasePart", true)
+		local boundsCFrame, boundsSize = station:GetBoundingBox()
+		local top = boundsCFrame.Position.Y + boundsSize.Y / 2
+		return Vector3.new(0, (top - adornee.Position.Y) + HEADROOM, 0)
 	end
-	return nil
+	return Vector3.new(0, adornee.Size.Y / 2 + HEADROOM, 0)
 end
 
 function StationBillboardController:_bind(station: Instance)
@@ -67,7 +70,7 @@ function StationBillboardController:_bind(station: Instance)
 		return
 	end
 
-	local adornee = findAdornee(station)
+	local adornee = EquipmentConfig.GetBase(station)
 	if adornee == nil then
 		return
 	end
@@ -75,10 +78,10 @@ function StationBillboardController:_bind(station: Instance)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "StationLabel"
 	gui.Adornee = adornee
-	gui.Size = UDim2.fromOffset(200, 54)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, adornee.Size.Y / 2 + 2.5, 0)
+	gui.Size = UDim2.fromOffset(210, 72)
+	gui.StudsOffsetWorldSpace = headroomOffset(station, adornee)
 	gui.AlwaysOnTop = false
-	gui.MaxDistance = 60
+	gui.MaxDistance = 70
 	gui.Parent = adornee
 
 	local panel = UI.Panel("Body", gui)
@@ -90,7 +93,7 @@ function StationBillboardController:_bind(station: Instance)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextSize = 13
 
-	billboards[station] = { definition = definition, label = label, gui = gui }
+	billboards[station] = { station = station, definition = definition, label = label, gui = gui }
 end
 
 function StationBillboardController:_unbind(station: Instance)
@@ -99,6 +102,26 @@ function StationBillboardController:_unbind(station: Instance)
 		entry.gui:Destroy()
 		billboards[station] = nil
 	end
+end
+
+--[[
+	The third line: how to get on, or why you cannot. Occupancy is read straight off
+	the attributes the server keeps on the station model.
+]]
+local function statusLine(entry: Entry): string
+	local used = entry.station:GetAttribute(EquipmentConfig.OCCUPANCY_ATTRIBUTE)
+	local capacity = entry.station:GetAttribute(EquipmentConfig.CAPACITY_ATTRIBUTE)
+
+	if type(used) == "number" and type(capacity) == "number" and capacity > 0 then
+		if used >= capacity then
+			return `<font color="#FF5C5C">In use — {used}/{capacity}</font>`
+		end
+		if capacity > 1 then
+			return `<font color="#8A93A8">Hold E to {entry.definition.ActionText} — {capacity - used}/{capacity} free</font>`
+		end
+	end
+
+	return `<font color="#8A93A8">Hold E to {entry.definition.ActionText}</font>`
 end
 
 function StationBillboardController:_refresh()
@@ -124,7 +147,8 @@ function StationBillboardController:_refresh()
 
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
 				.. `<font color="#{color:ToHex()}">{definition.StatId}</font>  `
-				.. `+{NumberFormat.Format(perSecond)}/s`
+				.. `+{NumberFormat.Format(perSecond)}/s\n`
+				.. statusLine(entry)
 		else
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
 				.. `<font color="#FF5C5C">Locked — {NumberFormat.Format(definition.UnlockPower)} power</font>`

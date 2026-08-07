@@ -17,6 +17,7 @@ local RunService = game:GetService("RunService")
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local UI = require(ReplicatedStorage.Modules.UI)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
+local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local Types = require(ReplicatedStorage.Modules.Types)
@@ -177,12 +178,14 @@ function HudController:_refreshVitals()
 		comboLabel.Text = `Knocked off the machine — {string.format("%.1f", stagger)}s`
 		comboLabel.TextColor3 = UI.Palette.Danger
 	elseif state.StationId ~= nil then
+		local definition = EquipmentConfig.Get(state.StationId)
+		local name = if definition ~= nil then definition.DisplayName else state.StationId
 		local combo = math.min(2, 1 + state.Combo * 0.02)
 		comboLabel.Text =
-			`Training {state.StationId}  —  combo x{string.format("%.2f", combo)} ({state.Combo} reps)`
+			`{name}  —  combo x{string.format("%.2f", combo)} ({state.Combo} reps)  —  hold E to stop`
 		comboLabel.TextColor3 = UI.Palette.Combo
 	else
-		comboLabel.Text = "Walk up to a machine to start training"
+		comboLabel.Text = "Hold E at a machine to start training"
 		comboLabel.TextColor3 = UI.Palette.TextMuted
 	end
 
