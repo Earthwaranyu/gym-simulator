@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import random
 
 # Floor slabs are 1 stud thick centred at y=0.5, so everything stands on y=1.
 FLOOR_TOP = 1.0
@@ -433,178 +434,515 @@ BUILDERS = {
 }
 
 
+
+
 # --------------------------------------------------------------------------
 # The world.
 #
-# Eleven training platforms on a spiral out to ~1,600 studs, so the map is a bit
-# over 3,000 studs across. Tiers must match ZoneConfig by id; the ids and the
-# power gates live there, the geometry lives here, and ZoneService warns at boot
-# if either side names a tier the other does not.
+# A city island at the origin with themed islands scattered around it. The
+# previous pass put eleven identical square decks on a golden-angle spiral,
+# which reads as a diagram of the progression ladder rather than as a place.
+# Bearings and radii are hand-picked here instead: the point of a map is that
+# no two directions look the same.
 #
-# The first three sit on the ground and can be walked to. Everything past them
-# floats, at a height that climbs with tier, so the back half of the map is only
-# reachable by flying — which makes the movement ladder and the progression
-# ladder the same ladder.
+# Downtown, Garage Gym and Iron Hall share the ground island at the origin and
+# the Docks is a walk across the causeway. Everything past that floats, higher
+# with every tier, so the back half of the map is only reachable by flying and
+# the movement ladder and the progression ladder stay the same ladder.
+#
+# District ids must match ZoneConfig; the ids and the power gates live there,
+# the geometry lives here.
 # --------------------------------------------------------------------------
 
-# (zone id, accent colour, pad colour, platform half-size, altitude)
-TIERS = [
-    ("Garage", ACCENT_STARTER, PAD_RED, 70, 0),
-    ("Iron", ACCENT_IRON, PAD_BLUE, 75, 0),
-    ("Powerhouse", [0.94, 0.42, 0.24], [0.42, 0.16, 0.10], 80, 0),
-    ("Strongman", [0.75, 0.47, 0.27], [0.34, 0.22, 0.13], 85, 120),
-    ("Titan", [1.0, 0.77, 0.24], [0.40, 0.28, 0.08], 90, 260),
-    ("Skydeck", [0.47, 0.82, 1.0], [0.13, 0.30, 0.42], 90, 420),
-    ("Storm", [0.59, 0.63, 1.0], [0.18, 0.20, 0.40], 95, 600),
-    ("Void", [0.63, 0.43, 0.92], [0.20, 0.12, 0.34], 95, 800),
-    ("Solar", [1.0, 0.55, 0.24], [0.42, 0.20, 0.08], 100, 1020),
-    ("Nebula", [1.0, 0.43, 0.75], [0.40, 0.14, 0.30], 100, 1260),
-    ("Ascendant", [1.0, 0.96, 0.78], [0.38, 0.36, 0.28], 110, 1520),
+
+def tagged(node, tags=None, attributes=None):
+    """Attaches CollectionService tags and instance attributes to a node.
+
+    Tags ride in `properties` and attributes in a sibling key, which is the
+    Rojo model-JSON encoding. Every tagged part in the world went through this
+    by hand before; getting it wrong silently breaks whichever service reads
+    the tag, so it is worth a function.
+    """
+    if tags:
+        node.setdefault("properties", {})["Tags"] = list(tags)
+    if attributes:
+        node["attributes"] = dict(attributes)
+    return node
+
+
+def folder(name, children):
+    return {"name": name, "className": "Folder", "children": children}
+
+
+# Ground/rock/accent per district, plus the machine pad colour. Keeping the
+# palette in the layout row rather than in the shape functions is what lets a
+# new district be one entry: the shape says what an island looks like, the row
+# says what it is made of.
+DISTRICTS = [
+    {
+        "zone": "Garage",
+        "bearing": 145, "radius": 210, "altitude": 0,
+        "shape": "lot", "half": 58, "layout": "rows",
+        "ground": [0.19, 0.19, 0.21], "ground_material": "Asphalt",
+        "rock": [0.13, 0.13, 0.15], "rock_material": "Rock",
+        "accent": ACCENT_STARTER, "pad": PAD_RED,
+    },
+    {
+        "zone": "Iron",
+        "bearing": 315, "radius": 225, "altitude": 0,
+        "shape": "lot", "half": 66, "layout": "rows",
+        "ground": [0.17, 0.18, 0.21], "ground_material": "Concrete",
+        "rock": [0.12, 0.13, 0.16], "rock_material": "Rock",
+        "accent": ACCENT_IRON, "pad": PAD_BLUE,
+    },
+    {
+        "zone": "Powerhouse",
+        "bearing": 60, "radius": 570, "altitude": 0,
+        "shape": "slab", "half": 128, "layout": "rows",
+        "ground": [0.30, 0.30, 0.31], "ground_material": "Concrete",
+        "rock": [0.16, 0.16, 0.17], "rock_material": "Rock",
+        "accent": [0.94, 0.42, 0.24], "pad": [0.42, 0.16, 0.10],
+    },
+    {
+        "zone": "Strongman",
+        "bearing": 200, "radius": 680, "altitude": 130,
+        "shape": "round", "half": 138, "layout": "ring",
+        "ground": [0.82, 0.72, 0.51], "ground_material": "Sand",
+        "rock": [0.45, 0.39, 0.30], "rock_material": "Sandstone",
+        "accent": [0.75, 0.47, 0.27], "pad": [0.34, 0.22, 0.13],
+    },
+    {
+        "zone": "Titan",
+        "bearing": 300, "radius": 800, "altitude": 270,
+        "shape": "mesa", "half": 142, "layout": "ring",
+        "ground": [0.62, 0.50, 0.34], "ground_material": "Sandstone",
+        "rock": [0.38, 0.31, 0.22], "rock_material": "Rock",
+        "accent": [1.0, 0.77, 0.24], "pad": [0.40, 0.28, 0.08],
+    },
+    {
+        "zone": "Skydeck",
+        "bearing": 20, "radius": 920, "altitude": 430,
+        "shape": "slab", "half": 126, "layout": "rows",
+        "ground": [0.24, 0.26, 0.30], "ground_material": "Concrete",
+        "rock": [0.15, 0.17, 0.20], "rock_material": "Slate",
+        "accent": [0.47, 0.82, 1.0], "pad": [0.13, 0.30, 0.42],
+    },
+    {
+        "zone": "Storm",
+        "bearing": 140, "radius": 1040, "altitude": 610,
+        "shape": "crag", "half": 136, "layout": "ring",
+        "ground": [0.36, 0.38, 0.44], "ground_material": "Slate",
+        "rock": [0.22, 0.24, 0.30], "rock_material": "Rock",
+        "accent": [0.59, 0.63, 1.0], "pad": [0.18, 0.20, 0.40],
+    },
+    {
+        "zone": "Void",
+        "bearing": 255, "radius": 1150, "altitude": 810,
+        "shape": "slab", "half": 130, "layout": "rows",
+        "ground": [0.07, 0.06, 0.10], "ground_material": "Basalt",
+        "rock": [0.04, 0.03, 0.06], "rock_material": "Basalt",
+        "accent": [0.63, 0.43, 0.92], "pad": [0.20, 0.12, 0.34],
+    },
+    {
+        "zone": "Solar",
+        "bearing": 345, "radius": 1260, "altitude": 1030,
+        "shape": "crag", "half": 140, "layout": "ring",
+        "ground": [0.24, 0.13, 0.10], "ground_material": "Basalt",
+        "rock": [0.14, 0.07, 0.06], "rock_material": "CrackedLava",
+        "accent": [1.0, 0.55, 0.24], "pad": [0.42, 0.20, 0.08],
+    },
+    {
+        "zone": "Nebula",
+        "bearing": 175, "radius": 1370, "altitude": 1270,
+        "shape": "slab", "half": 144, "layout": "rows",
+        "ground": [0.16, 0.11, 0.20], "ground_material": "Metal",
+        "rock": [0.10, 0.07, 0.14], "rock_material": "Slate",
+        "accent": [1.0, 0.43, 0.75], "pad": [0.40, 0.14, 0.30],
+    },
+    {
+        "zone": "Ascendant",
+        "bearing": 285, "radius": 1480, "altitude": 1530,
+        "shape": "round", "half": 152, "layout": "ring",
+        "ground": [0.86, 0.84, 0.78], "ground_material": "Marble",
+        "rock": [0.55, 0.53, 0.48], "rock_material": "Limestone",
+        "accent": [1.0, 0.96, 0.78], "pad": [0.38, 0.36, 0.28],
+    },
 ]
 
-# Where the hub sits, and how far out the first and last platforms are.
-HUB_RADIUS = 46
-FIRST_RADIUS = 210
-RADIUS_STEP = 138
-# A spiral rather than a ring: consecutive tiers never line up, so the walk out
-# always reveals a new direction instead of a corridor.
-SPIRAL_DEGREES = 137.5
+# The city island everything starts on. Big enough to hold a street grid, the
+# first two gyms and a plaza with room to stand around in.
+DOWNTOWN_HALF = 330
+PLAZA_RADIUS = 92
+# Bearing of the causeway out to the Docks, matched to Powerhouse's entry.
+CAUSEWAY_BEARING = 60
 
 
-def tier_origin(index):
-    """Where a tier's platform sits, as a CFrame facing back toward the hub."""
-    radius = FIRST_RADIUS + index * RADIUS_STEP
-    angle = math.radians(index * SPIRAL_DEGREES)
-    x = math.sin(angle) * radius
-    z = math.cos(angle) * radius
-    altitude = TIERS[index][4]
-    # Face the hub, so a player arriving at the spawn pad is looking at the gym.
-    return mul(cf(x, altitude, z), rot_y(math.degrees(angle) + 180))
+def district_origin(row):
+    """Where a district sits, as a CFrame facing back toward Downtown."""
+    angle = math.radians(row["bearing"])
+    x = math.sin(angle) * row["radius"]
+    z = math.cos(angle) * row["radius"]
+    return mul(cf(x, row["altitude"], z), rot_y(row["bearing"] + 180))
 
 
-def platform(zone_id, accent, half, altitude):
-    """A tier's floor, edge trim, corner pylons and lights, in local space."""
+def disc(name, thickness, diameter, y, color, material, **props):
+    """A flat horizontal disc. Roblox cylinders run along local X, so a disc is
+    a cylinder stood on its end."""
+    return cylinder(name, thickness, diameter,
+                    mul(cf(0, y, 0), rot_z(90)), color, material, **props)
+
+
+def underside(row, rng, round_shape):
+    """Tapering rock beneath a deck.
+
+    Islands float. Seen from below — which is most of the time once flight
+    unlocks — a bare slab reads as a placeholder, so each island gets a stack
+    of shrinking, jittered rock beneath it. Non-colliding and shadowless: it is
+    scenery, and a flier who clips it should pass through rather than snag.
+    """
     out = []
+    half = row["half"]
+    y = FLOOR_TOP - 4
+    width = half * 2
+
+    for index in range(6):
+        width *= 0.79
+        depth = 7 + index * 4
+        y -= depth * 0.5
+        shade = [c * (1.0 - index * 0.1) for c in row["rock"]]
+        if round_shape:
+            out.append(disc("Rock", depth, width, y, shade, row["rock_material"],
+                            CanCollide=False, CastShadow=False))
+        else:
+            out.append(part("Rock", [width, depth, width],
+                            mul(cf(0, y, 0), rot_y(rng.uniform(-16, 16))),
+                            shade, row["rock_material"],
+                            CanCollide=False, CastShadow=False))
+        y -= depth * 0.5
+
+    # A spike at the bottom so the taper ends in a point rather than a stub.
+    out.append(part("RockTip", [width * 0.55, 34, width * 0.55],
+                    mul(cf(0, y - 14, 0), rot_y(rng.uniform(-20, 20))),
+                    [c * 0.4 for c in row["rock"]], row["rock_material"],
+                    CanCollide=False, CastShadow=False))
+    return out
+
+
+def spawn_pad(row):
+    """The pad travel drops arrivals onto, on the Downtown-facing edge."""
+    half = row["half"]
+    pad = disc("SpawnPad", 1.0, 30, FLOOR_TOP + 0.5, row["accent"], "Neon")
+    pad["properties"]["CFrame"] = serialise_cf(
+        mul(cf(0, FLOOR_TOP + 0.5, half * 0.74), rot_z(90))
+    )
+    return tagged(pad, tags=["ZoneSpawn"], attributes={"ZoneId": row["zone"]})
+
+
+def beacon(row, x, z, height):
+    """A lit pylon. Islands are far apart and mostly seen against sky, so each
+    one needs something that carries its colour at distance."""
+    out = []
+    out.append(part("Pylon", [4.5, height, 4.5],
+                    cf(x, FLOOR_TOP + height / 2, z), STEEL, "DiamondPlate"))
+    light = part("Beacon", [6, 3, 6], cf(x, FLOOR_TOP + height + 1.5, z),
+                 row["accent"], "Neon", CanCollide=False)
+    light["children"] = [{
+        "name": "Glow",
+        "className": "PointLight",
+        "properties": {"Brightness": 3, "Range": 70, "Color": row["accent"]},
+    }]
+    out.append(light)
+    return out
+
+
+# --------------------------------------------------------------------------
+# Island silhouettes. Each returns local-space children; the caller places
+# them. A new silhouette is a function plus a SHAPES entry.
+# --------------------------------------------------------------------------
+
+
+def island_slab(row, rng):
+    """A rectangular deck with a kerb — quays, rooftops, stations."""
+    half = row["half"]
     size = half * 2
+    out = [part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2, 0),
+                row["ground"], row["ground_material"])]
+    out.append(part("DeckTrim", [size + 5, 1.4, size + 5], cf(0, FLOOR_TOP - 4.5, 0),
+                    [c * 0.5 for c in row["accent"]], "Metal"))
 
-    out.append(part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2, 0), FLOOR_DARK, "Concrete"))
-    out.append(part("DeckTrim", [size + 4, 1.2, size + 4], cf(0, FLOOR_TOP - 4.4, 0),
-                    [c * 0.5 for c in accent], "Metal"))
-    out.append(part("Rug", [size * 0.45, 0.1, size * 0.45], cf(0, FLOOR_TOP + 0.05, 0),
-                    [c * 0.22 for c in accent], "Pebble", CanCollide=False))
-
-    # A low kerb so a running player is nudged rather than walking off a floating
-    # slab, but low enough to step over deliberately.
     for sx, sz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        length = size + 3 if sx == 0 else 3
-        width = size + 3 if sz == 0 else 3
-        out.append(part("Kerb", [width, 2.4, length],
-                        cf(sx * (half + 1.5), FLOOR_TOP + 1.2, sz * (half + 1.5)),
-                        [c * 0.6 for c in accent], "Metal"))
+        length = size + 4 if sx == 0 else 4
+        width = size + 4 if sz == 0 else 4
+        out.append(part("Kerb", [width, 2.6, length],
+                        cf(sx * (half + 2), FLOOR_TOP + 1.3, sz * (half + 2)),
+                        [c * 0.6 for c in row["accent"]], "Metal"))
 
     for sx in (-1, 1):
         for sz in (-1, 1):
-            out.append(part("Pylon", [5, 26, 5],
-                            cf(sx * (half - 4), FLOOR_TOP + 13, sz * (half - 4)), STEEL, "DiamondPlate"))
-            beacon = part("Beacon", [6, 2.5, 6],
-                          cf(sx * (half - 4), FLOOR_TOP + 27, sz * (half - 4)), accent, "Neon",
-                          CanCollide=False)
-            beacon["children"] = [{
-                "name": "Glow",
-                "className": "PointLight",
-                "properties": {
-                    "Brightness": 3,
-                    "Range": 60,
-                    "Color": accent,
-                },
-            }]
-            out.append(beacon)
+            out.extend(beacon(row, sx * (half - 6), sz * (half - 6), 26))
 
-    # The spawn pad a gate delivers players onto.
-    pad = part("SpawnPad", [16, 1, 16], cf(0, FLOOR_TOP + 0.5, half - 16), accent, "Neon")
-    pad["properties"]["Tags"] = ["ZoneSpawn"]
-    pad["attributes"] = {"ZoneId": zone_id}
-    out.append(pad)
+    out.extend(underside(row, rng, False))
+    return out
+
+
+def island_round(row, rng):
+    """A disc island with a stone rim — beaches and peaks."""
+    half = row["half"]
+    out = [disc("Deck", 4, half * 2, FLOOR_TOP - 2, row["ground"], row["ground_material"])]
+    out.append(disc("DeckTrim", 1.6, half * 2 + 8, FLOOR_TOP - 4.6,
+                    [c * 0.5 for c in row["accent"]], "Metal"))
+
+    # A ring of boulders instead of a kerb: on a natural island a machined edge
+    # is the thing that gives it away.
+    for index in range(14):
+        angle = 360.0 * index / 14 + rng.uniform(-6, 6)
+        size = rng.uniform(7, 13)
+        out.append(part("Boulder", [size, size * 0.8, size],
+                        mul(mul(rot_y(angle), cf(0, FLOOR_TOP + size * 0.2, half - 3)),
+                            rot_y(rng.uniform(0, 90))),
+                        [c * rng.uniform(0.8, 1.1) for c in row["rock"]],
+                        row["rock_material"]))
+
+    for angle in (35, 145, 215, 325):
+        spot = mul(rot_y(angle), cf(0, 0, half - 20))
+        out.extend(beacon(row, spot[0][0], spot[0][2], 24))
+
+    out.extend(underside(row, rng, True))
+    return out
+
+
+def island_mesa(row, rng):
+    """A flat top on stepped stone shoulders — quarries and plateaus."""
+    half = row["half"]
+    size = half * 2
+    out = [part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2, 0),
+                row["ground"], row["ground_material"])]
+
+    # Shoulders step outward and down, so the top plate overhangs slightly.
+    for index in range(3):
+        width = size + 10 + index * 16
+        out.append(part("Shoulder", [width, 9, width],
+                        mul(cf(0, FLOOR_TOP - 6 - index * 9, 0),
+                            rot_y(rng.uniform(-8, 8))),
+                        [c * (0.95 - index * 0.12) for c in row["rock"]],
+                        row["rock_material"]))
+
+    # Cut walls at the back edge, the quarry face.
+    for index in range(4):
+        out.append(part("Face", [rng.uniform(24, 44), rng.uniform(14, 30), 12],
+                        cf(rng.uniform(-half * 0.7, half * 0.7), FLOOR_TOP + 8,
+                           -half + rng.uniform(2, 10)),
+                        [c * rng.uniform(0.85, 1.05) for c in row["rock"]],
+                        row["rock_material"]))
+
+    for sx in (-1, 1):
+        out.extend(beacon(row, sx * (half - 8), half - 8, 22))
+
+    out.extend(underside(row, rng, False))
+    return out
+
+
+def island_crag(row, rng):
+    """A deck ringed by jagged spurs — storm peaks and volcanic rock."""
+    half = row["half"]
+    out = [disc("Deck", 4, half * 2, FLOOR_TOP - 2, row["ground"], row["ground_material"])]
+
+    for index in range(9):
+        angle = 360.0 * index / 9 + rng.uniform(-10, 10)
+        height = rng.uniform(26, 62)
+        width = rng.uniform(14, 26)
+        spur = mul(rot_y(angle), cf(0, FLOOR_TOP + height / 2 - 4, half - rng.uniform(4, 16)))
+        out.append(part("Spur", [width, height, width],
+                        mul(mul(spur, rot_y(rng.uniform(0, 90))),
+                            rot_x(rng.uniform(-9, 9))),
+                        [c * rng.uniform(0.8, 1.15) for c in row["rock"]],
+                        row["rock_material"]))
+
+    for angle in (0, 180):
+        spot = mul(rot_y(angle), cf(0, 0, half - 26))
+        out.extend(beacon(row, spot[0][0], spot[0][2], 28))
+
+    out.extend(underside(row, rng, True))
+    return out
+
+
+def island_lot(row, _rng):
+    """No island at all — a district that stands on Downtown's ground.
+
+    Garage Gym and Iron Hall are city blocks, not islands, so they get a floor
+    slab and a kerb and nothing underneath. #69 puts buildings on top of them.
+    """
+    half = row["half"]
+    size = half * 2
+    out = [part("Lot", [size, 1.2, size], cf(0, FLOOR_TOP - 0.6, 0),
+                row["ground"], row["ground_material"])]
+    out.append(part("LotTrim", [size + 4, 0.5, size + 4], cf(0, FLOOR_TOP - 1.4, 0),
+                    [c * 0.5 for c in row["accent"]], "Metal"))
+
+    for sx in (-1, 1):
+        out.extend(beacon(row, sx * (half - 6), half - 6, 18))
 
     return out
 
 
-def zone_volume(zone_id, origin, half):
-    """The invisible box token accrual and machine tiering both test against."""
-    return place(origin, {
-        "name": f"{zone_id}Volume",
+SHAPES = {
+    "slab": island_slab,
+    "round": island_round,
+    "mesa": island_mesa,
+    "crag": island_crag,
+    "lot": island_lot,
+}
+
+
+def zone_volume(row):
+    """The invisible box token accrual and machine tiering both test against.
+
+    Must be a genuine volume the standing HumanoidRootPart ends up inside —
+    see the warning in ZoneConfig. Tall enough to cover a district's whole
+    playable height, and no wider than the district, so the plaza next door
+    stays outside every zone and therefore pays nothing.
+    """
+    half = row["half"]
+    return tagged({
+        "name": f"{row['zone']}Volume",
         "className": "Part",
-        "attributes": {"ZoneId": zone_id},
         "properties": {
-            "Tags": ["GymZone"],
             "Anchored": True,
             "Locked": True,
             "CanCollide": False,
             "Transparency": 1,
             "CastShadow": False,
-            "Size": [half * 2 + 8, 90, half * 2 + 8],
-            "CFrame": serialise_cf(cf(0, 40, 0)),
+            "Size": [half * 2 + 8, 120, half * 2 + 8],
+            "CFrame": serialise_cf(cf(0, 55, 0)),
             "Material": "SmoothPlastic",
         },
-    })
+    }, tags=["GymZone"], attributes={"ZoneId": row["zone"]})
 
 
-# Where each machine stands on a platform, as a fraction of its half-size, and
-# which way it faces. Spread to the edges on purpose: crossing a platform to
-# change exercise should take a moment.
-MACHINE_SPOTS = [
-    ("BenchPress", -0.55, -0.5, 0),
-    ("Dumbbells", 0.6, -0.5, -90),
-    ("PullUpBar", -0.6, 0.45, 0),
-    ("SitUpBench", 0.0, -0.62, 0),
-    ("Treadmill", 0.6, 0.45, 180),
-]
+# --------------------------------------------------------------------------
+# Machine layouts. Where the five machines stand on a district, as CFrames in
+# its local space. A new arrangement is a function plus a LAYOUTS entry.
+# --------------------------------------------------------------------------
+
+MACHINE_ORDER = ["BenchPress", "Dumbbells", "PullUpBar", "SitUpBench", "Treadmill"]
+
+
+def layout_ring(half, count):
+    """Evenly around a circle, every machine facing the middle. Reads as a
+    deliberate arrangement on a round island, where a grid reads as a car park."""
+    out = []
+    radius = half * 0.54
+    for index in range(count):
+        angle = 360.0 * index / count + 18
+        out.append(mul(mul(rot_y(angle), cf(0, 0, radius)), rot_y(180)))
+    return out
+
+
+def layout_rows(half, count):
+    """Two alternating rows facing each other across an aisle — a gym floor."""
+    out = []
+    span = half * 0.6
+    for index in range(count):
+        x = -span + (2 * span) * (index / max(1, count - 1))
+        near = index % 2 == 0
+        out.append(mul(cf(x, 0, span * (0.55 if near else -0.55)),
+                       rot_y(180 if near else 0)))
+    return out
+
+
+LAYOUTS = {
+    "ring": layout_ring,
+    "rows": layout_rows,
+}
+
+
+# --------------------------------------------------------------------------
+# Downtown: the ground island at the origin. #69 builds the streets and blocks
+# on top of what this lays down.
+# --------------------------------------------------------------------------
+
+
+def downtown():
+    out = []
+    rng = random.Random("Downtown")
+    size = DOWNTOWN_HALF * 2
+    row = {
+        "half": DOWNTOWN_HALF,
+        "rock": [0.15, 0.15, 0.17],
+        "rock_material": "Rock",
+    }
+
+    out.append(part("Ground", [size, 4, size], cf(0, FLOOR_TOP - 2, 0),
+                    [0.21, 0.21, 0.22], "Asphalt"))
+    out.append(part("GroundTrim", [size + 8, 2, size + 8], cf(0, FLOOR_TOP - 5, 0),
+                    [0.26, 0.27, 0.30], "Concrete"))
+
+    # Plaza: raised a hair so it reads as its own surface, and the only place
+    # in the game where travel is free.
+    out.append(disc("Plaza", 1.2, PLAZA_RADIUS * 2, FLOOR_TOP + 0.2,
+                    [0.42, 0.41, 0.40], "Pavement"))
+    out.append(disc("PlazaInlay", 0.4, PLAZA_RADIUS * 1.1, FLOOR_TOP + 0.9,
+                    [0.55, 0.50, 0.38], "Marble", CanCollide=False))
+
+    for index in range(12):
+        angle = 360.0 * index / 12
+        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS + 3))
+        out.append(part("PlazaLamp", [1.4, 16, 1.4],
+                        cf(spot[0][0], FLOOR_TOP + 8, spot[0][2]),
+                        [0.16, 0.16, 0.18], "Metal"))
+        out.append(part("PlazaLampHead", [2.4, 1.2, 2.4],
+                        cf(spot[0][0], FLOOR_TOP + 16.4, spot[0][2]),
+                        [1.0, 0.93, 0.76], "Neon", CanCollide=False))
+
+    # The safe zone, sized to the plaza rather than to a 40-stud bubble. It is
+    # both the PvP shelter and the origin check for free travel, so its extent
+    # is a gameplay number, not decoration.
+    out.append(tagged(
+        part("SpawnSafeZone", [PLAZA_RADIUS * 2 + 12, 44, PLAZA_RADIUS * 2 + 12],
+             cf(0, FLOOR_TOP + 22, 0), [0.4, 0.8, 1.0], "ForceField",
+             CanCollide=False, Transparency=0.94, CastShadow=False),
+        tags=["SafeZone"],
+    ))
+
+    # Causeway out to the Docks, so the first three tiers stay walkable.
+    # Spans exactly the gap between the two square edges, with a short seat at
+    # each end — run it further and its railings end up crossing the city.
+    angle = math.radians(CAUSEWAY_BEARING)
+    inner = DOWNTOWN_HALF / max(abs(math.sin(angle)), abs(math.cos(angle)))
+    docks = next(r for r in DISTRICTS if r["zone"] == "Powerhouse")
+    outer = docks["radius"] - docks["half"]
+    span = (outer - inner) + 24
+    bridge = mul(rot_y(CAUSEWAY_BEARING), cf(0, FLOOR_TOP - 0.8, (inner + outer) / 2))
+    out.append(part("Causeway", [36, 1.6, span], bridge,
+                    [0.28, 0.28, 0.29], "Concrete"))
+    for side in (-1, 1):
+        out.append(part("CausewayRail", [1.6, 3.2, span],
+                        mul(bridge, cf(side * 17.2, 2.4, 0)),
+                        [0.20, 0.21, 0.23], "Metal"))
+
+    out.extend(underside(row, rng, False))
+    return out
 
 
 def build_world():
-    structure = []
+    structure = [folder("Downtown", downtown())]
     machines = []
 
-    # Hub: the safe plaza everybody starts on, ringed with one gate per tier.
-    structure.append(part("HubDeck", [HUB_RADIUS * 2, 4, HUB_RADIUS * 2],
-                          cf(0, FLOOR_TOP - 2, 0), FLOOR_DARK, "Concrete"))
-    structure.append(part("HubTrim", [HUB_RADIUS * 2 + 6, 1.4, HUB_RADIUS * 2 + 6],
-                          cf(0, FLOOR_TOP - 4.6, 0), [0.30, 0.33, 0.40], "Metal"))
+    for row in DISTRICTS:
+        origin = district_origin(row)
+        rng = random.Random(row["zone"])
 
-    safe = part("SpawnSafeZone", [40, 20, 40], cf(0, FLOOR_TOP + 10, 0),
-                [0.4, 0.8, 1.0], "ForceField", CanCollide=False, Transparency=0.9,
-                CastShadow=False)
-    safe["properties"]["Tags"] = ["SafeZone"]
-    structure.append(safe)
+        pieces = SHAPES[row["shape"]](row, rng)
+        pieces.append(spawn_pad(row))
+        pieces.append(zone_volume(row))
+        structure.append(folder(row["zone"], [place(origin, piece) for piece in pieces]))
 
-    for index, (zone_id, accent, pad_color, half, altitude) in enumerate(TIERS):
-        origin = tier_origin(index)
-
-        # Gate on the hub rim, pointing at its tier. Touch it with the power and
-        # ZoneService puts you on that tier's spawn pad.
-        angle = index * SPIRAL_DEGREES
-        gate_at = mul(cf(0, 0, 0), rot_y(angle))
-        gate = part(f"{zone_id}Gate", [12, 11, 2],
-                    mul(gate_at, cf(0, FLOOR_TOP + 6, HUB_RADIUS - 4)), accent, "ForceField",
-                    CanCollide=False, Transparency=0.4)
-        gate["properties"]["Tags"] = ["ZoneGate"]
-        gate["attributes"] = {"ZoneId": zone_id}
-        structure.append(gate)
-
-        post = part(f"{zone_id}GatePost", [14, 1.5, 3],
-                    mul(gate_at, cf(0, FLOOR_TOP + 0.6, HUB_RADIUS - 4)), accent, "Neon")
-        structure.append(post)
-
-        for piece in platform(zone_id, accent, half, altitude):
-            structure.append(place(origin, piece))
-        structure.append(zone_volume(zone_id, origin, half))
-
-        for equipment_id, fx, fz, facing in MACHINE_SPOTS:
-            spot = mul(cf(fx * half, 0, fz * half), rot_y(facing))
-            machines.append(machine(
-                f"{zone_id}{equipment_id}", equipment_id, mul(origin, spot),
-                BUILDERS[equipment_id](pad_color, accent),
-            ))
+        spots = LAYOUTS[row["layout"]](row["half"], len(MACHINE_ORDER))
+        machines.append(folder(row["zone"], [
+            machine(f"{row['zone']}{equipment_id}", equipment_id, mul(origin, spot),
+                    BUILDERS[equipment_id](row["pad"], row["accent"]))
+            for equipment_id, spot in zip(MACHINE_ORDER, spots)
+        ]))
 
     return ({"className": "Folder", "children": structure},
             {"className": "Folder", "children": machines})
@@ -616,7 +954,15 @@ def write(name, payload):
     with open(path, "w") as handle:
         json.dump(payload, handle, indent=2)
         handle.write("\n")
-    print(f"wrote {os.path.relpath(path)}")
+    print(f"wrote {os.path.relpath(path)} ({count_instances(payload)} instances)")
+
+
+def count_instances(node):
+    if isinstance(node, dict):
+        return sum(count_instances(child) for child in node.get("children", [])) + (
+            1 if "className" in node and "name" in node else 0
+        )
+    return 0
 
 
 def main():

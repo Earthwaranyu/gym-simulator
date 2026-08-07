@@ -4,9 +4,9 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 65 built / 67** — every phase complete. #22 (stamina) and #24 (training
-anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
-client remote to exploit.
+**Progress: 66 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
+server-driven with no client remote to exploit.
 
 **Before this ships**, see [`docs/PLAYTEST.md`](docs/PLAYTEST.md). Two things are stubbed
 on purpose: `DataService` uses the Studio mock store, and every product `AssetId` is `0`
@@ -187,6 +187,43 @@ for machines, and training that happened *to* you as you walked past.
       **Gain rides on the zone, not the machine**: `ZoneConfig` carries a
       `GainMultiplier` (x1 to x100M) and `TrainingService` resolves a station's tier by
       which volume contains it. One `BenchPress` entry still covers all eleven benches.
+
+## Phase 11 — A city worth hanging around in
+
+#67 built a big map but not a place: eleven identical square decks on a golden-angle
+spiral, and a 40-stud force-field bubble for a safe zone. The reference is Super Power
+Training Simulator's world — a central city island ringed by themed satellites — with
+GTA V's art direction on top of it. And travel becomes a **button**, not a portal.
+
+- [x] 68. **Islands, not decks.** A `DISTRICTS` table replaces `TIERS` and the golden-angle
+      spiral: bearing, radius, altitude, silhouette, palette, machine layout, one row per
+      district. Bearings are hand-picked, because the point of a map is that no two
+      directions look the same. Five silhouettes in a `SHAPES` registry — `slab`, `round`,
+      `mesa`, `crag`, and `lot` for the two districts that stand on Downtown's ground
+      rather than on an island of their own. Every island grows a **tapering rock
+      underside**: once flight unlocks you spend half your time looking up at these, and a
+      bare slab from below reads as a placeholder. Geometry now emits one `Folder` per
+      district instead of 326 flat children, tags go through a `tagged()` helper, and the
+      2048-stud `Baseplate` is gone — the map is 2,866 across and floats over nothing,
+      which is the reference's look anyway.
+- [ ] 69. **Downtown.** Street grid, sidewalks, blocks, storefronts, streetlights, parked
+      cars. Garage Gym and Iron Hall become buildings on its streets.
+- [ ] 70. **The plaza.** Quest-giver NPC and leaderboard monuments in the safe zone
+      everybody spawns into.
+- [ ] 71. **Eight themed districts.** A `PROPS` registry: docks, beach, quarry, rooftop,
+      peak, void, lava, nebula, celestial.
+- [ ] 72. **Travel is a button.** `ZoneGate` and its `Touched` handler go; `TravelService`
+      validates power, origin and combat state instead. Removing the gates means *mounting*
+      has to check the zone's `RequiredPower` too — geometry stops being the gate, config is.
+- [ ] 73. **The travel map.** A Map tab drawing every district as a pin, with lock state
+      and what it is worth.
+- [ ] 74. **Fast Travel gamepass.** Travel from anywhere instead of only from the plaza.
+- [ ] 75. **NPCs that do something.** `NpcConfig` plus a client controller; the prompt opens
+      the menu on a named tab.
+- [ ] 76. **The boards read.** The monuments render the `OrderedDataStore` boards #54 has
+      been serving to nothing.
+- [ ] 77. **Don't fall forever.** A void catcher, and a part-budget pass on a map that is
+      now a city.
 
 ---
 
