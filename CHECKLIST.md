@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 70 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+**Progress: 71 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
 and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
 server-driven with no client remote to exploit.
 
@@ -249,8 +249,17 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       a fresh player walking in and training at x6. Gain already rides on the zone, so
       mounting now does too — `TrainingService` checks the district's `RequiredPower`
       alongside the machine's. Geometry stops being the gate; config is.
-- [ ] 73. **The travel map.** A Map tab drawing every district as a pin, with lock state
-      and what it is worth.
+- [x] 73. **The travel map.** A `Map` tab — one entry in `MenuController.tabs`, the
+      declared extension point — drawing every district as a pin on a plan view, dimmed
+      when locked, with a panel underneath for the selected one: tagline, gain multiplier,
+      and either a Travel button or what it still costs. It opens on this tab now, and a
+      marker shows where you are standing, so the map answers "where am I" as well as
+      "where can I go". Pins are **numbered, not named** — eleven labels on a 616px board
+      pile up in the middle where Downtown's two gyms nearly overlap, and an unreadable map
+      is worse than a list. Pad positions come from the `GetDestinations` remote rather
+      than from `Workspace`: with streaming on, a district 1,500 studs away is not
+      replicated, so a client measuring for itself would draw only what happened to be
+      loaded.
 - [ ] 74. **Fast Travel gamepass.** Travel from anywhere instead of only from the plaza.
 - [ ] 75. **NPCs that do something.** `NpcConfig` plus a client controller; the prompt opens
       the menu on a named tab.

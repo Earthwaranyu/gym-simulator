@@ -1,6 +1,6 @@
 --!strict
 --[[
-	MenuController — the tabbed menu: upgrades, quests, shop, leaderboard, settings.
+	MenuController — the tabbed menu: map, upgrades, quests, shop, leaderboard, settings.
 
 	Tabs are declared in one table with a render function each, so adding a screen is
 	an entry rather than a new controller and a new toggle.
@@ -20,6 +20,7 @@ local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
+local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 
@@ -36,8 +37,14 @@ local body: Frame
 local titleLabel: TextLabel
 local tabStrip: Frame
 local isOpen = false
-local activeTab = "Upgrades"
+local activeTab = "Map"
 local quests: { any } = {}
+
+-- District id -> where its landing pad is in the world. Fetched once from the
+-- server, because StreamingEnabled means the client cannot see a pad 1,500 studs
+-- away to measure it. Pads do not move, so one fetch is enough.
+local destinations: { [string]: Vector3? } = {}
+local selectedZone: string? = nil
 
 type Tab = {
 	Id: string,
@@ -102,6 +109,13 @@ function MenuController:Init()
 
 	tabs = {
 		{
+			Id = "Map",
+			DisplayName = "Map",
+			Render = function(parent)
+				self:_renderMap(parent)
+			end,
+		},
+		{
 			Id = "Upgrades",
 			DisplayName = "Upgrades",
 			Render = function(parent)
@@ -137,6 +151,240 @@ function MenuController:Init()
 			end,
 		},
 	}
+end
+
+--[[
+	Pulls every district's landing pad from the server, once.
+]]
+function MenuController:_fetchDestinations()
+	if next(destinations) ~= nil then
+		return
+	end
+
+	local ok, list = pcall(function()
+		return Net.Function("GetDestinations"):InvokeServer()
+	end)
+	if not ok or type(list) ~= "table" then
+		return
+	end
+
+	for _, entry in list do
+		if type(entry) == "table" and type(entry.Id) == "string" then
+			destinations[entry.Id] = Vector3.new(entry.X, entry.Y, entry.Z)
+		end
+	end
+end
+
+--[[
+	The travel map: every district as a pin on a plan view, and a panel for
+	whichever one is selected.
+
+	Pins carry a tier number rather than a name. Eleven labels on a board this
+	size overlap in the middle, where Downtown's two gyms sit almost on top of
+	each other, and an unreadable map is worse than a list. The board is stretched
+	to fit rather than kept to scale for the same reason — it is a diagram of where
+	things are relative to each other, not a survey.
+]]
+function MenuController:_renderMap(parent: Frame)
+	self:_fetchDestinations()
+
+	local data = ProfileController:Get()
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+
+	-- Default to the furthest district already open: that is where somebody
+	-- opening this menu almost always means to go.
+	if selectedZone == nil then
+		for _, zone in ZoneConfig.List do
+			if power >= zone.RequiredPower then
+				selectedZone = zone.Id
+			end
+		end
+	end
+
+	local board = Instance.new("Frame")
+	board.Name = "Board"
+	board.BackgroundColor3 = UI.Palette.Backdrop
+	board.BackgroundTransparency = 0.2
+	board.BorderSizePixel = 0
+	board.Size = UDim2.new(1, 0, 0, 258)
+	board.LayoutOrder = 1
+	board.Parent = parent
+
+	local boardCorner = Instance.new("UICorner")
+	boardCorner.CornerRadius = UDim.new(0, 8)
+	boardCorner.Parent = board
+
+	local boardStroke = Instance.new("UIStroke")
+	boardStroke.Color = UI.Palette.GlassStroke
+	boardStroke.Transparency = 0.75
+	boardStroke.Parent = board
+
+	if next(destinations) == nil then
+		local empty = UI.Label("Empty", board)
+		empty.Size = UDim2.fromScale(1, 1)
+		empty.TextXAlignment = Enum.TextXAlignment.Center
+		empty.TextColor3 = UI.Palette.TextMuted
+		empty.Text = "The map is still loading."
+		return
+	end
+
+	-- Bounds seeded with the origin so Downtown anchors the middle even before
+	-- any outer district has been reached.
+	local minX, maxX, minZ, maxZ = 0, 0, 0, 0
+	for _, at in destinations do
+		if at ~= nil then
+			minX, maxX = math.min(minX, at.X), math.max(maxX, at.X)
+			minZ, maxZ = math.min(minZ, at.Z), math.max(maxZ, at.Z)
+		end
+	end
+	local padX = math.max((maxX - minX) * 0.08, 1)
+	local padZ = math.max((maxZ - minZ) * 0.08, 1)
+	minX, maxX, minZ, maxZ = minX - padX, maxX + padX, minZ - padZ, maxZ + padZ
+
+	local function project(x: number, z: number): UDim2
+		-- World +Z is north, and screen Y grows downward, so Z is flipped.
+		return UDim2.fromScale((x - minX) / (maxX - minX), 1 - (z - minZ) / (maxZ - minZ))
+	end
+
+	-- Downtown itself has no district entry — it is the hub, not a tier — but it
+	-- is the thing every other pin is placed relative to, so it gets a marker.
+	local hub = UI.Label("Hub", board)
+	hub.AnchorPoint = Vector2.new(0.5, 0.5)
+	hub.Position = project(0, 0)
+	hub.Size = UDim2.fromOffset(90, 16)
+	hub.TextXAlignment = Enum.TextXAlignment.Center
+	hub.TextSize = 11
+	hub.TextColor3 = UI.Palette.TextMuted
+	hub.Text = "DOWNTOWN"
+
+	local unlockedCount = 0
+	for index, zone in ZoneConfig.List do
+		local at = destinations[zone.Id]
+		if at == nil then
+			continue
+		end
+
+		local unlocked = power >= zone.RequiredPower
+		if unlocked then
+			unlockedCount += 1
+		end
+		local isSelected = selectedZone == zone.Id
+		local size = if isSelected then 26 else 20
+
+		local pin = Instance.new("TextButton")
+		pin.Name = zone.Id
+		pin.AnchorPoint = Vector2.new(0.5, 0.5)
+		pin.Position = project(at.X, at.Z)
+		pin.Size = UDim2.fromOffset(size, size)
+		pin.BackgroundColor3 = zone.Color
+		pin.BackgroundTransparency = if unlocked then 0 else 0.6
+		pin.BorderSizePixel = 0
+		pin.Font = UI.Font.Numeric
+		pin.TextSize = 12
+		pin.TextColor3 = UI.Palette.Backdrop
+		pin.Text = tostring(index)
+		pin.ZIndex = if isSelected then 3 else 2
+		pin.Parent = board
+
+		local pinCorner = Instance.new("UICorner")
+		pinCorner.CornerRadius = UDim.new(1, 0)
+		pinCorner.Parent = pin
+
+		local pinStroke = Instance.new("UIStroke")
+		pinStroke.Color = if isSelected then UI.Palette.Text else UI.Palette.Backdrop
+		pinStroke.Thickness = if isSelected then 2 else 1
+		pinStroke.Parent = pin
+
+		pin.Activated:Connect(function()
+			selectedZone = zone.Id
+			self:_refresh()
+		end)
+	end
+
+	-- Where the player is standing, so the map answers "where am I" as well as
+	-- "where can I go".
+	local character = Players.LocalPlayer.Character
+	local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	if root ~= nil and root:IsA("BasePart") then
+		local here = Instance.new("Frame")
+		here.Name = "You"
+		here.AnchorPoint = Vector2.new(0.5, 0.5)
+		here.Position = project(root.Position.X, root.Position.Z)
+		here.Size = UDim2.fromOffset(10, 10)
+		here.BackgroundColor3 = UI.Palette.Text
+		here.BorderSizePixel = 0
+		here.ZIndex = 4
+		here.Parent = board
+
+		local hereCorner = Instance.new("UICorner")
+		hereCorner.CornerRadius = UDim.new(1, 0)
+		hereCorner.Parent = here
+	end
+
+	local count = UI.Label("Count", parent)
+	count.Size = UDim2.new(1, 0, 0, 20)
+	count.LayoutOrder = 2
+	count.TextSize = 12
+	count.TextColor3 = UI.Palette.TextMuted
+	count.Text = `{unlockedCount} of {#ZoneConfig.List} districts open  ·  travel is free from the plaza`
+
+	self:_renderDestination(parent, power)
+end
+
+--[[
+	The panel under the map: what the selected district is, and the button.
+]]
+function MenuController:_renderDestination(parent: Frame, power: number)
+	local zone = if selectedZone ~= nil then ZoneConfig.Get(selectedZone) else nil
+	if zone == nil then
+		return
+	end
+
+	local heading = UI.Label("Name", parent)
+	heading.Size = UDim2.new(1, 0, 0, 24)
+	heading.LayoutOrder = 3
+	heading.Font = UI.Font.Heading
+	heading.TextSize = 17
+	heading.TextColor3 = zone.Color
+	heading.Text = string.upper(zone.DisplayName)
+
+	local tagline = UI.Label("Tagline", parent)
+	tagline.Size = UDim2.new(1, 0, 0, 18)
+	tagline.LayoutOrder = 4
+	tagline.TextSize = 13
+	tagline.TextColor3 = UI.Palette.TextMuted
+	tagline.Text = zone.Tagline
+
+	local action = row(parent, 44, 5)
+	local detail = UI.Label("Detail", action)
+	detail.Size = UDim2.new(1, -120, 1, 0)
+	detail.TextSize = 13
+
+	local shortfall = zone.RequiredPower - power
+	if shortfall > 0 then
+		detail.Text = `<font color="#FF5C5C">Needs {NumberFormat.Format(shortfall)} more power</font>`
+			.. `  ·  x{NumberFormat.Format(zone.GainMultiplier)} gains`
+		local locked = UI.Label("Locked", action)
+		locked.AnchorPoint = Vector2.new(1, 0.5)
+		locked.Position = UDim2.fromScale(1, 0.5)
+		locked.Size = UDim2.fromOffset(104, 28)
+		locked.TextXAlignment = Enum.TextXAlignment.Center
+		locked.Font = UI.Font.Heading
+		locked.TextColor3 = UI.Palette.TextMuted
+		locked.Text = "LOCKED"
+		return
+	end
+
+	detail.Text = `x{NumberFormat.Format(zone.GainMultiplier)} gains  ·  `
+		.. `<font color="#7EE7FF">open</font>`
+
+	button(action, "Travel", zone.Color, function()
+		local ok, message = Net.Function("Travel"):InvokeServer(zone.Id)
+		toast(message)
+		if ok then
+			self:Toggle()
+		end
+	end)
 end
 
 function MenuController:_renderUpgrades(parent: Frame)
@@ -351,7 +599,7 @@ function MenuController:_build()
 	local panel = UI.Panel("Menu", screen)
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.fromOffset(560, 430)
+	panel.Size = UDim2.fromOffset(640, 500)
 	panel.BackgroundTransparency = 0.05
 
 	titleLabel = UI.Label("Title", panel)
@@ -408,7 +656,7 @@ function MenuController:Start()
 	end)
 
 	ProfileController.Changed:Connect(function()
-		if isOpen and (activeTab == "Upgrades" or activeTab == "Shop") then
+		if isOpen and (activeTab == "Upgrades" or activeTab == "Shop" or activeTab == "Map") then
 			self:_refresh()
 		end
 	end)
