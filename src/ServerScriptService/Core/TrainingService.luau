@@ -33,6 +33,7 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local Types = require(ReplicatedStorage.Modules.Types)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
+local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local PoseConfig = require(ReplicatedStorage.Modules.PoseConfig)
 
@@ -50,6 +51,10 @@ local MOUNT_SLACK = 6
 
 type StationRecord = {
 	definition: EquipmentConfig.EquipmentDefinition,
+	-- What the platform this machine stands on multiplies its gains by. Resolved once
+	-- when the station binds, because machines do not move between tiers at runtime.
+	zoneMultiplier: number,
+	zoneName: string?,
 	anchors: { BasePart },
 	exit: BasePart?,
 	prompt: ProximityPrompt,
@@ -498,8 +503,21 @@ function TrainingService:_bindStation(station: Instance)
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = base
 
+	-- A machine is worth whatever tier it stands in. Resolving by containment rather
+	-- than by an attribute means a designer tiers a machine by placing it, and cannot
+	-- leave a bench in Titan Forge still paying Garage rates.
+	local zone = ZoneConfig.AtPosition(base.Position)
+	if zone == nil then
+		warn(
+			`[TrainingService] {station:GetFullName()} stands outside every "{ZoneConfig.ZONE_TAG}" `
+				.. `volume, so it pays base rate. Put it inside one to tier it.`
+		)
+	end
+
 	local record: StationRecord = {
 		definition = definition,
+		zoneMultiplier = if zone ~= nil then zone.GainMultiplier else 1,
+		zoneName = if zone ~= nil then zone.DisplayName else nil,
 		anchors = anchors,
 		exit = if exit ~= nil and exit:IsA("BasePart") then exit else nil,
 		prompt = prompt,
@@ -554,7 +572,7 @@ function TrainingService:_step(player: Player, session: Session, now: number)
 	-- identical CFrame is a no-op, so this costs no replication in the normal case.
 	session.root.CFrame = session.anchorCFrame
 
-	local gain = session.definition.BaseGain * self:GetComboMultiplier(player)
+	local gain = session.definition.BaseGain * self:GetComboMultiplier(player) * session.record.zoneMultiplier
 	StatService:AddStat(player, session.definition.StatId, gain)
 
 	if now - (lastPushAt[player] or 0) >= PUSH_INTERVAL then

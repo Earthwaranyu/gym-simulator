@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 64 built / 66** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 65 built / 67** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -180,6 +180,14 @@ for machines, and training that happened *to* you as you walked past.
       at 8M power, held by a `LinearVelocity` so a flier still collides with the world.
       `FlightService` owns permission and publishes it as a character attribute; taking a
       hit grounds you for the stagger window, so one punch still buys one clean opening.
+- [x] 67. **The big map.** Eleven tiers on a spiral out to ~1,400 studs radius, ~2,800
+      across, 55 machines. The first three stand on the ground; the rest float higher and
+      higher, so flight is what opens the back half and the movement ladder *is* the
+      progression ladder. A hub plaza at the origin rings one gate per tier.
+      **Gain rides on the zone, not the machine**: `ZoneConfig` carries a
+      `GainMultiplier` (x1 to x100M) and `TrainingService` resolves a station's tier by
+      which volume contains it. One `BenchPress` entry still covers all eleven benches.
+
 ---
 
 ## Milestone 1 — Vertical Slice

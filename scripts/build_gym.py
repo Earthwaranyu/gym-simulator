@@ -434,82 +434,105 @@ BUILDERS = {
 
 
 # --------------------------------------------------------------------------
-# Rooms.
+# The world.
+#
+# Eleven training platforms on a spiral out to ~1,600 studs, so the map is a bit
+# over 3,000 studs across. Tiers must match ZoneConfig by id; the ids and the
+# power gates live there, the geometry lives here, and ZoneService warns at boot
+# if either side names a tier the other does not.
+#
+# The first three sit on the ground and can be walked to. Everything past them
+# floats, at a height that climbs with tier, so the back half of the map is only
+# reachable by flying — which makes the movement ladder and the progression
+# ladder the same ladder.
 # --------------------------------------------------------------------------
 
+# (zone id, accent colour, pad colour, platform half-size, altitude)
+TIERS = [
+    ("Garage", ACCENT_STARTER, PAD_RED, 70, 0),
+    ("Iron", ACCENT_IRON, PAD_BLUE, 75, 0),
+    ("Powerhouse", [0.94, 0.42, 0.24], [0.42, 0.16, 0.10], 80, 0),
+    ("Strongman", [0.75, 0.47, 0.27], [0.34, 0.22, 0.13], 85, 120),
+    ("Titan", [1.0, 0.77, 0.24], [0.40, 0.28, 0.08], 90, 260),
+    ("Skydeck", [0.47, 0.82, 1.0], [0.13, 0.30, 0.42], 90, 420),
+    ("Storm", [0.59, 0.63, 1.0], [0.18, 0.20, 0.40], 95, 600),
+    ("Void", [0.63, 0.43, 0.92], [0.20, 0.12, 0.34], 95, 800),
+    ("Solar", [1.0, 0.55, 0.24], [0.42, 0.20, 0.08], 100, 1020),
+    ("Nebula", [1.0, 0.43, 0.75], [0.40, 0.14, 0.30], 100, 1260),
+    ("Ascendant", [1.0, 0.96, 0.78], [0.38, 0.36, 0.28], 110, 1520),
+]
 
-def room(name, centre_z, floor_color, wall_color, accent, has_ceiling=True):
-    """A 80x60 hall: floor, four walls with a doorway, and ceiling lights."""
+# Where the hub sits, and how far out the first and last platforms are.
+HUB_RADIUS = 46
+FIRST_RADIUS = 210
+RADIUS_STEP = 138
+# A spiral rather than a ring: consecutive tiers never line up, so the walk out
+# always reveals a new direction instead of a corridor.
+SPIRAL_DEGREES = 137.5
+
+
+def tier_origin(index):
+    """Where a tier's platform sits, as a CFrame facing back toward the hub."""
+    radius = FIRST_RADIUS + index * RADIUS_STEP
+    angle = math.radians(index * SPIRAL_DEGREES)
+    x = math.sin(angle) * radius
+    z = math.cos(angle) * radius
+    altitude = TIERS[index][4]
+    # Face the hub, so a player arriving at the spawn pad is looking at the gym.
+    return mul(cf(x, altitude, z), rot_y(math.degrees(angle) + 180))
+
+
+def platform(zone_id, accent, half, altitude):
+    """A tier's floor, edge trim, corner pylons and lights, in local space."""
     out = []
-    half_x, half_z = 40.0, 30.0
+    size = half * 2
 
-    out.append(part(f"{name}Floor", [80, 1, 60], cf(0, 0.5, centre_z),
-                    floor_color, "Concrete"))
-    # Rubber flooring down the middle of the hall. Tinted toward the zone's accent
-    # rather than painted with it — at full strength this reads as a lawn.
-    out.append(part(f"{name}Rug", [24, 0.1, 58], cf(0, FLOOR_TOP + 0.05, centre_z),
+    out.append(part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2, 0), FLOOR_DARK, "Concrete"))
+    out.append(part("DeckTrim", [size + 4, 1.2, size + 4], cf(0, FLOOR_TOP - 4.4, 0),
+                    [c * 0.5 for c in accent], "Metal"))
+    out.append(part("Rug", [size * 0.45, 0.1, size * 0.45], cf(0, FLOOR_TOP + 0.05, 0),
                     [c * 0.22 for c in accent], "Pebble", CanCollide=False))
 
-    wall_h = 22.0
-    wall_y = FLOOR_TOP + wall_h / 2
+    # A low kerb so a running player is nudged rather than walking off a floating
+    # slab, but low enough to step over deliberately.
+    for sx, sz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        length = size + 3 if sx == 0 else 3
+        width = size + 3 if sz == 0 else 3
+        out.append(part("Kerb", [width, 2.4, length],
+                        cf(sx * (half + 1.5), FLOOR_TOP + 1.2, sz * (half + 1.5)),
+                        [c * 0.6 for c in accent], "Metal"))
 
-    for side in (-1, 1):
-        out.append(part(f"{name}WallX", [1, wall_h, 60],
-                        cf(side * half_x, wall_y, centre_z), wall_color, "Brick"))
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            out.append(part("Pylon", [5, 26, 5],
+                            cf(sx * (half - 4), FLOOR_TOP + 13, sz * (half - 4)), STEEL, "DiamondPlate"))
+            beacon = part("Beacon", [6, 2.5, 6],
+                          cf(sx * (half - 4), FLOOR_TOP + 27, sz * (half - 4)), accent, "Neon",
+                          CanCollide=False)
+            beacon["children"] = [{
+                "name": "Glow",
+                "className": "PointLight",
+                "properties": {
+                    "Brightness": 3,
+                    "Range": 60,
+                    "Color": accent,
+                },
+            }]
+            out.append(beacon)
 
-    # The +Z and -Z walls each get a doorway so the two halls connect.
-    for side in (-1, 1):
-        z = centre_z + side * half_z
-        for x_off in (-26, 26):
-            out.append(part(f"{name}WallZ", [28, wall_h, 1],
-                            cf(x_off, wall_y, z), wall_color, "Brick"))
-        out.append(part(f"{name}Lintel", [24, wall_h - 10, 1],
-                        cf(0, FLOOR_TOP + wall_h - (wall_h - 10) / 2, z),
-                        wall_color, "Brick"))
-
-    # A mirror strip along one wall — the one detail that most sells a gym.
-    #
-    # Kept dark and barely reflective on purpose. Roblox Reflectance mirrors the
-    # skybox rather than the room, so a genuinely mirror-bright panel indoors reads
-    # as a window onto a blue sky. Dim tinted glass reads as a mirror; a shiny one
-    # does not.
-    out.append(part(f"{name}Mirror", [0.3, 10, 44],
-                    cf(-half_x + 0.7, FLOOR_TOP + 7, centre_z),
-                    [0.20, 0.23, 0.28], "Glass", Reflectance=0.12))
-    out.append(part(f"{name}MirrorTrim", [0.5, 0.6, 44],
-                    cf(-half_x + 0.75, FLOOR_TOP + 1.9, centre_z), accent, "Metal"))
-
-    if has_ceiling:
-        out.append(part(f"{name}Ceiling", [80, 1, 60],
-                        cf(0, FLOOR_TOP + wall_h + 0.5, centre_z),
-                        [c * 0.7 for c in wall_color], "Concrete"))
-        for x in (-24, 0, 24):
-            for z_off in (-16, 16):
-                light = part(f"{name}Light", [14, 0.4, 3],
-                             cf(x, FLOOR_TOP + wall_h - 0.4, centre_z + z_off),
-                             [1, 0.97, 0.9], "Neon", CanCollide=False)
-                light["children"] = [{
-                    "name": "Glow",
-                    "className": "SurfaceLight",
-                    "properties": {
-                        "Face": "Bottom",
-                        "Brightness": 2.5,
-                        "Range": 26,
-                        "Angle": 150,
-                        "Color": [1, 0.96, 0.88],
-                    },
-                }]
-                out.append(light)
+    # The spawn pad a gate delivers players onto.
+    pad = part("SpawnPad", [16, 1, 16], cf(0, FLOOR_TOP + 0.5, half - 16), accent, "Neon")
+    pad["properties"]["Tags"] = ["ZoneSpawn"]
+    pad["attributes"] = {"ZoneId": zone_id}
+    out.append(pad)
 
     return out
 
 
-def zone_furniture(zone_id, centre_z, accent, spawn_z, gate_z, gate_name):
-    out = []
-
-    # The volume token accrual tests against — tall, invisible, covers the hall.
-    out.append({
-        "name": f"{zone_id}ZoneVolume",
+def zone_volume(zone_id, origin, half):
+    """The invisible box token accrual and machine tiering both test against."""
+    return place(origin, {
+        "name": f"{zone_id}Volume",
         "className": "Part",
         "attributes": {"ZoneId": zone_id},
         "properties": {
@@ -519,83 +542,72 @@ def zone_furniture(zone_id, centre_z, accent, spawn_z, gate_z, gate_name):
             "CanCollide": False,
             "Transparency": 1,
             "CastShadow": False,
-            "Size": [80, 40, 60],
-            "CFrame": serialise_cf(cf(0, 20, centre_z)),
+            "Size": [half * 2 + 8, 90, half * 2 + 8],
+            "CFrame": serialise_cf(cf(0, 40, 0)),
             "Material": "SmoothPlastic",
         },
     })
 
-    spawn = part(f"{zone_id}SpawnPad", [12, 1, 12], cf(0, FLOOR_TOP + 0.2, spawn_z),
-                 accent, "Neon", CanCollide=True)
-    spawn["properties"]["Tags"] = ["ZoneSpawn"]
-    spawn["attributes"] = {"ZoneId": zone_id}
-    out.append(spawn)
 
-    gate = part(gate_name, [22, 10, 2], cf(0, FLOOR_TOP + 5, gate_z), accent,
-                "ForceField", CanCollide=False, Transparency=0.45)
-    gate["properties"]["Tags"] = ["ZoneGate"]
-    gate["attributes"] = {"ZoneId": zone_id}
-    out.append(gate)
-
-    return out
-
-
-def build_structure():
-    children = []
-    children += room("Starter", 0, FLOOR_DARK, WALL, ACCENT_STARTER)
-    children += room("Iron", -90, FLOOR_IRON, WALL_IRON, ACCENT_IRON)
-
-    # The corridor joining the two halls.
-    children.append(part("Corridor", [24, 1, 32], cf(0, 0.5, -45), FLOOR_DARK, "Concrete"))
-    for side in (-1, 1):
-        children.append(part("CorridorWall", [1, 22, 32],
-                             cf(side * 12, FLOOR_TOP + 11, -45), WALL, "Brick"))
-    children.append(part("CorridorCeiling", [24, 1, 32],
-                         cf(0, FLOOR_TOP + 22.5, -45), [c * 0.7 for c in WALL], "Concrete"))
-
-    children += zone_furniture("Starter", 0, ACCENT_STARTER, 22, -60, "ReturnGate")
-    children += zone_furniture("Iron", -90, ACCENT_IRON, -70, -34, "IronGate")
-
-    # Safe spawn: no damage lands inside this volume.
-    safe = part("SpawnSafeZone", [24, 14, 24], cf(0, FLOOR_TOP + 7, 22),
-                [0.4, 0.8, 1.0], "ForceField", CanCollide=False, Transparency=0.85,
-                CastShadow=False)
-    safe["properties"]["Tags"] = ["SafeZone"]
-    children.append(safe)
-
-    return {"className": "Folder", "children": children}
-
-
-# Machine layout: id -> (name, x, z, facing degrees).
-#
-# The lane x[-12..12] is left clear end to end: it is the walk between the two
-# halls' doorways, and anything standing in it blocks the only route through.
-LAYOUTS = [
-    ("Starter", 0, PAD_RED, ACCENT_STARTER, [
-        ("BenchPress", "StarterBenchPress", -26, -4, 0),
-        ("Dumbbells", "StarterDumbbells", 32, -20, -90),
-        ("PullUpBar", "StarterPullUpBar", 26, -4, 0),
-        ("SitUpBench", "StarterSitUpBench", -26, 12, 0),
-        ("Treadmill", "StarterTreadmill", 26, 12, 180),
-    ]),
-    ("Iron", -90, PAD_BLUE, ACCENT_IRON, [
-        ("BenchPress", "IronBenchPress", -26, -94, 0),
-        ("Dumbbells", "IronDumbbells", 32, -110, -90),
-        ("PullUpBar", "IronPullUpBar", 26, -94, 0),
-        ("SitUpBench", "IronSitUpBench", -26, -78, 0),
-        ("Treadmill", "IronTreadmill", 26, -78, 180),
-    ]),
+# Where each machine stands on a platform, as a fraction of its half-size, and
+# which way it faces. Spread to the edges on purpose: crossing a platform to
+# change exercise should take a moment.
+MACHINE_SPOTS = [
+    ("BenchPress", -0.55, -0.5, 0),
+    ("Dumbbells", 0.6, -0.5, -90),
+    ("PullUpBar", -0.6, 0.45, 0),
+    ("SitUpBench", 0.0, -0.62, 0),
+    ("Treadmill", 0.6, 0.45, 180),
 ]
 
 
-def build_machines():
-    children = []
-    for _zone, _centre, pad_color, accent, entries in LAYOUTS:
-        for equipment_id, name, x, z, facing in entries:
-            origin = mul(cf(x, 0, z), rot_y(facing))
-            builder = BUILDERS[equipment_id]
-            children.append(machine(name, equipment_id, origin, builder(pad_color, accent)))
-    return {"className": "Folder", "children": children}
+def build_world():
+    structure = []
+    machines = []
+
+    # Hub: the safe plaza everybody starts on, ringed with one gate per tier.
+    structure.append(part("HubDeck", [HUB_RADIUS * 2, 4, HUB_RADIUS * 2],
+                          cf(0, FLOOR_TOP - 2, 0), FLOOR_DARK, "Concrete"))
+    structure.append(part("HubTrim", [HUB_RADIUS * 2 + 6, 1.4, HUB_RADIUS * 2 + 6],
+                          cf(0, FLOOR_TOP - 4.6, 0), [0.30, 0.33, 0.40], "Metal"))
+
+    safe = part("SpawnSafeZone", [40, 20, 40], cf(0, FLOOR_TOP + 10, 0),
+                [0.4, 0.8, 1.0], "ForceField", CanCollide=False, Transparency=0.9,
+                CastShadow=False)
+    safe["properties"]["Tags"] = ["SafeZone"]
+    structure.append(safe)
+
+    for index, (zone_id, accent, pad_color, half, altitude) in enumerate(TIERS):
+        origin = tier_origin(index)
+
+        # Gate on the hub rim, pointing at its tier. Touch it with the power and
+        # ZoneService puts you on that tier's spawn pad.
+        angle = index * SPIRAL_DEGREES
+        gate_at = mul(cf(0, 0, 0), rot_y(angle))
+        gate = part(f"{zone_id}Gate", [12, 11, 2],
+                    mul(gate_at, cf(0, FLOOR_TOP + 6, HUB_RADIUS - 4)), accent, "ForceField",
+                    CanCollide=False, Transparency=0.4)
+        gate["properties"]["Tags"] = ["ZoneGate"]
+        gate["attributes"] = {"ZoneId": zone_id}
+        structure.append(gate)
+
+        post = part(f"{zone_id}GatePost", [14, 1.5, 3],
+                    mul(gate_at, cf(0, FLOOR_TOP + 0.6, HUB_RADIUS - 4)), accent, "Neon")
+        structure.append(post)
+
+        for piece in platform(zone_id, accent, half, altitude):
+            structure.append(place(origin, piece))
+        structure.append(zone_volume(zone_id, origin, half))
+
+        for equipment_id, fx, fz, facing in MACHINE_SPOTS:
+            spot = mul(cf(fx * half, 0, fz * half), rot_y(facing))
+            machines.append(machine(
+                f"{zone_id}{equipment_id}", equipment_id, mul(origin, spot),
+                BUILDERS[equipment_id](pad_color, accent),
+            ))
+
+    return ({"className": "Folder", "children": structure},
+            {"className": "Folder", "children": machines})
 
 
 def write(name, payload):
@@ -608,9 +620,10 @@ def write(name, payload):
 
 
 def main():
+    structure, machines = build_world()
     write("init.meta.json", {"className": "Model"})
-    write("Structure.model.json", build_structure())
-    write("Machines.model.json", build_machines())
+    write("Structure.model.json", structure)
+    write("Machines.model.json", machines)
 
 
 if __name__ == "__main__":
