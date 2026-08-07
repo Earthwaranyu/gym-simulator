@@ -699,10 +699,13 @@ def island_slab(row, rng):
     out.append(part("DeckTrim", [size + 5, 1.4, size + 5], cf(0, FLOOR_TOP - 4.5, 0),
                     [c * 0.5 for c in row["accent"]], "Metal"))
 
+    # A kerb runs ALONG the edge it sits on, so the long axis is the one the
+    # offset is *not* on. #67's platform() had these two swapped, which put a
+    # full-width bar at x = half and left it sticking a whole island's width out
+    # into the void — invisible from inside, obvious from the air.
     for sx, sz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        length = size + 4 if sx == 0 else 4
-        width = size + 4 if sz == 0 else 4
-        out.append(part("Kerb", [width, 2.6, length],
+        out.append(part("Kerb",
+                        [4 if sx != 0 else size + 4, 2.6, 4 if sz != 0 else size + 4],
                         cf(sx * (half + 2), FLOOR_TOP + 1.3, sz * (half + 2)),
                         [c * 0.6 for c in row["accent"]], "Metal"))
 

@@ -4,9 +4,9 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 75 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
-and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
-server-driven with no client remote to exploit.
+**Progress: 76 built / 78** — every phase complete. #22 (stamina) and #24 (training
+anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
+client remote to exploit.
 
 **Before this ships**, see [`docs/PLAYTEST.md`](docs/PLAYTEST.md). Two things are stubbed
 on purpose: `DataService` uses the Studio mock store, and every product `AssetId` is `0`
@@ -300,6 +300,22 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       (55 machines, the Coach, both monuments) is `ModelStreamingMode = Atomic`, so a
       bench arrives whole instead of one part at a time with the `TrainAnchor` still
       missing. 2,867 instances across the whole map, one folder per district.
+- [x] 78. **Run it again, and fix what only running finds.** A live Studio session over the
+      MCP bridge, the #64 method. The boot log is clean — 23 services, 14 controllers, no
+      station outside a zone, no district without a landing pad — and the travel rules all
+      hold from a real client: a locked district refuses with its shortfall, an unlocked one
+      lands you on its pad, a second attempt hits the cooldown, and travelling from outside
+      the plaza is refused. All 55 stations resolve to the district they stand in, so the
+      tiering the new mount gate reads is right for every one of them.
+      One real bug, and only visible from the air: **the edge kerbs were inverted**. The
+      bar at `x = half` was given the island's *full width* along X instead of along Z, so
+      each of the four kerbs shot a whole island's width out into the void. Inherited
+      unnoticed from #67's `platform()` — from inside a district it looks like a kerb.
+      Two things that looked like bugs and were not, both worth writing down: a district
+      origin carries a yaw, so a world-space bounding box over-reports a rotated part by up
+      to 41% and invents overhangs that aren't there — the check now measures in the
+      district's own frame. And discs are cylinders stood on end, so their two equal axes
+      are a circle, not a square.
 
 ---
 
