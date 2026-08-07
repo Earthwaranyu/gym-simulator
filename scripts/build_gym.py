@@ -479,25 +479,28 @@ def folder(name, children):
 # new district be one entry: the shape says what an island looks like, the row
 # says what it is made of.
 DISTRICTS = [
+    # Garage and Iron are city blocks, not islands: they take two of Downtown's
+    # twelve plots. `facing` overrides the usual "point back at the origin", because
+    # a gym sitting at 45 degrees to the street it is on looks like a mistake.
     {
         "zone": "Garage",
-        "bearing": 145, "radius": 210, "altitude": 0,
-        "shape": "lot", "half": 58, "layout": "rows",
+        "bearing": 135, "radius": 338, "altitude": 0, "facing": 0,
+        "shape": "lot", "half": 81, "layout": "rows",
         "ground": [0.19, 0.19, 0.21], "ground_material": "Asphalt",
         "rock": [0.13, 0.13, 0.15], "rock_material": "Rock",
         "accent": ACCENT_STARTER, "pad": PAD_RED,
     },
     {
         "zone": "Iron",
-        "bearing": 315, "radius": 225, "altitude": 0,
-        "shape": "lot", "half": 66, "layout": "rows",
+        "bearing": 315, "radius": 338, "altitude": 0, "facing": 180,
+        "shape": "lot", "half": 81, "layout": "rows",
         "ground": [0.17, 0.18, 0.21], "ground_material": "Concrete",
         "rock": [0.12, 0.13, 0.16], "rock_material": "Rock",
         "accent": ACCENT_IRON, "pad": PAD_BLUE,
     },
     {
         "zone": "Powerhouse",
-        "bearing": 60, "radius": 570, "altitude": 0,
+        "bearing": 90, "radius": 570, "altitude": 0,
         "shape": "slab", "half": 128, "layout": "rows",
         "ground": [0.30, 0.30, 0.31], "ground_material": "Concrete",
         "rock": [0.16, 0.16, 0.17], "rock_material": "Rock",
@@ -573,16 +576,24 @@ DISTRICTS = [
 # first two gyms and a plaza with room to stand around in.
 DOWNTOWN_HALF = 330
 PLAZA_RADIUS = 92
-# Bearing of the causeway out to the Docks, matched to Powerhouse's entry.
-CAUSEWAY_BEARING = 60
+# Bearing of the causeway out to the Docks. Due east so it runs straight off
+# the end of the east avenue — a bridge you have to go looking for is not a
+# bridge anyone walks.
+CAUSEWAY_BEARING = 90
 
 
 def district_origin(row):
-    """Where a district sits, as a CFrame facing back toward Downtown."""
+    """Where a district sits, as a CFrame.
+
+    Districts face back toward Downtown by default, so a player arriving on the
+    spawn pad is looking into the gym. A `facing` key overrides that for the two
+    that stand on Downtown's own street grid.
+    """
     angle = math.radians(row["bearing"])
     x = math.sin(angle) * row["radius"]
     z = math.cos(angle) * row["radius"]
-    return mul(cf(x, row["altitude"], z), rot_y(row["bearing"] + 180))
+    facing = row.get("facing", row["bearing"] + 180)
+    return mul(cf(x, row["altitude"], z), rot_y(facing))
 
 
 def disc(name, thickness, diameter, y, color, material, **props):
@@ -857,9 +868,177 @@ LAYOUTS = {
 
 
 # --------------------------------------------------------------------------
-# Downtown: the ground island at the origin. #69 builds the streets and blocks
-# on top of what this lays down.
+# Downtown: the city island at the origin.
+#
+# A grid, not a scatter. Two roads each way at +/-GRID, with the plaza sitting
+# in the block they enclose, and four avenues running from there out to the
+# island edge. The twelve rectangles that grid leaves behind are the city's
+# plots: ten get buildings, and two are handed to Garage Gym and Iron Hall —
+# which is the whole reason those districts are `lot` shaped and stand here
+# rather than on islands of their own.
 # --------------------------------------------------------------------------
+
+ROAD = [0.12, 0.12, 0.13]
+ROAD_LINE = [0.76, 0.70, 0.36]
+SIDEWALK = [0.40, 0.40, 0.41]
+KERB = [0.53, 0.53, 0.54]
+
+GRID = 140
+ROAD_WIDTH = 36
+# Plots run from the grid roads out to here; past it is promenade and railing.
+PLOT_EDGE = 320
+
+# Four skins rather than one, picked per building. A city where every wall is
+# the same colour reads as a texture, not as a place people built over time.
+BUILDING_SKINS = [
+    {"wall": [0.45, 0.41, 0.36], "trim": [0.29, 0.26, 0.23],
+     "glass": [0.15, 0.21, 0.26], "material": "Concrete"},
+    {"wall": [0.37, 0.24, 0.20], "trim": [0.24, 0.15, 0.12],
+     "glass": [0.14, 0.18, 0.23], "material": "Brick"},
+    {"wall": [0.56, 0.53, 0.47], "trim": [0.36, 0.34, 0.30],
+     "glass": [0.18, 0.25, 0.30], "material": "Sandstone"},
+    {"wall": [0.21, 0.23, 0.27], "trim": [0.14, 0.15, 0.18],
+     "glass": [0.20, 0.31, 0.37], "material": "Metal"},
+]
+
+
+def city_plots():
+    """The twelve rectangles the street grid leaves behind, as (x, z, sx, sz).
+
+    Three per quadrant: one flanking each avenue, one on the corner. The two
+    corner plots the gym districts occupy are excluded by the caller.
+    """
+    out = []
+    near, far = ROAD_WIDTH / 2 + 2, GRID - ROAD_WIDTH / 2
+    inner, outer = GRID + ROAD_WIDTH / 2, PLOT_EDGE
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            out.append((sx * (near + far) / 2, sz * (inner + outer) / 2,
+                        far - near, outer - inner))
+            out.append((sx * (inner + outer) / 2, sz * (near + far) / 2,
+                        outer - inner, far - near))
+            out.append((sx * (inner + outer) / 2, sz * (inner + outer) / 2,
+                        outer - inner, outer - inner))
+    return out
+
+
+def street(length, width, frame, dash_axis):
+    """Asphalt laid flush with the ground, with a dashed centre line."""
+    out = [part("Road", [width, 0.5, length], frame, ROAD, "Asphalt",
+                CanCollide=False)]
+    for offset in range(-int(length // 2) + 20, int(length // 2) - 18, 44):
+        out.append(part("Line", [1.2, 0.1, 14] if dash_axis else [14, 0.1, 1.2],
+                        mul(frame, cf(0, 0.3, offset)), ROAD_LINE, "SmoothPlastic",
+                        CanCollide=False, CastShadow=False))
+    return out
+
+
+def street_light(x, z, facing):
+    """Pole, arm and head. Three parts, and they are what makes a road at dusk
+    read as a road rather than as a grey stripe."""
+    arm = mul(cf(x, FLOOR_TOP + 15.5, z), rot_y(facing))
+    return [
+        part("LightPole", [1.1, 16, 1.1], cf(x, FLOOR_TOP + 8, z), [0.17, 0.17, 0.19], "Metal"),
+        part("LightArm", [0.8, 0.8, 7], mul(arm, cf(0, 0, 3.5)), [0.17, 0.17, 0.19], "Metal"),
+        part("LightHead", [2.2, 0.7, 3.4], mul(arm, cf(0, -0.6, 6.6)),
+             [1.0, 0.90, 0.68], "Neon", CanCollide=False),
+    ]
+
+
+def parked_car(x, z, facing, rng):
+    """Six parts. Cars exist to give the kerb a scale and the street a life."""
+    body = [rng.uniform(0.15, 0.75) for _ in range(3)]
+    frame = mul(cf(x, FLOOR_TOP, z), rot_y(facing))
+    out = [
+        part("CarBody", [7.4, 3.2, 16], mul(frame, cf(0, 2.6, 0)), body, "Metal"),
+        part("CarCabin", [6.6, 2.8, 7.6], mul(frame, cf(0, 5.6, -0.6)),
+             [0.11, 0.12, 0.15], "Glass", Reflectance=0.25),
+    ]
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            out.append(cylinder("CarWheel", 1.2, 3.0,
+                                mul(frame, mul(cf(sx * 3.6, 1.5, sz * 5.2), rot_y(90))),
+                                [0.06, 0.06, 0.07], "Rubber"))
+    return out
+
+
+def palm(x, z, rng):
+    """Trunk and fronds. The one plant in a city of concrete."""
+    height = rng.uniform(16, 26)
+    out = [cylinder("PalmTrunk", height, 2.2,
+                    mul(cf(x, FLOOR_TOP + height / 2, z), rot_z(90)),
+                    [0.31, 0.25, 0.18], "Wood")]
+    for index in range(6):
+        angle = 60 * index + rng.uniform(-12, 12)
+        frond = mul(mul(cf(x, FLOOR_TOP + height, z), rot_y(angle)), rot_x(-28))
+        out.append(part("PalmFrond", [2.4, 0.4, 11],
+                        mul(frond, cf(0, 0, 5)), [0.16, 0.33, 0.16], "Grass",
+                        CanCollide=False))
+    return out
+
+
+def building(x, z, sx, sz, height, skin, rng):
+    """A tower: storefront band, shaft, glazing on each face, and a parapet.
+
+    Deliberately few parts. At the distance you actually see these from, a
+    window strip per face carries a building far better than a floor-by-floor
+    grid would, and this map has ten plots of them to pay for.
+    """
+    out = [
+        part("Storefront", [sx, 9, sz], cf(x, FLOOR_TOP + 4.5, z),
+             skin["trim"], skin["material"]),
+        part("Shaft", [sx - 2, height, sz - 2], cf(x, FLOOR_TOP + 9 + height / 2, z),
+             skin["wall"], skin["material"]),
+        part("Parapet", [sx + 1, 3, sz + 1], cf(x, FLOOR_TOP + 10.5 + height, z),
+             skin["trim"], skin["material"]),
+    ]
+
+    lit = rng.random() < 0.4
+    for side, (ox, oz, w, d) in enumerate((
+        (0, sz / 2 - 1, sx - 10, 0.6),
+        (0, -sz / 2 + 1, sx - 10, 0.6),
+        (sx / 2 - 1, 0, 0.6, sz - 10),
+        (-sx / 2 + 1, 0, 0.6, sz - 10),
+    )):
+        if w <= 0 or d <= 0:
+            continue
+        out.append(part("Glazing", [w, height - 6, d],
+                        cf(x + ox, FLOOR_TOP + 9 + height / 2, z + oz),
+                        skin["glass"], "Neon" if lit else "Glass",
+                        Transparency=0 if lit else 0.35, CanCollide=False))
+
+    # Lit shopfront across the street-facing side, at head height.
+    if sx >= sz:
+        shop_size, shop_at = [sx - 12, 5, 0.4], cf(x, FLOOR_TOP + 4.5, z + sz / 2 - 0.2)
+    else:
+        shop_size, shop_at = [0.4, 5, sz - 12], cf(x + sx / 2 - 0.2, FLOOR_TOP + 4.5, z)
+    out.append(part("ShopGlass", shop_size, shop_at, [0.85, 0.72, 0.38], "Neon",
+                    CanCollide=False))
+    return out
+
+
+def city_plot(x, z, sx, sz, rng):
+    """A sidewalk, its kerb, and two or three buildings standing on it."""
+    out = [
+        part("Sidewalk", [sx, 1.0, sz], cf(x, FLOOR_TOP + 0.5, z), SIDEWALK, "Concrete"),
+        part("Kerb", [sx + 3, 0.7, sz + 3], cf(x, FLOOR_TOP + 0.35, z), KERB, "Concrete"),
+    ]
+
+    # Split the long axis into two or three footprints with a gap between, so a
+    # plot reads as several buildings rather than one extruded rectangle.
+    along_x = sx >= sz
+    span = sx if along_x else sz
+    count = 2 if span < 150 else 3
+    cell = span / count
+    for index in range(count):
+        offset = -span / 2 + cell * (index + 0.5)
+        w = cell - 12 if along_x else sx - 16
+        d = sz - 16 if along_x else cell - 12
+        out.extend(building(
+            x + (offset if along_x else 0), z + (0 if along_x else offset),
+            w, d, rng.uniform(26, 104), rng.choice(BUILDING_SKINS), rng,
+        ))
+    return out
 
 
 def downtown():
@@ -876,6 +1055,40 @@ def downtown():
                     [0.21, 0.21, 0.22], "Asphalt"))
     out.append(part("GroundTrim", [size + 8, 2, size + 8], cf(0, FLOOR_TOP - 5, 0),
                     [0.26, 0.27, 0.30], "Concrete"))
+
+    # The grid: two roads each way across the island, then four avenues from
+    # the plaza block out to the edge.
+    # `street` lays its road along the frame's local Z, so the ones that run
+    # east-west are the rotated pair, not the ones sitting at x = +/-GRID.
+    for sign in (-1, 1):
+        out.extend(street(size, ROAD_WIDTH,
+                          mul(cf(0, FLOOR_TOP - 0.25, sign * GRID), rot_y(90)), False))
+        out.extend(street(size, ROAD_WIDTH, cf(sign * GRID, FLOOR_TOP - 0.25, 0), False))
+
+        inner = GRID - ROAD_WIDTH / 2
+        avenue = DOWNTOWN_HALF - inner
+        mid = sign * (inner + avenue / 2)
+        out.extend(street(avenue, ROAD_WIDTH, cf(0, FLOOR_TOP - 0.25, mid), True))
+        out.extend(street(avenue, ROAD_WIDTH,
+                          mul(cf(mid, FLOOR_TOP - 0.25, 0), rot_y(90)), True))
+
+    # Plots. The two the gym districts stand on are left bare here; their own
+    # `lot` geometry covers them.
+    gym_plots = {(round(district_origin(r)[0][0]), round(district_origin(r)[0][2]))
+                 for r in DISTRICTS if r["shape"] == "lot"}
+    for x, z, sx, sz in city_plots():
+        if (round(x), round(z)) in gym_plots:
+            continue
+        out.extend(city_plot(x, z, sx, sz, rng))
+
+    # Street furniture along both sides of the grid roads.
+    for sign in (-1, 1):
+        for along in range(-DOWNTOWN_HALF + 60, DOWNTOWN_HALF - 40, 74):
+            out.extend(street_light(along, sign * (GRID - ROAD_WIDTH / 2 - 3), 90 * sign))
+            out.extend(street_light(sign * (GRID - ROAD_WIDTH / 2 - 3), along, 90 - 90 * sign))
+        for along in range(-DOWNTOWN_HALF + 96, DOWNTOWN_HALF - 90, 122):
+            out.extend(parked_car(along, sign * (GRID - ROAD_WIDTH / 2 - 6), 90, rng))
+            out.extend(parked_car(sign * (GRID - ROAD_WIDTH / 2 - 6), along, 0, rng))
 
     # Plaza: raised a hair so it reads as its own surface, and the only place
     # in the game where travel is free.
@@ -919,6 +1132,25 @@ def downtown():
         out.append(part("CausewayRail", [1.6, 3.2, span],
                         mul(bridge, cf(side * 17.2, 2.4, 0)),
                         [0.20, 0.21, 0.23], "Metal"))
+
+    # Promenade railing around the island edge, and palms along it. The edge is
+    # a 300-stud drop into nothing now that the baseplate is gone, so it wants
+    # to be visibly an edge.
+    for sign in (-1, 1):
+        for axis in (0, 1):
+            at = cf(0, FLOOR_TOP + 2, sign * (DOWNTOWN_HALF - 2))
+            frame = mul(rot_y(90 * axis), at)
+            out.append(part("Railing", [DOWNTOWN_HALF * 2, 3.4, 1.2], frame,
+                            [0.24, 0.25, 0.27], "Metal"))
+        for along in range(-DOWNTOWN_HALF + 70, DOWNTOWN_HALF - 60, 96):
+            out.extend(palm(along, sign * (DOWNTOWN_HALF - 16), rng))
+            out.extend(palm(sign * (DOWNTOWN_HALF - 16), along, rng))
+
+    # Palms ringing the plaza, between the lamps.
+    for index in range(8):
+        angle = 360.0 * index / 8 + 22.5
+        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS + 14))
+        out.extend(palm(spot[0][0], spot[0][2], rng))
 
     out.extend(underside(row, rng, False))
     return out

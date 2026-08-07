@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 66 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+**Progress: 67 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
 and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
 server-driven with no client remote to exploit.
 
@@ -206,8 +206,15 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       district instead of 326 flat children, tags go through a `tagged()` helper, and the
       2048-stud `Baseplate` is gone — the map is 2,866 across and floats over nothing,
       which is the reference's look anyway.
-- [ ] 69. **Downtown.** Street grid, sidewalks, blocks, storefronts, streetlights, parked
-      cars. Garage Gym and Iron Hall become buildings on its streets.
+- [x] 69. **Downtown.** A grid, not a scatter: two roads each way with the plaza in the
+      block they enclose, and four avenues running out to the island edge. The twelve
+      rectangles that leaves are the city's plots — ten get sidewalks, kerbs and two or
+      three part-built towers apiece, picked from four skins so the city looks built over
+      time rather than extruded in one pass; the other two **are** Garage Gym and Iron
+      Hall, which is why those districts are `lot` shaped and stand here instead of on
+      islands. Streetlights and parked cars line the grid roads, palms line the plaza and
+      the promenade, and the causeway to the Docks now runs due east off the end of the
+      east avenue — a bridge you have to go looking for is not a bridge anyone walks.
 - [ ] 70. **The plaza.** Quest-giver NPC and leaderboard monuments in the safe zone
       everybody spawns into.
 - [ ] 71. **Eight themed districts.** A `PROPS` registry: docks, beach, quarry, rooftop,
