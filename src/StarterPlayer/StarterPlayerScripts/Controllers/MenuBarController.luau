@@ -31,6 +31,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local UI = require(ReplicatedStorage.Modules.UI)
@@ -43,6 +44,12 @@ local LABEL_WIDTH = 108
 -- Gap between buttons. Enough that a thumb cannot catch two at once.
 local SPACING = 8
 local EDGE_MARGIN = 16
+-- Where the HUD's top-left block ends. The bar never starts above this.
+local HUD_BLOCK = 108
+-- On a touch device the bottom of the screen belongs to Roblox: the movement
+-- thumbstick bottom-left and the jump button bottom-right. Measured generously,
+-- because a button a thumb *nearly* hits is worse than one it cannot reach.
+local TOUCH_RESERVED_BOTTOM = 0.6
 
 local MenuBarController = {
 	Name = "MenuBarController",
@@ -62,6 +69,57 @@ type Entry = {
 }
 
 local entries: { Entry } = {}
+local screenGui: ScreenGui
+local bar: Frame
+local layout: UIListLayout
+local barScale: UIScale
+
+-- Anchor is the y of the column's centre, or of the strip's top edge.
+export type Plan = { Mode: string, Scale: number, Anchor: number }
+
+--[[
+	Decides how the bar is laid out on a given screen. Pure, so it can be checked
+	against a table of real device sizes without a device to hand.
+
+	A column of five 56px buttons needs 312px. That is fine on a desktop, where the
+	whole height is usable — and fits on no phone at all once the bottom 40% is
+	given back to the thumbstick and the jump button: an iPhone 14 in landscape has
+	about 126px between the HUD and the touch zone. So a short screen gets the same
+	buttons as a horizontal strip under the HUD instead, where the space is.
+
+	The mode is computed from the geometry rather than switched on `TouchEnabled`,
+	so a large tablet keeps the column it has room for.
+]]
+function MenuBarController._plan(viewportHeight: number, count: number, touch: boolean): Plan
+	local scale = UI.LayoutScale(viewportHeight)
+	local column = count * TILE + math.max(0, count - 1) * SPACING
+
+	-- The window the bar is allowed to occupy: below the HUD block, and above the
+	-- touch controls if there are any.
+	local top = HUD_BLOCK * scale + EDGE_MARGIN
+	local bottom = if touch then viewportHeight * TOUCH_RESERVED_BOTTOM else viewportHeight - EDGE_MARGIN
+	local window = bottom - top
+
+	-- Centred in the window rather than in the viewport. Centring on the viewport
+	-- is what a first version did, and on a tablet it pushed a column that had
+	-- been *sized* to fit the window straight back down through the bottom of it.
+	if column * scale <= window then
+		local half = column * scale / 2
+		return {
+			Mode = "Column",
+			Scale = scale,
+			Anchor = math.clamp(viewportHeight / 2, top + half, bottom - half),
+		}
+	end
+
+	-- Nearly fits: shrink rather than change shape.
+	local fitting = window / column
+	if fitting >= UI.MIN_LAYOUT_SCALE then
+		return { Mode = "Column", Scale = fitting, Anchor = top + column * fitting / 2 }
+	end
+
+	return { Mode = "Strip", Scale = scale, Anchor = top }
+end
 
 function MenuBarController:Init()
 	MenuController = Loader.Get("MenuController")
@@ -98,6 +156,7 @@ function MenuBarController:_build()
 	local tabs = MenuController:GetBarTabs()
 
 	local screen = Instance.new("ScreenGui")
+	screenGui = screen
 	screen.Name = "GymMenuBar"
 	screen.ResetOnSpawn = false
 	-- Matches the HUD, so both live in the same coordinate space and "vertically
@@ -107,15 +166,18 @@ function MenuBarController:_build()
 	screen.DisplayOrder = 4
 	screen.Parent = playerGui
 
-	local bar = Instance.new("Frame")
+	-- Created here, driven by _arrange: the bar's scale is not simply
+	-- UI.LayoutScale, because a column that nearly fits is shrunk further to fit
+	-- rather than allowed to run into the touch controls.
+	barScale = Instance.new("UIScale")
+	barScale.Parent = screen
+
+	bar = Instance.new("Frame")
 	bar.Name = "Bar"
 	bar.BackgroundTransparency = 1
-	bar.AnchorPoint = Vector2.new(0, 0.5)
-	bar.Position = UDim2.new(0, EDGE_MARGIN, 0.5, 0)
-	bar.Size = UDim2.fromOffset(TILE + LABEL_WIDTH, #tabs * TILE + math.max(0, #tabs - 1) * SPACING)
 	bar.Parent = screen
 
-	local layout = UI.VerticalList(bar, SPACING)
+	layout = UI.VerticalList(bar, SPACING)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
 	for index, tab in tabs do
@@ -191,12 +253,59 @@ function MenuBarController:_build()
 	end
 end
 
+--[[
+	Applies a plan: direction, button width, whether labels show, and where the
+	whole thing sits.
+]]
+function MenuBarController:_arrange()
+	-- The ScreenGui's own height, not the camera's: this GUI respects the inset,
+	-- so the space it can use is already smaller than the screen.
+	local height = screenGui.AbsoluteSize.Y
+	if height <= 0 then
+		return
+	end
+	local plan = MenuBarController._plan(height, #entries, UserInputService.TouchEnabled)
+
+	barScale.Scale = plan.Scale
+	local column = plan.Mode == "Column"
+	local width = if column then TILE + LABEL_WIDTH else TILE
+
+	layout.FillDirection = if column then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal
+
+	for _, entry in entries do
+		entry.Button.Size = UDim2.fromOffset(width, TILE)
+		-- The label is what does not fit in a strip; the glyph is the part that
+		-- has to survive, so the label is what goes.
+		entry.Label.Visible = column
+	end
+
+	local span = #entries * TILE + math.max(0, #entries - 1) * SPACING
+	-- Anchor is in real pixels; the bar's own offsets are multiplied by the
+	-- UIScale, so the position has to be divided by it to land where planned.
+	local anchor = plan.Anchor / plan.Scale
+	local margin = EDGE_MARGIN / plan.Scale
+
+	if column then
+		bar.Size = UDim2.fromOffset(width, span)
+		bar.AnchorPoint = Vector2.new(0, 0.5)
+	else
+		bar.Size = UDim2.fromOffset(span, TILE)
+		bar.AnchorPoint = Vector2.new(0, 0)
+	end
+	bar.Position = UDim2.fromOffset(margin, anchor)
+end
+
 function MenuBarController:Start()
 	self:_build()
+	self:_arrange()
 	self:_refresh(MenuController:GetOpenTab())
 
 	MenuController.Changed:Connect(function(openTab: string?)
 		self:_refresh(openTab)
+	end)
+
+	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		self:_arrange()
 	end)
 end
 

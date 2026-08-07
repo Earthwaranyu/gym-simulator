@@ -257,6 +257,52 @@ function UI.Pressable(button: GuiButton, options: PressableOptions?): UIScale
 	return scale
 end
 
+-- The screen height every fixed offset in this game was chosen against.
+local REFERENCE_HEIGHT = 720
+-- Below this the interface would shrink past the point a finger can hit it; above
+-- it, a 4K monitor would get a HUD with comic proportions.
+local MIN_LAYOUT_SCALE = 0.85
+local MAX_LAYOUT_SCALE = 1.25
+
+--[[
+	How much to scale fixed-offset interface for the screen it is on.
+
+	Everything in the HUD is written in offsets against a 720-tall screen, which is
+	right for a desktop and wrong for everything else. One definition of the factor
+	lives here so the HUD and the button bar cannot drift apart and start
+	overlapping on one device but not another.
+]]
+function UI.LayoutScale(viewportHeight: number): number
+	return math.clamp(viewportHeight / REFERENCE_HEIGHT, MIN_LAYOUT_SCALE, MAX_LAYOUT_SCALE)
+end
+
+UI.MIN_LAYOUT_SCALE = MIN_LAYOUT_SCALE
+
+--[[
+	Applies UI.LayoutScale to a whole ScreenGui and keeps it applied when the window
+	changes — which on a phone is every rotation, and on a desktop every resize.
+]]
+function UI.ScaleWithViewport(screen: ScreenGui): UIScale
+	local scale = screen:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	scale.Parent = screen
+
+	-- The ScreenGui's own size, not the camera's. A GUI that respects the inset
+	-- has less room than the screen reports, and scaling off the camera makes two
+	-- ScreenGuis with different inset settings disagree about how big a pixel is —
+	-- which is how the HUD ended up at 1.04 while the bar beside it was at 0.96.
+	local function apply()
+		local height = screen.AbsoluteSize.Y
+		if height > 0 then
+			scale.Scale = UI.LayoutScale(height)
+		end
+	end
+
+	apply()
+	screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply)
+
+	return scale
+end
+
 --[[
 	Locks an element's shape across screen sizes, which is what keeps square badges
 	square on ultrawide monitors and phones alike.

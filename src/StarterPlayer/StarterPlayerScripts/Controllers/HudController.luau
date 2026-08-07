@@ -72,6 +72,11 @@ function HudController:_build()
 	screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screen.Parent = playerGui
 
+	-- Every offset below was chosen against a 720-tall screen. This is what makes
+	-- them mean the same thing on a phone and on a monitor, and it is shared with
+	-- the button bar so the two cannot drift into each other.
+	UI.ScaleWithViewport(screen)
+
 	-- Top-left: power, tokens, and every stat, in one block.
 	--
 	-- This was two stacked panels 250px tall, which owned the whole left column and

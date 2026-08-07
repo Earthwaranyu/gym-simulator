@@ -135,10 +135,12 @@ local function drawSettings(parent: GuiObject, color: Color3, _hole: Color3)
 	-- has to be told apart from the rail by colour, and at 28 pixels there is not
 	-- enough of it left to tell — the two merge into a blob. A perpendicular tick
 	-- is still a tick at any size, and needs no second colour to work.
+	-- Rails are 0.24 apart, so a handle taller than about 0.22 reaches into the
+	-- next one and the three merge into a single block at tile size.
 	for index, spec in { { 0.26, 0.32 }, { 0.5, 0.7 }, { 0.74, 0.46 } } do
 		local y, handleX = spec[1], spec[2]
 		shape(parent, `Rail{index}`, 0.5, y, 0.88, 0.08, color, 0, 1)
-		shape(parent, `Handle{index}`, handleX, y, 0.13, 0.32, color, 0, 0.4)
+		shape(parent, `Handle{index}`, handleX, y, 0.14, 0.2, color, 0, 0.4)
 	end
 end
 

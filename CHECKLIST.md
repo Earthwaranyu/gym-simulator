@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 82 built / 85** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 83 built / 85** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -402,8 +402,25 @@ Roblox UI.
       was a `TOP_INSET = 44` constant; the real inset measured 58 and is not a constant
       across devices, so the answer is to stop ignoring it and let Roblox place the origin.
       Verified in a live session: zero overlaps between any two panels or the bar.
-- [ ] 85. **Fits a phone.** A viewport-driven `UIScale`, checked against the three zones
-      Roblox reserves: thumbstick, jump button, and its own menu.
+- [x] 85. **Fits a phone.** Modelling the layout against real device heights killed the
+      original design outright: **a column of five 56px buttons needs 312px, and no phone
+      has it** once the bottom 40% is given back to the thumbstick and the jump button —
+      an iPhone 14 in landscape leaves about 126px between the HUD and the touch zone.
+      So `MenuBarController._plan` decides the shape from the geometry rather than assuming
+      one: a column where it fits, shrunk to fit where it nearly does, and a horizontal
+      strip of icon-only tiles under the HUD where it does not. Computed, not switched on
+      `TouchEnabled`, so a tablet keeps the column it has room for. It is a pure function
+      precisely so it can be checked against a table of device sizes without a device.
+      Two bugs it found. `_plan` sized a column to fit a window and `_arrange` then centred
+      it on the whole viewport, pushing it straight back out of the bottom on both iPads.
+      And the HUD scaled off the camera while the bar scaled off its own GUI space — 1.04
+      against 0.96 — so `UI.ScaleWithViewport` now measures the ScreenGui, which is the
+      space either of them actually has.
+      Verified: every device from a 320px phone to a 1440p monitor clears both the HUD
+      block and the reserved zones, the smallest tile is 48px against a 44px floor, and
+      the strip fits the narrowest landscape phone. Drawing the icons at their real 38px
+      also showed the Settings handles were taller than the gap between its rails and
+      merged into a block; they are shorter now.
 ---
 
 ## Milestone 1 — Vertical Slice
