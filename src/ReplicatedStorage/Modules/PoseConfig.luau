@@ -24,6 +24,14 @@
 	  * Offsets are studs, and only really matter on Root, which moves the whole
 	    body — that is what lifts a player up the pull-up bar.
 
+	**Keep angles under about 150.** Rigs carry BallSocketConstraints that limit how
+	far a joint may actually travel, so past roughly 150 degrees the achieved angle
+	stops tracking the requested one and then goes back the way it came: measured on
+	a stock R15 avatar, a shoulder asked for 150 reaches 166, but asked for 180 it
+	reaches only 149. A pose written past that ceiling does not merely clamp, it
+	animates backwards. The same limits are why a lifter's feet hang short of the
+	floor on the bench rather than planting on it — the hips will not fold that far.
+
 	Adding a machine reuses a pose by id, or adds one entry here. Nothing consumes
 	these except TrainingPoseController, which knows nothing about any specific pose.
 ]]
@@ -60,14 +68,17 @@ local poses: { Pose } = {
 		Id = "BenchPress",
 		Cycles = 1,
 		Joints = {
-			{ Joint = "RightShoulder", Rest = deg(55, 0, 30), Peak = deg(88, 0, 8) },
-			{ Joint = "LeftShoulder", Rest = deg(55, 0, -30), Peak = deg(88, 0, -8) },
-			{ Joint = "RightElbow", Rest = deg(90, 0, 0), Peak = deg(5, 0, 0) },
-			{ Joint = "LeftElbow", Rest = deg(90, 0, 0), Peak = deg(5, 0, 0) },
-			{ Joint = "RightHip", Rest = deg(-15, 0, 8), Peak = deg(-15, 0, 8) },
-			{ Joint = "LeftHip", Rest = deg(-15, 0, -8), Peak = deg(-15, 0, -8) },
-			{ Joint = "RightKnee", Rest = deg(-75, 0, 0), Peak = deg(-75, 0, 0) },
-			{ Joint = "LeftKnee", Rest = deg(-75, 0, 0), Peak = deg(-75, 0, 0) },
+			-- The bar is a fixed prop, so the bottom of the stroke is deliberately
+			-- shallow: a full bench-press range of motion drops the hands far enough
+			-- below it to read as letting go rather than lowering the weight.
+			{ Joint = "RightShoulder", Rest = deg(66, 0, 26), Peak = deg(88, 0, 8) },
+			{ Joint = "LeftShoulder", Rest = deg(66, 0, -26), Peak = deg(88, 0, -8) },
+			{ Joint = "RightElbow", Rest = deg(66, 0, 0), Peak = deg(5, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(66, 0, 0), Peak = deg(5, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(-50, 0, 8), Peak = deg(-50, 0, 8) },
+			{ Joint = "LeftHip", Rest = deg(-50, 0, -8), Peak = deg(-50, 0, -8) },
+			{ Joint = "RightKnee", Rest = deg(-55, 0, 0), Peak = deg(-55, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-55, 0, 0), Peak = deg(-55, 0, 0) },
 			{ Joint = "Waist", Rest = deg(-6, 0, 0), Peak = deg(-6, 0, 0) },
 			{ Joint = "Neck", Rest = deg(12, 0, 0), Peak = deg(12, 0, 0) },
 		},
@@ -99,8 +110,8 @@ local poses: { Pose } = {
 				RestOffset = Vector3.new(0, -0.9, 0),
 				PeakOffset = Vector3.new(0, 0.9, 0),
 			},
-			{ Joint = "RightShoulder", Rest = deg(0, 0, 165), Peak = deg(0, 0, 158) },
-			{ Joint = "LeftShoulder", Rest = deg(0, 0, -165), Peak = deg(0, 0, -158) },
+			{ Joint = "RightShoulder", Rest = deg(0, 0, 150), Peak = deg(0, 0, 136) },
+			{ Joint = "LeftShoulder", Rest = deg(0, 0, -150), Peak = deg(0, 0, -136) },
 			{ Joint = "RightElbow", Rest = deg(10, 0, 0), Peak = deg(85, 0, 0) },
 			{ Joint = "LeftElbow", Rest = deg(10, 0, 0), Peak = deg(85, 0, 0) },
 			{ Joint = "RightHip", Rest = deg(12, 0, 6), Peak = deg(12, 0, 6) },

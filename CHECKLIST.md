@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 61 built / 63** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 62 built / 64** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -150,8 +150,24 @@ for machines, and training that happened *to* you as you walked past.
       the prompt and the billboard.
 - [x] 63. **Training animations.** `PoseConfig` describes each exercise as joint angles;
       `TrainingPoseController` plays it on every training character it can see by writing
-      `Motor6D.Transform` after the animator. Generated rather than uploaded, so no
+      the joint's `Transform` after the animator. Generated rather than uploaded, so no
       animation asset is referenced and nothing needs to be owned.
+- [x] 64. **Run it and fix what only running finds.** A live Studio session over the MCP
+      bridge. Nothing below was reachable by static analysis, and two of them meant the
+      animation system did not move a single limb:
+      - Characters have **no `Motor6D` at all** on current Studio builds. Roblox's avatar
+        joint upgrade replaced them with `AnimationConstraint`. Both carry `Transform`;
+        the controller now takes either.
+      - Writing `Transform` after the render step sets the property but changes nothing.
+        The value has to land on **`PreSimulation`** — after the animator evaluates,
+        before the world step reads joints. Measured, not guessed.
+      - Rigs enforce joint limits, so angles past ~150° stop tracking and then reverse.
+        The pull-up's ±165° shoulders were on the wrong side of that.
+      - The dumbbell rack stood in the only doorway between the two halls.
+      - The bench barbell sat 2.9 studs from the lifter's hands; the pull-up bar 1.4
+        studs above them. Both now meet the hands the pose actually reaches.
+      - Players spawned on `Workspace.SpawnLocation` at the origin — mid-floor, in open
+        PvP — rather than the safe-zone bubble. The project now owns that instance.
 
 ---
 

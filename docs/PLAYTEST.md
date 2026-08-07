@@ -21,9 +21,26 @@ Two real bugs were found and fixed this way — a DataStore error aborting the w
 server boot, and gym zones tagged on floor slabs so tokens never accrued. Neither was
 reachable by static analysis.
 
-That session predates checklist 61–63, which replaced the coloured-box gym with built
-machines and swapped proximity auto-training for hold-E mounting. **Everything in step 2
-below needs re-running from scratch**, and the training poses have never been seen move.
+## Also verified in a live session (checklist 64)
+
+A second MCP-driven session, after 61–63 replaced the coloured-box gym:
+
+- Server boots clean: 21 server systems, 11 client, and **no station warnings** — all ten
+  machines resolve their definition, their `TrainAnchor` spots and their prompt.
+- Prompts build correctly: "Bench" / "Bench Press", hold 0.45s, 14-stud range.
+- Occupancy attributes publish (`0/1` on the bench, `0/3` on the dumbbell rack).
+- All five poses drive a real avatar, measured joint by joint through a full rep:
+  bench hands travel 4.80→5.45 and meet the bar within 0.32 studs; the curl swings
+  1.54 studs; the pull-up lifts the body 1.8 studs with the chin clearing the bar;
+  the sit-up curls the head through 2.42 studs; the run strides and swings arms.
+
+**Two caveats on that.** The poses were verified by *measuring* limb positions, not by
+watching them — `screen_capture` does not work while playing. Numbers cannot tell you
+whether the result looks good, so the animation still wants a human's eyes. And the
+hold-E path itself could not be exercised: proximity prompts never appear in an
+MCP-driven session (a freshly created control prompt beside the player does not show
+either), so `Triggered` never fires and mounting had to be driven by setting the same
+attributes the server sets. **Step 2's first two lines are still genuinely untested.**
 
 **Still unverified**, and the reason the rest of this document exists: anything needing
 two players (PvP, the training interrupt, kill feed, bounties), real DataStore
@@ -48,8 +65,11 @@ step says otherwise.
 
 ## 2. Training loop
 
-- [ ] Walk up to the Bench Press. A "Hold E to Bench" prompt appears.
+- [ ] Walk up to the Bench Press. A "Hold E to Bench" prompt appears. **Never yet seen
+      with human hands — prompts do not render in an MCP-driven session, so this is the
+      one step in the whole file with no evidence behind it at all.**
 - [ ] Hold **E**. You are placed on the machine, locked there, and start pressing.
+- [ ] You spawn in the blue safe-zone bubble, not in the middle of the gym floor.
 - [ ] Chest climbs in the HUD; total power climbs with it.
 - [ ] The combo readout rises toward x2.00 the longer you stay on.
 - [ ] Hold **E** again. You are put down beside the machine and the combo resets.

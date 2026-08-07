@@ -12,14 +12,21 @@
 	uploaded animation, so the game owns everything it animates. See that module for
 	why, and for what the angles mean.
 
-	Two details make it work alongside Roblox's own animations:
+	Three details make it work alongside Roblox's own animations:
 
-	  * It writes Motor6D.Transform, the same field the animator writes. Posed
+	  * It writes the joint's Transform, the same field the animator writes. Posed
 	    joints are overridden; every other joint keeps playing idle underneath, so a
 	    benching character still breathes.
-	  * It runs at render priority just after Character, so it lands after the
-	    animator has written for the frame. Earlier in the frame and the idle
-	    animation would simply overwrite it.
+	  * A joint is a Motor6D on a classic rig and an AnimationConstraint on a rig
+	    built since Roblox's avatar joint upgrade. Both expose Transform and mean the
+	    same thing by it, so both are accepted — a rig with neither simply is not
+	    posed. Do not assume Motor6D: current Studio builds ship characters with no
+	    Motor6D in them at all.
+	  * It runs on PreSimulation, which is after the animator has evaluated for the
+	    frame and before the world step that turns joint transforms into part
+	    positions. That window is the whole trick. Writing later — on Heartbeat, or
+	    after RenderPriority.Character — sets the property but the value is
+	    overwritten before anything reads it, and the body never moves.
 
 	This controller knows nothing about any particular machine or pose. A new
 	exercise is a PoseConfig entry, and nothing here changes.
@@ -34,16 +41,24 @@ local PoseConfig = require(ReplicatedStorage.Modules.PoseConfig)
 -- Seconds spent easing from wherever the body was into the pose, so mounting a
 -- machine does not snap.
 local BLEND_SECONDS = 0.3
--- Must sit after Enum.RenderPriority.Character, which is when the animator runs.
-local RENDER_PRIORITY = Enum.RenderPriority.Character.Value + 1
-local RENDER_NAME = "TrainingPose"
 
 -- Bound once: the blend-in lerps out of this, and clearing a joint restores it.
 local IDENTITY: CFrame = CFrame.identity
 
+--[[
+	A rig joint, described by the one thing this controller needs from it.
+
+	Motor6D (classic rigs) and AnimationConstraint (rigs built since Roblox's avatar
+	joint upgrade) both carry a Transform layered over the joint's rest pose, and
+	both mean the same thing by it — but they share no ancestor that declares it.
+	Naming the shape instead of the classes is what lets one code path drive either
+	without branching on rig generation everywhere.
+]]
+type Joint = Instance & { Transform: CFrame }
+
 type Bound = {
 	motion: PoseConfig.JointMotion,
-	motor: Motor6D,
+	joint: Joint,
 }
 
 type Entry = {
@@ -61,11 +76,15 @@ local TrainingPoseController = {
 local active: { [Model]: Entry } = {}
 
 --[[
-	Finds the Motor6D a motion drives, translating R15 joint names to their R6
+	Finds the joint a motion drives, translating R15 joint names to their R6
 	equivalents on an R6 rig. Joints with no equivalent return nil and are dropped,
 	which is how a pose degrades on R6 rather than erroring.
+
+	Matched on name *and* class rather than name alone: a rig carries several
+	instances per joint — RightShoulderAttachment, RightShoulderBallSocket — and a
+	plain name search can land on one of those instead.
 ]]
-local function findMotor(character: Model, rigType: Enum.HumanoidRigType, jointName: string): Motor6D?
+local function findJoint(character: Model, rigType: Enum.HumanoidRigType, jointName: string): Joint?
 	local name = jointName
 	if rigType == Enum.HumanoidRigType.R6 then
 		local alias = PoseConfig.R6Joints[jointName]
@@ -75,9 +94,14 @@ local function findMotor(character: Model, rigType: Enum.HumanoidRigType, jointN
 		name = alias
 	end
 
-	local found = character:FindFirstChild(name, true)
-	if found ~= nil and found:IsA("Motor6D") then
-		return found
+	for _, descendant in character:GetDescendants() do
+		if descendant.Name == name then
+			if descendant:IsA("Motor6D") or descendant:IsA("AnimationConstraint") then
+				-- Sound by the check above; the cast only bridges the type the two
+				-- joint classes are missing in common.
+				return (descendant :: any) :: Joint
+			end
+		end
 	end
 	return nil
 end
@@ -98,8 +122,8 @@ function TrainingPoseController:_clear(character: Model)
 	active[character] = nil
 
 	for _, bound in entry.joints do
-		if bound.motor.Parent ~= nil then
-			bound.motor.Transform = IDENTITY
+		if bound.joint.Parent ~= nil then
+			bound.joint.Transform = IDENTITY
 		end
 	end
 end
@@ -140,9 +164,9 @@ function TrainingPoseController:_sync(character: Model)
 
 	local joints: { Bound } = {}
 	for _, motion in pose.Joints do
-		local motor = findMotor(character, humanoid.RigType, motion.Joint)
-		if motor ~= nil then
-			table.insert(joints, { motion = motion, motor = motor })
+		local joint = findJoint(character, humanoid.RigType, motion.Joint)
+		if joint ~= nil then
+			table.insert(joints, { motion = motion, joint = joint })
 		end
 	end
 
@@ -169,7 +193,7 @@ local function poseAt(motion: PoseConfig.JointMotion, alpha: number): CFrame
 	return CFrame.new(offset) * rotation
 end
 
-function TrainingPoseController:_render()
+function TrainingPoseController:_apply()
 	local now = os.clock()
 
 	for character, entry in active do
@@ -182,7 +206,7 @@ function TrainingPoseController:_render()
 		local blend = math.min(1, elapsed / BLEND_SECONDS)
 
 		for _, bound in entry.joints do
-			if bound.motor.Parent == nil then
+			if bound.joint.Parent == nil then
 				continue
 			end
 
@@ -191,7 +215,7 @@ function TrainingPoseController:_render()
 			-- lift and back down, not tick between two poses.
 			local alpha = 0.5 - 0.5 * math.cos(phase * math.pi * 2)
 
-			bound.motor.Transform = IDENTITY:Lerp(poseAt(bound.motion, alpha), blend)
+			bound.joint.Transform = IDENTITY:Lerp(poseAt(bound.motion, alpha), blend)
 		end
 	end
 end
@@ -227,8 +251,8 @@ function TrainingPoseController:Start()
 		self:_track(player)
 	end)
 
-	RunService:BindToRenderStep(RENDER_NAME, RENDER_PRIORITY, function()
-		self:_render()
+	RunService.PreSimulation:Connect(function()
+		self:_apply()
 	end)
 end
 

@@ -45,6 +45,26 @@
       "Gym": {
         "$path": "src/Workspace/Gym"
       },
+      "SpawnLocation": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Anchored": true,
+          "CanCollide": false,
+          "Transparency": 1,
+          "Size": [
+            10,
+            1,
+            10
+          ],
+          "Position": [
+            0,
+            2,
+            22
+          ],
+          "Neutral": true,
+          "Duration": 0
+        }
+      },
       "Baseplate": {
         "$className": "Part",
         "$properties": {
@@ -71,9 +91,9 @@
     "Lighting": {
       "$properties": {
         "Ambient": [
-          0,
-          0,
-          0
+          0.09,
+          0.09,
+          0.11
         ],
         "Brightness": 2,
         "GlobalShadows": true,

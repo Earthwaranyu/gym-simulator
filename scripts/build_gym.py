@@ -219,14 +219,19 @@ def bench_press(pad_color, accent):
     """Flat bench under a two-post rack. The player lies back on the pad."""
     out = [floor_mat(11, 13)]
 
-    # Rack posts at the head end, with the barbell resting in the hooks.
+    # Rack posts stand just behind the lifter's head, with hook arms cantilevered
+    # forward so the bar sits over the chest — level with where the hands top out
+    # in the press (PoseConfig "BenchPress"). Racking it back over the uprights,
+    # where a bare rack would hold it, leaves the lifter pressing thin air.
     for side in (-1, 1):
-        out.append(part("RackPost", [0.45, 4.8, 0.45],
-                        cf(side * 1.7, FLOOR_TOP + 2.4, -3.6), STEEL, "DiamondPlate"))
+        out.append(part("RackPost", [0.45, 4.55, 0.45],
+                        cf(side * 1.7, FLOOR_TOP + 2.28, -2.6), STEEL, "DiamondPlate"))
         out.append(part("RackFoot", [0.7, 0.35, 2.8],
-                        cf(side * 1.7, FLOOR_TOP + 0.18, -3.6), STEEL, "DiamondPlate"))
-        out.append(part("RackHook", [0.3, 1.0, 0.3],
-                        cf(side * 1.7, FLOOR_TOP + 4.6, -3.25), accent, "Metal"))
+                        cf(side * 1.7, FLOOR_TOP + 0.18, -2.6), STEEL, "DiamondPlate"))
+        out.append(part("HookArm", [0.3, 0.3, 2.3],
+                        cf(side * 1.7, FLOOR_TOP + 4.45, -1.5), STEEL, "Metal"))
+        out.append(part("RackHook", [0.32, 0.85, 0.32],
+                        cf(side * 1.7, FLOOR_TOP + 4.7, -0.45), accent, "Metal"))
 
     # Bench frame and pad.
     out.append(part("FrameSpine", [0.55, 0.45, 8.4],
@@ -239,11 +244,11 @@ def bench_press(pad_color, accent):
     out.append(part("HeadPad", [2.7, 0.35, 1.6],
                     cf(0, FLOOR_TOP + 1.75, -2.9), pad_color, "Fabric"))
 
-    # Loaded barbell sitting in the hooks.
-    bar_y = FLOOR_TOP + 4.95
-    out.append(cylinder("Bar", 7.6, 0.32, cf(0, bar_y, -3.25), CHROME, "Metal",
+    # Loaded barbell sitting in the hooks, above the chest.
+    bar_y = FLOOR_TOP + 4.55
+    out.append(cylinder("Bar", 7.6, 0.32, cf(0, bar_y, -0.45), CHROME, "Metal",
                         Reflectance=0.3))
-    plates("Bar", bar_y, -3.25, (2.35, 2.85), 1.25, 0.4, out)
+    plates("Bar", bar_y, -0.45, (2.35, 2.85), 1.25, 0.4, out)
 
     # Lying on the back: head toward the rack (-Z), face toward the ceiling.
     out.append(marker("TrainAnchor", [2, 2, 1],
@@ -307,9 +312,12 @@ def pull_up_rig(pad_color, accent):
     for side in (-1, 1):
         out.append(cylinder("Grip", 1.3, 0.5, cf(side * 1.9, FLOOR_TOP + 8.35, 0),
                             accent, "Pebble"))
-        # Hanging: feet well clear of the floor, facing out into the room.
+        # Hanging: feet well clear of the floor, facing out into the room. Height is
+        # set so the hands meet the bar with the arms overhead and the chin clears it
+        # at the top of the pull — the arms cannot stretch to find the bar on their
+        # own, so the body has to hang at the right distance below it.
         out.append(marker("TrainAnchor", [2, 2, 1],
-                          mul(cf(side * 1.9, FLOOR_TOP + 4.9, 0), rot_y(180))))
+                          mul(cf(side * 1.9, FLOOR_TOP + 6.2, 0), rot_y(180))))
     out.append(marker("TrainExit", [2, 2, 1],
                       cf(0, FLOOR_TOP + ROOT_HEIGHT, 3.4)))
     return out
@@ -400,9 +408,10 @@ def room(name, centre_z, floor_color, wall_color, accent, has_ceiling=True):
 
     out.append(part(f"{name}Floor", [80, 1, 60], cf(0, 0.5, centre_z),
                     floor_color, "Concrete"))
-    out.append(part(f"{name}Rug", [46, 0.1, 34], cf(0, FLOOR_TOP + 0.05, centre_z),
-                    [c * 0.8 for c in accent], "Pebble", CanCollide=False,
-                    Transparency=0.55))
+    # Rubber flooring down the middle of the hall. Tinted toward the zone's accent
+    # rather than painted with it — at full strength this reads as a lawn.
+    out.append(part(f"{name}Rug", [24, 0.1, 58], cf(0, FLOOR_TOP + 0.05, centre_z),
+                    [c * 0.22 for c in accent], "Pebble", CanCollide=False))
 
     wall_h = 22.0
     wall_y = FLOOR_TOP + wall_h / 2
@@ -422,9 +431,14 @@ def room(name, centre_z, floor_color, wall_color, accent, has_ceiling=True):
                         wall_color, "Brick"))
 
     # A mirror strip along one wall — the one detail that most sells a gym.
+    #
+    # Kept dark and barely reflective on purpose. Roblox Reflectance mirrors the
+    # skybox rather than the room, so a genuinely mirror-bright panel indoors reads
+    # as a window onto a blue sky. Dim tinted glass reads as a mirror; a shiny one
+    # does not.
     out.append(part(f"{name}Mirror", [0.3, 10, 44],
                     cf(-half_x + 0.7, FLOOR_TOP + 7, centre_z),
-                    [0.55, 0.60, 0.66], "Glass", Reflectance=0.55))
+                    [0.20, 0.23, 0.28], "Glass", Reflectance=0.12))
     out.append(part(f"{name}MirrorTrim", [0.5, 0.6, 44],
                     cf(-half_x + 0.75, FLOOR_TOP + 1.9, centre_z), accent, "Metal"))
 
@@ -516,17 +530,20 @@ def build_structure():
 
 
 # Machine layout: id -> (name, x, z, facing degrees).
+#
+# The lane x[-12..12] is left clear end to end: it is the walk between the two
+# halls' doorways, and anything standing in it blocks the only route through.
 LAYOUTS = [
     ("Starter", 0, PAD_RED, ACCENT_STARTER, [
         ("BenchPress", "StarterBenchPress", -26, -4, 0),
-        ("Dumbbells", "StarterDumbbells", 0, -22, 0),
+        ("Dumbbells", "StarterDumbbells", 32, -20, -90),
         ("PullUpBar", "StarterPullUpBar", 26, -4, 0),
         ("SitUpBench", "StarterSitUpBench", -26, 12, 0),
         ("Treadmill", "StarterTreadmill", 26, 12, 180),
     ]),
     ("Iron", -90, PAD_BLUE, ACCENT_IRON, [
         ("BenchPress", "IronBenchPress", -26, -94, 0),
-        ("Dumbbells", "IronDumbbells", 0, -112, 0),
+        ("Dumbbells", "IronDumbbells", 32, -110, -90),
         ("PullUpBar", "IronPullUpBar", 26, -94, 0),
         ("SitUpBench", "IronSitUpBench", -26, -78, 0),
         ("Treadmill", "IronTreadmill", 26, -78, 180),
