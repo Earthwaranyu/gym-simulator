@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 63 built / 65** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 64 built / 66** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -174,7 +174,12 @@ for machines, and training that happened *to* you as you walked past.
       somebody trains there the prop tracks their hands, and on release it goes back to
       the rack it was authored in. Client-side only and unreplicated: every viewer puts
       the same weight in the same hands from the pose they can already see.
-
+- [x] 66. **Walk, run, fly.** Legs becomes the traversal stat: `Formulas.WalkSpeed` was
+      capped at 30 — under 2x base, forever — which was tuned for one gym hall and would
+      have made a 3,000-stud map a permanent walk. Ceiling raised to ~7x. Flight unlocks
+      at 8M power, held by a `LinearVelocity` so a flier still collides with the world.
+      `FlightService` owns permission and publishes it as a character attribute; taking a
+      hit grounds you for the stagger window, so one punch still buys one clean opening.
 ---
 
 ## Milestone 1 — Vertical Slice

@@ -50,6 +50,7 @@ local recentKills: { [Player]: { [Player]: number } } = {}
 local DataService: any = nil
 local StatService: any = nil
 local TrainingService: any = nil
+local FlightService: any = nil
 
 -- (victim, attacker, damage, isKill)
 CombatService.DamageDealt = Signal.new()
@@ -62,6 +63,7 @@ function CombatService:Init()
 	DataService = Loader.Get("DataService")
 	StatService = Loader.Get("StatService")
 	TrainingService = Loader.Get("TrainingService")
+	FlightService = Loader.Get("FlightService")
 
 	self:_loadAbilities()
 end
@@ -217,6 +219,10 @@ function CombatService:ApplyDamage(attacker: Player, victim: Player, rawDamage: 
 	if TrainingService:IsTraining(victim) then
 		TrainingService:Interrupt(victim)
 	end
+
+	-- Grounded for the same window. Without this the victim just takes off, and the
+	-- interrupt costs them a few seconds of reps instead of a fight.
+	FlightService:Ground(victim)
 
 	Net.Event("CombatFeedback"):FireClient(attacker, { Kind = "Hit", Damage = damage, Victim = victim.Name })
 	Net.Event("CombatFeedback")

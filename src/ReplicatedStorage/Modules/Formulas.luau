@@ -110,11 +110,22 @@ function Formulas.AttackDamage(armsStat: number, chestStat: number): number
 end
 
 --[[
-	Walkspeed. Capped so Legs cannot turn the gym into a blur, and so a fleeing player
-	is always catchable eventually.
+	Ground speed. Legs is the traversal stat: this is the "run" rung of the
+	walk-run-fly ladder, and the reason a map thousands of studs across is a
+	progression curve rather than a tax.
+
+	The old ceiling was 30 — under two times base, forever. That was tuned for a
+	single gym hall, where the only thing speed did was decide whether you could
+	flee a fight. On the current map it would mean a minutes-long walk to the outer
+	tiers that never once got shorter, so the cap is now roughly seven times base.
+
+	Fleeing still fails, but for a different reason: the runner and the chaser both
+	scale, so a fight is decided by the power gap rather than by a speed ceiling
+	neither can reach. CombatService's damage falloff is what protects a weaker
+	player now, not the inability to run away.
 ]]
 function Formulas.WalkSpeed(legsStat: number): number
-	return 16 + math.min(14, softScale(legsStat, 1.2))
+	return 16 + math.min(96, softScale(legsStat, 7))
 end
 
 --[[
@@ -187,7 +198,10 @@ function Formulas.RunSelfTest(): { string }
 	check("time-to-kill stays stable across scales", math.abs(lowTtk - highTtk) < 3)
 
 	check("walkspeed floor", Formulas.WalkSpeed(0) == 16)
-	check("walkspeed capped", Formulas.WalkSpeed(1e30) <= 30)
+	check("walkspeed capped", Formulas.WalkSpeed(1e30) <= 112)
+	-- Crossing the map has to visibly improve, or Legs is not a traversal stat and
+	-- the outer tiers are a permanent walk.
+	check("walkspeed rewards Legs", Formulas.WalkSpeed(1e9) > Formulas.WalkSpeed(1e3) * 1.5)
 
 	check("no falloff when weaker", Formulas.PowerGapFalloff(100, 1000) == 1)
 	check("no falloff when equal", Formulas.PowerGapFalloff(1000, 1000) == 1)
