@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 86 built / 90** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 87 built / 90** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -466,7 +466,19 @@ one job with Chest, and Legs only affected running.
       who was being attacked. Two guards it needs: none on the blow that kills, since a
       dead player does not hit back, and an `isRetaliation` flag so two players with Core
       do not bounce one punch between them until somebody falls over.
-- [ ] 89. **Legs flies.** Flight speed scales with Legs instead of being flat for everyone.
+- [x] 89. **Legs flies.** `CLAUDE.md` gives Legs "speed in running and flying" and only
+      the running half was ever built — everyone flew at a flat 220 whatever they had
+      trained, so Legs stopped mattering at exactly the point the map starts being
+      vertical. `Formulas.FlightSpeed` fixes that, and climbing became a *ratio* of level
+      flight rather than its own flat number so it follows Legs too instead of becoming
+      the slow part of flying for a maxed player. Read every frame, not cached on takeoff,
+      so a rep landed mid-flight shows up at once.
+      The split is deliberate and now says so in `MovementConfig`: **total power decides
+      whether you fly, Legs decides how fast.** The gate is matched to how high the
+      districts float and belongs to the map; the speed is a stat and belongs to the
+      player. The floor sits above `WalkSpeed`'s ceiling, so taking off is an upgrade even
+      on zero Legs — asserted, because a rung of the ladder that is slower than the one
+      below it is worse than not having it.
 - [ ] 90. **Tell the player what a muscle does.** Nothing in the game says what any stat
       is for; the HUD shows numbers and no meaning.
 ---

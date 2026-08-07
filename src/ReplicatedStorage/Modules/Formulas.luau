@@ -180,6 +180,21 @@ function Formulas.WalkSpeed(legsStat: number): number
 end
 
 --[[
+	Flight speed, also from Legs. `CLAUDE.md` gives Legs "speed in running and
+	flying" and only the running half was ever built — everyone flew at a flat 220
+	regardless of what they had trained, which made Legs stop mattering at exactly
+	the point the map starts being vertical.
+
+	The floor is above WalkSpeed's ceiling, so taking off is always an upgrade the
+	moment flight unlocks, even on zero Legs. The unlock itself stays on total power
+	(MovementConfig.FLIGHT_POWER) — that gate is matched to how high the districts
+	float, and this changes only how fast you cross once you are up.
+]]
+function Formulas.FlightSpeed(legsStat: number): number
+	return 140 + math.min(220, softScale(legsStat, 16))
+end
+
+--[[
 	Damage scaling applied when a much stronger player hits a much weaker one.
 	Returns a value in [0.25, 1]: the wider the power gap in the attacker's favour,
 	the less damage lands. This is the anti-grief dial — a maxed player can still kill
@@ -253,6 +268,11 @@ function Formulas.RunSelfTest(): { string }
 	-- if a weight is ever retuned, this is what says so out loud.
 	check("an even build deals what it always did, low", math.abs(Formulas.AttackDamage(1e3) - 35) < 0.5)
 	check("an even build deals what it always did, high", math.abs(Formulas.AttackDamage(1e12) - 116) < 0.5)
+
+	-- Flight must always beat running, or the rung above the ladder is a downgrade.
+	check("flight beats the fastest possible run", Formulas.FlightSpeed(0) > Formulas.WalkSpeed(1e30))
+	check("flight rewards legs", Formulas.FlightSpeed(1e12) > Formulas.FlightSpeed(1e3) * 1.3)
+	check("flight is capped", Formulas.FlightSpeed(1e30) <= 360)
 
 	check("walkspeed floor", Formulas.WalkSpeed(0) == 16)
 	check("walkspeed capped", Formulas.WalkSpeed(1e30) <= 112)

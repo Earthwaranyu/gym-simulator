@@ -23,6 +23,7 @@ local UserInputService = game:GetService("UserInputService")
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MovementConfig = require(ReplicatedStorage.Modules.MovementConfig)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 local FlightController = {
 	Name = "FlightController",
@@ -38,9 +39,25 @@ local attachment: Attachment? = nil
 local velocity = Vector3.zero
 
 local ToastController: any = nil
+local ProfileController: any = nil
 
 function FlightController:Init()
 	ToastController = Loader.Get("ToastController")
+	ProfileController = Loader.Get("ProfileController")
+end
+
+--[[
+	Level flight speed for this player's Legs.
+
+	Read every frame rather than cached on takeoff, so a rep landed mid-flight
+	shows up immediately — which is the whole point of Legs being the traversal
+	stat. Falls back to zero Legs before the first profile push, which is the floor
+	and still faster than running.
+]]
+local function flightSpeed(): number
+	local data = ProfileController:Get()
+	local legs = if data ~= nil then (data.Stats.Legs or 0) else 0
+	return Formulas.FlightSpeed(legs)
 end
 
 local function isAllowed(): boolean
@@ -147,11 +164,12 @@ local function inputDirection(): Vector3
 		vertical -= 1
 	end
 
+	local speed = flightSpeed()
 	local direction = Vector3.new(move.X, 0, move.Z)
 	if direction.Magnitude > 0 then
-		direction = direction.Unit * MovementConfig.FLIGHT_SPEED
+		direction = direction.Unit * speed
 	end
-	return direction + Vector3.new(0, vertical * MovementConfig.FLIGHT_CLIMB_SPEED, 0)
+	return direction + Vector3.new(0, vertical * speed * MovementConfig.FLIGHT_CLIMB_RATIO, 0)
 end
 
 function FlightController:_step(delta: number)
