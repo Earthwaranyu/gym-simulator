@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 67 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+**Progress: 68 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
 and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
 server-driven with no client remote to exploit.
 
@@ -215,8 +215,14 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       islands. Streetlights and parked cars line the grid roads, palms line the plaza and
       the promenade, and the causeway to the Docks now runs due east off the end of the
       east avenue — a bridge you have to go looking for is not a bridge anyone walks.
-- [ ] 70. **The plaza.** Quest-giver NPC and leaderboard monuments in the safe zone
-      everybody spawns into.
+- [x] 70. **The plaza.** The safe zone stops being a 40-stud bubble and becomes the plaza
+      itself — the only safe ground in the game and, once #72 lands, the only place travel
+      is free, so it is where everybody ends up. Standing in it: **Coach**, a part-built
+      figure tagged `Npc`, and two leaderboard monuments tagged `LeaderboardBoard` — two,
+      not the three #54 claimed, because `LeaderboardService` defines exactly two boards
+      and a monument with nothing to show is worse than no monument. Benches, palms and
+      lamps ring it. All of it is inert geometry carrying a tag and an id; #75 and #76 give
+      it behaviour, which keeps the world file free of anything a controller should own.
 - [ ] 71. **Eight themed districts.** A `PROPS` registry: docks, beach, quarry, rooftop,
       peak, void, lava, nebula, celestial.
 - [ ] 72. **Travel is a button.** `ZoneGate` and its `Touched` handler go; `TravelService`

@@ -1041,6 +1041,106 @@ def city_plot(x, z, sx, sz, rng):
     return out
 
 
+# --------------------------------------------------------------------------
+# What stands in the plaza.
+#
+# The plaza is the only safe ground in the game and the only place travel is
+# free, so it is where everybody ends up. That makes it the right place for the
+# two things the player needs a person or an object for: quests and standings.
+# Both are inert geometry here — a tag and an id — and the client controllers
+# in #75 and #76 give them behaviour.
+# --------------------------------------------------------------------------
+
+PLAZA_TOP = FLOOR_TOP + 0.8
+
+SKIN = [0.76, 0.58, 0.44]
+TRACKSUIT = [0.13, 0.14, 0.17]
+
+
+def facing_centre(x, z):
+    """Degrees of yaw that turn an object's +Z front toward the origin."""
+    return math.degrees(math.atan2(x, z)) + 180
+
+
+def npc(name, npc_id, x, z, accent):
+    """A part-built figure. R6 proportions, no rig and no animation — it stands
+    there and holds a ProximityPrompt, which is all a quest giver has to do."""
+    frame = mul(cf(x, 0, z), rot_y(facing_centre(x, z)))
+    body = [
+        part("LeftLeg", [1.0, 2.8, 1.0], cf(-0.6, PLAZA_TOP + 1.4, 0), TRACKSUIT, "Fabric"),
+        part("RightLeg", [1.0, 2.8, 1.0], cf(0.6, PLAZA_TOP + 1.4, 0), TRACKSUIT, "Fabric"),
+        # Named Base to match the station contract, so anything looking for an
+        # object's anchor part finds the same name everywhere in the world.
+        part("Base", [2.3, 2.8, 1.3], cf(0, PLAZA_TOP + 4.2, 0), TRACKSUIT, "Fabric"),
+        part("Stripe", [2.4, 0.5, 1.35], cf(0, PLAZA_TOP + 4.6, 0), accent, "Neon",
+             CanCollide=False),
+        part("LeftArm", [0.9, 2.6, 0.9], cf(-1.6, PLAZA_TOP + 4.2, 0), TRACKSUIT, "Fabric"),
+        part("RightArm", [0.9, 2.6, 0.9], cf(1.6, PLAZA_TOP + 4.2, 0), TRACKSUIT, "Fabric"),
+        part("Head", [1.5, 1.5, 1.5], cf(0, PLAZA_TOP + 6.4, 0), SKIN, "SmoothPlastic"),
+        part("Cap", [1.7, 0.6, 1.7], cf(0, PLAZA_TOP + 7.3, 0), accent, "Fabric"),
+        part("CapPeak", [1.6, 0.25, 0.9], cf(0, PLAZA_TOP + 7.1, 1.1), accent, "Fabric",
+             CanCollide=False),
+    ]
+    return tagged({
+        "name": name,
+        "className": "Model",
+        "children": [place(frame, piece) for piece in body],
+    }, tags=["Npc"], attributes={"NpcId": npc_id})
+
+
+def leaderboard_monument(name, board_id, x, z, accent):
+    """Plinth, frame and a screen the client paints an OrderedDataStore board onto.
+
+    The screen's readable side faces local +Z, which is this script's convention
+    for "the side you approach from" — and which is Roblox's Back face, not its
+    Front. The controller names that explicitly rather than guessing.
+    """
+    frame = mul(cf(x, 0, z), rot_y(facing_centre(x, z)))
+    pieces = [
+        part("Plinth", [13, 3, 5], cf(0, PLAZA_TOP + 1.5, 0), [0.34, 0.34, 0.35], "Concrete"),
+        part("Frame", [13, 17, 1.8], cf(0, PLAZA_TOP + 11.5, 0), [0.17, 0.18, 0.21], "Metal"),
+        part("Screen", [11.8, 15, 0.3], cf(0, PLAZA_TOP + 11.5, 0.95),
+             [0.05, 0.05, 0.07], "SmoothPlastic"),
+        part("Header", [13, 0.6, 2.0], cf(0, PLAZA_TOP + 20.3, 0), accent, "Neon",
+             CanCollide=False),
+    ]
+    return tagged({
+        "name": name,
+        "className": "Model",
+        "children": [place(frame, piece) for piece in pieces],
+    }, tags=["LeaderboardBoard"], attributes={"BoardId": board_id})
+
+
+def bench(x, z):
+    """Somewhere to stand around. A plaza with nothing to face is a floor."""
+    frame = mul(cf(x, 0, z), rot_y(facing_centre(x, z)))
+    pieces = [
+        part("Seat", [9, 0.5, 2.6], cf(0, PLAZA_TOP + 2.0, 0), [0.36, 0.25, 0.16], "WoodPlanks"),
+        part("BenchBack", [9, 2.2, 0.4], cf(0, PLAZA_TOP + 3.1, -1.1),
+             [0.36, 0.25, 0.16], "WoodPlanks"),
+    ]
+    for side in (-1, 1):
+        pieces.append(part("BenchLeg", [0.5, 2.0, 2.4], cf(side * 3.8, PLAZA_TOP + 1.0, 0),
+                           [0.17, 0.17, 0.19], "Metal"))
+    return [place(frame, piece) for piece in pieces]
+
+
+def plaza_furniture():
+    """The quest giver, the standings, and something to sit on."""
+    out = [npc("Coach", "Coach", 0, -46, ACCENT_STARTER)]
+
+    # Two monuments, because LeaderboardService defines two boards. A third
+    # board would be a third entry here and nothing else.
+    out.append(leaderboard_monument("StrongestBoard", "Power", -48, 44, [1.0, 0.77, 0.24]))
+    out.append(leaderboard_monument("KnockoutsBoard", "Kills", 48, 44, [1.0, 0.36, 0.36]))
+
+    for index in range(4):
+        angle = 90 * index + 45
+        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS - 26))
+        out.extend(bench(spot[0][0], spot[0][2]))
+    return out
+
+
 def downtown():
     out = []
     rng = random.Random("Downtown")
@@ -1151,6 +1251,8 @@ def downtown():
         angle = 360.0 * index / 8 + 22.5
         spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS + 14))
         out.extend(palm(spot[0][0], spot[0][2], rng))
+
+    out.extend(plaza_furniture())
 
     out.extend(underside(row, rng, False))
     return out
