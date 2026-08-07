@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 87 built / 90** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 88 built / 90** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -91,6 +91,8 @@ system that consumes it:
 
 - [x] 29. `CombatService` — server-authoritative damage, hit validation, cooldowns, i-frames.
 - [x] 30. Damage/health model derived from stats (Arms + Chest → damage, Core → max HP, Legs → walkspeed).
+      *Superseded by Phase 14: that wiring disagreed with `CLAUDE.md` on four of the five
+      stats and left Back doing nothing. See #86–#90.*
 - [x] 31. **Ability registry** — folder of ability modules sharing one interface (`Cost`, `Cooldown`, `Validate`, `Execute`). Punch, Slam, Dash ship first; new abilities are new files only.
 - [x] 32. **Training interrupt** — the core hook. Being hit knocks you off the machine for 3s and resets the rep combo. With training otherwise free, this stagger is the *entire* cost of being attacked — and the whole reason to attack a trainer.
 - [x] 33. Death & respawn — respawn timer, rep-streak reset, in-flight token tick forfeited. **No stat, cash, or token loss on death.** *(ragdoll deferred to #56 VFX)*
@@ -479,8 +481,22 @@ one job with Chest, and Legs only affected running.
       player. The floor sits above `WalkSpeed`'s ceiling, so taking off is an upgrade even
       on zero Legs — asserted, because a rung of the ladder that is slower than the one
       below it is worse than not having it.
-- [ ] 90. **Tell the player what a muscle does.** Nothing in the game says what any stat
-      is for; the HUD shows numbers and no meaning.
+- [x] 90. **Tell the player what a muscle does.** Nothing in the game said what a stat was
+      *for* — the HUD showed five numbers and no meaning, and Back could be trained for an
+      hour before you noticed it changed nothing. Each stat now carries an `Effect` on its
+      own definition: a function from your stats to a short line — "116 damage a hit", "580
+      max health", "35% of hits sent back". A function on the definition rather than a
+      switch downstream, so a sixth stat arrives carrying its own explanation and nothing
+      branches on a stat id.
+      Shown in the Upgrades tab, so the number you are buying a multiplier on is visible
+      before you buy it, and on the training machines, so a player at the pull-up bar
+      learns what Back is for while standing at it. Back quotes its *ceiling* and says
+      "up to", because a contested reduction has no single number — and reads "no damage
+      reduction yet" at zero rather than "-0%".
+      The old blurbs were also wrong in the world: Core still promised "your max health
+      and stamina pool" when stamina was withdrawn in #22 and health had never been its
+      job, and Back said "broadens the frame", which was only accurate because it did
+      nothing else.
 ---
 
 ## Milestone 1 — Vertical Slice

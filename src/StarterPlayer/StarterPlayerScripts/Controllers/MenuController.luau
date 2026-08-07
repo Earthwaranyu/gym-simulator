@@ -428,13 +428,23 @@ function MenuController:_renderUpgrades(parent: Frame)
 		local level = if data ~= nil then (data.MultiplierLevels[definition.Id] or 0) else 0
 		local cost = Formulas.MultiplierCost(level)
 
-		local line = row(parent, 44, index)
+		local line = row(parent, 56, index)
 
 		local label = UI.Label("Text", line)
-		label.Size = UDim2.new(1, -120, 1, 0)
+		label.Size = UDim2.new(1, -120, 0, 26)
+		label.Position = UDim2.fromOffset(0, 6)
 		label.TextColor3 = definition.Color
 		label.Text = `{definition.DisplayName}  <font color="#8A93A8">lvl {level} · </font>`
 			.. `x{string.format("%.2f", Formulas.MultiplierValue(level))}`
+
+		-- What the stat is currently worth, from the stat's own definition. The
+		-- number you are about to buy a multiplier on, shown before you buy it.
+		local effect = UI.Label("Effect", line)
+		effect.Size = UDim2.new(1, -120, 0, 18)
+		effect.Position = UDim2.fromOffset(0, 30)
+		effect.TextSize = 13
+		effect.TextColor3 = UI.Palette.TextMuted
+		effect.Text = definition.Effect(if data ~= nil then data.Stats else {})
 
 		button(line, `{NumberFormat.Format(cost)} 🪙`, UI.Palette.Token, function()
 			local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)

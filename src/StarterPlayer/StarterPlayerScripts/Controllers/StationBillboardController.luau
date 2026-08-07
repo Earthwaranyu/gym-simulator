@@ -78,7 +78,8 @@ function StationBillboardController:_bind(station: Instance)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "StationLabel"
 	gui.Adornee = adornee
-	gui.Size = UDim2.fromOffset(210, 72)
+	-- Four lines now: name, rate, what the stat buys you, and how to get on.
+	gui.Size = UDim2.fromOffset(210, 90)
 	gui.StudsOffsetWorldSpace = headroomOffset(station, adornee)
 	gui.AlwaysOnTop = false
 	gui.MaxDistance = 70
@@ -145,9 +146,17 @@ function StationBillboardController:_refresh()
 			local level = if data ~= nil then (data.MultiplierLevels[definition.StatId] or 0) else 0
 			local perSecond = definition.BaseGain * Formulas.MultiplierValue(level) / definition.RepInterval
 
+			-- The third line is what the stat is FOR. A player standing at the
+			-- pull-up bar could previously read that it trains Back and how fast,
+			-- and still have no idea what Back does to them.
+			local effect = if statDefinition ~= nil
+				then statDefinition.Effect(if data ~= nil then data.Stats else {})
+				else ""
+
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
 				.. `<font color="#{color:ToHex()}">{definition.StatId}</font>  `
 				.. `+{NumberFormat.Format(perSecond)}/s\n`
+				.. `<font color="#8A93A8">{effect}</font>\n`
 				.. statusLine(entry)
 		else
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`

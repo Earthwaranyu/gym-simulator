@@ -12,6 +12,7 @@
 ]]
 
 local Types = require(script.Parent.Types)
+local Formulas = require(script.Parent.Formulas)
 
 export type StatDefinition = {
 	Id: Types.StatId,
@@ -20,9 +21,22 @@ export type StatDefinition = {
 	Color: Color3,
 	-- Short blurb for the training station tooltip.
 	Description: string,
+	-- What this stat is currently worth to this player, as a short line: "38 damage
+	-- a hit", "412 max health". Nothing in the game used to say what a stat was
+	-- FOR — the HUD showed five numbers and no meaning, and Back could be trained
+	-- for an hour before you noticed it changed nothing.
+	--
+	-- A function on the definition rather than a switch somewhere downstream, so a
+	-- sixth stat arrives carrying its own explanation and no consumer ever branches
+	-- on a stat id.
+	Effect: (stats: { [string]: number }) -> string,
 	-- R15 part name -> how much this stat inflates it, relative to other stats.
 	BodyScales: { [string]: number },
 }
+
+local function get(stats: { [string]: number }, id: string): number
+	return stats[id] or 0
+end
 
 -- Display order is this array's order.
 local definitions: { StatDefinition } = {
@@ -30,7 +44,10 @@ local definitions: { StatDefinition } = {
 		Id = "Arms",
 		DisplayName = "Arms",
 		Color = Color3.fromRGB(239, 83, 80),
-		Description = "Raw punching power. Drives most of your PvP damage.",
+		Description = "Raw punching power. Every point of damage you deal starts here.",
+		Effect = function(stats)
+			return `{string.format("%.0f", Formulas.AttackDamage(get(stats, "Arms")))} damage a hit`
+		end,
 		BodyScales = {
 			LeftUpperArm = 1.0,
 			RightUpperArm = 1.0,
@@ -42,7 +59,10 @@ local definitions: { StatDefinition } = {
 		Id = "Chest",
 		DisplayName = "Chest",
 		Color = Color3.fromRGB(255, 167, 38),
-		Description = "Pressing strength. Adds to damage and to how wide you get.",
+		Description = "How much punishment you can take before you drop.",
+		Effect = function(stats)
+			return `{string.format("%.0f", Formulas.MaxHealth(get(stats, "Chest")))} max health`
+		end,
 		BodyScales = {
 			UpperTorso = 1.0,
 		},
@@ -51,7 +71,17 @@ local definitions: { StatDefinition } = {
 		Id = "Back",
 		DisplayName = "Back",
 		Color = Color3.fromRGB(102, 187, 106),
-		Description = "Pulling strength. Broadens the frame.",
+		Description = "Braced against heavier hitters. Blunts damage from anyone whose Arms trail your Back.",
+		Effect = function(stats)
+			-- Resistance is contested, so there is no single number for it. Quoted
+			-- against an attacker with nothing in Arms, which is the ceiling, and
+			-- labelled as such rather than pretending it applies to everyone.
+			local best = Formulas.DamageResistance(get(stats, "Back"), 0)
+			if best < 0.005 then
+				return "no damage reduction yet"
+			end
+			return `up to -{string.format("%.0f", best * 100)}% damage taken`
+		end,
 		BodyScales = {
 			UpperTorso = 0.6,
 		},
@@ -59,7 +89,10 @@ local definitions: { StatDefinition } = {
 	{
 		Id = "Core",
 		DisplayName = "Core",
-		Description = "Toughness. Sets your max health and stamina pool.",
+		Description = "Hitting you costs the attacker. A share of every blow goes straight back.",
+		Effect = function(stats)
+			return `{string.format("%.0f", Formulas.Retaliation(get(stats, "Core"), 100))}% of hits sent back`
+		end,
 		Color = Color3.fromRGB(66, 165, 245),
 		BodyScales = {
 			LowerTorso = 1.0,
@@ -69,7 +102,12 @@ local definitions: { StatDefinition } = {
 		Id = "Legs",
 		DisplayName = "Legs",
 		Color = Color3.fromRGB(171, 71, 188),
-		Description = "Movement speed. Catch people, or escape them.",
+		Description = "Ground speed and air speed. The stat that makes the map smaller.",
+		Effect = function(stats)
+			local legs = get(stats, "Legs")
+			return `{string.format("%.0f", Formulas.WalkSpeed(legs))} run · `
+				.. `{string.format("%.0f", Formulas.FlightSpeed(legs))} fly`
+		end,
 		BodyScales = {
 			LeftUpperLeg = 1.0,
 			RightUpperLeg = 1.0,
