@@ -95,18 +95,28 @@ end
 -- === Combat =================================================================
 
 --[[
-	Max health. Core is the tank stat; the log curve means a 1e12 Core player has
-	roughly 6x the health of a 1e2 player, not 1e10 times.
+	Max health, from Chest. The log curve means a 1e12 player has roughly 6x the
+	health of a 1e2 player, not 1e10 times.
+
+	This used to read Core, which was simply the wrong stat: CLAUDE.md gives Chest
+	the health and Core the retaliation, and the code had the two swapped. Only the
+	input changed — the curve is untouched, so nobody's health moved.
 ]]
-function Formulas.MaxHealth(coreStat: number): number
-	return 100 + softScale(coreStat, 40)
+function Formulas.MaxHealth(chestStat: number): number
+	return 100 + softScale(chestStat, 40)
 end
 
 --[[
-	Base melee damage before per-ability multipliers. Arms leads, Chest supports.
+	Base melee damage before per-ability multipliers. Arms, and only Arms.
+
+	Chest used to contribute a third of this on top of Arms' two thirds, which left
+	Chest doing two jobs and Arms sharing its one. The weight here rose from 6 to 9
+	to absorb exactly what Chest was adding, so a player who trained both evenly
+	deals the same damage as before — 116 at 1e12, 35 at 1e3. This is a
+	reassignment, not a rebalance, and the time-to-kill check below proves it.
 ]]
-function Formulas.AttackDamage(armsStat: number, chestStat: number): number
-	return 8 + softScale(armsStat, 6) + softScale(chestStat, 3)
+function Formulas.AttackDamage(armsStat: number): number
+	return 8 + softScale(armsStat, 9)
 end
 
 --[[
@@ -177,25 +187,31 @@ function Formulas.RunSelfTest(): { string }
 	check("first upgrade is affordable", Formulas.MultiplierCost(0) <= 10)
 
 	check("health has a floor", Formulas.MaxHealth(0) == 100)
-	check("health grows with core", Formulas.MaxHealth(1e12) > Formulas.MaxHealth(1e6))
-	-- The whole point of log scaling: a trillion-Core player is tanky, not invincible.
+	check("health grows with chest", Formulas.MaxHealth(1e12) > Formulas.MaxHealth(1e6))
+	-- The whole point of log scaling: a trillion-Chest player is tanky, not invincible.
 	check("health stays bounded", Formulas.MaxHealth(1e12) < 1000)
 
-	check("damage grows with arms", Formulas.AttackDamage(1e9, 0) > Formulas.AttackDamage(1e3, 0))
-	check("damage stays bounded", Formulas.AttackDamage(1e12, 1e12) < 200)
+	check("damage grows with arms", Formulas.AttackDamage(1e9) > Formulas.AttackDamage(1e3))
+	check("damage stays bounded", Formulas.AttackDamage(1e12) < 200)
 
 	-- The griefing invariant. Raw damage at 1e12 (~116) does exceed a fresh player's
 	-- 100 health, so this only holds once falloff is applied — which is exactly why
 	-- CombatService must never skip it.
-	local bullyDamage = Formulas.AttackDamage(1e12, 1e12) * Formulas.PowerGapFalloff(3e12, 0)
+	local bullyDamage = Formulas.AttackDamage(1e12) * Formulas.PowerGapFalloff(3e12, 0)
 	check("a maxed player cannot one-shot a beginner", bullyDamage < Formulas.MaxHealth(0))
 	check("a maxed player still kills a beginner in a few hits", bullyDamage * 6 > Formulas.MaxHealth(0))
 
 	-- Equal-stat fights should take a similar number of hits at every scale, or combat
 	-- gets faster or slower as the server ages.
-	local lowTtk = Formulas.MaxHealth(1e3) / Formulas.AttackDamage(1e3, 1e3)
-	local highTtk = Formulas.MaxHealth(1e12) / Formulas.AttackDamage(1e12, 1e12)
+	local lowTtk = Formulas.MaxHealth(1e3) / Formulas.AttackDamage(1e3)
+	local highTtk = Formulas.MaxHealth(1e12) / Formulas.AttackDamage(1e12)
 	check("time-to-kill stays stable across scales", math.abs(lowTtk - highTtk) < 3)
+
+	-- Moving damage off Chest and onto Arms must not have moved these. The numbers
+	-- are the ones the old Arms+Chest model produced for an evenly-trained player;
+	-- if a weight is ever retuned, this is what says so out loud.
+	check("an even build deals what it always did, low", math.abs(Formulas.AttackDamage(1e3) - 35) < 0.5)
+	check("an even build deals what it always did, high", math.abs(Formulas.AttackDamage(1e12) - 116) < 0.5)
 
 	check("walkspeed floor", Formulas.WalkSpeed(0) == 16)
 	check("walkspeed capped", Formulas.WalkSpeed(1e30) <= 112)

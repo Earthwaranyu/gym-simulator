@@ -13,15 +13,27 @@ local RunService = game:GetService("RunService")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 require(ReplicatedStorage.Modules.Net)
 
 if RunService:IsStudio() then
-	local failures = NumberFormat.RunSelfTest()
-	if #failures > 0 then
-		warn(`[Bootstrap] NumberFormat self-test failed ({#failures}):`)
-		for _, failure in failures do
-			warn(`  - {failure}`)
+	-- Formulas' self-test holds the PvP balance invariants — that a maxed player
+	-- cannot one-shot a beginner, that time-to-kill is stable at every scale. It
+	-- existed for a long time without anything calling it, which meant a retuned
+	-- weight could break combat silently. scripts/check.sh runs it before a commit
+	-- now; this catches a build that reached Studio anyway.
+	for _, suite in
+		{
+			{ Name = "NumberFormat", Failures = NumberFormat.RunSelfTest() },
+			{ Name = "Formulas", Failures = Formulas.RunSelfTest() },
+		}
+	do
+		if #suite.Failures > 0 then
+			warn(`[Bootstrap] {suite.Name} self-test failed ({#suite.Failures}):`)
+			for _, failure in suite.Failures do
+				warn(`  - {failure}`)
+			end
 		end
 	end
 end

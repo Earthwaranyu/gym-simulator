@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 83 built / 85** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 84 built / 90** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -421,6 +421,36 @@ Roblox UI.
       the strip fits the narrowest landscape phone. Drawing the icons at their real 38px
       also showed the Settings handles were taller than the gap between its rails and
       merged into a block; they are shorter now.
+
+## Phase 14 — Five stats, five jobs
+
+`CLAUDE.md` names what each muscle does. The code did something else for four of the
+five, and **Back did nothing at all** — you could train it to a trillion and no number
+in the game changed. Chest and Core were wired to each other's jobs, Arms shared its
+one job with Chest, and Legs only affected running.
+
+- [x] 86. **One job per stat.** `AttackDamage` takes Arms alone and `MaxHealth` takes
+      Chest, with `CombatService`'s two call sites following. Arms' weight rose 6 → 9 to
+      absorb exactly what Chest had been adding, so an evenly-trained player deals what
+      they always did — 35 at 1e3, 116 at 1e12 — and time-to-kill is untouched. This is a
+      reassignment, not a rebalance, and there are now two self-test checks that say so by
+      name rather than leaving it to be believed.
+      **The safety net was not plugged in.** `Formulas.RunSelfTest` holds the invariants
+      that keep PvP playable at trillion-stat scale — a maxed player cannot one-shot a
+      beginner, time-to-kill does not drift as the server ages — and nothing called it.
+      `Bootstrap` ran `NumberFormat`'s and not this one. Balance is the one thing here
+      that breaks quietly: a retuned weight still compiles, still type-checks, still
+      lints. So `scripts/selftest.luau` now runs both suites under the `luau` CLI in
+      milliseconds, `check.sh` runs it before every commit, and Bootstrap runs it too for
+      a build that reached Studio anyway. Verified by deliberately breaking a weight and
+      watching four checks fail.
+- [ ] 87. **Back finally does something.** Damage resistance, contested against the
+      attacker's Arms.
+- [ ] 88. **Core hits back.** Retaliation onto whoever hit you, routed through the same
+      damage path so every PvP rule applies to it.
+- [ ] 89. **Legs flies.** Flight speed scales with Legs instead of being flat for everyone.
+- [ ] 90. **Tell the player what a muscle does.** Nothing in the game says what any stat
+      is for; the HUD shows numbers and no meaning.
 ---
 
 ## Milestone 1 — Vertical Slice

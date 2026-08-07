@@ -49,6 +49,13 @@ else
 	echo "no type errors"
 fi
 
+# Balance is the one thing here that breaks quietly: a retuned weight still
+# compiles, still type-checks, and still lints. These are the invariants that say
+# whether PvP is still playable, and they run in milliseconds because Formulas
+# touches no Roblox API.
+echo "==> self-tests"
+luau scripts/selftest.luau || status=1
+
 if [[ $status -eq 0 ]]; then
 	echo
 	echo "All checks passed."

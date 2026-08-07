@@ -356,12 +356,12 @@ end
 	Exposed so abilities never reimplement the stat curve.
 ]]
 function CombatService:GetBaseDamage(player: Player): number
-	return Formulas.AttackDamage(StatService:GetStat(player, "Arms"), StatService:GetStat(player, "Chest"))
+	return Formulas.AttackDamage(StatService:GetStat(player, "Arms"))
 end
 
 --[[
 	Pushes stat-derived health and walkspeed onto a living character, preserving the
-	current health ratio so growing your Core heals proportionally rather than
+	current health ratio so growing your Chest heals proportionally rather than
 	leaving you at a sliver of a bigger bar.
 ]]
 function CombatService:_applyVitals(player: Player)
@@ -370,7 +370,7 @@ function CombatService:_applyVitals(player: Player)
 		return
 	end
 
-	local maxHealth = Formulas.MaxHealth(StatService:GetStat(player, "Core"))
+	local maxHealth = Formulas.MaxHealth(StatService:GetStat(player, "Chest"))
 	if math.abs(humanoid.MaxHealth - maxHealth) > 0.01 then
 		local ratio = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
 		humanoid.MaxHealth = maxHealth
