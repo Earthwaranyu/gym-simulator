@@ -602,6 +602,35 @@ function MenuController:Toggle()
 	end
 end
 
+--[[
+	Opens the menu on a named tab, for anything in the world that wants to put a
+	screen in front of the player — the quest giver in the plaza, and whatever
+	stands next to him later.
+
+	An unknown tab id opens the menu on whatever was last showing rather than
+	failing silently on a blank panel, and says so, because a mistyped tab in a
+	config table should be visible to whoever wrote it.
+]]
+function MenuController:Open(tabId: string)
+	local known = false
+	for _, tab in tabs do
+		if tab.Id == tabId then
+			known = true
+			break
+		end
+	end
+
+	if known then
+		activeTab = tabId
+	else
+		warn(`[MenuController] No tab named "{tabId}"`)
+	end
+
+	isOpen = true
+	screen.Enabled = true
+	self:_refresh()
+end
+
 function MenuController:_build()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 

@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 72 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+**Progress: 73 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
 and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
 server-driven with no client remote to exploit.
 
@@ -269,8 +269,15 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       requirement applies to owners exactly as it does to everyone else. The Map tab is its
       point of sale, and with `AssetId` still `0` the server answers "not available yet",
       which the toast shows verbatim.
-- [ ] 75. **NPCs that do something.** `NpcConfig` plus a client controller; the prompt opens
-      the menu on a named tab.
+- [x] 75. **NPCs that do something.** `NpcConfig` (id, title, prompt verb, which tab it
+      opens) plus a client `NpcController` that gives every model tagged `Npc` a proximity
+      prompt and a nameplate, and a new `MenuController:Open(tabId)` for it to call.
+      **Entirely client-side, and deliberately so** — every NPC opens a screen the menu
+      already has, so a server half would be a remote whose only job is telling the client
+      to open its own UI. Bound per tagged model and rebound on add/remove, because
+      streaming unloads the plaza while you are out at a district; a one-shot pass at
+      startup leaves the quest giver mute for the rest of the session. Adding a shopkeeper
+      is an entry plus a tagged model.
 - [ ] 76. **The boards read.** The monuments render the `OrderedDataStore` boards #54 has
       been serving to nothing.
 - [ ] 77. **Don't fall forever.** A void catcher, and a part-budget pass on a map that is
