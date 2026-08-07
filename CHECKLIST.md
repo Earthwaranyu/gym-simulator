@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 80 built / 85** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 81 built / 85** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -381,8 +381,15 @@ Roblox UI.
       button presses is styling, and a restyle should stay one file. Plus a blank
       `EffectsConfig.Sounds.UiClick`, quieter and pitch-jittered because it is the one
       sound a player can trigger as fast as they can tap.
-- [ ] 83. **The bar, rebuilt.** Left edge, icon tile plus label, real touch size, and an
-      active-tab highlight driven by a new `MenuController.Changed` signal.
+- [x] 83. **The bar, rebuilt.** Left edge on the vertical centre, 164×56 buttons — an icon
+      tile, a label, 8px apart — using `Icons` and `UI.Pressable`. Three deliberate
+      corrections to #79: **left, not right**, because the right half of a phone screen is
+      where you drag to turn the camera; **56px, not 38**, which clears the touch floor;
+      and **icon first**, because five dark rectangles of text read as more HUD panels.
+      The open tab fills with the accent and knocks its glyph out of it, driven by a new
+      `MenuController.Changed` signal rather than set at click time — Escape and the ✕
+      never touch the bar, so a click-time highlight would stay lit after them.
+      This leaves the bar overlapping the stat panel, which #84 is for.
 - [ ] 84. **Room on the left.** The HUD's Summary and Stats panels merge into one compact
       block so the bar can have the left column.
 - [ ] 85. **Fits a phone.** A viewport-driven `UIScale`, checked against the three zones

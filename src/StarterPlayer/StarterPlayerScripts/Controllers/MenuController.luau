@@ -15,6 +15,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
@@ -28,6 +29,12 @@ local MenuController = {
 	Name = "MenuController",
 	Priority = 7,
 }
+
+-- Fires with the id of the screen now showing, or nil when the menu is closed.
+-- The button bar highlights whichever tab this names; without it the highlight
+-- would have to be set at click time and would then stay lit after Escape or the
+-- close button, which do not go through the bar at all.
+MenuController.Changed = Signal.new()
 
 local ProfileController: any = nil
 local ToastController: any = nil
@@ -54,6 +61,10 @@ type Tab = {
 	-- true, so a new screen is reachable without touching the bar; Quests opts
 	-- out because Coach in the plaza is how you are meant to find it.
 	OnBar: boolean?,
+	-- Which glyph in Icons.luau the button draws. Defaults to the tab's own id,
+	-- so a tab only names this when the two differ — as Ranks does, whose icon
+	-- and label are both "Top".
+	Icon: string?,
 }
 
 local tabs: { Tab } = {}
@@ -144,6 +155,7 @@ function MenuController:Init()
 		{
 			Id = "Ranks",
 			DisplayName = "Top",
+			Icon = "Top",
 			Render = function(parent)
 				self:_renderLeaderboard(parent)
 			end,
@@ -595,6 +607,7 @@ function MenuController:_renderTabStrip()
 		btn.Activated:Connect(function()
 			activeTab = tab.Id
 			self:_refresh()
+			self:_publish()
 		end)
 	end
 end
@@ -619,19 +632,40 @@ function MenuController:Toggle(tabId: string?)
 		end
 		self:_refresh()
 	end
+
+	self:_publish()
 end
 
 --[[
 	The tabs that should appear as on-screen buttons, in declaration order.
 ]]
-function MenuController:GetBarTabs(): { { Id: string, DisplayName: string } }
+function MenuController:GetBarTabs(): { { Id: string, DisplayName: string, Icon: string } }
 	local out = {}
 	for _, tab in tabs do
 		if tab.OnBar ~= false then
-			table.insert(out, { Id = tab.Id, DisplayName = tab.DisplayName })
+			table.insert(out, {
+				Id = tab.Id,
+				DisplayName = tab.DisplayName,
+				Icon = tab.Icon or tab.Id,
+			})
 		end
 	end
 	return out
+end
+
+--[[
+	Announces what is on screen. Every path that opens or closes the menu ends
+	here, so nothing has to remember to tell the bar.
+]]
+function MenuController:_publish()
+	MenuController.Changed:Fire(if isOpen then activeTab else nil)
+end
+
+--[[
+	The tab currently showing, or nil when the menu is closed.
+]]
+function MenuController:GetOpenTab(): string?
+	return if isOpen then activeTab else nil
 end
 
 --[[
@@ -661,6 +695,7 @@ function MenuController:Open(tabId: string)
 	isOpen = true
 	screen.Enabled = true
 	self:_refresh()
+	self:_publish()
 end
 
 function MenuController:_build()
