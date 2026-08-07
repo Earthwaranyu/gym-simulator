@@ -649,12 +649,17 @@ def underside(row, rng, round_shape):
 
 
 def spawn_pad(row):
-    """The pad travel drops arrivals onto, on the Downtown-facing edge."""
+    """The pad travel drops arrivals onto, on the Downtown-facing edge.
+
+    A flat box, not a disc. TravelService lands a player at the pad's CFrame
+    raised by half its height, so the pad's orientation becomes the player's:
+    a disc is a cylinder turned on its end, and arriving on one would lay you
+    on your side. Unrotated in local space, its LookVector points at the middle
+    of the island, so you arrive facing the gym rather than the drop.
+    """
     half = row["half"]
-    pad = disc("SpawnPad", 1.0, 30, FLOOR_TOP + 0.5, row["accent"], "Neon")
-    pad["properties"]["CFrame"] = serialise_cf(
-        mul(cf(0, FLOOR_TOP + 0.5, half * 0.74), rot_z(90))
-    )
+    pad = part("SpawnPad", [30, 1, 30], cf(0, FLOOR_TOP + 0.5, half * 0.74),
+               row["accent"], "Neon")
     return tagged(pad, tags=["ZoneSpawn"], attributes={"ZoneId": row["zone"]})
 
 

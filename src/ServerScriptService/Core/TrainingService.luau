@@ -54,6 +54,9 @@ type StationRecord = {
 	-- What the platform this machine stands on multiplies its gains by. Resolved once
 	-- when the station binds, because machines do not move between tiers at runtime.
 	zoneMultiplier: number,
+	-- What the district demands of anyone who wants to use its machines. Gain
+	-- rides on the zone, so mounting has to as well — see _onTriggered.
+	zoneRequiredPower: number,
 	zoneName: string?,
 	anchors: { BasePart },
 	exit: BasePart?,
@@ -425,6 +428,21 @@ function TrainingService:_onTriggered(player: Player, station: Instance)
 		return
 	end
 
+	-- The district gate. It used to be geometry: a ZoneGate slab you could not walk
+	-- through without the power, which also meant a machine could not be reached
+	-- without passing one. Travel is a menu button now and two of the gyms stand on
+	-- Downtown's own streets, so nothing physical stops a fresh player strolling into
+	-- Iron Hall and training at its multiplier. Gain already rides on the zone; this
+	-- is the same rule applied to getting on the machine at all.
+	local districtShortfall = record.zoneRequiredPower - StatService:GetTotalPower(player)
+	if districtShortfall > 0 then
+		Net.Event("Notify"):FireClient(
+			player,
+			`{record.zoneName or "This district"} needs {NumberFormat.Format(districtShortfall)} more power`
+		)
+		return
+	end
+
 	local definition = record.definition
 	if not self:_isUnlocked(player, definition) then
 		Net.Event("Notify"):FireClient(
@@ -517,6 +535,7 @@ function TrainingService:_bindStation(station: Instance)
 	local record: StationRecord = {
 		definition = definition,
 		zoneMultiplier = if zone ~= nil then zone.GainMultiplier else 1,
+		zoneRequiredPower = if zone ~= nil then zone.RequiredPower else 0,
 		zoneName = if zone ~= nil then zone.DisplayName else nil,
 		anchors = anchors,
 		exit = if exit ~= nil and exit:IsA("BasePart") then exit else nil,

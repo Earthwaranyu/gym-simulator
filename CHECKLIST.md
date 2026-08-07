@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 69 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
+**Progress: 70 built / 77** — Phases 0–10 complete, Phase 11 in progress. #22 (stamina)
 and #24 (training anti-exploit) were withdrawn by design, not skipped: reps are
 server-driven with no client remote to exploit.
 
@@ -234,9 +234,21 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       go in their own folder per district, and `rim_spots` skips a 28° arc around every
       spawn pad — otherwise travel drops you inside a shipping container, and the gap
       doubles as a clear walk onto the island.
-- [ ] 72. **Travel is a button.** `ZoneGate` and its `Touched` handler go; `TravelService`
-      validates power, origin and combat state instead. Removing the gates means *mounting*
-      has to check the zone's `RequiredPower` too — geometry stops being the gate, config is.
+- [x] 72. **Travel is a button.** `ZoneService` and every `ZoneGate` slab are gone;
+      `TravelService` owns the rules the geometry used to. It checks **power** (the same
+      test the gates made), **where you are** — free travel only from inside a `SafeZone`,
+      which is the plaza, unless you own Fast Travel — and **whether you are in a fight**,
+      reusing `FlightService:IsGrounded` so travelling out of a losing fight is refused on
+      exactly the window that already stops you flying out of one. It dismounts you first,
+      because pivoting a player whose root is anchored to a `TrainAnchor` strands them and
+      leaves the station reading as occupied.
+      Two things fell out of it. The landing pads had become discs — a cylinder stood on
+      its end — and landing a player on one would have laid them on their side, so they
+      are flat boxes again, unrotated so you arrive facing the gym. And **removing the
+      gates opened a hole**: with Iron Hall on a Downtown street, nothing physical stopped
+      a fresh player walking in and training at x6. Gain already rides on the zone, so
+      mounting now does too — `TrainingService` checks the district's `RequiredPower`
+      alongside the machine's. Geometry stops being the gate; config is.
 - [ ] 73. **The travel map.** A Map tab drawing every district as a pin, with lock state
       and what it is worth.
 - [ ] 74. **Fast Travel gamepass.** Travel from anywhere instead of only from the plaza.

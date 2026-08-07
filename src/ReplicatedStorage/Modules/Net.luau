@@ -57,6 +57,11 @@ local FUNCTION_NAMES: { string } = {
 	"ClaimVipDaily",
 	-- Client -> server: read the global leaderboards. Returns a list.
 	"GetLeaderboard",
+	-- Client -> server: travel to a district by id. Returns ok, message.
+	"Travel",
+	-- Client -> server: every district's landing pad in world space, for the
+	-- travel map's pins. Streaming means the client cannot measure them itself.
+	"GetDestinations",
 }
 
 local folder: Folder

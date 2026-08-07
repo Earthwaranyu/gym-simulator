@@ -16,7 +16,10 @@ local CollectionService = game:GetService("CollectionService")
 export type Zone = {
 	Id: string,
 	DisplayName: string,
-	-- Total power needed to pass this zone's gate.
+	-- One line of flavour, shown on the travel map beside the name. Districts are
+	-- places now, and a list of eleven names tells you nothing about any of them.
+	Tagline: string,
+	-- Total power needed to travel here.
 	RequiredPower: number,
 	-- Everything trained inside this zone is multiplied by this.
 	--
@@ -36,24 +39,24 @@ export type Zone = {
 -- containment test never passes. Zone volumes are invisible, tall, and cover the whole
 -- playable height of their area.
 local ZONE_TAG = "GymZone"
--- Tag on a part that teleports the toucher into a zone.
-local GATE_TAG = "ZoneGate"
--- Tag on the part a gate teleports you to.
+-- Tag on the pad travel lands you on.
 local SPAWN_TAG = "ZoneSpawn"
 -- Attribute naming which zone a tagged part belongs to.
 local ZONE_ATTRIBUTE = "ZoneId"
 
--- Eleven tiers spiralling outward. Power roughly x20 and gain roughly x6 per step, so
--- reaching the next platform is always worth far more than grinding the current one —
--- which is the whole reason to cross a map this size.
+-- Eleven districts. Power roughly x20 and gain roughly x6 per step, so reaching the
+-- next one is always worth far more than grinding the one you are on — which is the
+-- whole reason to cross a map this size.
 --
--- The first three sit on the ground and can be walked to. Everything from Skydeck out
--- floats, and is only reachable by flying, so the movement ladder and the progression
--- ladder are the same ladder.
+-- Garage and Iron are city blocks in Downtown and the Docks is a walk across the
+-- causeway; everything from Strongman out floats, higher with every tier, and is only
+-- reachable by flying or by travelling. The movement ladder and the progression ladder
+-- are the same ladder.
 local zones: { Zone } = {
 	{
 		Id = "Garage",
 		DisplayName = "Garage Gym",
+		Tagline = "Where everybody starts.",
 		RequiredPower = 0,
 		GainMultiplier = 1,
 		Color = Color3.fromRGB(126, 211, 155),
@@ -61,6 +64,7 @@ local zones: { Zone } = {
 	{
 		Id = "Iron",
 		DisplayName = "Iron Hall",
+		Tagline = "Warehouse iron, two streets off the plaza.",
 		RequiredPower = 25e3,
 		GainMultiplier = 6,
 		Color = Color3.fromRGB(66, 165, 245),
@@ -68,6 +72,7 @@ local zones: { Zone } = {
 	{
 		Id = "Powerhouse",
 		DisplayName = "The Powerhouse",
+		Tagline = "The docks work all night.",
 		RequiredPower = 500e3,
 		GainMultiplier = 40,
 		Color = Color3.fromRGB(239, 108, 61),
@@ -75,6 +80,7 @@ local zones: { Zone } = {
 	{
 		Id = "Strongman",
 		DisplayName = "Strongman Yard",
+		Tagline = "Sand, salt and heavy stone.",
 		RequiredPower = 10e6,
 		GainMultiplier = 250,
 		Color = Color3.fromRGB(190, 120, 70),
@@ -82,6 +88,7 @@ local zones: { Zone } = {
 	{
 		Id = "Titan",
 		DisplayName = "Titan Forge",
+		Tagline = "The pit that ate a mountain.",
 		RequiredPower = 200e6,
 		GainMultiplier = 1600,
 		Color = Color3.fromRGB(255, 196, 61),
@@ -89,6 +96,7 @@ local zones: { Zone } = {
 	{
 		Id = "Skydeck",
 		DisplayName = "Sky Deck",
+		Tagline = "Above the smog line.",
 		RequiredPower = 4e9,
 		GainMultiplier = 10e3,
 		Color = Color3.fromRGB(120, 210, 255),
@@ -96,6 +104,7 @@ local zones: { Zone } = {
 	{
 		Id = "Storm",
 		DisplayName = "Storm Peak",
+		Tagline = "Thin air and live cable.",
 		RequiredPower = 80e9,
 		GainMultiplier = 65e3,
 		Color = Color3.fromRGB(150, 160, 255),
@@ -103,6 +112,7 @@ local zones: { Zone } = {
 	{
 		Id = "Void",
 		DisplayName = "Void Gym",
+		Tagline = "No sun reaches this far out.",
 		RequiredPower = 1.5e12,
 		GainMultiplier = 400e3,
 		Color = Color3.fromRGB(160, 110, 235),
@@ -110,6 +120,7 @@ local zones: { Zone } = {
 	{
 		Id = "Solar",
 		DisplayName = "Solar Forge",
+		Tagline = "Lit from underneath.",
 		RequiredPower = 30e12,
 		GainMultiplier = 2.5e6,
 		Color = Color3.fromRGB(255, 140, 60),
@@ -117,6 +128,7 @@ local zones: { Zone } = {
 	{
 		Id = "Nebula",
 		DisplayName = "Nebula Hall",
+		Tagline = "Nothing below but colour.",
 		RequiredPower = 600e12,
 		GainMultiplier = 16e6,
 		Color = Color3.fromRGB(255, 110, 190),
@@ -124,6 +136,7 @@ local zones: { Zone } = {
 	{
 		Id = "Ascendant",
 		DisplayName = "Ascendant Peak",
+		Tagline = "The last place there is.",
 		RequiredPower = 12e15,
 		GainMultiplier = 100e6,
 		Color = Color3.fromRGB(255, 245, 200),
@@ -134,7 +147,6 @@ local ZoneConfig = {}
 
 ZoneConfig.List = zones
 ZoneConfig.ZONE_TAG = ZONE_TAG
-ZoneConfig.GATE_TAG = GATE_TAG
 ZoneConfig.SPAWN_TAG = SPAWN_TAG
 ZoneConfig.ZONE_ATTRIBUTE = ZONE_ATTRIBUTE
 
