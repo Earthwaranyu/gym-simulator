@@ -615,6 +615,15 @@ block, both the next location and the machine waiting there were easy to predict
       all five interior routes succeed, every exit has support exactly three studs below,
       the client receives 157 faithful map features, locked sky travel is refused, starter
       travel lands at zero error, and every one of the fifteen poses visibly changes a joint.
+
+- [x] 95. **Flight from the first spawn.** Flight permission no longer waits for a
+      power milestone: `MovementConfig.FLIGHT_POWER` is `0`, so the server publishes
+      `FlightAllowed = true` as soon as a player is alive. Q still toggles flight, WASD
+      steers, Space climbs, and Left Shift descends; Legs still controls speed, while
+      training and the short post-hit combat lock still ground the player. Verified in
+      Studio with a fresh mock player: the attribute was true before earning any stats,
+      Q created `FlightVelocity` and platform stand, and Q again returned control to the
+      Humanoid.
 ---
 
 ## Milestone 1 — Vertical Slice

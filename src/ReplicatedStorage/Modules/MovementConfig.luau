@@ -21,9 +21,9 @@
 
 local MovementConfig = {}
 
--- Total power before a player may fly at all. Sits just under the fourth tier's
--- gate, so flight arrives exactly when the platforms start leaving the ground.
-MovementConfig.FLIGHT_POWER = 8e6
+-- Flight is available from the first spawn. Total power still controls progression
+-- and travel destinations, while Legs controls how quickly each player flies.
+MovementConfig.FLIGHT_POWER = 0
 
 -- How fast the flier settles into a new direction. Low enough to feel like a body
 -- with mass rather than a camera.
