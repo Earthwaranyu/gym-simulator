@@ -39,9 +39,13 @@ local Signal = require(ReplicatedStorage.Packages.Signal)
 -- Long enough that travel is a decision rather than a way to flicker around the
 -- map, short enough that a mistaken destination is not a punishment.
 local TRAVEL_COOLDOWN = 4
--- The gamepass that lifts the "only from the plaza" rule. Absent until #74 adds
--- the product file, and stubbed at AssetId 0 until it exists in the dashboard —
--- HasFastTravel returns false for both, so the plaza rule simply holds.
+-- The gamepass that allows teleporting at all. Without it there is no fast travel
+-- from anywhere, including the plaza: a non-owner who picks a destination is given a
+-- tracked waypoint and walks or flies there.
+--
+-- It is stubbed at AssetId 0 until it exists in the dashboard, and HasFastTravel
+-- returns false for that — so today nobody teleports and everybody tracks. That is the
+-- correct behaviour for the state the product is in, not a bug.
 local FAST_TRAVEL_PRODUCT = "FastTravel"
 -- How long to wait for the destination to stream in before going anyway.
 local STREAM_WAIT = 1
@@ -55,8 +59,11 @@ local TravelService = {
 --- (player, zoneId, travelId) — fired after a successful arrival.
 TravelService.Traveled = Signal.new()
 
+-- Studio-only Fast Travel grant, set by DevService. Never populated on a live server:
+-- DevService itself refuses to run outside Studio, so nothing can reach this.
+local studioOverride: { [Player]: boolean } = {}
+
 local StatService: any = nil
-local CombatService: any = nil
 local TrainingService: any = nil
 local PurchaseService: any = nil
 local FlightService: any = nil
@@ -93,7 +100,6 @@ end
 
 function TravelService:Init()
 	StatService = Loader.Get("StatService")
-	CombatService = Loader.Get("CombatService")
 	TrainingService = Loader.Get("TrainingService")
 	PurchaseService = Loader.Get("PurchaseService")
 	FlightService = Loader.Get("FlightService")
@@ -108,6 +114,12 @@ function TravelService:Init()
 	Net.BindFunction("GetDestinations", 2, function(_player: Player)
 		return self:GetDestinations(), self:GetMapFeatures()
 	end)
+
+	-- The client needs to know whether a destination button says "Go" or "Track"
+	-- before it is pressed. Ownership itself is still only ever decided here.
+	Net.BindFunction("GetTravelAccess", 2, function(player: Player)
+		return { HasFastTravel = self:CanTravelFrom(player) }
+	end)
 end
 
 function TravelService:CanEnter(player: Player, requiredPower: number): boolean
@@ -117,6 +129,18 @@ end
 --[[
 	Whether the player owns the pass that lets them travel from anywhere.
 ]]
+--[[
+	Studio-only: pretend this player owns the pass. Called by DevService, which cannot
+	run outside Studio, so a live server has no path to it.
+]]
+function TravelService:SetStudioFastTravel(player: Player, enabled: boolean)
+	if enabled then
+		studioOverride[player] = true
+	else
+		studioOverride[player] = nil
+	end
+end
+
 function TravelService:HasFastTravel(player: Player): boolean
 	local product = PurchaseService:GetProduct(FAST_TRAVEL_PRODUCT)
 	if product == nil or product.AssetId == 0 then
@@ -126,14 +150,23 @@ function TravelService:HasFastTravel(player: Player): boolean
 end
 
 --[[
-	Whether the player is somewhere travel is allowed from.
+	Whether the player may teleport at all.
 
-	Reuses CombatService's safe-zone test rather than naming the plaza, so if a
-	second safe volume is ever added it is travellable for the same reason it is
-	safe: nobody can be jumped standing in it, so nothing is being escaped.
+	This used to be "from inside a safe zone, or with the pass". It is now the pass
+	alone. The plaza rule meant the fastest way across the city was to die or walk back
+	to spawn first, which taught players to treat the hub as a loading screen — and it
+	made the pass worth very little, since the free path did the same job with one extra
+	step.
+
+	A non-owner is not blocked from the destination, only from skipping the trip: the
+	client turns a refused Travel into a tracked waypoint. Flight is available from
+	spawn, so every location is reachable on foot or in the air.
 ]]
 function TravelService:CanTravelFrom(player: Player): boolean
-	return CombatService:IsInSafeZone(player) or self:HasFastTravel(player)
+	if studioOverride[player] then
+		return true
+	end
+	return self:HasFastTravel(player)
 end
 
 -- Every map-enabled station in world space. The server supplies this because
@@ -270,7 +303,9 @@ function TravelService:Travel(player: Player, travelId: string): (boolean, strin
 	end
 
 	if not self:CanTravelFrom(player) then
-		return false, "Travel from the spawn plaza, or get Fast Travel to go from anywhere."
+		-- The client turns this exact refusal into a tracked waypoint, so the message
+		-- explains the offer rather than just denying it.
+		return false, "NO_FAST_TRAVEL"
 	end
 
 	if not self:CanEnter(player, requiredPower) then

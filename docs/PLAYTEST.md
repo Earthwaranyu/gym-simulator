@@ -107,8 +107,16 @@ The rule under test: **a hit does not dismount; only death does.**
       late. If they do, raise `StreamingMinRadius` in `default.project.json`.
 - [ ] Open the map. All **55** locations are present and selectable; zoom, pan, and
       selection survive a refresh.
-- [ ] Fast Travel to a location, including one across the map, and land intact and mounted
-      to nothing.
+- [ ] **Without the Fast Travel pass**, pick any destination. You are NOT moved: a
+      beacon appears over it with a live distance, an arrow points to it whenever it is
+      off-screen, and the menu closes. Walk/fly there and confirm it clears itself
+      within ~26 studs with an "Arrived" toast.
+- [ ] Turn around — the arrow must point behind you, not at the mirrored side of the
+      screen.
+- [ ] Die while tracking. The beacon survives the respawn (it is rebuilt on the new
+      camera).
+- [ ] **With the pass** (`/fasttravel` in Studio), the same button teleports instead,
+      including across the map, and you land intact and mounted to nothing.
 - [ ] Die mid-flight and mid-travel. You respawn cleanly with no stuck camera, no residual
       velocity, and no half-applied travel.
 
@@ -117,13 +125,27 @@ The rule under test: **a hit does not dismount; only death does.**
 - [ ] Open the menu → **Train**. It opens on the muscle you are furthest behind on.
 - [ ] Click each of the five muscle chips. Every station for that muscle is listed —
       11 for most muscles, 55 across all five.
-- [ ] Usable machines sort above locked ones, best gain/second first within each group.
+- [ ] Usable machines sort above locked ones, **weakest gain/second first** within each
+      group — the list reads as a ladder, not a trophy cabinet.
 - [ ] Free/busy counts are live: have a second player mount a machine and confirm the
       count drops within ~2 seconds without reopening the panel.
 - [ ] While you are training, that station reads **YOU ARE HERE** and its button says
       "Here".
 - [ ] Close the panel and confirm the polling stops (no further `GetSpotStatus` traffic).
 - [ ] Locked entries show the shortfall in power, not a Go button.
+
+## 4c. Machine visibility
+
+- [ ] Stand anywhere with machines in sight. Each carries an outline in its muscle's
+      colour and a glowing ring on the floor at its base.
+- [ ] Locked machines are marked in grey, not hidden — you can see what you are
+      training toward.
+- [ ] Outlines do **not** shine through buildings (DepthMode is Occluded). If the city
+      looks like a christmas tree, that setting regressed.
+- [ ] Run across a district and confirm marks hand off to the nearest machines without
+      accumulating — at most 14 outlines and 14 rings exist at once.
+- [ ] Respawn and confirm rings/outlines come back rather than vanishing for the
+      session.
 
 ## 5. Progression
 

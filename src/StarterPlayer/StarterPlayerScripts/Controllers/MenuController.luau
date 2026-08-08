@@ -93,6 +93,11 @@ local currentSpotId: string? = nil
 -- a muscle the player has since switched away from, discards itself instead of
 -- redrawing the screen out from under them.
 local trainPollToken = 0
+
+-- Whether this player may teleport at all. Refreshed whenever the menu opens, because
+-- buying the pass mid-session must change the buttons without a rejoin. The server
+-- re-checks on every actual Travel call; this only decides what the button says.
+local hasFastTravel = false
 local mapZoom = 1
 local mapCenter = Vector2.new(0.5, 0.5)
 
@@ -863,12 +868,8 @@ function MenuController:_renderDestination(parent: Frame, power: number)
 	detail.Text = `x{NumberFormat.Format(destination.GainMultiplier)} gains  ·  `
 		.. `<font color="#7EE7FF">open</font>`
 
-	button(action, "Travel", stat.Color, function()
-		local ok, message = Net.Function("Travel"):InvokeServer(destination.Id)
-		toast(message)
-		if ok then
-			self:Toggle()
-		end
+	button(action, if hasFastTravel then "Travel" else "Track", stat.Color, function()
+		self:_goTo(destination, `{equipment.DisplayName} · {zone.DisplayName}`, stat.Color)
 	end)
 end
 
@@ -879,6 +880,48 @@ end
 	leaves mid-call, and a menu that errors is worse than a menu showing slightly stale
 	occupancy.
 ]]
+--[[
+	Refreshes whether destination buttons offer "Go" or "Track".
+]]
+function MenuController:_fetchTravelAccess()
+	local ok, access = pcall(function()
+		return Net.Function("GetTravelAccess"):InvokeServer()
+	end)
+	if ok and type(access) == "table" then
+		hasFastTravel = access.HasFastTravel == true
+	end
+end
+
+--[[
+	Acts on a chosen destination.
+
+	With the pass, this teleports. Without it, the destination becomes a tracked
+	waypoint and the menu closes so the player can start moving — the same button, and
+	never a dead end. The refusal string is matched rather than the ownership flag so
+	that a player whose pass state changed a second ago still gets the right outcome:
+	the server is the only thing that decides.
+]]
+function MenuController:_goTo(destination: Destination, label: string, color: Color3)
+	if hasFastTravel then
+		local ok, message = Net.Function("Travel"):InvokeServer(destination.Id)
+		if ok then
+			toast(message)
+			self:Toggle()
+			return
+		end
+		if message ~= "NO_FAST_TRAVEL" then
+			toast(message)
+			return
+		end
+		hasFastTravel = false
+	end
+
+	local WaypointController = Loader.Get("WaypointController")
+	WaypointController:SetTarget(destination.Position, label, color)
+	toast(`Tracking {label} — follow the arrow`)
+	self:Toggle()
+end
+
 function MenuController:_fetchSpotStatus()
 	local ok, status = pcall(function()
 		return Net.Function("GetSpotStatus"):InvokeServer()
@@ -1023,7 +1066,10 @@ function MenuController:_renderTrain(parent: Frame)
 			return a.Unlocked
 		end
 		if a.Unlocked then
-			return a.PerSecond > b.PerSecond
+			-- Weakest first. The list is read as a ladder — where you train now, then
+			-- what you are working toward — and sorting the endgame machine to the top
+			-- puts the one entry you cannot use for twenty hours where your eye lands.
+			return a.PerSecond < b.PerSecond
 		end
 		return a.Destination.RequiredPower < b.Destination.RequiredPower
 	end)
@@ -1040,7 +1086,11 @@ function MenuController:_renderTrain(parent: Frame)
 		end
 	end
 	summary.Text = `{open} of {#spots} {stat.DisplayName} stations open to you  ·  `
-		.. `<font color="#8A93A8">live free/busy, refreshed every 2s</font>`
+		.. (
+			if hasFastTravel
+				then `<font color="#8A93A8">Go teleports you</font>`
+				else `<font color="#8A93A8">Track points you there — Fast Travel teleports</font>`
+		)
 
 	if #spots == 0 then
 		local empty = UI.Label("Empty", parent)
@@ -1088,12 +1138,9 @@ function MenuController:_renderTrain(parent: Frame)
 			detail.Text = `{NumberFormat.Format(spot.PerSecond)}/s  ·  `
 				.. `x{NumberFormat.Format(destination.GainMultiplier)}  ·  {occupancy}  ·  {access}`
 
-			button(line, if here then "Here" else "Go", stat.Color, function()
-				local ok, message = Net.Function("Travel"):InvokeServer(destination.Id)
-				toast(message)
-				if ok then
-					self:Toggle()
-				end
+			local action = if here then "Here" elseif hasFastTravel then "Go" else "Track"
+			button(line, action, stat.Color, function()
+				self:_goTo(destination, `{spot.Equipment.DisplayName} · {zoneName}`, stat.Color)
 			end)
 		else
 			local shortfall = destination.RequiredPower - power
@@ -1414,6 +1461,8 @@ end
 	player actually reads.
 ]]
 function MenuController:_enterTab()
+	self:_fetchTravelAccess()
+
 	if activeTab == "Train" then
 		self:_fetchSpotStatus()
 		self:_pollTrainPanel()

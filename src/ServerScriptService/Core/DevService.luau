@@ -26,6 +26,8 @@
 	    /unlockall        enough power to open every district and machine
 	    /reset            back to a fresh profile's stats and tokens
 	    /where <muscle>   list every station for a muscle and whether it is open
+	    /fasttravel       toggle Fast Travel for yourself, so Go teleports instead of
+	                      tracking (the real gamepass is still AssetId 0)
 	    /help             print this list in the output window
 ]]
 
@@ -96,6 +98,10 @@ end
 -- Typed as returning `...any` rather than `()` for the same reason the Loader's
 -- lifecycle hooks are: with `()`, the type checker sees pcall as returning only the
 -- success boolean and the error message cannot be captured.
+-- Studio-only Fast Travel toggle. One flag rather than per-player because a Studio
+-- session is one developer testing both sides of the gamepass.
+local fastTravelOn = false
+
 local COMMANDS: { [string]: (Player, { string }) -> ...any } = {}
 
 COMMANDS["/power"] = function(player: Player, args: { string })
@@ -212,8 +218,20 @@ COMMANDS["/where"] = function(player: Player, args: { string })
 	notify(player, `{count} {statId} stations listed in Output`)
 end
 
+COMMANDS["/fasttravel"] = function(player: Player, _args: { string })
+	local TravelService = Loader.Get("TravelService")
+	fastTravelOn = not fastTravelOn
+	TravelService:SetStudioFastTravel(player, fastTravelOn)
+	notify(
+		player,
+		if fastTravelOn then "Fast Travel ON — Go teleports" else "Fast Travel OFF — Go tracks"
+	)
+end
+
 COMMANDS["/help"] = function(player: Player, _args: { string })
-	print("[DevService] /power n · /stat id n · /tokens n · /unlockall · /reset · /where muscle")
+	print(
+		"[DevService] /power n · /stat id n · /tokens n · /unlockall · /reset · /where muscle · /fasttravel"
+	)
 	notify(player, "Commands printed to Output")
 end
 
