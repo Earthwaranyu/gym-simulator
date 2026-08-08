@@ -35,8 +35,10 @@ local character: Model? = nil
 local root: BasePart? = nil
 local humanoid: Humanoid? = nil
 local mover: LinearVelocity? = nil
+local orienter: AlignOrientation? = nil
 local attachment: Attachment? = nil
 local velocity = Vector3.zero
+local lastJumpTapAt = 0
 
 local ToastController: any = nil
 local ProfileController: any = nil
@@ -80,6 +82,10 @@ function FlightController:Stop()
 		mover:Destroy()
 		mover = nil
 	end
+	if orienter ~= nil then
+		orienter:Destroy()
+		orienter = nil
+	end
 	if attachment ~= nil then
 		attachment:Destroy()
 		attachment = nil
@@ -112,8 +118,24 @@ function FlightController:_takeOff()
 	force.VectorVelocity = Vector3.zero
 	force.Parent = part
 
+	-- Without this the rig tumbles. PlatformStand switches off the humanoid's own
+	-- balancing, and nothing else damps angular velocity — so the first clipped corner
+	-- or leftover spin from a jump sets the character rotating forever, which is the
+	-- "flying animation keeps spinning" bug. AlignOrientation replaces the balance the
+	-- humanoid stopped providing.
+	local orient = Instance.new("AlignOrientation")
+	orient.Name = "FlightOrientation"
+	orient.Attachment0 = point
+	orient.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	orient.RigidityEnabled = false
+	orient.Responsiveness = MovementConfig.FLIGHT_ORIENT_RESPONSIVENESS
+	orient.MaxTorque = math.huge
+	orient.CFrame = part.CFrame
+	orient.Parent = part
+
 	attachment = point
 	mover = force
+	orienter = orient
 	velocity = part.AssemblyLinearVelocity
 	flying = true
 
@@ -142,8 +164,17 @@ function FlightController:Toggle()
 end
 
 --[[
-	The direction the player is asking to go, in world space, from camera-relative
-	input. Returns a unit vector, or zero when they are asking to hover.
+	The direction the player is asking to go, in world space.
+
+	Flight follows where the camera is *looking*, pitch included: point down and hold
+	forward and you dive. This used to flatten the camera to the horizon, so the only
+	way down was the descend key and flying felt like driving a hovercraft — you could
+	aim at a sky deck and still travel level underneath it.
+
+	Mobile keeps working because the thumbstick is recovered rather than replaced:
+	`MoveDirection` is decomposed against the camera's flattened basis to get "how much
+	forward, how much right", and those two numbers are then re-applied to the camera's
+	full 3D basis.
 ]]
 local function inputDirection(): Vector3
 	local camera = workspace.CurrentCamera
@@ -156,6 +187,18 @@ local function inputDirection(): Vector3
 	local humanoidObject = humanoid
 	local move = if humanoidObject ~= nil then humanoidObject.MoveDirection else Vector3.zero
 
+	local look = camera.CFrame.LookVector
+	local right = camera.CFrame.RightVector
+
+	-- The camera's basis with pitch removed, which is the space MoveDirection is in.
+	local flatLook = Vector3.new(look.X, 0, look.Z)
+	local flatRight = Vector3.new(right.X, 0, right.Z)
+	flatLook = if flatLook.Magnitude > 1e-4 then flatLook.Unit else Vector3.new(0, 0, -1)
+	flatRight = if flatRight.Magnitude > 1e-4 then flatRight.Unit else Vector3.new(1, 0, 0)
+
+	local forwardAmount = move:Dot(flatLook)
+	local rightAmount = move:Dot(flatRight)
+
 	local vertical = 0
 	if UserInputService:IsKeyDown(MovementConfig.ASCEND_KEY) then
 		vertical += 1
@@ -165,10 +208,15 @@ local function inputDirection(): Vector3
 	end
 
 	local speed = flightSpeed()
-	local direction = Vector3.new(move.X, 0, move.Z)
-	if direction.Magnitude > 0 then
+
+	-- Re-applied to the full basis, so forward means "where I am looking".
+	local direction = look * forwardAmount + right * rightAmount
+	if direction.Magnitude > 1e-4 then
 		direction = direction.Unit * speed
+	else
+		direction = Vector3.zero
 	end
+
 	return direction + Vector3.new(0, vertical * speed * MovementConfig.FLIGHT_CLIMB_RATIO, 0)
 end
 
@@ -189,6 +237,26 @@ function FlightController:_step(delta: number)
 	local blend = math.min(1, MovementConfig.FLIGHT_ACCELERATION * delta)
 	velocity = velocity:Lerp(inputDirection(), blend)
 	force.VectorVelocity = velocity
+
+	-- Face the way you are moving, upright. Held level rather than banked into the
+	-- dive: a rig with no flight animation looks like a falling body when pitched, and
+	-- an upright one reads as flight even while descending.
+	local orient = orienter
+	if orient ~= nil then
+		local heading = Vector3.new(velocity.X, 0, velocity.Z)
+		if heading.Magnitude > 1 then
+			orient.CFrame = CFrame.lookAt(Vector3.zero, heading.Unit)
+		else
+			-- Hovering: keep whatever heading we had, just level. Deriving it from the
+			-- current CFrame rather than leaving it alone is what stops a residual
+			-- tilt from persisting for the whole flight.
+			local current = part.CFrame.LookVector
+			local flat = Vector3.new(current.X, 0, current.Z)
+			if flat.Magnitude > 1e-3 then
+				orient.CFrame = CFrame.lookAt(Vector3.zero, flat.Unit)
+			end
+		end
+	end
 end
 
 function FlightController:_bind(model: Model)
@@ -226,10 +294,27 @@ function FlightController:Start()
 	end)
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		if processed or input.KeyCode ~= MovementConfig.TOGGLE_KEY then
+		if processed then
 			return
 		end
-		self:Toggle()
+
+		if input.KeyCode == MovementConfig.TOGGLE_KEY then
+			self:Toggle()
+			return
+		end
+
+		-- Double-tap jump to take off. Only while grounded: in the air Space is
+		-- already the climb key, and turning a climb into a landing would make
+		-- ascending impossible to hold.
+		if input.KeyCode == Enum.KeyCode.Space and not flying then
+			local now = os.clock()
+			if now - lastJumpTapAt <= MovementConfig.DOUBLE_TAP_SECONDS then
+				lastJumpTapAt = 0
+				self:Toggle()
+			else
+				lastJumpTapAt = now
+			end
+		end
 	end)
 
 	RunService.Heartbeat:Connect(function(delta: number)

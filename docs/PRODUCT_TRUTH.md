@@ -1,4 +1,4 @@
-# Product Truth — v3 (2026-08-08)
+# Product Truth — v4 (2026-08-08)
 
 The single versioned inventory of what this build actually is. `CLAUDE.md`, `AGENTS.md`,
 `README.md`, `CHECKLIST.md`, and `docs/PLAYTEST.md` are all reconciled against this file.
@@ -27,18 +27,21 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Zones | 11 — Garage, Iron, Powerhouse, Strongman, Titan, Skydeck, Storm, Void, Solar, Nebula, Ascendant | `ZoneConfig.luau` |
 | Server systems | 26 entries under `Core/` — **25 ignite** (`_Migrations` is a helper, skipped by the `_` rule) | `[Loader/Server] Ignited 25 systems` |
 | Client controllers | 19 | `[Loader/Client] Ignited 19 systems` |
+| Character | **uniform for everyone** — `LoadCharacterAppearance` off, clothing/accessories stripped, one skin tone, shorts painted onto the R15 UpperLegs | `AppearanceService.luau`, `default.project.json` |
 | Stats | 5 — Arms (damage), Chest (max HP), Back (durability), Core (retaliation knockback), Legs (run + flight speed) | `StatConfig.luau`, Phase 14 |
 | Abilities | **1 — Punch only.** Slam and Dash are *deferred*, not shipped | `CombatService/Abilities/` |
 | Training start | hold **E** at a station prompt; server mounts, locks, and poses the player; reps tick automatically | `TrainingService.luau` |
 | Training stop | hold **E** again, or press **Space** / jump | `TrainingService.luau`, `Net` `StopTraining` |
 | Training interruption | **kill-only.** A hit deals damage and grounds the victim but does *not* dismount them; only death ends the set | `CombatService/init.luau` |
 | Death cost | respawn timer, combo reset, in-flight token tick forfeited. No stat, cash, or token loss | `CHECKLIST.md` #33 |
-| Flight | toggle **Q**, ascend **Space**, descend **LeftShift** — **keyboard only**, no touch or gamepad binding | `MovementConfig.luau`, `FlightController.luau` |
+| Flight | toggle **Q** or **double-tap Space**, ascend **Space**, descend **LeftShift** — **keyboard only**, no touch or gamepad binding | `MovementConfig.luau`, `FlightController.luau` |
+| Flight steering | follows the camera's full look direction, pitch included; the rig is held upright and facing its heading by an `AlignOrientation` | `FlightController:_step` |
 | Flight availability | available from spawn | commit `895d0e3` |
 | Leaderboards | 2 global boards — Power and Kills | `LeaderboardService.luau` |
 | Menu tabs | 7 — Map, **Train**, Upgrades, Quests, Shop, Top, Settings | `MenuController.luau` |
 | Finding a machine | the **Train** tab lists every station for a chosen muscle, **weakest first**, with live free/busy counts polled every 2s while open | `MenuController:_renderTrain`, `TrainingService:GetSpotStatus` |
 | Teleporting | **Fast Travel gamepass only.** The plaza rule is gone. Without the pass a destination becomes a tracked waypoint — beacon plus off-screen arrow — and the player walks or flies | `TravelService:CanTravelFrom`, `WaypointController` |
+| Muscle growth | per stat, not per total: Arms→upper/lower arms, Chest→UpperTorso, Back→UpperTorso (0.6), Core→LowerTorso, Legs→upper/lower legs. Shared parts take the largest contribution, never the product | `StatConfig.BodyScales`, `MuscleService:ComputeScales` |
 | Machine visibility | nearest 14 stations within 260 studs carry a muscle-coloured outline and floor ring, grey while locked | `StationHighlightController` |
 | Dev commands | `/power`, `/stat`, `/tokens`, `/unlockall`, `/reset`, `/where`, `/help` — **Studio only**, gated on `RunService:IsStudio()` | `DevService.luau` |
 | Quests | 3 — `DailyReps`, `DailyBounties` (daily), `FirstMillion` (one-shot) | `QuestService/Quests/` |

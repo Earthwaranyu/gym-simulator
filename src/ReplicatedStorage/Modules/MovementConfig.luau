@@ -48,4 +48,15 @@ MovementConfig.TOGGLE_KEY = Enum.KeyCode.Q
 MovementConfig.ASCEND_KEY = Enum.KeyCode.Space
 MovementConfig.DESCEND_KEY = Enum.KeyCode.LeftShift
 
+-- Double-tapping jump also takes off, which is the gesture most flight games use and
+-- the one players try before reading any control list. Long enough that a deliberate
+-- double-tap lands inside it, short enough that two ordinary jumps in a row do not.
+MovementConfig.DOUBLE_TAP_SECONDS = 0.32
+
+-- How hard the flier is held upright and pointed where it is going. High enough that
+-- a collision cannot start the rig tumbling, which is what PlatformStand alone allows:
+-- with the humanoid's own stabilisation off and nothing replacing it, a clipped corner
+-- sets the character spinning and nothing ever damps it out.
+MovementConfig.FLIGHT_ORIENT_RESPONSIVENESS = 40
+
 return MovementConfig

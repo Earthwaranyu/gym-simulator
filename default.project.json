@@ -25,6 +25,10 @@
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
+      "$properties": {
+        "LoadCharacterAppearance": false,
+        "CharacterUseJumpPower": true
+      },
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
         "Controllers": {

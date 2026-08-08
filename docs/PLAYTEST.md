@@ -100,8 +100,14 @@ The rule under test: **a hit does not dismount; only death does.**
 ## 4. Movement, flight, and travel
 
 - [ ] Flight is available **from spawn** — no unlock gate.
-- [ ] **Q** toggles flight, **Space** ascends, **LeftShift** descends. Confirm Space
-      ascending in flight never conflicts with Space dismounting a machine (different states).
+- [ ] **Q** toggles flight. **Double-tapping Space** while grounded also takes off.
+      **Space** ascends and **LeftShift** descends once airborne — confirm a double-tap
+      in the air does not land you, and that Space still dismounts a machine.
+- [ ] Flight follows the camera: pitch down and hold forward, you dive; pitch up, you
+      climb. Velocity should track the camera's look direction, not the horizon.
+- [ ] The character stays **upright and facing its heading** the whole flight. Any
+      tumbling or continuous spin means the `AlignOrientation` regressed.
+- [ ] Clip a building mid-flight and confirm it does not start the rig rotating.
 - [ ] Higher Legs visibly raises both run and flight speed.
 - [ ] Fly between distant districts with StreamingEnabled on — machines must not pop in
       late. If they do, raise `StreamingMinRadius` in `default.project.json`.
@@ -133,6 +139,16 @@ The rule under test: **a hit does not dismount; only death does.**
       "Here".
 - [ ] Close the panel and confirm the polling stops (no further `GetSpotStatus` traffic).
 - [ ] Locked entries show the shortfall in power, not a Go button.
+
+## 4d. Body and growth
+
+- [ ] Every player looks identical on spawn: no shirt, no accessories, one skin tone,
+      dark shorts (the R15 UpperLegs) over bare shins. Join with an avatar wearing a
+      hat and confirm it does not appear.
+- [ ] Train **one** muscle and confirm only its parts grow: Chest → UpperTorso only,
+      Arms → both arms only, Legs → both legs only, Core → LowerTorso only.
+- [ ] Train Chest and Back together — UpperTorso takes the larger of the two, and does
+      not compound into a runaway size.
 
 ## 4c. Machine visibility
 
