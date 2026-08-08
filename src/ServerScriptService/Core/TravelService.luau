@@ -44,6 +44,7 @@ local TRAVEL_COOLDOWN = 4
 local FAST_TRAVEL_PRODUCT = "FastTravel"
 -- How long to wait for the destination to stream in before going anyway.
 local STREAM_WAIT = 1
+local MAP_FEATURE_TAG = "MapFeature"
 
 local TravelService = {
 	Name = "TravelService",
@@ -101,7 +102,7 @@ function TravelService:Init()
 	end)
 
 	Net.BindFunction("GetDestinations", 2, function(_player: Player)
-		return self:GetDestinations()
+		return self:GetDestinations(), self:GetMapFeatures()
 	end)
 end
 
@@ -144,6 +145,8 @@ function TravelService:GetDestinations(): { any }
 		if type(travelId) ~= "string" or definition == nil or zone == nil or landing == nil then
 			continue
 		end
+		local accessKind = station:GetAttribute("AccessKind")
+		local floorIndex = station:GetAttribute("FloorIndex")
 		table.insert(out, {
 			Id = travelId,
 			ZoneId = zone.Id,
@@ -154,6 +157,8 @@ function TravelService:GetDestinations(): { any }
 			X = landing.Position.X,
 			Y = landing.Position.Y,
 			Z = landing.Position.Z,
+			AccessKind = if type(accessKind) == "string" then accessKind else "Street",
+			FloorIndex = if type(floorIndex) == "number" then floorIndex else 1,
 		})
 	end
 	table.sort(out, function(a, b)
@@ -164,6 +169,52 @@ function TravelService:GetDestinations(): { any }
 			return a.StatId < b.StatId
 		end
 		return a.Id < b.Id
+	end)
+
+	return out
+end
+
+-- A streaming-proof top-down description of the real city. The generated world
+-- tags its land, roads, blocks, buildings, parks, plaza and safe-zone footprint;
+-- the server serialises those parts because a spawn client cannot see distant
+-- Workspace geometry yet. Returning primitive values keeps this response stable
+-- even if the physical parts stream out immediately after the request.
+function TravelService:GetMapFeatures(): { any }
+	local out = {}
+
+	for _, instance in CollectionService:GetTagged(MAP_FEATURE_TAG) do
+		if not instance:IsA("BasePart") then
+			continue
+		end
+		local kind = instance:GetAttribute("MapKind")
+		local shape = instance:GetAttribute("MapShape")
+		if type(kind) ~= "string" or type(shape) ~= "string" then
+			continue
+		end
+		local _, yaw, _ = instance.CFrame:ToOrientation()
+		table.insert(out, {
+			Kind = kind,
+			Shape = shape,
+			X = instance.Position.X,
+			Z = instance.Position.Z,
+			Width = instance.Size.X,
+			Depth = instance.Size.Z,
+			Rotation = math.deg(yaw),
+			Color = instance.Color,
+		})
+	end
+
+	table.sort(out, function(a, b)
+		if a.Kind ~= b.Kind then
+			return a.Kind < b.Kind
+		end
+		if a.X ~= b.X then
+			return a.X < b.X
+		end
+		if a.Z ~= b.Z then
+			return a.Z < b.Z
+		end
+		return a.Width < b.Width
 	end)
 
 	return out

@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 90 built / 92** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 91 built / 93** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -547,6 +547,36 @@ body part the player meant to train.
       and shows the selected machine and tier before travel. Verified live: 55 unique ids,
       11 destinations per stat, five per tier, 55 rendered pins, and a client travel request
       landed within one stud of the chosen Arms machine.
+
+## Phase 17 — A city worth learning
+
+The connected grid fixed progression, but it was still a diagram: plain blocks, an empty
+map background, and no reason to remember one street from another. The starter machines
+were also far enough apart to feel like five unrelated destinations.
+
+- [x] 93. **The old islands become city landmarks, interiors, and a faithful map.** Ten
+      flat neighborhoods now reuse the old archipelago's visual language — docks and
+      cranes, beach and palms, quarry machinery, rooftops, storm pylons, void monoliths,
+      solar foundries, nebula hardware, and the marble civic district — while their 50
+      non-starter tier/stat pairs remain independently shuffled. Scenery therefore gives
+      directions without exposing progression. A collision keep-out keeps every landmark
+      and entrance readable instead of dropping old island props through a hidden gym.
+      The five x1 body-part venues now share one paved starter campus around spawn. A
+      visible cyan ForceField perimeter shows the smaller functional safe zone while the
+      machines remain outside it, preserving PvP interruption during training.
+      Seven destinations are concealed on the third floor of original, primitive-built
+      enterable buildings. Each has a real doorway, two connected stair flights and
+      landings, a closed upper facade, floor metadata, and an atomic streaming model so
+      fast travel cannot arrive before its support floor. All seven entrance-to-machine
+      paths succeed.
+      The Map tab is now a vector plan generated from the actual tagged land, roads,
+      blocks, parks, plaza, safe zone and 121 building footprints, with a stat legend and
+      all 55 exact-location pins. It preserves the world's aspect ratio and supports
+      mouse-wheel/buttons for 1–4x zoom plus touch/drag panning and recentering; selection
+      refreshes retain the current view. Verified live: 196 background features and 55
+      pins render, zoom expands the 616×300 canvas to 770×375 at 1.25x, every station has
+      floor support and its matching private zone, all seven interiors pathfind, and
+      Garage Dumbbells travel lands exactly on its `TrainExit`.
 ---
 
 ## Milestone 1 — Vertical Slice

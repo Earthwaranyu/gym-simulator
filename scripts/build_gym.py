@@ -179,7 +179,8 @@ def anchor_standing(frame):
 # --------------------------------------------------------------------------
 
 
-def machine(name, equipment_id, origin, children, travel_id=None):
+def machine(name, equipment_id, origin, children, travel_id=None,
+            access_kind=None, floor_index=None):
     # Atomic streaming: a machine arrives whole or not at all. Under the default
     # mode Roblox streams a model's parts in one at a time, and a bench press
     # missing its rack — or worse, missing the TrainAnchor the server pivots you
@@ -187,6 +188,10 @@ def machine(name, equipment_id, origin, children, travel_id=None):
     attributes = {"EquipmentId": equipment_id}
     if travel_id is not None:
         attributes["TravelId"] = travel_id
+    if access_kind is not None:
+        attributes["AccessKind"] = access_kind
+    if floor_index is not None:
+        attributes["FloorIndex"] = floor_index
     return {
         "name": name,
         "className": "Model",
@@ -604,13 +609,12 @@ DISTRICTS = [
 # The city island everything starts on. Big enough to hold a street grid, the
 # first two gyms and a plaza with room to stand around in.
 DOWNTOWN_HALF = 330
-# Small enough that Garage Gym's machine ring clears the safe zone around it, and
-# still big enough to hold Coach, the monuments and somewhere to stand.
-PLAZA_RADIUS = 56
-# The safe volume is a BOX and the plaza is a disc, so this covers the disc rather
-# than being inscribed in it: every part of the plaza you can stand on is sheltered,
-# with nothing sheltered that is not visibly on it.
-SAFE_ZONE_HALF = 58
+# The connected-city starter campus fills its central block. All five x1 training
+# venues sit on this pavement, while a smaller square barrier protects the actual
+# spawn point in the middle. Keeping the machines outside that barrier preserves
+# the game's core risk: somebody can still knock a trainee off a starter machine.
+PLAZA_RADIUS = 90
+SAFE_ZONE_HALF = 34
 # Bearing of the causeway out to the Docks. Due east so it runs straight off
 # the end of the east avenue — a bridge you have to go looking for is not a
 # bridge anyone walks.
@@ -1742,17 +1746,15 @@ def bench(x, z):
 
 def plaza_furniture():
     """The quest giver, the standings, and something to sit on."""
-    out = [npc("Coach", "Coach", 0, -34, ACCENT_STARTER)]
+    out = [npc("Coach", "Coach", 0, -17, ACCENT_STARTER)]
 
     # Two monuments, because LeaderboardService defines two boards. A third
     # board would be a third entry here and nothing else.
-    out.append(leaderboard_monument("StrongestBoard", "Power", -34, 30, [1.0, 0.77, 0.24]))
-    out.append(leaderboard_monument("KnockoutsBoard", "Kills", 34, 30, [1.0, 0.36, 0.36]))
+    out.append(leaderboard_monument("StrongestBoard", "Power", -23, 18, [1.0, 0.77, 0.24]))
+    out.append(leaderboard_monument("KnockoutsBoard", "Kills", 23, 18, [1.0, 0.36, 0.36]))
 
-    for index in range(4):
-        angle = 90 * index + 45
-        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS - 16))
-        out.extend(bench(spot[0][0], spot[0][2]))
+    out.extend(bench(-20, -2))
+    out.extend(bench(20, -2))
     return out
 
 
@@ -1933,14 +1935,70 @@ CITY_CELL_Z = 230
 CITY_BLOCK = 184
 CITY_HALF_X = CITY_COLUMNS * CITY_CELL_X / 2 + 70
 CITY_HALF_Z = CITY_ROWS * CITY_CELL_Z / 2 + 70
-HIDEOUT_STYLES = ["warehouse", "alley", "yard", "underpass", "bunker"]
+HIDEOUT_STYLES = ["warehouse", "alley", "yard", "underpass", "bunker", "tower"]
+THIRD_FLOOR_Y = 24
+MAP_FEATURE_TAG = "MapFeature"
+CITY_THEME_ZONES = [row["zone"] for row in DISTRICTS if row["zone"] != "Garage"]
+
+
+def map_feature(node, kind, shape="Rect"):
+    """Marks real geometry as a simplified feature on the in-game plan map."""
+    return tagged(node, tags=[MAP_FEATURE_TAG], attributes={
+        "MapKind": kind,
+        "MapShape": shape,
+    })
+
+
+def map_footprint(name, width, depth, frame, color, kind, shape="Rect"):
+    """Invisible top-down footprint for geometry whose visible parts are complex."""
+    return map_feature(
+        part(name, [width, 0.2, depth], frame, color, "SmoothPlastic",
+             CanCollide=False, CanTouch=False, CanQuery=False,
+             Transparency=1, CastShadow=False),
+        kind,
+        shape,
+    )
+
+
+def city_neighborhood(block_x, block_z):
+    """One of ten flat visual neighborhoods, independent of training tier.
+
+    Five west-to-east bands on each side of the city reuse the ten old island
+    themes. Training tiers are shuffled through them, so scenery creates useful
+    landmarks without revealing the multiplier hidden in a building.
+    """
+    column = round(block_x / CITY_CELL_X + (CITY_COLUMNS - 1) / 2)
+    band = min(4, int(column * 5 / CITY_COLUMNS))
+    side = 0 if block_z < 0 else 1
+    return CITY_THEME_ZONES[side * 5 + band]
 
 
 def connected_locations():
-    """All 55 stat/tier pairs assigned to stable, interleaved city blocks."""
+    """All 55 stat/tier pairs: five starters together, fifty shuffled outside."""
+    starters = []
+    starter_radius = 66
+    for index, equipment_id in enumerate(MACHINE_ORDER):
+        angle = 360.0 * index / len(MACHINE_ORDER) + 18
+        origin = mul(mul(rot_y(angle), cf(0, 0, starter_radius)), rot_y(180))
+        starters.append({
+            "id": f"Garage-{equipment_id}",
+            "zone": "Garage",
+            "equipment": equipment_id,
+            "block_x": 0.0,
+            "block_z": 0.0,
+            "ground_origin": origin,
+            "origin": origin,
+            "style": "starter",
+            "seed": f"Garage:{equipment_id}:starter",
+            "starter": True,
+            "landmark": False,
+            "neighborhood": "Garage",
+        })
+
     combinations = [
         (row["zone"], equipment_id)
         for row in DISTRICTS
+        if row["zone"] != "Garage"
         for equipment_id in MACHINE_ORDER
     ]
     slots = [
@@ -1948,39 +2006,47 @@ def connected_locations():
          (row - (CITY_ROWS - 1) / 2) * CITY_CELL_Z)
         for row in range(CITY_ROWS)
         for column in range(CITY_COLUMNS)
+        if column != (CITY_COLUMNS - 1) / 2 or row != (CITY_ROWS - 1) / 2
     ]
 
-    # Tier/stat assignment is random-looking but committed and reproducible.
-    # Keeping the centre block for a Garage location guarantees at least one
-    # beginner destination beside spawn; every other combination is shuffled.
-    rng = random.Random("connected-training-city-v1")
-    centre = slots.index((0.0, 0.0))
-    starter = combinations.index(("Garage", "Dumbbells"))
-    combinations[0], combinations[starter] = combinations[starter], combinations[0]
-    slots[0], slots[centre] = slots[centre], slots[0]
-    tail = combinations[1:]
-    rng.shuffle(tail)
-    combinations[1:] = tail
+    # Four of the 54 outer blocks remain scenery. Everything else is random-looking
+    # but committed and reproducible, with tiers deliberately interleaved.
+    rng = random.Random("connected-training-city-v2")
+    rng.shuffle(combinations)
+    rng.shuffle(slots)
+    slots = slots[:len(combinations)]
 
-    out = []
+    out = list(starters)
+    landmark_neighborhoods = set()
     for index, ((zone_id, equipment_id), (block_x, block_z)) in enumerate(zip(combinations, slots)):
         local_rng = random.Random(f"{zone_id}:{equipment_id}:city")
-        if block_x == 0 and block_z == 0:
-            offset_x, offset_z = 76, 0
-            yaw = 90
-        else:
-            offset_x = local_rng.uniform(-12, 12)
-            offset_z = local_rng.uniform(-24, 24)
-            yaw = local_rng.choice((0, 90, 180, 270))
+        offset_x = local_rng.uniform(-12, 12)
+        offset_z = local_rng.uniform(-24, 24)
+        yaw = local_rng.choice((0, 90, 180, 270))
+        style = HIDEOUT_STYLES[index % len(HIDEOUT_STYLES)]
+        neighborhood = city_neighborhood(block_x, block_z)
+        landmark = neighborhood not in landmark_neighborhoods
+        if landmark and style == "tower":
+            style = "warehouse"
+        ground_origin = mul(cf(block_x + offset_x, 0, block_z + offset_z), rot_y(yaw))
+        origin = mul(ground_origin, cf(0, THIRD_FLOOR_Y if style == "tower" else 0, 0))
+        landmark_neighborhoods.add(neighborhood)
         out.append({
             "id": f"{zone_id}-{equipment_id}",
             "zone": zone_id,
             "equipment": equipment_id,
             "block_x": block_x,
             "block_z": block_z,
-            "origin": mul(cf(block_x + offset_x, 0, block_z + offset_z), rot_y(yaw)),
-            "style": HIDEOUT_STYLES[index % len(HIDEOUT_STYLES)],
+            "ground_origin": ground_origin,
+            "origin": origin,
+            "style": style,
             "seed": f"{zone_id}:{equipment_id}:block",
+            "starter": False,
+            "landmark": landmark,
+            "neighborhood": neighborhood,
+            "offset_x": offset_x,
+            "offset_z": offset_z,
+            "yaw": yaw,
         })
     return out
 
@@ -2033,11 +2099,82 @@ def hideout_shell(style, equipment_id, accent):
     return out
 
 
+def enterable_training_tower(travel_id, equipment_id, accent):
+    """An atomic, enterable three-storey building with a floor-three gym."""
+    wall = [0.18, 0.19, 0.22]
+    glass = [0.12, 0.23, 0.30]
+    stat = STAT_COLORS[equipment_id]
+    out = [
+        # All surfaces line up with the builders' local FLOOR_TOP=1 contract.
+        # Upper slabs stop at x=16, leaving a 14-stud stairwell at the right wall.
+        part("Floor1", [60, 1, 66], cf(0, FLOOR_TOP - 0.5, 0),
+             [0.34, 0.34, 0.35], "Concrete"),
+        part("Floor2", [46, 1, 62], cf(-7, FLOOR_TOP + 11.5, 0),
+             [0.30, 0.30, 0.32], "Concrete"),
+        part("Floor3", [46, 1, 62], cf(-7, FLOOR_TOP + 23.5, 0),
+             [0.30, 0.30, 0.32], "Concrete"),
+        # The first flight rises from the front door toward -Z. The second turns
+        # back and rises toward +Z. Both overlap their landings, eliminating the
+        # small edge gaps that make Roblox pathfinding reject a staircase.
+        part("LandingFloor2", [14, 1, 22], cf(23, FLOOR_TOP + 11.5, -13),
+             [0.30, 0.30, 0.32], "Concrete"),
+        part("LandingFloor3", [14, 1, 18], cf(23, FLOOR_TOP + 23.5, 7),
+             [0.30, 0.30, 0.32], "Concrete"),
+        part("Stair_L1", [10, 1.2, 30],
+             mul(cf(23, FLOOR_TOP + 5.5, 8), rot_x(23.6)),
+             [0.26, 0.27, 0.30], "DiamondPlate"),
+        part("Stair_L2", [10, 1.2, 30],
+             mul(cf(23, FLOOR_TOP + 17.5, -7), rot_x(-23.6)),
+             [0.26, 0.27, 0.30], "DiamondPlate"),
+        # Back and side walls, plus a real ground-floor doorway. Upper storeys
+        # are closed facades so the hidden machine is not exposed like a dollhouse.
+        part("TowerBack", [60, 44, 1.2], cf(0, 22, -33), wall, "Brick"),
+        part("TowerLeft", [1.2, 44, 66], cf(-30, 22, 0), wall, "Brick"),
+        part("TowerRight", [1.2, 44, 66], cf(30, 22, 0), wall, "Brick"),
+        part("TowerRoof", [62, 1.2, 68], cf(0, 44.6, 0), wall, "Metal"),
+        part("FrontGroundLeft", [23, 12, 1.2], cf(-18.5, 7, 33), wall, "Brick"),
+        part("FrontGroundRight", [23, 12, 1.2], cf(18.5, 7, 33), wall, "Brick"),
+        part("EntranceHeader", [14, 2, 1.5], cf(0, 12, 33), stat, "Neon"),
+        part("FrontFloor2", [60, 10.8, 1.2], cf(0, 19, 33), wall, "Brick"),
+        part("FrontFloor3", [60, 18.8, 1.2], cf(0, 34.6, 33), wall, "Brick"),
+        part("TierStrip", [58, 0.8, 1.5], cf(0, 42, 32.2), accent, "Neon"),
+        marker("Entrance", [12, 9, 2], cf(0, 5.5, 31.5)),
+        part("TrainingRoomFloor", [30, 0.12, 30],
+             cf(0, THIRD_FLOOR_Y + FLOOR_TOP + 0.06, 0), stat, "Neon",
+             CanCollide=False, Transparency=0.82, CastShadow=False),
+    ]
+
+    # Window bands make each storey readable from the street while keeping the
+    # machine itself out of sight until the player climbs inside.
+    for y in (7, 19, 31):
+        out.append(part("Window", [18, 6, 0.3], cf(-18, FLOOR_TOP + y, 33.7),
+                        glass, "Glass", Transparency=0.28, CanCollide=False))
+        out.append(part("Window", [18, 6, 0.3], cf(18, FLOOR_TOP + y, 33.7),
+                        glass, "Glass", Transparency=0.28, CanCollide=False))
+
+    return {
+        "name": f"Enterable_{travel_id}",
+        "className": "Model",
+        "attributes": {
+            "Enterable": True,
+            "FloorCount": 3,
+            "TrainingFloor": 3,
+            "TravelId": travel_id,
+            "AccessKind": "ThirdFloor",
+        },
+        "properties": {"ModelStreamingMode": "Atomic"},
+        "children": out,
+    }
+
+
 def connected_ground():
     """One landmass and its complete road grid, all at the same playable Y."""
     out = [
-        part("CityGround", [CITY_HALF_X * 2, 5, CITY_HALF_Z * 2],
-             cf(0, FLOOR_TOP - 2.5, 0), [0.20, 0.22, 0.20], "Ground"),
+        map_feature(
+            part("CityGround", [CITY_HALF_X * 2, 5, CITY_HALF_Z * 2],
+                 cf(0, FLOOR_TOP - 2.5, 0), [0.20, 0.22, 0.20], "Ground"),
+            "Land",
+        ),
         part("CityFoundation", [CITY_HALF_X * 2 + 12, 4, CITY_HALF_Z * 2 + 12],
              cf(0, FLOOR_TOP - 7, 0), [0.12, 0.13, 0.14], "Rock"),
     ]
@@ -2047,11 +2184,15 @@ def connected_ground():
     road_length_z = CITY_HALF_Z * 2 - 18
     for column in range(CITY_COLUMNS + 1):
         x = (column - CITY_COLUMNS / 2) * CITY_CELL_X
-        out.extend(street(road_length_z, road_width, cf(x, FLOOR_TOP - 0.2, 0), False))
+        pieces = street(road_length_z, road_width, cf(x, FLOOR_TOP - 0.2, 0), False)
+        map_feature(pieces[0], "Road")
+        out.extend(pieces)
     for row_index in range(CITY_ROWS + 1):
         z = (row_index - CITY_ROWS / 2) * CITY_CELL_Z
-        out.extend(street(road_length_x, road_width,
-                          mul(cf(0, FLOOR_TOP - 0.2, z), rot_y(90)), False))
+        pieces = street(road_length_x, road_width,
+                        mul(cf(0, FLOOR_TOP - 0.2, z), rot_y(90)), False)
+        map_feature(pieces[0], "Road")
+        out.extend(pieces)
 
     # A low continuous boundary makes the ground read as one coastal city plate,
     # not a baseplate fading into the void.
@@ -2068,20 +2209,42 @@ def connected_ground():
 
 def connected_plaza():
     out = [
-        disc("Plaza", 1.2, PLAZA_RADIUS * 2, FLOOR_TOP + 0.2,
+        # Top surface is exactly FLOOR_TOP, matching every machine builder.
+        disc("Plaza", 1.2, PLAZA_RADIUS * 2, FLOOR_TOP - 0.6,
              [0.42, 0.41, 0.40], "Pavement"),
-        disc("PlazaInlay", 0.4, PLAZA_RADIUS * 1.1, FLOOR_TOP + 0.9,
+        disc("PlazaInlay", 0.08, PLAZA_RADIUS * 1.1, FLOOR_TOP + 0.04,
              [0.55, 0.50, 0.38], "Marble", CanCollide=False),
         tagged(
             part("SpawnSafeZone", [SAFE_ZONE_HALF * 2, 44, SAFE_ZONE_HALF * 2],
                  cf(0, FLOOR_TOP + 22, 0), [0.4, 0.8, 1.0], "ForceField",
-                 CanCollide=False, Transparency=0.94, CastShadow=False),
+                 CanCollide=False, Transparency=1, CastShadow=False),
             tags=["SafeZone"],
         ),
+        map_footprint("PlazaMap", PLAZA_RADIUS * 2, PLAZA_RADIUS * 2,
+                      cf(0, FLOOR_TOP + 0.1, 0), [0.48, 0.47, 0.45],
+                      "Plaza", "Circle"),
+        map_footprint("SafeZoneMap", SAFE_ZONE_HALF * 2, SAFE_ZONE_HALF * 2,
+                      cf(0, FLOOR_TOP + 0.15, 0), [0.30, 0.86, 1.0],
+                      "SafeZone"),
     ]
+
+    # The safe volume remains invisible and authoritative; these four luminous
+    # ForceField walls make its exact boundary obvious without blocking movement.
+    barrier_color = [0.30, 0.86, 1.0]
+    for x, z, sx, sz in (
+        (0, -SAFE_ZONE_HALF, SAFE_ZONE_HALF * 2, 1.2),
+        (0, SAFE_ZONE_HALF, SAFE_ZONE_HALF * 2, 1.2),
+        (-SAFE_ZONE_HALF, 0, 1.2, SAFE_ZONE_HALF * 2),
+        (SAFE_ZONE_HALF, 0, 1.2, SAFE_ZONE_HALF * 2),
+    ):
+        out.append(part("SafeBarrier", [sx, 20, sz], cf(x, FLOOR_TOP + 10, z),
+                        barrier_color, "ForceField", CanCollide=False,
+                        Transparency=0.58, CastShadow=False))
+        out.append(part("SafeBoundary", [sx, 0.5, sz], cf(x, FLOOR_TOP + 0.35, z),
+                        barrier_color, "Neon", CanCollide=False, CastShadow=False))
     for index in range(12):
         angle = 360.0 * index / 12
-        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS + 3))
+        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS - 6))
         out.append(part("PlazaLamp", [1.4, 16, 1.4],
                         cf(spot[0][0], FLOOR_TOP + 8, spot[0][2]),
                         [0.16, 0.16, 0.18], "Metal"))
@@ -2092,32 +2255,135 @@ def connected_plaza():
     return out
 
 
-def connected_block(location, zone_row):
+def starter_training_area(location, zone_row):
+    """One of all five x1 machines openly ringing the spawn safe zone."""
+    origin = location["origin"]
+    out = [
+        place(origin, piece)
+        for piece in training_venue(location["equipment"], zone_row["accent"])
+    ]
+    out.append(place(origin, volume(
+        location["zone"], f"{location['id']}Volume", [54, 40, 54], cf(0, 19, 0)
+    )))
+    out.append(place(origin, map_footprint(
+        "StarterVenueMap", 30, 30, cf(0, FLOOR_TOP + 0.1, 0),
+        STAT_COLORS[location["equipment"]], "Building"
+    )))
+    return out
+
+
+def adapted_city_landmark(location, visual_row):
+    """Reuses an old island theme without placing scenery through the gym.
+
+    The island prop functions already produce the authored cranes, palms, quarry
+    rigs, pylons, monoliths and observatory hardware. Their old centre/rim rules
+    do not know about a shuffled city doorway, so this pass removes any whole prop
+    whose footprint enters a generous keep-out circle around the hideout.
+    """
+    theme = visual_row.get("props")
+    if theme is None or not location["landmark"]:
+        return []
+    row = dict(visual_row)
+    row["half"] = 82
+    row["layout"] = "ring"
+    rng = random.Random(f"{location['neighborhood']}:city-landmark")
+    origin = cf(location["block_x"], 0, location["block_z"])
+    kept = []
+    for piece in PROPS[theme](row, rng):
+        properties = piece.get("properties", {})
+        frame = properties.get("CFrame")
+        size = properties.get("Size", [0, 0, 0])
+        if frame is not None:
+            dx = frame[0] - location["offset_x"]
+            dz = frame[2] - location["offset_z"]
+            footprint = max(size[0], size[2]) / 2
+            if math.hypot(dx, dz) < 45 + footprint:
+                continue
+        kept.append(place(origin, piece))
+    return kept
+
+
+def scenic_block(x, z, index):
+    """The four blocks not occupied by training become parks or parking lots."""
+    rng = random.Random(f"scenic:{x}:{z}")
+    color = [0.24, 0.31, 0.24] if index % 2 == 0 else [0.26, 0.27, 0.29]
+    material = "Grass" if index % 2 == 0 else "Asphalt"
+    out = [
+        map_feature(
+            part("ScenicBlock", [CITY_BLOCK, 1, CITY_BLOCK], cf(x, FLOOR_TOP - 0.5, z),
+                 color, material),
+            "Park" if index % 2 == 0 else "Block",
+        ),
+    ]
+    if index % 2 == 0:
+        for px, pz in ((-54, -48), (54, -48), (-54, 48), (54, 48), (0, 0)):
+            out.extend(palm(x + px, z + pz, rng))
+    else:
+        for offset in range(-68, 69, 34):
+            out.append(part("ParkingLine", [1, 0.1, 24],
+                            cf(x + offset, FLOOR_TOP + 1.05, z),
+                            [0.82, 0.76, 0.46], "SmoothPlastic", CanCollide=False))
+    return out
+
+
+def connected_block(location, zone_row, visual_row):
     """Sidewalk, neighbouring buildings, hideout shell and its private zone."""
     rng = random.Random(location["seed"])
     x, z = location["block_x"], location["block_z"]
     out = [
-        part("Sidewalk", [CITY_BLOCK, 1, CITY_BLOCK], cf(x, FLOOR_TOP + 0.5, z),
-             SIDEWALK, "Concrete"),
-        part("Kerb", [CITY_BLOCK + 4, 0.6, CITY_BLOCK + 4], cf(x, FLOOR_TOP + 0.3, z),
-             KERB, "Concrete"),
+        map_feature(
+            part("Sidewalk", [CITY_BLOCK, 1, CITY_BLOCK], cf(x, FLOOR_TOP - 0.5, z),
+                 visual_row["ground"], visual_row["ground_material"]),
+            "Block",
+        ),
     ]
+    # A kerb is a perimeter, not another full slab over the whole block. The old
+    # solid 188x188 part lifted every street gym 0.6 studs above the floor its
+    # machine was authored for and buried the low mats and bases inside it.
+    kerb_at = CITY_BLOCK / 2 + 1
+    for kx, kz, sx, sz in (
+        (x - kerb_at, z, 2, CITY_BLOCK + 4),
+        (x + kerb_at, z, 2, CITY_BLOCK + 4),
+        (x, z - kerb_at, CITY_BLOCK + 4, 2),
+        (x, z + kerb_at, CITY_BLOCK + 4, 2),
+    ):
+        out.append(part("Kerb", [sx, 0.3, sz], cf(kx, FLOOR_TOP + 0.15, kz),
+                        KERB, "Concrete"))
 
     # Two unrelated street buildings make the training door part of a city block
-    # instead of a freestanding labelled gym. The spawn block stays open so the
-    # plaza remains readable and its offset beginner hideout is visible on arrival.
-    if x != 0 or z != 0:
+    # instead of a freestanding labelled gym. Landmark and tower blocks provide
+    # their own skyline and stay clear of this generic pair.
+    if not location["landmark"] and location["style"] != "tower":
         skin_a, skin_b = rng.choice(BUILDING_SKINS), rng.choice(BUILDING_SKINS)
         out.extend(building(x - 64, z, 38, 144, rng.uniform(30, 82), skin_a, rng))
         out.extend(building(x + 64, z, 38, 144, rng.uniform(26, 74), skin_b, rng))
+        out.append(map_footprint("BuildingMap", 38, 144,
+                                 cf(x - 64, FLOOR_TOP + 0.2, z), skin_a["wall"], "Building"))
+        out.append(map_footprint("BuildingMap", 38, 144,
+                                 cf(x + 64, FLOOR_TOP + 0.2, z), skin_b["wall"], "Building"))
 
     origin = location["origin"]
-    out.extend(place(origin, piece) for piece in hideout_shell(
-        location["style"], location["equipment"], zone_row["accent"]
-    ))
+    ground_origin = location["ground_origin"]
+    if location["style"] == "tower":
+        out.append(place(ground_origin, enterable_training_tower(
+            location["id"], location["equipment"], visual_row["accent"]
+        )))
+        out.append(place(ground_origin, map_footprint(
+            "TowerMap", 60, 66, cf(0, FLOOR_TOP + 0.2, 0),
+            [0.18, 0.19, 0.22], "Building"
+        )))
+    else:
+        out.extend(place(origin, piece) for piece in hideout_shell(
+            location["style"], location["equipment"], visual_row["accent"]
+        ))
+        out.append(place(origin, map_footprint(
+            "HideoutMap", 58, 64, cf(0, FLOOR_TOP + 0.2, 0),
+            [0.20, 0.21, 0.23], "Building"
+        )))
     out.extend(place(origin, piece) for piece in training_venue(
-        location["equipment"], zone_row["accent"]
+        location["equipment"], visual_row["accent"]
     ))
+    out.extend(adapted_city_landmark(location, visual_row))
     out.append(place(origin, volume(
         location["zone"], f"{location['id']}Volume", [76, 46, 82], cf(0, 22, 0)
     )))
@@ -2130,15 +2396,33 @@ def build_connected_world():
     structure = connected_ground()
     structure.extend(connected_plaza())
     machines = []
+    used_blocks = {(0.0, 0.0)}
 
     for location in locations:
         row = zone_rows[location["zone"]]
-        structure.append(folder(location["id"], connected_block(location, row)))
+        visual_row = zone_rows[location["neighborhood"]]
+        if location["starter"]:
+            pieces = starter_training_area(location, row)
+        else:
+            pieces = connected_block(location, row, visual_row)
+            used_blocks.add((location["block_x"], location["block_z"]))
+        structure.append(folder(location["id"], pieces))
         machines.append(machine(
             location["id"], location["equipment"], location["origin"],
             BUILDERS[location["equipment"]](row["pad"], row["accent"]),
             travel_id=location["id"],
+            access_kind="ThirdFloor" if location["style"] == "tower" else "Street",
+            floor_index=3 if location["style"] == "tower" else 1,
         ))
+
+    all_blocks = [
+        ((column - (CITY_COLUMNS - 1) / 2) * CITY_CELL_X,
+         (row - (CITY_ROWS - 1) / 2) * CITY_CELL_Z)
+        for row in range(CITY_ROWS)
+        for column in range(CITY_COLUMNS)
+    ]
+    for index, (x, z) in enumerate(spot for spot in all_blocks if spot not in used_blocks):
+        structure.append(folder(f"ScenicBlock{index + 1}", scenic_block(x, z, index)))
 
     return (
         {"className": "Folder", "children": [folder("ConnectedCity", structure)]},

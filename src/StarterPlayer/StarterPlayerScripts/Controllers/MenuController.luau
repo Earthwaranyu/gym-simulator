@@ -56,13 +56,36 @@ type Destination = {
 	RequiredPower: number,
 	GainMultiplier: number,
 	Position: Vector3,
+	AccessKind: string,
+	FloorIndex: number,
+}
+
+type MapFeature = {
+	Kind: string,
+	Shape: string,
+	X: number,
+	Z: number,
+	Width: number,
+	Depth: number,
+	Rotation: number,
+	Color: Color3,
 }
 
 -- All 55 training locations come from the server because StreamingEnabled means
 -- most physical stations do not exist in the spawn client's Workspace yet.
 local destinations: { Destination } = {}
 local destinationsById: { [string]: Destination } = {}
+local mapFeatures: { MapFeature } = {}
+local mapLoaded = false
 local selectedDestination: string? = nil
+local mapZoom = 1
+local mapCenter = Vector2.new(0.5, 0.5)
+
+local MAP_HEIGHT = 300
+local MAP_ASPECT = 2.05
+local MAP_MIN_ZOOM = 1
+local MAP_MAX_ZOOM = 4
+local MAP_ZOOM_STEP = 1.25
 
 type Tab = {
 	Id: string,
@@ -183,16 +206,20 @@ end
 
 -- Pull every map-enabled training station from the server once.
 function MenuController:_fetchDestinations()
-	if #destinations > 0 then
+	if mapLoaded then
 		return
 	end
 
-	local ok, list = pcall(function()
+	local ok, list, features = pcall(function()
 		return Net.Function("GetDestinations"):InvokeServer()
 	end)
 	if not ok or type(list) ~= "table" then
 		return
 	end
+
+	table.clear(destinations)
+	table.clear(destinationsById)
+	table.clear(mapFeatures)
 
 	for _, entry in list do
 		if
@@ -217,10 +244,42 @@ function MenuController:_fetchDestinations()
 			RequiredPower = entry.RequiredPower,
 			GainMultiplier = entry.GainMultiplier,
 			Position = Vector3.new(entry.X, entry.Y, entry.Z),
+			AccessKind = if type(entry.AccessKind) == "string" then entry.AccessKind else "Street",
+			FloorIndex = if type(entry.FloorIndex) == "number" then entry.FloorIndex else 1,
 		}
 		table.insert(destinations, destination)
 		destinationsById[destination.Id] = destination
 	end
+
+	if type(features) == "table" then
+		for _, entry in features do
+			if
+				type(entry) ~= "table"
+				or type(entry.Kind) ~= "string"
+				or type(entry.Shape) ~= "string"
+				or type(entry.X) ~= "number"
+				or type(entry.Z) ~= "number"
+				or type(entry.Width) ~= "number"
+				or type(entry.Depth) ~= "number"
+				or type(entry.Rotation) ~= "number"
+				or typeof(entry.Color) ~= "Color3"
+			then
+				continue
+			end
+			table.insert(mapFeatures, {
+				Kind = entry.Kind,
+				Shape = entry.Shape,
+				X = entry.X,
+				Z = entry.Z,
+				Width = entry.Width,
+				Depth = entry.Depth,
+				Rotation = entry.Rotation,
+				Color = entry.Color,
+			})
+		end
+	end
+
+	mapLoaded = #destinations > 0
 end
 
 -- Every training location appears immediately. Pin colour is the stat; locked
@@ -242,10 +301,12 @@ function MenuController:_renderMap(parent: Frame)
 	local board = Instance.new("Frame")
 	board.Name = "Board"
 	board.BackgroundColor3 = UI.Palette.Backdrop
-	board.BackgroundTransparency = 0.2
+	board.BackgroundTransparency = 0
 	board.BorderSizePixel = 0
-	board.Size = UDim2.new(1, 0, 0, 258)
+	board.Size = UDim2.new(1, 0, 0, MAP_HEIGHT)
 	board.LayoutOrder = 1
+	board:SetAttribute("DestinationCount", #destinations)
+	board:SetAttribute("FeatureCount", #mapFeatures)
 	board.Parent = parent
 
 	local boardCorner = Instance.new("UICorner")
@@ -266,29 +327,150 @@ function MenuController:_renderMap(parent: Frame)
 		return
 	end
 
-	local minX, maxX, minZ, maxZ = 0, 0, 0, 0
-	for _, destination in destinations do
-		local at = destination.Position
-		minX, maxX = math.min(minX, at.X), math.max(maxX, at.X)
-		minZ, maxZ = math.min(minZ, at.Z), math.max(maxZ, at.Z)
+	-- Bounds come from the real generated land footprint, not from the outermost
+	-- pins. That keeps roads, blocks and buildings in their true proportions.
+	local minX, maxX = math.huge, -math.huge
+	local minZ, maxZ = math.huge, -math.huge
+	local function includeFeature(feature: MapFeature)
+		local angle = math.rad(feature.Rotation)
+		local halfX = math.abs(math.cos(angle)) * feature.Width / 2
+			+ math.abs(math.sin(angle)) * feature.Depth / 2
+		local halfZ = math.abs(math.sin(angle)) * feature.Width / 2
+			+ math.abs(math.cos(angle)) * feature.Depth / 2
+		minX, maxX = math.min(minX, feature.X - halfX), math.max(maxX, feature.X + halfX)
+		minZ, maxZ = math.min(minZ, feature.Z - halfZ), math.max(maxZ, feature.Z + halfZ)
 	end
-	local padX = math.max((maxX - minX) * 0.08, 1)
-	local padZ = math.max((maxZ - minZ) * 0.08, 1)
-	minX, maxX, minZ, maxZ = minX - padX, maxX + padX, minZ - padZ, maxZ + padZ
+
+	local foundLand = false
+	for _, feature in mapFeatures do
+		if feature.Kind == "Land" then
+			includeFeature(feature)
+			foundLand = true
+		end
+	end
+	if not foundLand then
+		for _, feature in mapFeatures do
+			includeFeature(feature)
+		end
+	end
+	if minX == math.huge then
+		for _, destination in destinations do
+			local at = destination.Position
+			minX, maxX = math.min(minX, at.X), math.max(maxX, at.X)
+			minZ, maxZ = math.min(minZ, at.Z), math.max(maxZ, at.Z)
+		end
+	end
+
+	local worldWidth = math.max(maxX - minX, 1)
+	local worldDepth = math.max(maxZ - minZ, 1)
+	local pad = math.max(worldWidth, worldDepth) * 0.025
+	minX, maxX = minX - pad, maxX + pad
+	minZ, maxZ = minZ - pad, maxZ + pad
+	worldWidth, worldDepth = maxX - minX, maxZ - minZ
+	if worldWidth / worldDepth > MAP_ASPECT then
+		local targetDepth = worldWidth / MAP_ASPECT
+		local extra = (targetDepth - worldDepth) / 2
+		minZ, maxZ = minZ - extra, maxZ + extra
+	else
+		local targetWidth = worldDepth * MAP_ASPECT
+		local extra = (targetWidth - worldWidth) / 2
+		minX, maxX = minX - extra, maxX + extra
+	end
+	worldWidth, worldDepth = maxX - minX, maxZ - minZ
 
 	local function project(x: number, z: number): UDim2
 		-- World +Z is north, and screen Y grows downward, so Z is flipped.
-		return UDim2.fromScale((x - minX) / (maxX - minX), 1 - (z - minZ) / (maxZ - minZ))
+		return UDim2.fromScale((x - minX) / worldWidth, 1 - (z - minZ) / worldDepth)
 	end
 
-	local hub = UI.Label("Hub", board)
+	local viewport = Instance.new("ScrollingFrame")
+	viewport.Name = "MapViewport"
+	viewport.Active = true
+	viewport.BackgroundColor3 = Color3.fromRGB(20, 24, 25)
+	viewport.BorderSizePixel = 0
+	viewport.Size = UDim2.fromScale(1, 1)
+	viewport.CanvasSize = UDim2.fromScale(mapZoom, mapZoom)
+	viewport.AutomaticCanvasSize = Enum.AutomaticSize.None
+	viewport.ScrollingDirection = Enum.ScrollingDirection.XY
+	viewport.ElasticBehavior = Enum.ElasticBehavior.Never
+	viewport.ScrollBarThickness = 4
+	viewport.ScrollBarImageColor3 = UI.Palette.TextMuted
+	viewport.ScrollBarImageTransparency = 0.35
+	viewport.ClipsDescendants = true
+	viewport.Parent = board
+
+	local canvas = Instance.new("Frame")
+	canvas.Name = "MapCanvas"
+	canvas.BackgroundTransparency = 1
+	canvas.BorderSizePixel = 0
+	canvas.Size = UDim2.fromScale(1, 1)
+	canvas:SetAttribute("Zoom", mapZoom)
+	canvas:SetAttribute("CenterX", mapCenter.X)
+	canvas:SetAttribute("CenterY", mapCenter.Y)
+	canvas.Parent = viewport
+
+	local featureLayer = Instance.new("Frame")
+	featureLayer.Name = "MapFeatures"
+	featureLayer.BackgroundTransparency = 1
+	featureLayer.Size = UDim2.fromScale(1, 1)
+	featureLayer.ZIndex = 1
+	featureLayer.Parent = canvas
+
+	local pinLayer = Instance.new("Frame")
+	pinLayer.Name = "MapPins"
+	pinLayer.BackgroundTransparency = 1
+	pinLayer.Size = UDim2.fromScale(1, 1)
+	pinLayer.ZIndex = 20
+	pinLayer.Parent = canvas
+
+	local featureLayers: { [string]: number } = {
+		Land = 1,
+		Block = 2,
+		Park = 3,
+		Road = 4,
+		Building = 5,
+		Plaza = 6,
+		SafeZone = 7,
+	}
+	for index, feature in mapFeatures do
+		local shape = Instance.new("Frame")
+		shape.Name = `Feature_{index}_{feature.Kind}`
+		shape.AnchorPoint = Vector2.new(0.5, 0.5)
+		shape.Position = project(feature.X, feature.Z)
+		shape.Size = UDim2.fromScale(feature.Width / worldWidth, feature.Depth / worldDepth)
+		shape.Rotation = feature.Rotation
+		shape.BackgroundColor3 = feature.Color
+		shape.BackgroundTransparency = if feature.Kind == "SafeZone" then 0.5 else 0
+		shape.BorderSizePixel = 0
+		shape.ZIndex = featureLayers[feature.Kind] or 3
+		shape.Parent = featureLayer
+
+		if feature.Shape == "Circle" then
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(1, 0)
+			corner.Parent = shape
+		elseif feature.Kind == "Building" or feature.Kind == "SafeZone" then
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 2)
+			corner.Parent = shape
+		end
+		if feature.Kind == "SafeZone" then
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = Color3.fromRGB(78, 220, 255)
+			stroke.Thickness = 2
+			stroke.Parent = shape
+		end
+	end
+
+	local hub = UI.Label("Hub", pinLayer)
 	hub.AnchorPoint = Vector2.new(0.5, 0.5)
 	hub.Position = project(0, 0)
-	hub.Size = UDim2.fromOffset(90, 16)
+	hub.Size = UDim2.fromOffset(74, 16)
 	hub.TextXAlignment = Enum.TextXAlignment.Center
 	hub.TextSize = 11
-	hub.TextColor3 = UI.Palette.TextMuted
+	hub.TextColor3 = Color3.fromRGB(126, 231, 255)
 	hub.Text = "SPAWN"
+	hub.ZIndex = 24
 
 	local unlockedCount = 0
 	for _, destination in destinations do
@@ -317,8 +499,8 @@ function MenuController:_renderMap(parent: Frame)
 		pin.TextSize = 9
 		pin.TextColor3 = UI.Palette.Backdrop
 		pin.Text = string.sub(stat.DisplayName, 1, 1)
-		pin.ZIndex = if isSelected then 3 else 2
-		pin.Parent = board
+		pin.ZIndex = if isSelected then 24 else 22
+		pin.Parent = pinLayer
 
 		local pinCorner = Instance.new("UICorner")
 		pinCorner.CornerRadius = UDim.new(1, 0)
@@ -330,6 +512,14 @@ function MenuController:_renderMap(parent: Frame)
 		pinStroke.Parent = pin
 
 		pin.Activated:Connect(function()
+			local canvasSize = viewport.AbsoluteCanvasSize
+			local windowSize = viewport.AbsoluteWindowSize
+			if canvasSize.X > 0 and canvasSize.Y > 0 then
+				mapCenter = Vector2.new(
+					math.clamp((viewport.CanvasPosition.X + windowSize.X / 2) / canvasSize.X, 0, 1),
+					math.clamp((viewport.CanvasPosition.Y + windowSize.Y / 2) / canvasSize.Y, 0, 1)
+				)
+			end
 			selectedDestination = destination.Id
 			self:_refresh()
 		end)
@@ -347,13 +537,205 @@ function MenuController:_renderMap(parent: Frame)
 		here.Size = UDim2.fromOffset(10, 10)
 		here.BackgroundColor3 = UI.Palette.Text
 		here.BorderSizePixel = 0
-		here.ZIndex = 4
-		here.Parent = board
+		here.ZIndex = 25
+		here.Parent = pinLayer
 
 		local hereCorner = Instance.new("UICorner")
 		hereCorner.CornerRadius = UDim.new(1, 0)
 		hereCorner.Parent = here
 	end
+
+	local settingCanvasPosition = false
+	local function rememberCenter()
+		if settingCanvasPosition then
+			return
+		end
+		local canvasSize = viewport.AbsoluteCanvasSize
+		local windowSize = viewport.AbsoluteWindowSize
+		if canvasSize.X <= 0 or canvasSize.Y <= 0 then
+			return
+		end
+		mapCenter = Vector2.new(
+			math.clamp((viewport.CanvasPosition.X + windowSize.X / 2) / canvasSize.X, 0, 1),
+			math.clamp((viewport.CanvasPosition.Y + windowSize.Y / 2) / canvasSize.Y, 0, 1)
+		)
+		canvas:SetAttribute("CenterX", mapCenter.X)
+		canvas:SetAttribute("CenterY", mapCenter.Y)
+	end
+
+	local function setCanvasPosition(position: Vector2)
+		local canvasSize = viewport.AbsoluteCanvasSize
+		local windowSize = viewport.AbsoluteWindowSize
+		local maxPosition =
+			Vector2.new(math.max(canvasSize.X - windowSize.X, 0), math.max(canvasSize.Y - windowSize.Y, 0))
+		settingCanvasPosition = true
+		viewport.CanvasPosition =
+			Vector2.new(math.clamp(position.X, 0, maxPosition.X), math.clamp(position.Y, 0, maxPosition.Y))
+		settingCanvasPosition = false
+		rememberCenter()
+	end
+
+	local function zoomAt(targetZoom: number, focus: Vector2?)
+		targetZoom = math.clamp(targetZoom, MAP_MIN_ZOOM, MAP_MAX_ZOOM)
+		if math.abs(targetZoom - mapZoom) < 0.001 then
+			return
+		end
+		local oldSize = viewport.AbsoluteCanvasSize
+		local windowSize = viewport.AbsoluteWindowSize
+		local localFocus = focus or windowSize / 2
+		local focusPoint = mapCenter
+		if oldSize.X > 0 and oldSize.Y > 0 then
+			focusPoint = Vector2.new(
+				(viewport.CanvasPosition.X + localFocus.X) / oldSize.X,
+				(viewport.CanvasPosition.Y + localFocus.Y) / oldSize.Y
+			)
+		end
+
+		mapZoom = targetZoom
+		viewport.CanvasSize = UDim2.fromScale(mapZoom, mapZoom)
+		canvas:SetAttribute("Zoom", mapZoom)
+		task.defer(function()
+			if viewport.Parent == nil then
+				return
+			end
+			local newSize = viewport.AbsoluteCanvasSize
+			setCanvasPosition(
+				Vector2.new(focusPoint.X * newSize.X - localFocus.X, focusPoint.Y * newSize.Y - localFocus.Y)
+			)
+		end)
+	end
+
+	viewport:GetPropertyChangedSignal("CanvasPosition"):Connect(rememberCenter)
+	viewport.InputChanged:Connect(function(input: InputObject)
+		if input.UserInputType ~= Enum.UserInputType.MouseWheel or input.Position.Z == 0 then
+			return
+		end
+		local mouse = UserInputService:GetMouseLocation()
+		local focus = Vector2.new(
+			math.clamp(mouse.X - viewport.AbsolutePosition.X, 0, viewport.AbsoluteWindowSize.X),
+			math.clamp(mouse.Y - viewport.AbsolutePosition.Y, 0, viewport.AbsoluteWindowSize.Y)
+		)
+		zoomAt(mapZoom * (if input.Position.Z > 0 then MAP_ZOOM_STEP else 1 / MAP_ZOOM_STEP), focus)
+	end)
+
+	-- Touch devices get native ScrollingFrame panning; desktop gets the same
+	-- grab-and-drag interaction instead of being limited to tiny scrollbars.
+	local dragging = false
+	local dragStart = Vector2.zero
+	local scrollStart = Vector2.zero
+	viewport.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+			return
+		end
+		dragging = true
+		dragStart = Vector2.new(input.Position.X, input.Position.Y)
+		scrollStart = viewport.CanvasPosition
+	end)
+	local moveConnection = UserInputService.InputChanged:Connect(function(input: InputObject)
+		if not dragging or input.UserInputType ~= Enum.UserInputType.MouseMovement then
+			return
+		end
+		local current = Vector2.new(input.Position.X, input.Position.Y)
+		setCanvasPosition(scrollStart - (current - dragStart))
+	end)
+	local endConnection = UserInputService.InputEnded:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+	viewport.Destroying:Connect(function()
+		moveConnection:Disconnect()
+		endConnection:Disconnect()
+	end)
+
+	local function mapControl(name: string, caption: string, right: number, onClick: () -> ())
+		local control = Instance.new("TextButton")
+		control.Name = name
+		control.AnchorPoint = Vector2.new(1, 0)
+		control.Position = UDim2.new(1, -right, 0, 10)
+		control.Size = UDim2.fromOffset(38, 38)
+		control.BackgroundColor3 = UI.Palette.Glass
+		control.BackgroundTransparency = 0.05
+		control.BorderSizePixel = 0
+		control.Font = UI.Font.Heading
+		control.TextSize = 21
+		control.TextColor3 = UI.Palette.Text
+		control.Text = caption
+		control.ZIndex = 50
+		control.Parent = board
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 6)
+		corner.Parent = control
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = UI.Palette.GlassStroke
+		stroke.Transparency = 0.55
+		stroke.Parent = control
+		control.Activated:Connect(onClick)
+	end
+
+	mapControl("ZoomIn", "+", 10, function()
+		zoomAt(mapZoom * MAP_ZOOM_STEP)
+	end)
+	mapControl("ZoomOut", "−", 54, function()
+		zoomAt(mapZoom / MAP_ZOOM_STEP)
+	end)
+	mapControl("Recenter", "⌂", 98, function()
+		mapZoom = 1
+		mapCenter = Vector2.new(0.5, 0.5)
+		viewport.CanvasSize = UDim2.fromScale(1, 1)
+		canvas:SetAttribute("Zoom", mapZoom)
+		task.defer(function()
+			if viewport.Parent ~= nil then
+				setCanvasPosition(Vector2.zero)
+			end
+		end)
+	end)
+
+	local legend = Instance.new("Frame")
+	legend.Name = "Legend"
+	legend.Position = UDim2.fromOffset(10, 10)
+	legend.Size = UDim2.fromOffset(326, 38)
+	legend.BackgroundColor3 = UI.Palette.Glass
+	legend.BackgroundTransparency = 0.05
+	legend.BorderSizePixel = 0
+	legend.ZIndex = 50
+	legend.Parent = board
+	local legendCorner = Instance.new("UICorner")
+	legendCorner.CornerRadius = UDim.new(0, 6)
+	legendCorner.Parent = legend
+	local legendPadding = Instance.new("UIPadding")
+	legendPadding.PaddingLeft = UDim.new(0, 8)
+	legendPadding.PaddingRight = UDim.new(0, 8)
+	legendPadding.Parent = legend
+	local legendLayout = Instance.new("UIListLayout")
+	legendLayout.FillDirection = Enum.FillDirection.Horizontal
+	legendLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	legendLayout.Padding = UDim.new(0, 5)
+	legendLayout.Parent = legend
+	for _, definition in StatConfig.List do
+		local key = UI.Label(definition.Id, legend)
+		key.Size = UDim2.fromOffset(57, 24)
+		key.Font = UI.Font.Heading
+		key.TextSize = 10
+		key.TextColor3 = definition.Color
+		key.Text = `● {definition.DisplayName}`
+		key.ZIndex = 51
+	end
+
+	-- Reapply the persisted view after a pin/profile refresh rebuilt the tab.
+	task.defer(function()
+		if viewport.Parent == nil then
+			return
+		end
+		local canvasSize = viewport.AbsoluteCanvasSize
+		local windowSize = viewport.AbsoluteWindowSize
+		setCanvasPosition(
+			Vector2.new(
+				mapCenter.X * canvasSize.X - windowSize.X / 2,
+				mapCenter.Y * canvasSize.Y - windowSize.Y / 2
+			)
+		)
+	end)
 
 	local count = UI.Label("Count", parent)
 	count.Size = UDim2.new(1, 0, 0, 20)
@@ -408,7 +790,10 @@ function MenuController:_renderDestination(parent: Frame, power: number)
 	tagline.LayoutOrder = 4
 	tagline.TextSize = 13
 	tagline.TextColor3 = UI.Palette.TextMuted
-	tagline.Text = `{zone.DisplayName} location  ·  {zone.Tagline}`
+	local access = if destination.FloorIndex > 1
+		then `floor {destination.FloorIndex} interior`
+		else "street level"
+	tagline.Text = `{zone.DisplayName} location  ·  {access}  ·  {zone.Tagline}`
 
 	local action = row(parent, 44, 5)
 	local detail = UI.Label("Detail", action)
