@@ -111,8 +111,13 @@ The rule under test: **a hit does not dismount; only death does.**
 - [ ] Higher Legs visibly raises both run and flight speed.
 - [ ] Fly between distant districts with StreamingEnabled on — machines must not pop in
       late. If they do, raise `StreamingMinRadius` in `default.project.json`.
-- [ ] Open the map. All **55** locations are present and selectable; zoom, pan, and
-      selection survive a refresh.
+- [ ] Open the map. It is a **light** board, not a dark one, and every district, road
+      and building is legible against it. All **55** locations are present and
+      selectable; zoom, pan, and selection survive a refresh.
+- [ ] Locked pins are washed out but still clearly pins — they must not vanish into the
+      paper.
+- [ ] Run and fly through scenery — containers, palms, bollards, kerbs. None of it
+      blocks you. Buildings, ground and platforms still do.
 - [ ] **Without the Fast Travel pass**, pick any destination. You are NOT moved: a
       beacon appears over it with a live distance, an arrow points to it whenever it is
       off-screen, and the menu closes. Walk/fly there and confirm it clears itself
@@ -149,6 +154,13 @@ The rule under test: **a hit does not dismount; only death does.**
       Arms → both arms only, Legs → both legs only, Core → LowerTorso only.
 - [ ] Train Chest and Back together — UpperTorso takes the larger of the two, and does
       not compound into a runaway size.
+- [ ] At full growth the body is a **taper, not a box**: chest clearly wider than waist,
+      arms visibly longer than they are thick. If any limb looks like a disc or the
+      torso like a crate, `PhysiqueConfig`'s weights regressed.
+- [ ] Veins fade in on arms and chest as scale passes ~1.35 and are absent on a fresh
+      character — check a beginner has no `Veins` folder at all.
+- [ ] Check the joints at full scale: limbs stay in their sockets, character stands on
+      the floor rather than sinking.
 
 ## 4c. Machine visibility
 

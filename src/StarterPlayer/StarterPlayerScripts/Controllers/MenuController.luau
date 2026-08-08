@@ -101,6 +101,19 @@ local hasFastTravel = false
 local mapZoom = 1
 local mapCenter = Vector2.new(0.5, 0.5)
 
+-- The map is the one panel that is NOT dark.
+--
+-- The rest of the UI is a dark HUD over a bright world, which is right for something
+-- you read at a glance. A map is the opposite job: you study it, and every feature on
+-- it is a shade of the city's own concrete and asphalt — dark grey shapes on a dark
+-- grey board, which is unreadable no matter how carefully the greys are chosen.
+-- Lifting the whole thing to paper gives every feature somewhere to contrast against.
+local MAP_PAPER = Color3.fromRGB(232, 234, 238)
+local MAP_INK = Color3.fromRGB(38, 42, 52)
+-- How far each feature's real colour is pulled toward white. High, because the source
+-- colours are city-dark; the tint that survives is enough to tell water from park.
+local MAP_WASH = 0.62
+
 local MAP_HEIGHT = 300
 local MAP_ASPECT = 2.05
 local MAP_MIN_ZOOM = 1
@@ -122,6 +135,14 @@ type Tab = {
 }
 
 local tabs: { Tab } = {}
+
+--[[
+	Lightens a world colour into something readable on paper, keeping its hue so the
+	map still reads as the city rather than as an abstract diagram.
+]]
+local function wash(color: Color3, amount: number?): Color3
+	return color:Lerp(Color3.new(1, 1, 1), amount or MAP_WASH)
+end
 
 local function row(parent: Frame, height: number, order: number): Frame
 	local frame = Instance.new("Frame")
@@ -333,7 +354,7 @@ function MenuController:_renderMap(parent: Frame)
 
 	local board = Instance.new("Frame")
 	board.Name = "Board"
-	board.BackgroundColor3 = UI.Palette.Backdrop
+	board.BackgroundColor3 = MAP_PAPER
 	board.BackgroundTransparency = 0
 	board.BorderSizePixel = 0
 	board.Size = UDim2.new(1, 0, 0, MAP_HEIGHT)
@@ -474,11 +495,13 @@ function MenuController:_renderMap(parent: Frame)
 		shape.Position = project(feature.X, feature.Z)
 		shape.Size = UDim2.fromScale(feature.Width / worldWidth, feature.Depth / worldDepth)
 		shape.Rotation = feature.Rotation
-		shape.BackgroundColor3 = feature.Color
+		-- Buildings stay closest to their real colour so streets read as gaps between
+		-- them; everything else is washed further out so the pins sit on top of it.
+		shape.BackgroundColor3 = wash(feature.Color, if feature.Kind == "Building" then 0.45 else MAP_WASH)
 		shape.BackgroundTransparency = if feature.Kind == "SafeZone"
-			then 0.5
-			elseif feature.Kind == "Water" then 0.22
-			elseif feature.Kind == "SkyPlatform" then 0.12
+			then 0.45
+			elseif feature.Kind == "Water" then 0.1
+			elseif feature.Kind == "SkyPlatform" then 0.15
 			else 0
 		shape.BorderSizePixel = 0
 		shape.ZIndex = featureLayers[feature.Kind] or 3
@@ -495,12 +518,12 @@ function MenuController:_renderMap(parent: Frame)
 		end
 		if feature.Kind == "SafeZone" then
 			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(78, 220, 255)
+			stroke.Color = Color3.fromRGB(0, 132, 178)
 			stroke.Thickness = 2
 			stroke.Parent = shape
 		elseif feature.Kind == "SkyPlatform" then
 			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(215, 238, 255)
+			stroke.Color = Color3.fromRGB(96, 132, 168)
 			stroke.Thickness = 1.5
 			stroke.Parent = shape
 		end
@@ -512,7 +535,7 @@ function MenuController:_renderMap(parent: Frame)
 	hub.Size = UDim2.fromOffset(74, 16)
 	hub.TextXAlignment = Enum.TextXAlignment.Center
 	hub.TextSize = 11
-	hub.TextColor3 = Color3.fromRGB(126, 231, 255)
+	hub.TextColor3 = Color3.fromRGB(0, 118, 160)
 	hub.Text = "SPAWN"
 	hub.ZIndex = 24
 
@@ -536,12 +559,15 @@ function MenuController:_renderMap(parent: Frame)
 		pin.AnchorPoint = Vector2.new(0.5, 0.5)
 		pin.Position = project(at.X, at.Z)
 		pin.Size = UDim2.fromOffset(size, size)
-		pin.BackgroundColor3 = stat.Color
-		pin.BackgroundTransparency = if unlocked then 0 else 0.68
+		-- On paper a transparent pin disappears into the board, so a locked pin is
+		-- washed out rather than faded — still visibly a pin, still visibly its muscle
+		-- group, obviously not available.
+		pin.BackgroundColor3 = if unlocked then stat.Color else wash(stat.Color, 0.55)
+		pin.BackgroundTransparency = 0
 		pin.BorderSizePixel = 0
 		pin.Font = UI.Font.Numeric
 		pin.TextSize = 9
-		pin.TextColor3 = UI.Palette.Backdrop
+		pin.TextColor3 = if unlocked then MAP_PAPER else MAP_INK
 		pin.Text = string.sub(stat.DisplayName, 1, 1)
 		pin.ZIndex = if isSelected then 24 else 22
 		pin:SetAttribute("EnvironmentId", destination.EnvironmentId)
@@ -556,7 +582,7 @@ function MenuController:_renderMap(parent: Frame)
 		pinCorner.Parent = pin
 
 		local pinStroke = Instance.new("UIStroke")
-		pinStroke.Color = if isSelected then UI.Palette.Text else UI.Palette.Backdrop
+		pinStroke.Color = if isSelected then MAP_INK else wash(MAP_INK, 0.45)
 		pinStroke.Thickness = if isSelected then 2 else 1
 		pinStroke.Parent = pin
 

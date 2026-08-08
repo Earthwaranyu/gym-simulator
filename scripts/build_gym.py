@@ -1944,7 +1944,10 @@ def city_plot(x, z, sx, sz, rng):
     """A sidewalk, its kerb, and two or three buildings standing on it."""
     out = [
         part("Sidewalk", [sx, 1.0, sz], cf(x, FLOOR_TOP + 0.5, z), SIDEWALK, "Concrete"),
-        part("Kerb", [sx + 3, 0.7, sz + 3], cf(x, FLOOR_TOP + 0.35, z), KERB, "Concrete"),
+        # Non-colliding: a kerb is a painted edge, not a wall. Left solid it is 160
+        # ankle-height ledges across the city for a running player to catch on.
+        part("Kerb", [sx + 3, 0.7, sz + 3], cf(x, FLOOR_TOP + 0.35, z), KERB, "Concrete",
+             CanCollide=False),
     ]
 
     # Split the long axis into two or three footprints with a gap between, so a
@@ -2200,7 +2203,7 @@ def build_world():
         theme = row.get("props")
         if theme is not None:
             children.append(folder("Props", [
-                place(origin, piece) for piece in PROPS[theme](row, rng)
+                _decorate(place(origin, piece)) for piece in PROPS[theme](row, rng)
             ]))
 
         spots = machine_spots(row)
@@ -2659,7 +2662,35 @@ def region_ground(region):
     return out
 
 
-def _node_hits_sites(node, sites, clearance=48):
+def _decorate(node):
+    """Make a scenery node non-blocking, in place, and return it.
+
+    Props exist to make the city look like a place. They are not obstacles, and
+    every one of them that collides is something to get snagged on while running a
+    hundred studs between machines or flying between districts — a shipping
+    container is 26 studs deep and a crane leg is 62 tall.
+
+    They keep their shadows and their looks; they simply stop being in the way.
+    Collision is reserved for the things the layout actually intends you to walk on
+    or around: ground, buildings, platforms and the machines themselves.
+    """
+    properties = node.setdefault("properties", {})
+    if "Size" in properties or "CFrame" in properties:
+        properties["CanCollide"] = False
+        properties["CanTouch"] = False
+        properties["CanQuery"] = False
+    for child in node.get("children", []):
+        _decorate(child)
+    return node
+
+
+# Clearance around a machine that scenery may not occupy. A container placed at the
+# old 48 could still crowd the working space in front of a squat rack, which is the
+# one spot a player has to stand.
+PROP_CLEARANCE = 72
+
+
+def _node_hits_sites(node, sites, clearance=PROP_CLEARANCE):
     properties = node.get("properties", {})
     frame = properties.get("CFrame")
     size = properties.get("Size", [0, 0, 0])
@@ -2688,7 +2719,7 @@ def region_scenery(region, locations):
     for piece in PROPS[theme](row, rng):
         placed = place(region_frame(region), piece)
         if not _node_hits_sites(placed, site_positions):
-            out.append(placed)
+            out.append(_decorate(placed))
     return out
 
 
@@ -2803,6 +2834,7 @@ def connected_block(location, zone_row, visual_row):
     ):
         out.append(place(ground_origin, part(
             "Kerb", [sx, 0.3, sz], cf(x, FLOOR_TOP + 0.15, z), KERB, "Concrete",
+            CanCollide=False,
         )))
 
     origin = location["origin"]

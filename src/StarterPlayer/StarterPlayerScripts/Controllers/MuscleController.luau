@@ -2,6 +2,9 @@
 --[[
 	MuscleController — smooths every character's growth on this client.
 
+	Shape comes from `PhysiqueConfig`: this file decides *when* a part reaches its
+	target size, that file decides what that size looks like per axis.
+
 	The server writes target scales into each character's MuscleScales folder; this
 	lerps the actual meshes toward them so a player swells visibly over a set instead
 	of popping between sizes each time the server refreshes.
@@ -21,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local PhysiqueConfig = require(ReplicatedStorage.Modules.PhysiqueConfig)
 
 local FOLDER_NAME = "MuscleScales"
 -- Higher converges faster. Framerate-independent via the exponential below.
@@ -138,7 +142,13 @@ local function applyCharacter(character: Model, deltaTime: number)
 		-- Clamped here as well as server-side: this is the last line of defence
 		-- before a bad value reaches collision geometry.
 		local scale = math.clamp(value.Value, 1, Formulas.MAX_MUSCLE_SCALE)
-		local target = getBaseSize(part) * scale
+
+		-- Per axis, not uniform. Scaling a limb evenly makes it longer as well as
+		-- thicker, and a body at 2.5x uniform stops reading as a person and starts
+		-- reading as a box. PhysiqueConfig keeps the height weights low and the waist
+		-- behind the chest, which is what produces a taper instead of a barrel.
+		local axisX, axisY, axisZ = PhysiqueConfig.AxisScale(value.Name, scale)
+		local target = getBaseSize(part) * Vector3.new(axisX, axisY, axisZ)
 
 		if (part.Size - target).Magnitude > 0.001 then
 			part.Size = part.Size:Lerp(target, alpha)
