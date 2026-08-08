@@ -46,6 +46,9 @@ local EVENT_NAMES: { string } = {
 	"RosterChanged",
 	-- Server -> client: quest list with current progress.
 	"QuestsChanged",
+	-- Server -> client: this player's resolved feature-flag values. Outcomes only —
+	-- never the rules, never another player's cohort.
+	"FlagsChanged",
 	-- Client -> server: report a client-only analytics fact (device, locale, a panel
 	-- opened). The server validates the name against AnalyticsSchema and drops
 	-- anything not marked ClientReportable, so this grants nothing.

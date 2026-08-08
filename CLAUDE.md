@@ -7,11 +7,21 @@
 - Data Management: ProfileStore (loleris's supported successor to ProfileService, which is archived)
 
 ## Core Game Mechanics & Architecture
+
+## Game Vision & Aesthetics
+- **Visual Style (GTA V):** The world is urban, gritty, and realistic. When using the `Bold-Frontend-Design` skill, the UI should be sleek, modern, and dark-themed (think GTA V's minimalist menus and bold fonts). Avoid bubbly, cartoony Roblox UI.
+- **Gameplay Loop (Super Power Training Simulator):** Open-world exponential stat grinding. Players train specific stats, unlock massive multipliers, and transition from safe zones to open PvP. Stats scale endlessly into the billions/trillions.
+
 1. **The 5 Core Stats**: Arms, Chest, Back, Core, Legs.
+1.1 Arms make player hit stronger.
+1.2 Chest make player has more hp.
+1.3 Back make player has more durability.
+1.4 Core make player has more knockback damage. (if other player hit me they also hurt a bit).
+1.5 Legs make player has more speed in running and flying.
 2. **Massive Numbers**: Stats scale into the Billions and Trillions. Use a Number/Suffix abbreviation module.
 3. **Client-Server Boundary**: Client handles UI/inputs. Server handles stat math, the automatic training loop, and DataStores.
 4. **Muscle Deformation**: Avatar scaling relies on `NumberValue` instances inside the player's character model to drive server-sided MeshPart scaling.
-5. **Player can pvp**: Players can kill other players while they are training to annoy them. Training starts by holding **E** at a machine, which teleports the player onto it, locks them there, and plays the exercise animation while reps tick automatically (no stamina, no clicking). Because they are locked in place they cannot dodge, and a hit knocks them off the machine and resets their combo.
+5. **Player can pvp**: Players can kill other players while they are training to annoy them. Training starts by holding **E** at a machine, which teleports the player onto it, locks them there, and plays the exercise animation while reps tick automatically (no stamina, no clicking). Holding **E** again, or pressing **Space**, gets them off. Because they are locked in place they cannot dodge — but a hit only deals damage; **only dying dismounts them** and resets the combo, so an attacker has to commit to a full kill to break a set.
 6. **Player can avoid pvp**: Players can avoid pvp by buying immortal potion for 1 hour costing 19 robux per potion. We can have 1 day potion for 79 robux also. Players can buy VIP gamepass costing 199 robux which give you 1 hour immortal potion per day. Player who drink immortal potion will have a barrier between body.
 7. **Player can have reputation**: Criminal, guardian, Hero, etc.
 8. **In the tab bar**: it shows that player overall power, and reputation.

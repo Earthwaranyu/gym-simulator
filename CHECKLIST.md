@@ -732,10 +732,19 @@ Execution rules:
       moved, prompt seen, map opened, first flight) through one rate-limited remote
       allowlisted by `ClientReportable`. Every emit is pcall-wrapped and every failure
       warns and returns false.*
-- [ ] 99. **Feature flags and honest experiments.** Add persistent deterministic cohorts,
+- [x] 99. **Feature flags and honest experiments.** Add persistent deterministic cohorts,
       typed remote configuration, safe defaults, per-feature kill switches, exposure
       logging, and a Studio override. Flags may select config/UX, never trust client
       rewards, and never change saved shape without a migration and rollback path.
+      *Done: `FlagConfig.luau` declares flags and weighted variants as data, with a
+      deterministic FNV-1a+avalanche assignment on `(UserId, flag id)` — the self-test
+      proves stability, weight accuracy, and that two flags do not correlate (raw
+      FNV-1a's low bits do, which would have made two experiments secretly one).
+      `FlagService` resolves server-side through kill switch → live typed override on
+      a `FlagOverrides` Configuration → cohort → default, ignoring any override of the
+      wrong type, and logs exposure on first *read* rather than on assignment.
+      `FlagController` holds outcomes only. `ShopEnabled` is a real kill switch on both
+      purchase paths that never blocks fulfillment of an existing receipt.*
 - [ ] 100. **Progression and economy simulator.** Build a headless deterministic model
       from fresh spawn through every district and beyond Ascendant for active, casual,
       social, boosted, frequently-killed, and returning play styles. Gate balance changes

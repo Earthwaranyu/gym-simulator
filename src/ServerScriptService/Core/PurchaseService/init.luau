@@ -185,6 +185,14 @@ function PurchaseService:Start()
 			return false, "Invalid request."
 		end
 
+		-- The kill switch. It stops *new* prompts only: a receipt that already exists
+		-- is still fulfilled by _processReceipt, because a player who has been charged
+		-- must get what they paid for whether or not the store is open.
+		local FlagService = Loader.Get("FlagService")
+		if FlagService:Get(player, "ShopEnabled") == false then
+			return false, "The store is temporarily closed."
+		end
+
 		local product = products[productId]
 		if product == nil then
 			return false, "That item does not exist."

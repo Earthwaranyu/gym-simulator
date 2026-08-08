@@ -81,6 +81,13 @@ end
 	Buys an item. Returns (success, message) — the message is shown verbatim in a toast.
 ]]
 function ShopService:Purchase(player: Player, itemId: string): (boolean, string)
+	-- Same kill switch as the Robux path. Cash items are not receipts, so there is
+	-- nothing in flight to protect: closing the store closes it.
+	local FlagService = Loader.Get("FlagService")
+	if FlagService:Get(player, "ShopEnabled") == false then
+		return false, "The store is temporarily closed."
+	end
+
 	local item = ShopConfig.Get(itemId)
 	if item == nil then
 		return false, "That item does not exist."

@@ -108,6 +108,10 @@ local EVENTS: { [string]: EventDefinition } = {
 	},
 	Locale = { Kind = "Custom", Once = true, ClientReportable = true, Fields = { LocaleId = str(true) } },
 	AcquisitionSource = { Kind = "Custom", Once = true, Fields = { Source = str(true) } },
+	-- Logged when a consumer actually reads a flag, not when the cohort is assigned:
+	-- counting assignment would include players who never reached the feature and
+	-- dilute every result toward zero.
+	FlagExposure = { Kind = "Custom", Fields = { FlagId = str(true), Variant = str(true), Value = str() } },
 	CoPlayContext = {
 		Kind = "Custom",
 		Fields = { FriendsPresent = num(true), Intentional = { Kind = "boolean" } },

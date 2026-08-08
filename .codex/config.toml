@@ -1,0 +1,6 @@
+[mcp_servers.roblox-studio]
+command = "/Applications/RobloxStudio.app/Contents/MacOS/StudioMCP"
+args = ["--stdio"]
+
+[mcp_servers.roblox-studio.tools.execute_luau]
+approval_mode = "approve"
