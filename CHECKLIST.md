@@ -4,13 +4,18 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 91 built / 93** — every phase complete. #22 (stamina) and #24 (training
-anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
-client remote to exploit.
+**Foundation status: 93 completed / 95 historical items.** #22 (stamina) and #24
+(training anti-exploit) were withdrawn by design, not skipped: reps are server-driven
+with no client remote to exploit.
 
-**Before this ships**, see [`docs/PLAYTEST.md`](docs/PLAYTEST.md). Two things are stubbed
-on purpose: `DataService` uses the Studio mock store, and every product `AssetId` is `0`
-until they exist in the Creator Dashboard.
+**Growth roadmap: 0 / 73 items complete (#96–#168).** The checked foundation proves a
+large playable prototype; it does **not** mean the product is ready for a public launch.
+
+**Current public-launch blockers:** `DataService` still uses the Studio mock store, four
+product `AssetId`s are `0`, sound IDs are blank, and real persistence, Robux receipts,
+multiplayer balance, mobile controls, and load testing are incomplete. The current
+[`docs/PLAYTEST.md`](docs/PLAYTEST.md) also describes an older world and is reconciled in
+#96 before it is used as release evidence.
 
 ---
 
@@ -624,9 +629,442 @@ block, both the next location and the machine waiting there were easy to predict
       Studio with a fresh mock player: the attribute was true before earning any stats,
       Q created `FlightVelocity` and platform stand, and Q again returned control to the
       Humanoid.
+
 ---
 
-## Milestone 1 — Vertical Slice
+# Roadmap — From Playable Prototype to Viral-Ready Live Game
+
+No checklist can guarantee virality. Virality is an outcome of players getting value
+quickly, returning, deliberately playing with friends, and recommending an experience
+whose store page tells the truth. This roadmap is designed to maximize those conditions
+and Roblox's current recommendation signals without sacrificing fairness or safety.
+
+The product loop this roadmap optimizes is:
+
+> **accurate promise → first delight → meaningful goal → social story → return → share → repeat**
+
+## Audit of the current product
+
+| Area | What is genuinely present | Largest gap before growth |
+|---|---|---|
+| Core fantasy | 55 locations, 15 exercises, muscle growth, five meaningful stats, flight, PvP, reputation | A new player is not taught or directed through the fantasy |
+| World | Irregular connected city, interiors, sky gyms, vector map, streaming-aware travel | The full map is information overload and low-population servers disperse encounters |
+| Progression | ranks, tokens, multipliers, two daily quests, one one-shot quest | no balanced first-hour path, mastery, weekly goals, comeback loop, or post-endgame purpose |
+| Combat | authoritative Punch, damage, kills, bounties, safe zones | checklist claims Slam/Dash that do not exist; interruption behavior and paid protection need a fairness decision |
+| Social | roster, kill feed, global Power/Kills boards | no parties, friend co-training, invites, rivals, crews, co-op events, or shareable moments |
+| Monetization | receipt architecture and four configured product definitions | every id is `0`; paid peace can still permit aggression; no live receipt evidence or cosmetic catalog |
+| Analytics | partial onboarding and economy logging | declared FirstMultiplier/FirstPurchase steps are not wired; no social, tutorial, interruption, source, or experiment telemetry |
+| Platform reach | responsive menu-bar work and StreamingEnabled | flight is keyboard-only, major panels are fixed-size, controller/accessibility/localization/device QA are incomplete |
+| Operations | deterministic world generator, validator, lint/type/build checks | no live-ops scheduler, feature flags, content calendar, staged rollout, rollback rehearsal, or current playtest document |
+
+## Growth scorecard and decision rules
+
+Roblox's Home recommendations currently evaluate per-user signals including **qualified
+play-through rate (qPTR), 7-day playtime, 7-day play days, 7-day spend days, 7-day Robux
+spent, and 7-day intentional co-play days**. We optimize them together; revenue never
+overrules player safety, truthful merchandising, or retention.
+
+These are **starting internal gates, not Roblox promises or universal industry facts**.
+Replace them with the live Creator Dashboard's similar-experience benchmarks once enough
+traffic exists:
+
+| Funnel | Initial internal gate before scaling acquisition |
+|---|---|
+| First delight | p50 join→first rep ≤30s; onboarding completion ≥75%; 5-minute survival ≥65%; 10-minute survival ≥45% |
+| Retention | D1/D7/D30 at or above the similar-experience benchmark; working stretch targets 20% / 8% / 3% |
+| Engagement | median session ≥15 minutes; ≥3 distinct activity types per healthy session; 7-day play days/user ≥2 |
+| Social | intentional friend play in ≥20% of sessions; invite acceptance ≥8%; 7-day intentional co-play days/user ≥0.35 and rising toward benchmark |
+| Discovery | qPTR at or above benchmark with honest, meaningfully different creatives; judge each source by downstream D7, not clicks alone |
+| Monetization | 100% idempotent grants; no statistically meaningful D1/D7 or non-payer/PvP-victim regression after a store change |
+| Reliability | crash-free sessions ≥99.5%; OOM exits <0.1%; p95 join→interactive ≤10s; p50 ≥55 FPS on the chosen low-end mobile tier; healthy server heartbeat at capacity |
+
+Execution rules:
+
+1. Finish P0 truth, telemetry, onboarding, fairness, mobile, data, and performance gates
+   before public acquisition.
+2. Every experiment has one hypothesis, one primary metric, guardrails, a deterministic
+   cohort, a minimum observation window, and a keep/revert decision.
+3. Compare new-player, returning-player, payer/non-payer, solo/social, platform, locale,
+   and PvP-victim cohorts. An average must not conceal a harmed group.
+4. Do not buy traffic to diagnose a product problem. Paid acquisition starts only after
+   retention and session quality meet the live peer benchmark.
+5. Each implementation item below lands as one reviewable commit after its automated and
+   human acceptance evidence is recorded. This roadmap edit itself is documentation only.
+
+## Phase 19 — P0: Make the roadmap true and measurable
+
+- [ ] 96. **Reconcile product truth.** Audit `AGENTS.md`, `CLAUDE.md`, this checklist,
+      `README.md`, `docs/PLAYTEST.md`, and the live build as one versioned inventory.
+      Decide hit-vs-kill training interruption; either deliver or explicitly defer Slam
+      and Dash; correct board/system/count/control claims; rewrite playtests for 55 stations,
+      15 variants, current flight, and current map. No checked claim may lack code or test
+      evidence.
+- [ ] 97. **Own one KPI scorecard.** Add a concise product brief and dashboard definition
+      for qPTR, qualified plays by source, join→first rep/upgrade/flight, onboarding,
+      session length, 5/10-minute survival, D1/D7/D30, activity variety, intentional
+      co-play, invite conversion, payer metrics, PvP-victim churn, saves, receipts, crashes,
+      OOMs, FPS, and server heartbeat. Assign an owner and review cadence to every metric.
+- [ ] 98. **Analytics contract v2.** Version a server-validated event schema and wire the
+      missing FirstMultiplier and FirstPurchase steps plus moved, prompt seen, training
+      started/ended, map opened, first flight, first travel, zone/rank unlock, interruption,
+      death/kill, quest completion, item viewed, purchase prompt/result/grant, session end,
+      device/input, locale, acquisition source, and friend/co-play context. Add funnel,
+      custom, and economy self-tests; telemetry failure can never stop gameplay.
+- [ ] 99. **Feature flags and honest experiments.** Add persistent deterministic cohorts,
+      typed remote configuration, safe defaults, per-feature kill switches, exposure
+      logging, and a Studio override. Flags may select config/UX, never trust client
+      rewards, and never change saved shape without a migration and rollback path.
+- [ ] 100. **Progression and economy simulator.** Build a headless deterministic model
+      from fresh spawn through every district and beyond Ascendant for active, casual,
+      social, boosted, frequently-killed, and returning play styles. Gate balance changes
+      on documented time-to-first-upgrade/rank/zone, sources/sinks, stall points, inflation,
+      and sensitivity ranges instead of intuition.
+- [ ] 101. **Finite-number and hostile-input safety.** Define behavior above the current
+      suffix range; cap or safely display every stat, multiplier, damage, and datastore
+      value; fuzz formulas and runtime remote schemas with NaN/Inf/oversized/malformed
+      inputs; rate-limit endpoints; and record impossible gains without immediately
+      auto-banning. A hostile client must not grant value, corrupt replication, or crash a
+      server.
+- [ ] 102. **Baseline before feature work.** Run instrumented human alpha sessions on
+      keyboard, touch, and gamepad; capture first-rep/upgrade timing, confusion, deaths,
+      session exits, frame/memory/network traces, and qualitative notes. Freeze the first
+      beta targets from evidence and record the baseline commit/build so every later claim
+      has a comparison.
+- [ ] 103. **Deterministic service readiness.** Replace concurrently spawned, best-effort
+      startup with explicit dependencies/readiness and critical-vs-optional health. Joiners
+      present before or during boot cannot miss profile, entitlement, quest, analytics, or
+      replication setup; a critical failure fails the build/server visibly instead of
+      leaving a half-alive game. Prove 100 boot/join cycles initialize every service once.
+- [ ] 104. **Durable profile boundary.** Add an in-flight load guard, environment-specific
+      dev/stage/prod store names, schema/version checks, finite/range sanitization, historical
+      migration fixtures, corruption repair, and a typed allowlisted client DTO that never
+      exposes receipt ids. Order persistent stat/cash/quest/reward mutations transactionally
+      enough that disconnecting after any step produces all-or-none durable results.
+- [ ] 105. **Commit receipts before acknowledgement.** Replace in-memory-only receipt
+      acknowledgement with a durable idempotent receipt journal/commit-before-ack design,
+      keep tombstone handlers for retired products, fail startup on duplicate ids, and alert
+      on pending/unknown receipts. Fault-inject before/after grant, journal, save, and ack:
+      ownership lands exactly once and a paid receipt is never acknowledged without a
+      durable grant. A shop kill switch must never stop fulfillment of an existing receipt.
+- [ ] 106. **Authorize movement and travel.** Validate every movement/combat/travel payload,
+      issue narrow server teleport authority, enforce speed/position envelopes that respect
+      maximum Legs flight and network latency, and revalidate travel after every streaming
+      yield. A hit, death, respawn, exploit teleport, or stale character cannot escape combat,
+      enter locked training, or bypass Fast Travel; legitimate maximum-speed flight at the
+      supported latency has no false positives.
+- [ ] 107. **Hermetic CI and Studio contracts.** Pin/checksum tool definitions and make a
+      clean clone install dependencies, lint/typecheck, run self-tests, validate generated
+      JSON/config/migrations, and `rojo build` reproducibly. Add automated Studio contracts
+      for all 55/15 world entries, every remote failure path, profile load/save, receipts,
+      training/travel, and a two-client PvP scenario; no launch claim depends only on a
+      manual memory.
+- [ ] 108. **Scale the existing runtime before adding systems.** Cache immutable map and
+      entitlement data, replace per-second full-roster/profile broadcasts with versioned
+      deltas/coalescing, batch leaderboard/name work, and clean character/streaming caches on
+      respawn/removal. Ratchet world budgets near the measured build rather than the old
+      3× allowance. At target capacity, meet script/network/memory budgets with no per-frame
+      descendant scans, stale rig leaks, or repeated static Workspace scans.
+
+## Phase 20 — P0: Win the first ten minutes
+
+- [ ] 109. **Saved Coach onboarding.** Add a resumable, skippable, one-objective-at-a-time
+      path: move/look → train ten reps → try a second muscle → buy the first multiplier →
+      fly through a marker → open/select the map → practice combat on a dummy. Store only
+      durable step completion; repeat visits never replay forced panels.
+- [ ] 110. **Config-driven guidance.** Add a reusable objective ribbon, world waypoint,
+      distance indicator, highlight, and contextual control hint driven by station/map/
+      quest config rather than hardcoded paths. It must recover after death, streaming,
+      travel, control-scheme changes, and a destroyed target without trapping progress.
+- [ ] 111. **First permanent choice in five minutes.** Fund one guaranteed onboarding
+      multiplier through an earned one-time reward, preview how each of the five stats
+      changes gameplay before the choice, confirm the chosen benefit immediately, and log
+      time, choice distribution, hesitation, and abandonment. No Robux prompt appears first.
+- [ ] 112. **New-player peace shield.** During onboarding or a short non-repeatable grace
+      window, visibly block both incoming **and outgoing** PvP; end it when the player
+      explicitly opts into combat or the window expires. It cannot accrue bounties,
+      competitive rewards, or protected attack positioning and does not become a permanent
+      free PvP opt-out.
+- [ ] 113. **Sparring dummy and safe failure.** Add an original server-authoritative target
+      that teaches range, Punch, cooldown, damage roles, knockback, and recovery without
+      requiring another player or affecting reputation. It works in an empty server and
+      gives no farmable economy after its tutorial reward.
+- [ ] 114. **Progressive map disclosure without hiding content.** Keep the selected user
+      promise that all 55 locations are visible, but default the first-session view to
+      starter/nearby/recommended filters, a clear “Show all” control, search/filter by
+      muscle/access/environment, and one highlighted next destination. Preserve zoom,
+      pan, selection, and accessibility across refreshes.
+- [ ] 115. **First-session payoff and return hook.** Celebrate the completed fantasy—first
+      visible growth, stronger movement/combat, flight, discovery—with restrained original
+      audiovisual feedback, then let the player choose a next-stat/district goal for the
+      next session. Human-test the entire route on keyboard, phone, tablet, and controller
+      until the first-delight and onboarding gates hold.
+
+## Phase 21 — P1: Make every minute feel good
+
+- [ ] 116. **Original soundscape.** Replace blank sound ids with owned original music,
+      ambience, machine loops, reps, UI, flight, impacts, city layers, and district cues;
+      keep source/provenance records and loudness standards. Music/SFX settings, distance
+      rolloff, concurrency limits, interruption cleanup, and a silent fallback all work.
+- [ ] 117. **Lock the game's risk rule.** Decide with two-player evidence whether any valid
+      hit or only a knockout dismounts training, then make server behavior, stagger/combat
+      lock, HUD, tutorials, analytics, docs, and balance agree. Measure attacker delight
+      against victim early-exit/D1 harm and retain the smallest interruption that makes the
+      hook legible.
+- [ ] 118. **Three real combat choices.** Complete the registry with a reliable light
+      attack, a mobility/escape move, and an area/commitment move (Punch, Dash, Slam or
+      better tested equivalents). Each has server validation, readable cost/cooldown,
+      anticipation/recovery, counterplay, touch/gamepad bindings, and automated hit/range/
+      rate-limit tests.
+- [ ] 119. **Combat feel and accessibility pass.** Add readable anticipation, contact,
+      recovery, hit reaction, knockout/ragdoll, finisher restraint, camera/audio feedback,
+      and settings for shake, flash, damage numbers, and high-contrast cues. Validate the
+      same authoritative result under latency and never rely on color or sound alone.
+- [ ] 120. **Milestones that punctuate the grind.** Author short sequences for rank, zone,
+      multiplier, stat-shape, exercise-mastery, and reputation thresholds: preview, moment,
+      reward, next goal. Server announcements are nearby/relevant, rate-limited, opt-out,
+      and never cover controls or pressure a purchase.
+- [ ] 121. **Population-concentrating hotspot.** Rotate a disclosed “Hot Gym” or city
+      incident that gives modest earned rewards and funnels willing players toward one
+      location, with beginner and empty-server alternatives. Measure activity variety,
+      co-presence, PvP, interruption, and victim exits before making it permanent.
+
+## Phase 22 — P0: Mobile, controller, accessibility, and performance
+
+- [ ] 122. **Complete touch/gamepad flight.** Add discoverable toggle, ascend, descend,
+      steering state, altitude feedback, and control hints for touch and gamepad. Reserve
+      safe screen areas so flight never overlaps jump, Punch, camera drag, thumbstick,
+      menu, or Roblox controls; test respawn, training, combat lock, and input switching.
+- [ ] 123. **Responsive main menu.** Replace the fixed 640×500 body and fixed six-tab row
+      with breakpoint/content-driven layout for small phones, tablets, desktop, notches,
+      landscape changes, translated text expansion, and 44px+ targets. No tab, purchase
+      detail, map control, or close action can render off-screen.
+- [ ] 124. **Responsive roster.** Close it by default on small touch screens, provide a
+      visible on-screen toggle/dismiss control, reflow or paginate 300×462 content, and
+      preserve keyboard Tab behavior. Long names, ten-plus players, safe insets, menu,
+      chat, and mobile controls do not overlap.
+- [ ] 125. **One HUD safe-area planner.** Centralize placement/reservation for thumbstick,
+      jump, combat, flight, menu bar, vitals, objectives, toasts, map, roster, and Roblox
+      core UI. Validate representative phone/tablet/desktop/console fixtures and dynamic
+      resize/orientation rather than adding controller-specific pixel offsets.
+- [ ] 126. **Full controller path.** Implement deliberate selection order, focus state,
+      back behavior, scrolling, map zoom/pan, purchases, remappable/action-aware help, and
+      glyph switching. A controller-only player completes onboarding, trains, flies,
+      fights, upgrades, shops, parties, and exits every modal without a mouse.
+- [ ] 127. **Persisted accessibility/settings.** Add music, SFX, reduced motion, screen
+      flash/shake, damage numbers, kill feed, text/UI scale, high contrast, color cues,
+      camera sensitivity, and control help with migration-safe defaults and immediate
+      preview. Critical information always has text/shape as well as color/audio.
+- [ ] 128. **Localization-ready product.** Move every player-facing dynamic/static string
+      to keys, preserve names/numbers/placeholders safely, pseudo-localize long strings,
+      enable automatic capture/translation, and manually review the top live locales.
+      Critical onboarding, map, quest, control, safety, and purchase copy reaches 100%
+      coverage before global acquisition.
+- [ ] 129. **Device and capacity budget.** Set part/physics/network/UI/script/memory/load
+      budgets, profile low-end phone/tablet/console/desktop, and soak at target server
+      capacity with streaming, 55 stations, flight, combat, effects, leaderboards, and
+      events active. Track p50/p95 by device; fix regressions before increasing content.
+
+## Phase 23 — P1: Retention without coercion
+
+- [ ] 130. **Persistent goal service.** Provide claim-free, auto-awarded short/mid/long
+      goals across rank, zones, every stat, exercises, quests, combat, reputation, social
+      play, and exploration. The HUD shows one chosen goal while the menu shows the full
+      tree; requirements/rewards are data-driven and migration-safe.
+- [ ] 131. **Daily and weekly contract catalog.** Expand beyond two dailies to balanced
+      rotations covering training, varied exercises, exploration, reputation, PvP, races,
+      and co-op; add fair rerolls and population-aware fallbacks so an empty or protected
+      server never makes completion impossible. Simulate reward inflation before launch.
+- [ ] 132. **Forgiving return calendar.** Add a seven-day/flexible reward path with grace
+      days and catch-up; missing a day never deletes accumulated progress or creates a
+      purchase emergency. Rewards teach underused activities and remain modest beside
+      active play.
+- [ ] 133. **Exercise and district mastery.** Track all 15 variants, five families, ten
+      neighborhoods, interiors, and sky gyms in a discoverable collection/logbook with
+      original cosmetic/title rewards and meaningful milestones. Mastery adds identity
+      and route choice, not a hidden power reset.
+- [ ] 134. **Badges and achievements.** Add idempotent platform badges plus in-game
+      achievements for meaningful firsts, social feats, mastery, exploration, reputation,
+      fair PvP, and long-term goals. Never award or announce a badge from a client claim.
+- [ ] 135. **Respectful comeback path.** Give lapsed players a personalized recap, chosen
+      catch-up goals, and a capped temporary earned boost based on absence. It helps them
+      re-enter current content without leapfrogging active players or inventing false
+      urgency.
+- [ ] 136. **Actionable opt-in notifications.** After platform eligibility, request
+      permission at a relevant success moment and send at most policy/throttle-safe,
+      personalized events such as a nearly completed weekly, crew challenge, or beaten
+      record with useful launch data. Never gate progress, send generic ads, or pressure a
+      purchase; monitor CTR, dismiss, and opt-out.
+- [ ] 137. **Retention/farming review.** Cohort-test D1/D7 loops, activity diversity,
+      progression stalls, AFK incentives, multi-account/kill trading, quest failure, and
+      reward inflation. Remove mechanics that inflate minutes while players are not having
+      fun or that make victimization the dominant new-player memory.
+
+## Phase 24 — P1: Social and genuinely shareable play
+
+- [ ] 138. **Parties.** Add server-authoritative party membership, invites, accept/decline,
+      shared waypoint, same-server routing, reconnect/respawn handling, privacy controls,
+      and clean leadership/leave rules. Parties coordinate friends but never bypass zone,
+      equipment, reward, combat, or travel requirements.
+- [ ] 139. **Active friend co-training.** Add a capped spotter bonus and paired/co-op
+      machine or flight/race challenges that require both players to participate. Use
+      relationship/session/daily caps and contribution checks against alts; log whether
+      social cohorts retain better than solo cohorts.
+- [ ] 140. **Opt-in rival contracts.** Turn revenge into a clear challenge/rematch loop
+      with consent, expiration, balanced stakes, anti-repeat farming, block/privacy limits,
+      safe-zone behavior, and a non-PvP decline path. Never reveal precise private location
+      outside the mutually accepted activity.
+- [ ] 141. **Server-wide cooperative events.** Add scalable city threats/community goals
+      where each of the five stats has a role, beginners can make real contributions, low
+      populations receive adaptive objectives, and rewards use contribution bands rather
+      than last-hit ownership.
+- [ ] 142. **Contextual Roblox invites.** Check eligibility and prompt only at genuine
+      moments—forming a party, starting a duo event, first transformation—not on join.
+      Route the recipient through launch data into the same activity; any reward is granted
+      once only after the invitee completes meaningful onboarding, with relationship and
+      daily anti-abuse caps.
+- [ ] 143. **Earned identity.** Add original titles, nameplates, auras, trails, procedural
+      poses/emotes/finishers, and a saved loadout visible in the world, roster, profile,
+      party, and showcase. Separate earnable and purchasable variants clearly and keep
+      gameplay hitboxes/readability unchanged.
+- [ ] 144. **Capture-worthy moments.** Build optional photo/showcase spots and clean
+      milestone compositions for transformations, sky gyms, crew flights, rival wins, and
+      world events; support hiding UI and restoring it safely. Never auto-post, require
+      external sharing, or pay for unverifiable off-platform actions.
+- [ ] 145. **Demand gate for clans, gifting, and trading.** Measure party reuse, co-play,
+      identity ownership, support load, fraud risk, and player interviews before scoping
+      these systems. Do not ship trading at launch; duplication, scams, moderation, and
+      economy damage outweigh an unproven social benefit.
+
+## Phase 25 — P2: Endgame and a live world
+
+- [ ] 146. **Horizontal endgame mastery.** Extend beyond Ascendant/Godlike with permanent
+      mastery branches, collections, difficult routes, titles, cosmetic evolution, and
+      build expression. Preserve the locked no-rebirth promise: never erase or reset
+      trained stats merely to restart the same grind.
+- [ ] 147. **Fair seasonal PvP.** Add rating, divisions, placement, decay, matchmaking/
+      population fallback, anti-collusion, and cosmetic seasonal rewards; reset only
+      seasonal rating/rewards, never permanent stats. Prefer normalized event rules so
+      spending or old power alone cannot decide competitive rank.
+- [ ] 148. **World bosses and city threats.** Create scalable encounters with readable
+      phases, contributions for Arms/Chest/Back/Core/Legs, solo/low-pop fallback, death
+      recovery, anti-AFK contribution, and cosmetic/mastery drops. Use the existing world
+      generator/content registries rather than one-off service branches.
+- [ ] 149. **Reputation becomes gameplay.** Add Hero and Criminal contract tracks,
+      asymmetric public objectives, counterplay, safe alternatives, and rewards/risks that
+      make the title matter without trapping Neutral players. Repeated victim farming,
+      party collusion, and protected targets cannot advance it.
+- [ ] 150. **Fresh leaderboards.** Add weekly/seasonal, friend, mastery, event, and fair-PvP
+      boards alongside lifetime Power/Kills; use bounded stores, reset/version strategy,
+      tied-score rules, cached failure behavior, and cosmetic—not runaway power—rewards.
+- [ ] 151. **Population-aware event rotation.** Select hotspots, races, bosses, co-op, and
+      rivalry events from typed configs using server population, player progression, recent
+      history, and overlap priority, with empty-server fallbacks and cross-server messaging
+      only where it materially improves play.
+- [ ] 152. **Endgame command center.** Give advanced players one clear screen for mastery,
+      collections, season, reputation, community objectives, records, and next rewards so
+      “make the number larger” is never the only visible purpose.
+
+## Phase 26 — P1: Ethical monetization that does not poison PvP
+
+- [ ] 153. **Immortality becomes peace mode.** While active, the player can neither deal
+      nor receive player damage, earn PvP/bounty/reputation rewards, nor body-block fights;
+      show an unmistakable barrier and exact expiry/stacking behavior. Test activation,
+      expiry, reconnect, training, safe zones, parties, and every ability.
+- [ ] 154. **VIP fairness review.** Evaluate permanent 2× power and paid-only long-term
+      protection against payer/non-payer and attacker/victim retention. Prefer durable
+      identity/convenience or normalized competition over paid combat dominance; if a sold
+      benefit changes, publish a migration, compensation, and unchanged-term plan first.
+- [ ] 155. **Cosmetic-first catalog.** Build preview/equip/ownership flows for original
+      auras, trails, nameplates, gym skins, procedural pose/finisher styles, profile themes,
+      and loadout slots. Use several honest price points; do not add paid random rewards
+      without eligibility, disclosed odds, duplicate/pity/refund design, and policy review.
+- [ ] 156. **Keep progression honest.** Power gates, map information, combat outcome, and
+      competitive boards cannot be silently skipped by spending. Fast Travel may sell
+      convenience without bypassing requirements; no purchase modal appears during the
+      first-fun path or immediately after defeat.
+- [ ] 157. **Transparent regional store.** Fetch/display the user's actual localized or
+      managed price, contents, permanence/duration, peace-mode limitation, stacking,
+      ownership, restore state, and cancellation rules. Apply `PolicyService` eligibility,
+      accessible previews, clear close/back, and no false timers, fake discounts, or
+      preselected purchases.
+- [ ] 158. **Live commerce proof.** Create and fill all four real ids, disable zero-id
+      products in production checks, and test developer products/gamepasses on live servers:
+      prompt cancel, success, retry, reconnect, duplicate receipt, unknown product, grant
+      failure, concurrent session, ownership loss/refund behavior, and purchase-history
+      growth. Grants are idempotent and auditable.
+- [ ] 159. **Monetization guardrails.** Track view→detail→prompt→accept→receipt→grant and
+      post-purchase value/retention by product, platform, locale, cohort, payer status, and
+      PvP exposure. Keep/price tests require healthy non-payer and victim retention, not
+      revenue alone; consider a subscription only after repeatable monthly value exists.
+
+## Phase 27 — P2: Live operations, discovery, and staged launch
+
+- [ ] 160. **Versioned live-ops framework.** Add typed `LiveOpsConfig`/scheduler with UTC
+      windows, deterministic overlap priority, reward version, safe default-off behavior,
+      per-event kill switch, exposure/event analytics, server refresh strategy, and Studio
+      preview. A malformed/expired config cannot affect normal progression.
+- [ ] 161. **Content factory.** Add templates, schema validators, balance preview, geometry/
+      path/streaming validation, and freshness tests for quests, events, rewards, cosmetics,
+      zones, machines, environments, and poses. Preserve original primitive/procedural asset
+      rules and instance/performance budgets so a small update is routine rather than risky.
+- [ ] 162. **Rollback and disaster rehearsal.** Version event/content/save changes, back up
+      production configuration, document ownership/escalation, and rehearse disabling a
+      broken event, rolling back code/config, repairing affected profiles, and reconciling
+      receipts without wiping legitimate progress.
+- [ ] 163. **Twelve-week content inventory.** Before launch, prepare and test a realistic
+      calendar of daily rotations, weekly/biweekly events, challenges, cosmetics, and at
+      least one larger update. Ship small improvements every 2–4 weeks and major value
+      only when ready; never publish a cadence the content factory cannot sustain.
+- [ ] 164. **Creator campaign tools.** Add bounded promo codes/share campaigns with expiry,
+      maximum claims, idempotency, source/launch attribution, and anti-alt limits; favor
+      cosmetics or modest currency. Create one share link per channel/creator and judge it
+      on qualified play, D7, co-play, and payer quality rather than views.
+- [ ] 165. **Truthful publishing package.** Produce an original recognizable icon, several
+      meaningfully different 16:9 thumbnails, a short authentic gameplay trailer, semantic
+      title/description, update notes, and screenshots showing the real transformation,
+      city, sky gyms, social action, and flight. Localize metadata and keep creatives only
+      when qPTR **and** downstream retention improve.
+- [ ] 166. **Release-candidate proof.** Replace mock storage/blank sounds/zero ids, update
+      playtests, and pass real persistence, session lock, migration, commerce, two-client
+      PvP, 10+/target-capacity soak, private server, empty server, streaming/cold travel,
+      all 15 poses, R15 scale extremes, keyboard/touch/gamepad, locale, accessibility,
+      exploit, disconnect, shutdown, and rollback tests with no unexplained errors.
+- [ ] 167. **Invite-only alpha → staged public beta.** Start with observed target-audience
+      sessions, then limited cohorts and gradually increased traffic. Review onboarding,
+      D1/D7, social uplift, fairness/victim churn, economy, performance, saves, and support
+      after each stage; stop or roll back before paid ads/large creator pushes when a gate
+      misses.
+- [ ] 168. **Weekly growth operating loop.** Maintain one decision log and dashboard review:
+      observe → identify the largest constraint → form one hypothesis → ship the smallest
+      safe experiment → wait for the required cohort window → keep/revert → document the
+      next constraint. Scale acquisition only when qPTR, retention, engagement, intentional
+      co-play, monetization, and reliability improve together; pivot the weak loop instead
+      of manufacturing activity.
+
+## Official Roblox evidence used for this roadmap
+
+- [Discovery and Home recommendation signals](https://create.roblox.com/docs/production/promotion/discovery)
+- [Analytics overview and similar-experience benchmarks](https://create.roblox.com/docs/production/analytics)
+- [Retention and onboarding guidance](https://create.roblox.com/docs/production/analytics/retention)
+- [Funnel events](https://create.roblox.com/docs/production/analytics/funnel-events) and
+  [custom events](https://create.roblox.com/docs/production/analytics/custom-events)
+- [Invite prompts and launch data](https://create.roblox.com/docs/production/promotion/invite-prompts)
+- [Experience notifications](https://create.roblox.com/docs/production/promotion/experience-notifications)
+- [Monetization safety and transparency](https://create.roblox.com/docs/production/monetization),
+  [managed pricing](https://create.roblox.com/docs/production/monetization/managed-pricing),
+  and [monetization analytics](https://create.roblox.com/docs/production/analytics/monetization)
+- [Localization and automatic translations](https://create.roblox.com/docs/production/localization/automatic-translations)
+- [Performance optimization](https://create.roblox.com/docs/performance-optimization)
+- [Experience icons](https://create.roblox.com/docs/production/publishing/experience-icons) and
+  [thumbnails](https://create.roblox.com/docs/production/publishing/thumbnails)
+
+---
+
+## Historical Milestone 1 — Vertical Slice
+
+> **Archived reference only.** This milestone describes the original small prototype and
+> is not a current launch test. Item #96 replaces its stale station, control, combat, and
+> stamina assumptions before further implementation is checked off.
 
 Proves the full **train → grow → get killed → keep going** loop before any content scaling.
 
