@@ -18,6 +18,7 @@
 local SUITES = {
 	{ Name = "Formulas", Module = require("../src/ReplicatedStorage/Modules/Formulas") },
 	{ Name = "NumberFormat", Module = require("../src/ReplicatedStorage/Modules/NumberFormat") },
+	{ Name = "AnalyticsSchema", Module = require("../src/ReplicatedStorage/Modules/AnalyticsSchema") },
 }
 
 local total = 0

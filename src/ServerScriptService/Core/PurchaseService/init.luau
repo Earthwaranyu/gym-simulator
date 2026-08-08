@@ -23,6 +23,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local Types = require(ReplicatedStorage.Modules.Types)
@@ -31,6 +32,11 @@ local PurchaseService = {
 	Name = "PurchaseService",
 	Priority = 21,
 }
+
+--- (player, productId) — a Robux prompt was opened.
+PurchaseService.ProductPrompted = Signal.new()
+--- (player, productId, result) — "Granted", "Declined", or "Failed".
+PurchaseService.PurchaseResolved = Signal.new()
 
 local products: { [string]: Types.Product } = {}
 local devProductsByAssetId: { [number]: Types.Product } = {}
@@ -151,9 +157,11 @@ function PurchaseService:_processReceipt(receiptInfo: any): Enum.ProductPurchase
 	local ok, granted = pcall(product.Grant, player)
 	if not ok then
 		warn(`[PurchaseService] Grant for "{product.Id}" errored: {granted}`)
+		PurchaseService.PurchaseResolved:Fire(player, product.Id, "Failed")
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	if granted ~= true then
+		PurchaseService.PurchaseResolved:Fire(player, product.Id, "Failed")
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
@@ -161,6 +169,8 @@ function PurchaseService:_processReceipt(receiptInfo: any): Enum.ProductPurchase
 	-- nothing: the retry finds the record and returns PurchaseGranted.
 	data.PurchaseHistory[purchaseKey] = true
 	DataService:MarkDirty(player)
+
+	PurchaseService.PurchaseResolved:Fire(player, product.Id, "Granted")
 
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
@@ -189,17 +199,25 @@ function PurchaseService:Start()
 			MarketplaceService:PromptProductPurchase(player, product.AssetId)
 		end
 
+		PurchaseService.ProductPrompted:Fire(player, product.Id)
+
 		return true, nil
 	end)
 
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
 		function(player: Player, gamePassId: number, wasPurchased: boolean)
 			if not wasPurchased then
+				for _, product in gamepasses do
+					if product.AssetId == gamePassId then
+						PurchaseService.PurchaseResolved:Fire(player, product.Id, "Declined")
+					end
+				end
 				return
 			end
 			for _, product in gamepasses do
 				if product.AssetId == gamePassId then
 					product.Grant(player)
+					PurchaseService.PurchaseResolved:Fire(player, product.Id, "Granted")
 				end
 			end
 		end

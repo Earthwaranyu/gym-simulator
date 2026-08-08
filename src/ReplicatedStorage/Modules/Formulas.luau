@@ -42,13 +42,23 @@ end
 
 -- === Token multipliers ======================================================
 
+-- Safety rail: the highest level MultiplierValue will accept. 2^128 ≈ 3.4e38,
+-- which is large but finite and fits comfortably in a double. The cost curve
+-- puts level 60 far beyond any reachable token count, so this cap is a data
+-- hygiene guard, not a gameplay limit.
+Formulas.MULTIPLIER_LEVEL_CAP = 128
+
 --[[
 	The multiplier granted by owning `level` upgrades of a stat. Level 0 is 1x.
-	Linear at +25% per level, so the value is predictable while the COST is what
-	curves — that reads better in UI than a compounding multiplier.
+	Each level doubles the previous value: 2^level. The doubling reads cleanly
+	in UI ("2x → 4x → 8x") and gives every purchase the same *relative* impact
+	while the exponential COST curve gates pacing.
+
+	Level is clamped to MULTIPLIER_LEVEL_CAP so the value can never reach inf
+	and poison a saved profile.
 ]]
 function Formulas.MultiplierValue(level: number): number
-	return 1 + level * 0.25
+	return 2 ^ math.min(level, Formulas.MULTIPLIER_LEVEL_CAP)
 end
 
 --[[
@@ -238,7 +248,11 @@ function Formulas.RunSelfTest(): { string }
 	end
 
 	check("level 0 multiplier is 1x", Formulas.MultiplierValue(0) == 1)
-	check("multiplier grows with level", Formulas.MultiplierValue(4) > Formulas.MultiplierValue(3))
+	check("multiplier doubles each level", Formulas.MultiplierValue(5) == 2 * Formulas.MultiplierValue(4))
+	check(
+		"multiplier stays finite at cap",
+		Formulas.MultiplierValue(Formulas.MULTIPLIER_LEVEL_CAP) < math.huge
+	)
 	check("multiplier cost grows", Formulas.MultiplierCost(10) > Formulas.MultiplierCost(9))
 	check("first upgrade is affordable", Formulas.MultiplierCost(0) <= 10)
 

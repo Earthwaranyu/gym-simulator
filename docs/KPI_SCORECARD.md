@@ -1,11 +1,12 @@
-# KPI Scorecard — v1 (2026-08-08)
+# KPI Scorecard — v1.1 (2026-08-08)
 
 The one scorecard. If a number is not on this page it does not get optimized, and if it is
 on this page it has an owner, a source, a cadence, and a decision it feeds.
 
 Counts and shipped-feature claims come from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md).
-Instrumentation status comes from `AnalyticsService.luau` as it exists today — most rows
-are **NOT WIRED**, and #98 (analytics contract v2) is the item that fixes that. Nothing
+Instrumentation status comes from `AnalyticsService.luau` and `AnalyticsSchema.luau` as
+they exist today. #98 wired most of the gameplay rows; what remains NOT WIRED is mostly
+reliability sampling and systems that do not exist yet (invites, per-item views). Nothing
 here may be reported as a measured result until its row reads WIRED.
 
 ## Product brief
@@ -77,35 +78,35 @@ incomplete or unvalidated · **NOT WIRED** = must be added by #98.
 | Metric | Definition | Source | Status |
 |---|---|---|---|
 | qPTR | qualified play-through rate as Roblox defines it | Creator Dashboard | external |
-| Qualified plays by source | qualified plays split by acquisition source | Dashboard + `source` event field | NOT WIRED |
+| Qualified plays by source | qualified plays split by acquisition source | `AcquisitionSource` + Dashboard | PARTIAL (Direct vs Teleport only) |
 | Source quality | D7 of each source's cohort, not its click volume | joined + D7 by source | NOT WIRED |
 
 ### First delight — *Onboarding owner, weekly*
 
 | Metric | Definition | Source | Status |
 |---|---|---|---|
-| Join → first rep | seconds from `Joined` to `FirstRep` | funnel, needs timestamps | PARTIAL (steps fire, timing not captured) |
-| Join → first upgrade | seconds from `Joined` to `FirstMultiplier` | funnel | NOT WIRED (step declared, never fired) |
-| Join → first flight | seconds to first flight toggle | new event | NOT WIRED |
+| Join → first rep | seconds from `Joined` to `FirstRep` | funnel | WIRED (step; timing from row timestamps) |
+| Join → first upgrade | seconds from `Joined` to `FirstMultiplier` | funnel | WIRED (`MultiplierPurchased`) |
+| Join → first flight | seconds to first flight toggle | `FirstFlight` (client-reported) | WIRED |
 | Onboarding completion | share of new players finishing the #109 path | new events | NOT WIRED (path does not exist yet) |
-| 5-/10-minute survival | share of sessions still active at 5 / 10 min | session end event | NOT WIRED |
+| 5-/10-minute survival | share of sessions still active at 5 / 10 min | `SessionEnd.Seconds` | WIRED |
 
 ### Engagement and retention — *Loop owner, weekly*
 
 | Metric | Definition | Source | Status |
 |---|---|---|---|
 | D1 / D7 / D30 | Roblox-defined return rates | Dashboard | external |
-| Median session length | p50 session duration | session end | NOT WIRED |
-| Activity variety | distinct activity types per session (train / fight / travel / quest / shop / map) | custom events | NOT WIRED |
+| Median session length | p50 session duration | `SessionEnd.Seconds` | WIRED |
+| Activity variety | distinct activity types per session (train / fight / travel / quest / shop / fly) | `SessionEnd.Activities` | WIRED |
 | Rank pacing | time to each rank crossing | `RankReached` custom event | WIRED (no timing) |
-| Interruption rate | training sets ended by death, per player-hour | new event | NOT WIRED |
-| PvP-victim churn | D1/D7 of players killed ≥N times in their first session vs those not | kill + session events | NOT WIRED |
+| Interruption rate | training sets ended by death, per player-hour | `Interruption`, `TrainingEnded.Reason` | WIRED |
+| PvP-victim churn | D1/D7 of players killed ≥N times in their first session vs those not | `Death`, `SessionEnd.Deaths` + Dashboard retention | PARTIAL (events wired, join needs Dashboard) |
 
 ### Social — *Social owner, weekly*
 
 | Metric | Definition | Source | Status |
 |---|---|---|---|
-| Intentional co-play sessions | share of sessions with a friend present by intent | friend-context event | NOT WIRED |
+| Intentional co-play sessions | share of sessions with a friend present by intent | `CoPlayContext` | PARTIAL (presence wired; `Intentional` is always false until #124's invite flow) |
 | Invite conversion | invites accepted / invites sent | new events | NOT WIRED (no invite system) |
 | 7-day co-play days/user | per-user days with intentional co-play | Dashboard + events | NOT WIRED |
 
@@ -113,8 +114,8 @@ incomplete or unvalidated · **NOT WIRED** = must be added by #98.
 
 | Metric | Definition | Source | Status |
 |---|---|---|---|
-| Token source/sink balance | tokens granted vs spent per player-hour | `LogEconomy` | PARTIAL (source wired, sinks incomplete) |
-| First purchase | time and step of first paid conversion | funnel `FirstPurchase` | NOT WIRED (step declared, never fired) |
+| Token source/sink balance | tokens granted vs spent per player-hour | `LogEconomy` | PARTIAL (accrual source and multiplier sink wired; cash sinks still missing) |
+| First purchase | time and step of first paid conversion | funnel `FirstPurchase` | WIRED (`PurchaseResolved`) — untestable until an AssetId is set |
 | Payer rate / ARPDAU / 7-day spend days | standard payer metrics | Dashboard | external |
 | Grant idempotency | granted-exactly-once rate; target **100%** | receipt journal (#105) | NOT WIRED |
 | Non-payer guardrail | D1/D7 of non-payers before vs after any store change | cohort split | NOT WIRED |

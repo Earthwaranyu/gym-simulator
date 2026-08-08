@@ -3,9 +3,10 @@
 	CombatService — server-authoritative PvP, and the reason this game exists.
 
 	Players can attack each other anywhere except tagged SafeZone volumes, including
-	while their victim is mid-set at a machine. Landing a hit on someone who is
-	training breaks their combo and drains their stamina, which is the whole hook:
-	killing a trainer is annoying by design, but it never costs them saved progress.
+	while their victim is mid-set at a machine. Hits deal damage but do not knock
+	the victim off their machine — only dying does that. The attacker must commit
+	to a full kill to disrupt someone's set, which makes the decision to fight
+	meaningful rather than just an annoyance.
 
 	Abilities live in the Abilities/ folder next to this file and are discovered at
 	startup. Because the Loader does not descend into a ModuleScript's children, they
@@ -49,7 +50,6 @@ local recentKills: { [Player]: { [Player]: number } } = {}
 
 local DataService: any = nil
 local StatService: any = nil
-local TrainingService: any = nil
 local FlightService: any = nil
 
 -- (victim, attacker, damage, isKill)
@@ -62,7 +62,6 @@ CombatService.PlayerKilled = Signal.new()
 function CombatService:Init()
 	DataService = Loader.Get("DataService")
 	StatService = Loader.Get("StatService")
-	TrainingService = Loader.Get("TrainingService")
 	FlightService = Loader.Get("FlightService")
 
 	self:_loadAbilities()
@@ -233,15 +232,12 @@ function CombatService:ApplyDamage(
 	humanoid:TakeDamage(damage)
 	local isKill = humanoid.Health <= 0
 
-	-- The hook. Training is automatic and costs nothing, so knocking the victim off
-	-- the machine and resetting their combo is the entire penalty for being attacked
-	-- mid-set — and the entire reason attacking a trainer is worth doing.
-	if TrainingService:IsTraining(victim) then
-		TrainingService:Interrupt(victim)
-	end
+	-- Training players stay on their machine when hit — damage accumulates but they
+	-- keep training until they die. Only death dismounts them (handled by
+	-- TrainingService's humanoid.Died listener). This makes the attacker commit to
+	-- a full kill rather than cheaply disrupting every set they walk past.
 
-	-- Grounded for the same window. Without this the victim just takes off, and the
-	-- interrupt costs them a few seconds of reps instead of a fight.
+	-- Grounded so a flying player cannot simply escape.
 	FlightService:Ground(victim)
 
 	Net.Event("CombatFeedback"):FireClient(attacker, { Kind = "Hit", Damage = damage, Victim = victim.Name })

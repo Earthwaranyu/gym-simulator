@@ -868,7 +868,7 @@ function MenuController:_renderUpgrades(parent: Frame)
 		label.Position = UDim2.fromOffset(0, 6)
 		label.TextColor3 = definition.Color
 		label.Text = `{definition.DisplayName}  <font color="#8A93A8">lvl {level} · </font>`
-			.. `x{string.format("%.2f", Formulas.MultiplierValue(level))}`
+			.. `x{NumberFormat.Format(Formulas.MultiplierValue(level))}`
 
 		-- What the stat is currently worth, from the stat's own definition. The
 		-- number you are about to buy a multiplier on, shown before you buy it.

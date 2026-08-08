@@ -716,12 +716,22 @@ Execution rules:
       *Done: `docs/KPI_SCORECARD.md` v1 — product brief, six owner roles, four cadences,
       the internal gates, and every metric tagged WIRED / PARTIAL / NOT WIRED. Most are
       NOT WIRED today; #98 is what closes that, and a NOT WIRED metric may not be cited.*
-- [ ] 98. **Analytics contract v2.** Version a server-validated event schema and wire the
+- [x] 98. **Analytics contract v2.** Version a server-validated event schema and wire the
       missing FirstMultiplier and FirstPurchase steps plus moved, prompt seen, training
       started/ended, map opened, first flight, first travel, zone/rank unlock, interruption,
       death/kill, quest completion, item viewed, purchase prompt/result/grant, session end,
       device/input, locale, acquisition source, and friend/co-play context. Add funnel,
       custom, and economy self-tests; telemetry failure can never stop gameplay.
+      *Done: `AnalyticsSchema.luau` is the versioned contract (v2) — every event, its
+      funnel step, its payload shape, and whether a client may report it. Validation
+      rejects unknown names/fields, wrong types, NaN/Inf, and oversized strings; its
+      self-test runs in `scripts/selftest.luau` and again at server Init. Wired the
+      dead FirstMultiplier/FirstPurchase steps plus training start/end, interruption,
+      death/kill, quest, zone/rank, travel, purchase prompt/result/grant, session end,
+      and co-play. `AnalyticsController` reports the client-only facts (device, locale,
+      moved, prompt seen, map opened, first flight) through one rate-limited remote
+      allowlisted by `ClientReportable`. Every emit is pcall-wrapped and every failure
+      warns and returns false.*
 - [ ] 99. **Feature flags and honest experiments.** Add persistent deterministic cohorts,
       typed remote configuration, safe defaults, per-feature kill switches, exposure
       logging, and a Studio override. Flags may select config/UX, never trust client

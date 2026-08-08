@@ -2,16 +2,15 @@
 --[[
 	TrainingController — the client's view of what the player is training.
 
-	Training is automatic and entirely server-driven: walking near a machine starts it,
-	walking away stops it. So this controller sends nothing at all. It exists purely so
-	the HUD has somewhere to read current state from, and so a panel built later still
-	shows correct values if it loads after the first push.
-
-	There is no prompt to trigger and no rep input to bind — with no remote to call,
-	there is nothing here for an exploiter to abuse.
+	Training is automatic and entirely server-driven: holding E on a station mounts
+	the player, and reps tick on their own. This controller reads that state for the
+	HUD, and also lets the player cancel training by pressing Space or jumping —
+	those fire a lightweight StopTraining remote that the server validates.
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Signal = require(ReplicatedStorage.Packages.Signal)
 local Net = require(ReplicatedStorage.Modules.Net)
@@ -53,12 +52,56 @@ function TrainingController:GetStaggerRemaining(): number
 	return math.max(0, state.StaggerSeconds - (os.clock() - receivedAt))
 end
 
+--[[
+	Asks the server to stop the current training session. Called when the player
+	presses Space or jumps. The server re-checks that they are actually training;
+	a spoofed call by a non-training player is a harmless no-op.
+]]
+function TrainingController:RequestStop()
+	if not self:IsTraining() then
+		return
+	end
+	Net.Event("StopTraining"):FireServer()
+end
+
 function TrainingController:Init()
 	Net.Event("TrainingChanged").OnClientEvent:Connect(function(newState: Types.TrainingState)
 		state = newState
 		receivedAt = os.clock()
 		TrainingController.Changed:Fire(state)
 	end)
+end
+
+function TrainingController:Start()
+	-- Space key: cancel training. gameProcessedEvent is respected so typing in chat
+	-- does not dismount the player.
+	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
+		if gameProcessed then
+			return
+		end
+		if input.KeyCode == Enum.KeyCode.Space then
+			self:RequestStop()
+		end
+	end)
+
+	-- Also watch for jumps triggered by mobile or gamepad (Humanoid.StateChanged),
+	-- which may not come through as a Space key press.
+	local player = Players.LocalPlayer
+	local function watchCharacter(character: Model)
+		local humanoid = character:WaitForChild("Humanoid", 10)
+		if humanoid and humanoid:IsA("Humanoid") then
+			humanoid.StateChanged:Connect(function(_old: Enum.HumanoidStateType, new: Enum.HumanoidStateType)
+				if new == Enum.HumanoidStateType.Jumping then
+					self:RequestStop()
+				end
+			end)
+		end
+	end
+
+	if player.Character then
+		watchCharacter(player.Character)
+	end
+	player.CharacterAdded:Connect(watchCharacter)
 end
 
 return TrainingController

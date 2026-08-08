@@ -34,6 +34,7 @@ local Net = require(ReplicatedStorage.Modules.Net)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
+local Signal = require(ReplicatedStorage.Packages.Signal)
 
 -- Long enough that travel is a decision rather than a way to flicker around the
 -- map, short enough that a mistaken destination is not a punishment.
@@ -50,6 +51,9 @@ local TravelService = {
 	Name = "TravelService",
 	Priority = 17,
 }
+
+--- (player, zoneId, travelId) — fired after a successful arrival.
+TravelService.Traveled = Signal.new()
 
 local StatService: any = nil
 local CombatService: any = nil
@@ -296,6 +300,8 @@ function TravelService:Travel(player: Player, travelId: string): (boolean, strin
 		player:RequestStreamAroundAsync(landing.Position, STREAM_WAIT)
 	end)
 	character:PivotTo(landing)
+
+	TravelService.Traveled:Fire(player, zone.Id, travelId)
 
 	return true, `Travelled to {zone.DisplayName} {definition.DisplayName}.`
 end

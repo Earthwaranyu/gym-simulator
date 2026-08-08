@@ -207,7 +207,7 @@ function HudController:_refreshProfile()
 		-- tooltip-ish second line only when there is one to show, so an unupgraded
 		-- stat is not carrying a permanent "x1.00".
 		local suffix = if level > 0
-			then ` <font color="#8A93A8">x{string.format("%.1f", Formulas.MultiplierValue(level))}</font>`
+			then ` <font color="#8A93A8">x{NumberFormat.Format(Formulas.MultiplierValue(level))}</font>`
 			else ""
 		label.Text = `<b>{name}</b> {NumberFormat.Format(data.Stats[statId] or 0)}{suffix}`
 	end

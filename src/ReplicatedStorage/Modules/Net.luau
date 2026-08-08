@@ -37,6 +37,8 @@ local EVENT_NAMES: { string } = {
 	"CombatFeedback",
 	-- Server -> client: transient toast/notification text.
 	"Notify",
+	-- Client -> server: the player wants to stop training (spacebar / jump).
+	"StopTraining",
 	-- Server -> ALL clients: someone was knocked out. Drives the kill feed.
 	"KillFeed",
 	-- Server -> client: the public roster (power, rank, reputation, bounty) for the
@@ -44,6 +46,10 @@ local EVENT_NAMES: { string } = {
 	"RosterChanged",
 	-- Server -> client: quest list with current progress.
 	"QuestsChanged",
+	-- Client -> server: report a client-only analytics fact (device, locale, a panel
+	-- opened). The server validates the name against AnalyticsSchema and drops
+	-- anything not marked ClientReportable, so this grants nothing.
+	"AnalyticsReport",
 }
 
 local FUNCTION_NAMES: { string } = {

@@ -5,7 +5,8 @@
 	Holding E on a station's proximity prompt puts the player onto one of the
 	machine's training spots: they are moved onto the anchor, locked in place, and
 	posed into the machine's exercise. Reps then tick on their own — there is no
-	clicking and no stamina. Holding E again gets them off.
+	clicking and no stamina. Holding E again, pressing Space, or jumping gets
+	them off.
 
 	Everything stays server-authoritative. ProximityPrompt.Triggered fires on the
 	server and Roblox validates the distance before it does, so mounting needs no
@@ -472,7 +473,8 @@ function TrainingService:_onTriggered(player: Player, station: Instance)
 	end
 
 	self:_mount(player, station, record, anchorIndex)
-	Net.Event("Notify"):FireClient(player, `Training on {definition.DisplayName} — hold E to stop`)
+	Net.Event("Notify")
+		:FireClient(player, `Training on {definition.DisplayName} — press Space or hold E to stop`)
 end
 
 --[[
@@ -600,6 +602,11 @@ function TrainingService:_step(player: Player, session: Session, now: number)
 end
 
 function TrainingService:Start()
+	-- Client can request to stop training by pressing Space or jumping.
+	Net.BindEvent("StopTraining", 4, function(player: Player)
+		self:Stop(player)
+	end)
+
 	for _, station in CollectionService:GetTagged(EquipmentConfig.STATION_TAG) do
 		self:_bindStation(station)
 	end

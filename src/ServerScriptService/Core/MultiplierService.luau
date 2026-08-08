@@ -14,11 +14,13 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local Types = require(ReplicatedStorage.Modules.Types)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 
 local MODIFIER_ID = "TokenUpgrades"
 
@@ -26,6 +28,9 @@ local MultiplierService = {
 	Name = "MultiplierService",
 	Priority = 70,
 }
+
+--- (player, statId, newLevel) — fired after tokens are spent and the modifier applies.
+MultiplierService.MultiplierPurchased = Signal.new()
 
 local DataService: any = nil
 local StatService: any = nil
@@ -118,11 +123,13 @@ function MultiplierService:Purchase(player: Player, statId: Types.StatId): (bool
 	self:_refresh(player)
 	DataService:MarkDirty(player)
 
+	MultiplierService.MultiplierPurchased:Fire(player, statId, level + 1)
+
 	local definition = StatConfig.Get(statId)
 	local displayName = if definition ~= nil then definition.DisplayName else statId
 	local newMultiplier = Formulas.MultiplierValue(level + 1)
 
-	return true, `{displayName} multiplier is now {string.format("%.2f", newMultiplier)}x`
+	return true, `{displayName} multiplier is now {NumberFormat.Format(newMultiplier)}x`
 end
 
 return MultiplierService
