@@ -709,6 +709,40 @@ doubles every level.
       non-overlapping buttons, and `AddStat(player, "Arms", 0.25)` grants exactly 0.25
       while a mistyped stat id is refused.
 
+## Phase 21 — One button, one screen, and a click that trains
+
+#97 put three tabs behind one Menu tile, which meant pressing Menu still showed a
+strip of Info / Shop / Settings — the bar's own navigation, drawn a second time
+inside the thing the bar had just opened. The five stat slots along the bottom were
+the largest element in the HUD and did nothing but open a list of locations.
+
+- [x] 98. **A button per screen, and left-click training.** The tab strip is gone
+      entirely; `MenuBarController` draws five tiles — Info, Shop, Settings, Map, Rank —
+      and each opens only its own panel. The panel reclaims the 38 pixels the strip
+      occupied, and the lit tile is now the only thing saying where you are.
+      The Train tab is gone as a destination: its muscle picker and station list render
+      underneath the map, because "where do I train Back" is a question about the map.
+      `_renderTrain` gained a `baseOrder` offset so the two sections cannot interleave.
+      The bottom dock drops every value, name, multiplier and icon and becomes five
+      numbered squares that show one thing: which muscle the left mouse button trains.
+      The picked slot is painted in its own stat colour rather than the shared accent,
+      so it names the muscle and not merely the fact that something is selected.
+      **`ManualTrainingService`** is the new mechanic. Keys 1-5 pick a muscle, and
+      holding or clicking left mouse trains it at `BASE_RATE` 1/s through `StatService`,
+      so the modifier stack turns it into the multiplier the Info screen advertises.
+      The server owns the clock: the client sends "still holding, on this muscle" and
+      never an amount, and payout is rate x elapsed time, so spamming clicks earns
+      exactly what holding earns and an auto-clicker gains nothing. A hold expires
+      0.9s after the last ping, a dead player earns nothing, and while mounted on a
+      machine the manual rate applies only to that machine's own muscle — so a chest
+      press with Chest held pays machine + manual, and Core held there pays neither.
+      Verified in a clean Studio play session: the bar draws INFO/SHOP/SETTINGS/MAP/RANK,
+      the dock is 268px with slot 1 picked on spawn, no panel contains a tab strip, Map
+      renders the muscle chips and all seven Legs stations beneath the board, and Core
+      raised to x4 through the real purchase remote gained 9.27 over ~2.3s — **4.03/s**.
+      Spam-immunity measured directly: 40 clicks in one second paid 1.55 while a single
+      ping then idling paid 0.90, the exact activity window.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

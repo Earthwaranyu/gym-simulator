@@ -29,15 +29,18 @@ local Icons = require(ReplicatedStorage.Modules.Icons)
 -- authority; this only decides when the pip looks ready.
 local PUNCH_COOLDOWN = 0.6
 local FEED_LINES = 4
--- Wide enough for the worst case a chip has to hold: a stat in the trillions with
--- a multiplier beside it, which is about 110px of text at this size.
-local CHIP_WIDTH = 108
+-- A slot is a square big enough to hit with a thumb and small enough that five of
+-- them plus their gaps stay narrower than the vitals panel above.
+local SLOT_SIZE = 44
+local SLOT_GAP = 6
+-- How often a held mouse button re-tells the server it is still held. Comfortably
+-- inside the server's activity window so holding never flickers off, and slow
+-- enough that it costs nothing.
+local PING_INTERVAL = 0.4
 -- Which stat the fist belongs to. Named rather than inlined because two places
 -- below branch on it, and "Arms" appearing twice as a literal is how those two
 -- quietly disagree later.
 local ARMS_STAT = "Arms"
--- How long a press has to last to count as a hold rather than a tap.
-local HOLD_SECONDS = 0.35
 
 local HudController = {
 	Name = "HudController",
@@ -49,7 +52,13 @@ local TrainingController: any = nil
 local CombatController: any = nil
 local MenuController: any = nil
 
-local statLabels: { [Types.StatId]: TextLabel } = {}
+type Slot = { Button: TextButton, Stroke: UIStroke, Number: TextLabel }
+
+local slotButtons: { [Types.StatId]: Slot } = {}
+-- Which muscle the left mouse button trains. Never nil once Start has run: the
+-- click has to do something, so there is always a slot selected.
+local selectedStat: Types.StatId = StatConfig.List[1].Id
+local clicking = false
 local powerLabel: TextLabel
 local tokenLabel: TextLabel
 local healthBar: UI.Bar
@@ -140,18 +149,22 @@ function HudController:_build()
 	tokenGlyph.Parent = headline
 	Icons.Draw("Token", tokenGlyph, UI.Palette.Token, UI.Palette.Backdrop)
 
-	-- Bottom-centre: five persistent stat buttons, inspired by the reference game's
-	-- compact stat hotbar but redrawn in this project's gritty gym style. Clicking a
-	-- muscle opens its single current training destination in the Train menu.
+	-- Bottom-centre: which muscle the left mouse button is currently training.
+	--
+	-- This was five wide chips carrying each stat's name, value and multiplier. All
+	-- of that is on the Info screen, and repeating it across the bottom of the
+	-- screen was the largest thing in the HUD while being the least urgent. What is
+	-- urgent is one bit of state: which slot the click is going to train. So the
+	-- dock is five numbered squares and nothing else.
 	local chips = UI.Panel("TrainingDock", screen)
 	chips.AnchorPoint = Vector2.new(0.5, 1)
 	chips.Position = UDim2.new(0.5, 0, 1, -12)
-	chips.Size = UDim2.fromOffset(580, 64)
+	chips.Size = UDim2.fromOffset(SLOT_SIZE * 5 + SLOT_GAP * 4 + 24, SLOT_SIZE + 20)
 	chips.BackgroundTransparency = 0.16
 
 	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.fromOffset(CHIP_WIDTH, 48)
-	grid.CellPadding = UDim2.fromOffset(4, 0)
+	grid.CellSize = UDim2.fromOffset(SLOT_SIZE, SLOT_SIZE)
+	grid.CellPadding = UDim2.fromOffset(SLOT_GAP, 0)
 	grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	grid.VerticalAlignment = Enum.VerticalAlignment.Center
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
@@ -172,80 +185,29 @@ function HudController:_build()
 		corner.CornerRadius = UDim.new(0, 7)
 		corner.Parent = button
 
-		local accent = Instance.new("Frame")
-		accent.Name = "Accent"
-		accent.Size = UDim2.fromOffset(5, 48)
-		accent.BackgroundColor3 = definition.Color
-		accent.BorderSizePixel = 0
-		accent.Parent = button
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = definition.Color
+		stroke.Thickness = 2
+		stroke.Transparency = 1
+		stroke.Parent = button
 
-		-- The slot number, as drawn in the sketch. It is what the number keys bind to,
-		-- so the binding is legible without a tutorial.
-		local slot = UI.Label("Slot", button)
-		slot.Position = UDim2.fromOffset(9, 2)
-		slot.Size = UDim2.fromOffset(12, 12)
-		slot.Font = UI.Font.Numeric
-		slot.TextSize = 11
-		slot.TextColor3 = UI.Palette.TextMuted
-		slot.Text = tostring(index)
+		local number = UI.Label("Slot", button)
+		number.Size = UDim2.fromScale(1, 1)
+		number.Font = UI.Font.Numeric
+		number.TextSize = 18
+		number.TextXAlignment = Enum.TextXAlignment.Center
+		number.Text = tostring(index)
 
-		-- Arms wears the fist: it is the muscle you train by punching, and slot one is
-		-- also the attack. Everything else gets the dumbbell.
-		local glyph = Instance.new("Frame")
-		glyph.Name = "Glyph"
-		glyph.BackgroundTransparency = 1
-		glyph.Position = UDim2.fromOffset(10, 16)
-		glyph.Size = UDim2.fromOffset(22, 22)
-		glyph.Parent = button
-		Icons.Draw(
-			if definition.Id == ARMS_STAT then "Fist" else "Train",
-			glyph,
-			definition.Color,
-			UI.Palette.Backdrop
-		)
+		slotButtons[definition.Id] = { Button = button, Stroke = stroke, Number = number }
 
-		local chip = UI.Label("Value", button)
-		chip.Position = UDim2.fromOffset(34, 3)
-		chip.Size = UDim2.new(1, -38, 1, -6)
-		chip.TextSize = 12
-		chip.TextColor3 = UI.Palette.Text
-		chip.TextWrapped = true
-		-- Numbers here run to the trillions. Truncating keeps a long one inside its
-		-- own chip rather than letting it run over the stat next to it.
-		chip.TextTruncate = Enum.TextTruncate.AtEnd
-		statLabels[definition.Id] = chip
-
-		-- Slot one is the fist, so tapping it throws a punch instead of opening a
-		-- menu: it is the one slot that is an action rather than a destination. The
-		-- Arms route is still reachable — hold the same slot for it, which is the
-		-- gesture the note in the training dock explains.
+		-- Tapping a slot picks it, the same as pressing its number. It no longer
+		-- opens anything: the station list moved to the Map button, because "where
+		-- can I train this" is a question about the map.
 		UI.Pressable(button, {
 			OnPress = function()
-				if definition.Id == ARMS_STAT then
-					CombatController:Attack()
-				end
+				self:_select(definition.Id)
 			end,
 		})
-
-		button.Activated:Connect(function()
-			if definition.Id ~= ARMS_STAT then
-				MenuController:OpenTrain(definition.Id)
-			end
-		end)
-
-		-- Hold to open the route, for every slot. On the fist that is the only way in;
-		-- on the others it is a second path to the same place a tap already opens.
-		local holdStarted: number? = nil
-		button.MouseButton1Down:Connect(function()
-			holdStarted = os.clock()
-		end)
-		button.MouseButton1Up:Connect(function()
-			local began = holdStarted
-			holdStarted = nil
-			if began ~= nil and os.clock() - began >= HOLD_SECONDS then
-				MenuController:OpenTrain(definition.Id)
-			end
-		end)
 	end
 
 	-- Bottom-centre: the vitals the player watches while training and fighting.
@@ -343,6 +305,44 @@ function HudController:_build()
 	goalBar.Root.Position = UDim2.fromOffset(0, 78)
 end
 
+--[[
+	Picks the muscle the left mouse button trains, and paints the strip to say so.
+
+	The selected slot is drawn in its own stat colour rather than in the shared
+	accent: five slots that all light up yellow tell you something is selected but
+	not which muscle it was, and the stat colours are already the game's wayfinding
+	everywhere else — the machine highlights, the map pins, the Info rows.
+]]
+function HudController:_select(statId: Types.StatId)
+	if StatConfig.Get(statId) == nil then
+		return
+	end
+	selectedStat = statId
+
+	for id, slot in slotButtons do
+		local definition = StatConfig.Get(id)
+		local chosen = id == statId
+		slot.Button.BackgroundColor3 = if chosen
+			then (if definition ~= nil then definition.Color else UI.Palette.Accent)
+			else UI.Palette.Backdrop
+		slot.Button.BackgroundTransparency = if chosen then 0.05 else 0.08
+		slot.Stroke.Transparency = if chosen then 0 else 1
+		slot.Number.TextColor3 = if chosen then UI.Palette.Backdrop else UI.Palette.TextMuted
+	end
+end
+
+--[[
+	Tells the server the click is happening.
+
+	Deliberately a "still going" ping rather than "grant me a rep": the server owns
+	the clock and pays by elapsed time, so spamming the button as fast as possible
+	earns exactly the same as holding it. That is the whole reason the client sends
+	no amount and the server trusts no number from here.
+]]
+function HudController:_trainPing()
+	Net.Event("ManualTrain"):FireServer(selectedStat)
+end
+
 function HudController:_pushFeed(text: string)
 	table.insert(feedLines, 1, text)
 	while #feedLines > FEED_LINES do
@@ -397,20 +397,6 @@ function HudController:_refreshProfile()
 
 	powerLabel.Text = `POWER  {NumberFormat.Format(Formulas.TotalPower(data.Stats))}`
 	tokenLabel.Text = `Tokens  {NumberFormat.Format(data.Tokens)}`
-
-	for statId, label in statLabels do
-		local definition = StatConfig.Get(statId)
-		local name = if definition ~= nil then definition.DisplayName else statId
-		local level = data.MultiplierLevels[statId] or 0
-
-		-- A chip has room for the name and the number. The multiplier moves to the
-		-- tooltip-ish second line only when there is one to show, so an unupgraded
-		-- stat is not carrying a permanent "x1.00".
-		local suffix = if level > 0
-			then ` <font color="#8A93A8">x{NumberFormat.Format(Formulas.MultiplierValue(level))}</font>`
-			else ""
-		label.Text = `<b>{name}</b> {NumberFormat.Format(data.Stats[statId] or 0)}{suffix}`
-	end
 end
 
 function HudController:_refreshVitals()
@@ -489,22 +475,57 @@ function HudController:Start()
 		end
 	end)
 
-	-- Number keys drive the dock, matching the slot numbers printed on it. Slot one
-	-- is the fist and punches; the rest open their muscle's route. F still punches
-	-- too — this adds a binding rather than moving one, because a player who learned
-	-- F should not have it taken away.
+	self:_select(selectedStat)
+
+	-- Number keys pick a slot, matching the numbers printed on it.
+	--
+	-- Enum.KeyCode.One..Five rather than indexing the enum by the digit character:
+	-- `Enum.KeyCode["1"]` is nil, so the old loop silently bound nothing.
+	local DIGITS = {
+		Enum.KeyCode.One,
+		Enum.KeyCode.Two,
+		Enum.KeyCode.Three,
+		Enum.KeyCode.Four,
+		Enum.KeyCode.Five,
+	}
+
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
 		if processed then
 			return
 		end
+
 		for index, definition in StatConfig.List do
-			if input.KeyCode == (Enum.KeyCode :: any)[`{index}`] then
-				if definition.Id == ARMS_STAT then
-					CombatController:Attack()
-				else
-					MenuController:OpenTrain(definition.Id)
-				end
-				break
+			if DIGITS[index] ~= nil and input.KeyCode == DIGITS[index] then
+				self:_select(definition.Id)
+				return
+			end
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			clicking = true
+			-- Arms is the fist, so a click that has someone in reach is a punch as
+			-- well as a rep. CombatService rejects it if the target is out of range
+			-- or immune, and the training ping is unaffected either way.
+			if selectedStat == ARMS_STAT then
+				CombatController:Attack()
+			end
+			self:_trainPing()
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			clicking = false
+		end
+	end)
+
+	-- Holding the button has to keep paying, and the server's window is short so it
+	-- can tell "stopped clicking" from "between clicks". Re-ping while held.
+	task.spawn(function()
+		while true do
+			task.wait(PING_INTERVAL)
+			if clicking then
+				self:_trainPing()
 			end
 		end
 	end)

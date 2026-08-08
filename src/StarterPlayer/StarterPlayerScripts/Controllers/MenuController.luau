@@ -46,7 +46,6 @@ local ToastController: any = nil
 local screen: ScreenGui
 local body: Frame
 local titleLabel: TextLabel
-local tabStrip: Frame
 local isOpen = false
 local activeTab = "Info"
 local quests: { any } = {}
@@ -246,14 +245,6 @@ function MenuController:Init()
 			end,
 		},
 		{
-			Id = "Train",
-			DisplayName = "Train",
-			OnBar = false,
-			Render = function(parent)
-				self:_renderTrain(parent)
-			end,
-		},
-		{
 			Id = "Quests",
 			DisplayName = "Quests",
 			OnBar = false,
@@ -272,10 +263,6 @@ function MenuController:Init()
 		},
 	}
 end
-
--- Which tabs the strip across the top of the menu draws. The others are real tabs
--- that Open() can reach, they simply have their own button somewhere else.
-local STRIP_TABS = { Info = true, Shop = true, Settings = true }
 
 -- Pull every map-enabled training station from the server once.
 function MenuController:_fetchDestinations()
@@ -868,6 +855,12 @@ function MenuController:_renderMap(parent: Frame)
 		local _, message = Net.Function("PromptProduct"):InvokeServer("FastTravel")
 		toast(message)
 	end)
+
+	-- The muscle picker and its station list, which used to be a Train tab of its
+	-- own. "Where do I train Back" is a question about the map, so it is answered on
+	-- the map rather than one screen away from it — and the stat slots along the
+	-- bottom of the HUD no longer open anything, so this is the only route to it.
+	self:_renderTrain(parent, 10)
 end
 
 -- The selected machine, its stat, tier multiplier and travel button.
@@ -1004,13 +997,13 @@ function MenuController:_pollTrainPanel()
 	local token = trainPollToken
 
 	task.spawn(function()
-		while token == trainPollToken and isOpen and activeTab == "Train" do
+		while token == trainPollToken and isOpen and activeTab == "Map" do
 			task.wait(2)
-			if token ~= trainPollToken or not isOpen or activeTab ~= "Train" then
+			if token ~= trainPollToken or not isOpen or activeTab ~= "Map" then
 				return
 			end
 			self:_fetchSpotStatus()
-			if token == trainPollToken and isOpen and activeTab == "Train" then
+			if token == trainPollToken and isOpen and activeTab == "Map" then
 				self:_refresh()
 			end
 		end
@@ -1025,7 +1018,13 @@ end
 	see every station in the game that trains it, sorted by what it is worth, with the
 	ones you can use right now first and a live free/busy count on each.
 ]]
-function MenuController:_renderTrain(parent: Frame)
+--
+-- `baseOrder` shifts every LayoutOrder this function assigns. It exists because the
+-- panel is now shared with the map above it: without the offset the muscle chips
+-- (order 1) would sort into the same slot as the map board and the two sections
+-- would interleave.
+function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
+	local base = baseOrder or 0
 	self:_fetchDestinations()
 
 	local data = ProfileController:Get()
@@ -1051,7 +1050,7 @@ function MenuController:_renderTrain(parent: Frame)
 	chips.Name = "Muscles"
 	chips.BackgroundTransparency = 1
 	chips.Size = UDim2.new(1, 0, 0, 38)
-	chips.LayoutOrder = 1
+	chips.LayoutOrder = base + 1
 	chips.Parent = parent
 
 	local chipLayout = Instance.new("UIListLayout")
@@ -1133,7 +1132,7 @@ function MenuController:_renderTrain(parent: Frame)
 
 	local summary = UI.Label("Summary", parent)
 	summary.Size = UDim2.new(1, 0, 0, 20)
-	summary.LayoutOrder = 2
+	summary.LayoutOrder = base + 2
 	summary.TextSize = 13
 	summary.TextColor3 = UI.Palette.TextMuted
 	local open = 0
@@ -1152,7 +1151,7 @@ function MenuController:_renderTrain(parent: Frame)
 	if #spots == 0 then
 		local empty = UI.Label("Empty", parent)
 		empty.Size = UDim2.new(1, 0, 0, 40)
-		empty.LayoutOrder = 3
+		empty.LayoutOrder = base + 3
 		empty.TextColor3 = UI.Palette.TextMuted
 		empty.Text = "The map is still loading."
 		return
@@ -1163,7 +1162,7 @@ function MenuController:_renderTrain(parent: Frame)
 		local status = spotStatus[destination.Id]
 		local here = currentSpotId == destination.Id
 
-		local line = row(parent, 54, index + 2)
+		local line = row(parent, 54, base + index + 3)
 
 		local title = UI.Label("Title", line)
 		title.Size = UDim2.new(1, -110, 0, 24)
@@ -1225,7 +1224,7 @@ function MenuController:OpenTrain(statId: string)
 		return
 	end
 	selectedMuscle = statId
-	self:Open("Train")
+	self:Open("Map")
 end
 
 --[[
@@ -1551,48 +1550,6 @@ function MenuController:_refresh()
 			break
 		end
 	end
-
-	self:_renderTabStrip()
-end
-
-function MenuController:_renderTabStrip()
-	tabStrip:ClearAllChildren()
-
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 6)
-	layout.Parent = tabStrip
-
-	for index, tab in tabs do
-		if not STRIP_TABS[tab.Id] then
-			continue
-		end
-
-		local btn = Instance.new("TextButton")
-		btn.BackgroundColor3 = if tab.Id == activeTab then UI.Palette.Accent else UI.Palette.Backdrop
-		btn.BackgroundTransparency = if tab.Id == activeTab then 0 else 0.4
-		btn.BorderSizePixel = 0
-		-- Three tabs share the width the seven used to divide between them.
-		btn.Size = UDim2.fromOffset(132, 32)
-		btn.LayoutOrder = index
-		btn.Font = UI.Font.Heading
-		btn.TextSize = 14
-		btn.TextColor3 = if tab.Id == activeTab then UI.Palette.Backdrop else UI.Palette.Text
-		btn.Text = tab.DisplayName
-		btn.Parent = tabStrip
-
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 6)
-		corner.Parent = btn
-
-		btn.Activated:Connect(function()
-			activeTab = tab.Id
-			self:_enterTab()
-			self:_refresh()
-			self:_publish()
-		end)
-	end
 end
 
 --[[
@@ -1697,7 +1654,7 @@ end
 function MenuController:_enterTab()
 	self:_fetchTravelAccess()
 
-	if activeTab == "Train" then
+	if activeTab == "Map" then
 		self:_fetchSpotStatus()
 		self:_pollTrainPanel()
 	else
@@ -1742,19 +1699,16 @@ function MenuController:_build()
 		self:Toggle()
 	end)
 
-	tabStrip = Instance.new("Frame")
-	tabStrip.Name = "Tabs"
-	tabStrip.BackgroundTransparency = 1
-	tabStrip.Position = UDim2.fromOffset(0, 34)
-	tabStrip.Size = UDim2.new(1, 0, 0, 30)
-	tabStrip.Parent = panel
-
+	-- No tab strip. Every screen has its own button on the bar, so a strip here
+	-- would be a second copy of that navigation inside the thing it opened — and
+	-- it cost the panel 38 vertical pixels to say nothing new. The title tells you
+	-- where you are; the bar tile stays lit to say the same thing.
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "Body"
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
-	scroll.Position = UDim2.fromOffset(0, 72)
-	scroll.Size = UDim2.new(1, 0, 1, -72)
+	scroll.Position = UDim2.fromOffset(0, 38)
+	scroll.Size = UDim2.new(1, 0, 1, -38)
 	scroll.CanvasSize = UDim2.new()
 	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	scroll.ScrollBarThickness = 4
@@ -1776,7 +1730,7 @@ function MenuController:Start()
 	end)
 
 	ProfileController.Changed:Connect(function()
-		if isOpen and (activeTab == "Upgrades" or activeTab == "Shop" or activeTab == "Map") then
+		if isOpen and (activeTab == "Info" or activeTab == "Shop" or activeTab == "Map") then
 			self:_refresh()
 		end
 	end)

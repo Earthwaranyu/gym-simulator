@@ -138,15 +138,20 @@ end
 function MenuBarController:_build()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-	-- Three entries, because three screens are worth a permanent button.
+	-- One button per screen, and each opens only that screen.
 	--
-	-- The menu itself opens on Info, the character sheet. Map and Rank get their own
-	-- tiles rather than sitting behind the tab strip: they are the two screens a
-	-- player opens most often, and behind a strip both cost two clicks. The five
-	-- muscle routes stay in the HUD hotbar and Quests stays on the goal card, so the
-	-- bar still never grows past what a thumb can reach.
+	-- There is deliberately no tab strip inside the panel any more. A strip is a
+	-- second copy of this bar, drawn inside the thing this bar just opened: pressing
+	-- Info and then being shown Info, Shop and Settings again says nothing the bar
+	-- did not already say, and it cost the panel 38 pixels of height to say it.
+	--
+	-- Five is the ceiling here. _plan already shrinks or reflows the column when it
+	-- will not fit, but a sixth tile would start crowding the touch controls on a
+	-- phone, so a new screen should replace one of these rather than join them.
 	local tabs = {
-		{ Id = "Menu", DisplayName = "Menu", Icon = "Info", Tab = "Info" },
+		{ Id = "Info", DisplayName = "Info", Icon = "Info", Tab = "Info" },
+		{ Id = "Shop", DisplayName = "Shop", Icon = "Shop", Tab = "Shop" },
+		{ Id = "Settings", DisplayName = "Settings", Icon = "Settings", Tab = "Settings" },
 		{ Id = "Map", DisplayName = "Map", Icon = "Map", Tab = "Map" },
 		{ Id = "Rank", DisplayName = "Rank", Icon = "Rank", Tab = "Ranks" },
 	}

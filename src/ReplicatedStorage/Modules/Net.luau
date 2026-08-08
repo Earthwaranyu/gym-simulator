@@ -42,6 +42,11 @@ local EVENT_NAMES: { string } = {
 	"Notify",
 	-- Client -> server: the player wants to stop training (spacebar / jump).
 	"StopTraining",
+	-- Client -> server: "I am still holding the train button, on this muscle."
+	-- Carries no amount and grants nothing by itself. ManualTrainingService pays by
+	-- elapsed time, so a client firing this a hundred times a second earns exactly
+	-- what one firing it twice a second earns.
+	"ManualTrain",
 	-- Server -> ALL clients: someone was knocked out. Drives the kill feed.
 	"KillFeed",
 	-- Server -> client: the public roster (power, rank, reputation, bounty) for the
