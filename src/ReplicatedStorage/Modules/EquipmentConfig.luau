@@ -9,8 +9,9 @@
 	Placing a machine in Studio:
 	  1. Build the model (scripts/build_gym.py generates the ones that ship).
 	  2. Tag it "TrainingStation" (CollectionService).
-	  3. Set a string attribute "EquipmentId" to one of the ids below.
-	  4. Give it at least one part named "TrainAnchor".
+	 3. Set a string attribute "EquipmentId" to one of the ids below.
+	 4. Set a unique string attribute "TravelId" if it should appear on the map.
+	 5. Give it at least one part named "TrainAnchor".
 
 	A single shared tag plus an attribute — rather than a tag per machine — means new
 	equipment never needs a new tag registered anywhere.
@@ -63,6 +64,8 @@ export type EquipmentDefinition = {
 local STATION_TAG = "TrainingStation"
 -- The attribute naming which definition a tagged model uses.
 local ID_ATTRIBUTE = "EquipmentId"
+-- Unique map/travel destination id on generated stations.
+local TRAVEL_ATTRIBUTE = "TravelId"
 
 -- Names the server looks for inside a station model.
 local ANCHOR_NAME = "TrainAnchor"
@@ -151,6 +154,7 @@ local EquipmentConfig = {}
 EquipmentConfig.List = definitions
 EquipmentConfig.STATION_TAG = STATION_TAG
 EquipmentConfig.ID_ATTRIBUTE = ID_ATTRIBUTE
+EquipmentConfig.TRAVEL_ATTRIBUTE = TRAVEL_ATTRIBUTE
 EquipmentConfig.ANCHOR_NAME = ANCHOR_NAME
 EquipmentConfig.EXIT_NAME = EXIT_NAME
 EquipmentConfig.BASE_NAME = BASE_NAME

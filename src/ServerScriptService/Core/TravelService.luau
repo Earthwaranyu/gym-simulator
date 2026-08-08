@@ -1,6 +1,6 @@
 --!strict
 --[[
-	TravelService — moving between districts.
+	TravelService — moving to specific training locations.
 
 	This replaces the touch gates. Gates were force-field slabs on the hub rim: you
 	walked into one and it threw you at a tier. That worked when the map was eleven
@@ -8,7 +8,8 @@
 	has nowhere sensible to put a wall, and walking back to the hub to change district
 	is not a mechanic, it is a commute.
 
-	So travel is a button on the map screen, and the rules that used to live in
+	The connected-city map exposes every individual training station. Travel is a
+	button on that map screen, and the rules that used to live in
 	geometry live here instead:
 
 	  * **Power.** Same check the gates made. A district you cannot afford is listed
@@ -31,6 +32,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 
 -- Long enough that travel is a decision rather than a way to flicker around the
@@ -40,9 +42,6 @@ local TRAVEL_COOLDOWN = 4
 -- the product file, and stubbed at AssetId 0 until it exists in the dashboard —
 -- HasFastTravel returns false for both, so the plaza rule simply holds.
 local FAST_TRAVEL_PRODUCT = "FastTravel"
--- Studs above the pad to land on, so a character arrives standing rather than
--- intersecting it.
-local LANDING_CLEARANCE = 4
 -- How long to wait for the destination to stream in before going anyway.
 local STREAM_WAIT = 1
 
@@ -59,16 +58,32 @@ local FlightService: any = nil
 
 local nextTravelAt: { [Player]: number } = {}
 
---[[
-	The pad a district lands arrivals on, or nil if nobody built one.
-]]
-local function findSpawn(zoneId: string): BasePart?
-	for _, pad in CollectionService:GetTagged(ZoneConfig.SPAWN_TAG) do
-		if pad:IsA("BasePart") and pad:GetAttribute(ZoneConfig.ZONE_ATTRIBUTE) == zoneId then
-			return pad
+local function findStation(travelId: string): Instance?
+	for _, station in CollectionService:GetTagged(EquipmentConfig.STATION_TAG) do
+		if station:GetAttribute(EquipmentConfig.TRAVEL_ATTRIBUTE) == travelId then
+			return station
 		end
 	end
 	return nil
+end
+
+local function stationZone(station: Instance): ZoneConfig.Zone?
+	local base = EquipmentConfig.GetBase(station)
+	return if base ~= nil then ZoneConfig.AtPosition(base.Position) else nil
+end
+
+-- A TrainExit is already authored at HumanoidRootPart height and orientation.
+-- Falling back to the Base keeps hand-placed stations usable on the map too.
+local function landingCFrame(station: Instance): CFrame?
+	local exit = station:FindFirstChild(EquipmentConfig.EXIT_NAME, true)
+	if exit ~= nil and exit:IsA("BasePart") then
+		return exit.CFrame
+	end
+	local base = EquipmentConfig.GetBase(station)
+	if base == nil then
+		return nil
+	end
+	return base.CFrame + Vector3.new(0, base.Size.Y / 2 + 4, 0)
 end
 
 function TravelService:Init()
@@ -90,11 +105,8 @@ function TravelService:Init()
 	end)
 end
 
---[[
-	Whether a player meets a district's power requirement.
-]]
-function TravelService:CanEnter(player: Player, zone: ZoneConfig.Zone): boolean
-	return StatService:GetTotalPower(player) >= zone.RequiredPower
+function TravelService:CanEnter(player: Player, requiredPower: number): boolean
+	return StatService:GetTotalPower(player) >= requiredPower
 end
 
 --[[
@@ -119,29 +131,40 @@ function TravelService:CanTravelFrom(player: Player): boolean
 	return CombatService:IsInSafeZone(player) or self:HasFastTravel(player)
 end
 
---[[
-	Every district's landing pad in world space.
-
-	The client cannot read these off Workspace itself. StreamingEnabled means a
-	district 1,500 studs away is not replicated to a player standing in the plaza,
-	so its pad does not exist client-side to be measured — the travel map would
-	draw whatever happened to be loaded. The server always has all of them.
-]]
+-- Every map-enabled station in world space. The server supplies this because
+-- streaming means most of the connected city is absent from a spawn client's Workspace.
 function TravelService:GetDestinations(): { any }
 	local out = {}
 
-	for _, zone in ZoneConfig.List do
-		local pad = findSpawn(zone.Id)
-		if pad == nil then
+	for _, station in CollectionService:GetTagged(EquipmentConfig.STATION_TAG) do
+		local travelId = station:GetAttribute(EquipmentConfig.TRAVEL_ATTRIBUTE)
+		local definition = EquipmentConfig.Resolve(station)
+		local zone = stationZone(station)
+		local landing = landingCFrame(station)
+		if type(travelId) ~= "string" or definition == nil or zone == nil or landing == nil then
 			continue
 		end
 		table.insert(out, {
-			Id = zone.Id,
-			X = pad.Position.X,
-			Y = pad.Position.Y,
-			Z = pad.Position.Z,
+			Id = travelId,
+			ZoneId = zone.Id,
+			EquipmentId = definition.Id,
+			StatId = definition.StatId,
+			RequiredPower = math.max(zone.RequiredPower, definition.UnlockPower),
+			GainMultiplier = zone.GainMultiplier,
+			X = landing.Position.X,
+			Y = landing.Position.Y,
+			Z = landing.Position.Z,
 		})
 	end
+	table.sort(out, function(a, b)
+		if a.RequiredPower ~= b.RequiredPower then
+			return a.RequiredPower < b.RequiredPower
+		end
+		if a.StatId ~= b.StatId then
+			return a.StatId < b.StatId
+		end
+		return a.Id < b.Id
+	end)
 
 	return out
 end
@@ -153,11 +176,18 @@ end
 	message is shown to the player verbatim, so every refusal has to read as an
 	explanation rather than as an error.
 ]]
-function TravelService:Travel(player: Player, zoneId: string): (boolean, string)
-	local zone = ZoneConfig.Get(zoneId)
-	if zone == nil then
+function TravelService:Travel(player: Player, travelId: string): (boolean, string)
+	local station = findStation(travelId)
+	if station == nil then
 		return false, "Unknown destination."
 	end
+	local definition = EquipmentConfig.Resolve(station)
+	local zone = stationZone(station)
+	local landing = landingCFrame(station)
+	if definition == nil or zone == nil or landing == nil then
+		return false, "That training location is unavailable."
+	end
+	local requiredPower = math.max(zone.RequiredPower, definition.UnlockPower)
 
 	local now = os.clock()
 	if now < (nextTravelAt[player] or 0) then
@@ -180,15 +210,9 @@ function TravelService:Travel(player: Player, zoneId: string): (boolean, string)
 		return false, "Travel from the spawn plaza, or get Fast Travel to go from anywhere."
 	end
 
-	if not self:CanEnter(player, zone) then
-		local needed = zone.RequiredPower - StatService:GetTotalPower(player)
-		return false, `{zone.DisplayName} needs {NumberFormat.Format(needed)} more power.`
-	end
-
-	local pad = findSpawn(zone.Id)
-	if pad == nil then
-		warn(`[TravelService] "{zone.Id}" has no part tagged "{ZoneConfig.SPAWN_TAG}"`)
-		return false, `{zone.DisplayName} has nowhere to land.`
+	if not self:CanEnter(player, requiredPower) then
+		local needed = requiredPower - StatService:GetTotalPower(player)
+		return false, `{definition.DisplayName} needs {NumberFormat.Format(needed)} more power.`
 	end
 
 	-- Leave the machine first. Pivoting a player whose root is anchored to a
@@ -199,8 +223,6 @@ function TravelService:Travel(player: Player, zoneId: string): (boolean, string)
 	end
 
 	nextTravelAt[player] = now + TRAVEL_COOLDOWN
-
-	local landing = pad.CFrame + Vector3.new(0, pad.Size.Y / 2 + LANDING_CLEARANCE, 0)
 
 	-- Load the destination before dropping anyone into it. Travel crosses up to
 	-- 1,500 studs, far outside StreamingTargetRadius, so the arrival point is a
@@ -216,7 +238,7 @@ function TravelService:Travel(player: Player, zoneId: string): (boolean, string)
 	end)
 	character:PivotTo(landing)
 
-	return true, `Welcome to {zone.DisplayName}.`
+	return true, `Travelled to {zone.DisplayName} {definition.DisplayName}.`
 end
 
 function TravelService:Start()
@@ -224,11 +246,18 @@ function TravelService:Start()
 		nextTravelAt[player] = nil
 	end)
 
-	-- A district with no pad is a destination the map will offer and travel will
-	-- then refuse, so say so at boot rather than at the moment a player tries it.
-	for _, zone in ZoneConfig.List do
-		if findSpawn(zone.Id) == nil then
-			warn(`[TravelService] "{zone.Id}" has no "{ZoneConfig.SPAWN_TAG}" pad; travel there will fail`)
+	local seen: { [string]: boolean } = {}
+	for _, station in CollectionService:GetTagged(EquipmentConfig.STATION_TAG) do
+		local travelId = station:GetAttribute(EquipmentConfig.TRAVEL_ATTRIBUTE)
+		if travelId == nil then
+			continue
+		end
+		if type(travelId) ~= "string" or travelId == "" then
+			warn(`[TravelService] {station:GetFullName()} has an invalid travel id`)
+		elseif seen[travelId] then
+			warn(`[TravelService] Duplicate travel id "{travelId}"`)
+		else
+			seen[travelId] = true
 		end
 	end
 end

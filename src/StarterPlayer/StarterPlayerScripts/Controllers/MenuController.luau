@@ -20,6 +20,7 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
+local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
@@ -47,11 +48,21 @@ local isOpen = false
 local activeTab = "Map"
 local quests: { any } = {}
 
--- District id -> where its landing pad is in the world. Fetched once from the
--- server, because StreamingEnabled means the client cannot see a pad 1,500 studs
--- away to measure it. Pads do not move, so one fetch is enough.
-local destinations: { [string]: Vector3? } = {}
-local selectedZone: string? = nil
+type Destination = {
+	Id: string,
+	ZoneId: string,
+	EquipmentId: string,
+	StatId: string,
+	RequiredPower: number,
+	GainMultiplier: number,
+	Position: Vector3,
+}
+
+-- All 55 training locations come from the server because StreamingEnabled means
+-- most physical stations do not exist in the spawn client's Workspace yet.
+local destinations: { Destination } = {}
+local destinationsById: { [string]: Destination } = {}
+local selectedDestination: string? = nil
 
 type Tab = {
 	Id: string,
@@ -170,11 +181,9 @@ function MenuController:Init()
 	}
 end
 
---[[
-	Pulls every district's landing pad from the server, once.
-]]
+-- Pull every map-enabled training station from the server once.
 function MenuController:_fetchDestinations()
-	if next(destinations) ~= nil then
+	if #destinations > 0 then
 		return
 	end
 
@@ -186,34 +195,46 @@ function MenuController:_fetchDestinations()
 	end
 
 	for _, entry in list do
-		if type(entry) == "table" and type(entry.Id) == "string" then
-			destinations[entry.Id] = Vector3.new(entry.X, entry.Y, entry.Z)
+		if
+			type(entry) ~= "table"
+			or type(entry.Id) ~= "string"
+			or type(entry.ZoneId) ~= "string"
+			or type(entry.EquipmentId) ~= "string"
+			or type(entry.StatId) ~= "string"
+			or type(entry.RequiredPower) ~= "number"
+			or type(entry.GainMultiplier) ~= "number"
+			or type(entry.X) ~= "number"
+			or type(entry.Y) ~= "number"
+			or type(entry.Z) ~= "number"
+		then
+			continue
 		end
+		local destination: Destination = {
+			Id = entry.Id,
+			ZoneId = entry.ZoneId,
+			EquipmentId = entry.EquipmentId,
+			StatId = entry.StatId,
+			RequiredPower = entry.RequiredPower,
+			GainMultiplier = entry.GainMultiplier,
+			Position = Vector3.new(entry.X, entry.Y, entry.Z),
+		}
+		table.insert(destinations, destination)
+		destinationsById[destination.Id] = destination
 	end
 end
 
---[[
-	The travel map: every district as a pin on a plan view, and a panel for
-	whichever one is selected.
-
-	Pins carry a tier number rather than a name. Eleven labels on a board this
-	size overlap in the middle, where Downtown's two gyms sit almost on top of
-	each other, and an unreadable map is worse than a list. The board is stretched
-	to fit rather than kept to scale for the same reason — it is a diagram of where
-	things are relative to each other, not a survey.
-]]
+-- Every training location appears immediately. Pin colour is the stat; locked
+-- pins stay visible but dim so the map shows both where to go and what to grind for.
 function MenuController:_renderMap(parent: Frame)
 	self:_fetchDestinations()
 
 	local data = ProfileController:Get()
 	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
 
-	-- Default to the furthest district already open: that is where somebody
-	-- opening this menu almost always means to go.
-	if selectedZone == nil then
-		for _, zone in ZoneConfig.List do
-			if power >= zone.RequiredPower then
-				selectedZone = zone.Id
+	if selectedDestination == nil then
+		for _, destination in destinations do
+			if power >= destination.RequiredPower then
+				selectedDestination = destination.Id
 			end
 		end
 	end
@@ -236,7 +257,7 @@ function MenuController:_renderMap(parent: Frame)
 	boardStroke.Transparency = 0.75
 	boardStroke.Parent = board
 
-	if next(destinations) == nil then
+	if #destinations == 0 then
 		local empty = UI.Label("Empty", board)
 		empty.Size = UDim2.fromScale(1, 1)
 		empty.TextXAlignment = Enum.TextXAlignment.Center
@@ -245,14 +266,11 @@ function MenuController:_renderMap(parent: Frame)
 		return
 	end
 
-	-- Bounds seeded with the origin so Downtown anchors the middle even before
-	-- any outer district has been reached.
 	local minX, maxX, minZ, maxZ = 0, 0, 0, 0
-	for _, at in destinations do
-		if at ~= nil then
-			minX, maxX = math.min(minX, at.X), math.max(maxX, at.X)
-			minZ, maxZ = math.min(minZ, at.Z), math.max(maxZ, at.Z)
-		end
+	for _, destination in destinations do
+		local at = destination.Position
+		minX, maxX = math.min(minX, at.X), math.max(maxX, at.X)
+		minZ, maxZ = math.min(minZ, at.Z), math.max(maxZ, at.Z)
 	end
 	local padX = math.max((maxX - minX) * 0.08, 1)
 	local padZ = math.max((maxZ - minZ) * 0.08, 1)
@@ -263,8 +281,6 @@ function MenuController:_renderMap(parent: Frame)
 		return UDim2.fromScale((x - minX) / (maxX - minX), 1 - (z - minZ) / (maxZ - minZ))
 	end
 
-	-- Downtown itself has no district entry — it is the hub, not a tier — but it
-	-- is the thing every other pin is placed relative to, so it gets a marker.
 	local hub = UI.Label("Hub", board)
 	hub.AnchorPoint = Vector2.new(0.5, 0.5)
 	hub.Position = project(0, 0)
@@ -272,34 +288,35 @@ function MenuController:_renderMap(parent: Frame)
 	hub.TextXAlignment = Enum.TextXAlignment.Center
 	hub.TextSize = 11
 	hub.TextColor3 = UI.Palette.TextMuted
-	hub.Text = "DOWNTOWN"
+	hub.Text = "SPAWN"
 
 	local unlockedCount = 0
-	for index, zone in ZoneConfig.List do
-		local at = destinations[zone.Id]
-		if at == nil then
+	for _, destination in destinations do
+		local stat = StatConfig.Get(destination.StatId)
+		if stat == nil then
 			continue
 		end
 
-		local unlocked = power >= zone.RequiredPower
+		local unlocked = power >= destination.RequiredPower
 		if unlocked then
 			unlockedCount += 1
 		end
-		local isSelected = selectedZone == zone.Id
-		local size = if isSelected then 26 else 20
+		local isSelected = selectedDestination == destination.Id
+		local size = if isSelected then 22 else 15
+		local at = destination.Position
 
 		local pin = Instance.new("TextButton")
-		pin.Name = zone.Id
+		pin.Name = destination.Id
 		pin.AnchorPoint = Vector2.new(0.5, 0.5)
 		pin.Position = project(at.X, at.Z)
 		pin.Size = UDim2.fromOffset(size, size)
-		pin.BackgroundColor3 = zone.Color
-		pin.BackgroundTransparency = if unlocked then 0 else 0.6
+		pin.BackgroundColor3 = stat.Color
+		pin.BackgroundTransparency = if unlocked then 0 else 0.68
 		pin.BorderSizePixel = 0
 		pin.Font = UI.Font.Numeric
-		pin.TextSize = 12
+		pin.TextSize = 9
 		pin.TextColor3 = UI.Palette.Backdrop
-		pin.Text = tostring(index)
+		pin.Text = string.sub(stat.DisplayName, 1, 1)
 		pin.ZIndex = if isSelected then 3 else 2
 		pin.Parent = board
 
@@ -313,7 +330,7 @@ function MenuController:_renderMap(parent: Frame)
 		pinStroke.Parent = pin
 
 		pin.Activated:Connect(function()
-			selectedZone = zone.Id
+			selectedDestination = destination.Id
 			self:_refresh()
 		end)
 	end
@@ -343,7 +360,7 @@ function MenuController:_renderMap(parent: Frame)
 	count.LayoutOrder = 2
 	count.TextSize = 12
 	count.TextColor3 = UI.Palette.TextMuted
-	count.Text = `{unlockedCount} of {#ZoneConfig.List} districts open  ·  travel is free from the plaza`
+	count.Text = `{unlockedCount} of {#destinations} training locations open  ·  all locations shown`
 
 	self:_renderDestination(parent, power)
 
@@ -365,12 +382,16 @@ function MenuController:_renderMap(parent: Frame)
 	end)
 end
 
---[[
-	The panel under the map: what the selected district is, and the button.
-]]
+-- The selected machine, its stat, tier multiplier and travel button.
 function MenuController:_renderDestination(parent: Frame, power: number)
-	local zone = if selectedZone ~= nil then ZoneConfig.Get(selectedZone) else nil
-	if zone == nil then
+	local destination = if selectedDestination ~= nil then destinationsById[selectedDestination] else nil
+	if destination == nil then
+		return
+	end
+	local zone = ZoneConfig.Get(destination.ZoneId)
+	local equipment = EquipmentConfig.Get(destination.EquipmentId)
+	local stat = StatConfig.Get(destination.StatId)
+	if zone == nil or equipment == nil or stat == nil then
 		return
 	end
 
@@ -379,25 +400,25 @@ function MenuController:_renderDestination(parent: Frame, power: number)
 	heading.LayoutOrder = 3
 	heading.Font = UI.Font.Heading
 	heading.TextSize = 17
-	heading.TextColor3 = zone.Color
-	heading.Text = string.upper(zone.DisplayName)
+	heading.TextColor3 = stat.Color
+	heading.Text = string.upper(`{stat.DisplayName} · {equipment.DisplayName}`)
 
 	local tagline = UI.Label("Tagline", parent)
 	tagline.Size = UDim2.new(1, 0, 0, 18)
 	tagline.LayoutOrder = 4
 	tagline.TextSize = 13
 	tagline.TextColor3 = UI.Palette.TextMuted
-	tagline.Text = zone.Tagline
+	tagline.Text = `{zone.DisplayName} location  ·  {zone.Tagline}`
 
 	local action = row(parent, 44, 5)
 	local detail = UI.Label("Detail", action)
 	detail.Size = UDim2.new(1, -120, 1, 0)
 	detail.TextSize = 13
 
-	local shortfall = zone.RequiredPower - power
+	local shortfall = destination.RequiredPower - power
 	if shortfall > 0 then
 		detail.Text = `<font color="#FF5C5C">Needs {NumberFormat.Format(shortfall)} more power</font>`
-			.. `  ·  x{NumberFormat.Format(zone.GainMultiplier)} gains`
+			.. `  ·  x{NumberFormat.Format(destination.GainMultiplier)} gains`
 		local locked = UI.Label("Locked", action)
 		locked.AnchorPoint = Vector2.new(1, 0.5)
 		locked.Position = UDim2.fromScale(1, 0.5)
@@ -409,11 +430,11 @@ function MenuController:_renderDestination(parent: Frame, power: number)
 		return
 	end
 
-	detail.Text = `x{NumberFormat.Format(zone.GainMultiplier)} gains  ·  `
+	detail.Text = `x{NumberFormat.Format(destination.GainMultiplier)} gains  ·  `
 		.. `<font color="#7EE7FF">open</font>`
 
-	button(action, "Travel", zone.Color, function()
-		local ok, message = Net.Function("Travel"):InvokeServer(zone.Id)
+	button(action, "Travel", stat.Color, function()
+		local ok, message = Net.Function("Travel"):InvokeServer(destination.Id)
 		toast(message)
 		if ok then
 			self:Toggle()

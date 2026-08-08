@@ -1,10 +1,10 @@
 --!strict
 --[[
-	ZoneConfig — the gym tiers and what it takes to get into them.
+	ZoneConfig — training multiplier tiers and what it takes to use them.
 
-	A zone is a tagged volume in the world; this table says what each one is called and
-	how much power it demands. Adding a tier is an entry here plus a tagged part, with
-	no code change.
+	A zone is a tagged volume around one hidden training location; this table says what
+	each tier is called and how much power it demands. The connected city can place one
+	volume for each stat at every tier without changing the systems that consume it.
 
 	Zones do double duty: TokenService only accrues inside one, so the same volumes that
 	gate progression also define where idling pays. That is deliberate — it keeps
@@ -16,15 +16,14 @@ local CollectionService = game:GetService("CollectionService")
 export type Zone = {
 	Id: string,
 	DisplayName: string,
-	-- One line of flavour, shown on the travel map beside the name. Districts are
-	-- places now, and a list of eleven names tells you nothing about any of them.
+	-- One line of flavour, shown beside a selected training location on the map.
 	Tagline: string,
-	-- Total power needed to travel here.
+	-- Total power needed to use a location carrying this tier.
 	RequiredPower: number,
 	-- Everything trained inside this zone is multiplied by this.
 	--
 	-- Tier lives on the zone rather than on the equipment, so one "Bench Press" entry
-	-- covers every bench in the game and a new tier is one row here plus a platform.
+	-- covers every bench in the game and a new tier is one row plus tagged volumes.
 	-- The alternative — an EquipmentConfig entry per machine per tier — is fifty-odd
 	-- near-identical rows that all have to move together whenever a number changes.
 	GainMultiplier: number,
@@ -44,14 +43,9 @@ local SPAWN_TAG = "ZoneSpawn"
 -- Attribute naming which zone a tagged part belongs to.
 local ZONE_ATTRIBUTE = "ZoneId"
 
--- Eleven districts. Power roughly x20 and gain roughly x6 per step, so reaching the
--- next one is always worth far more than grinding the one you are on — which is the
--- whole reason to cross a map this size.
---
--- Garage and Iron are city blocks in Downtown and the Docks is a walk across the
--- causeway; everything from Strongman out floats, higher with every tier, and is only
--- reachable by flying or by travelling. The movement ladder and the progression ladder
--- are the same ladder.
+-- Eleven multiplier tiers. Power roughly x20 and gain roughly x6 per step. Each tier
+-- appears once for every stat, shuffled across the connected city rather than gathered
+-- into one level-shaped district.
 local zones: { Zone } = {
 	{
 		Id = "Garage",
@@ -188,8 +182,7 @@ end
 	The zone whose tagged volume contains a point, or nil out in the open.
 
 	Used to tier a training station without anyone having to label it: a machine is
-	worth whatever the platform it stands on is worth, so moving a bench to a richer
-	tier is a drag in Studio and nothing else. When volumes overlap the richest wins,
+	worth whatever location volume contains it. When volumes overlap the richest wins,
 	which makes an overlap generous rather than arbitrary.
 ]]
 function ZoneConfig.AtPosition(position: Vector3): Zone?

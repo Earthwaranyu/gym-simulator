@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 89 built / 91** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 90 built / 92** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -520,6 +520,33 @@ part of an open world with things to discover.
       props, zone gain multipliers, and travel gates. Garage's floor bays now derive from
       the actual generated positions instead of a second layout formula, so decoration and
       machines cannot drift apart.
+
+## Phase 16 — One world, fifty-five destinations
+
+#91 scattered machines *inside* the old progression islands. It solved the repeated
+five-point ring but kept the deeper problem: the world was still eleven isolated level
+plates, rising into the sky, and the Map button travelled to a tier rather than to the
+body part the player meant to train.
+
+- [x] 92. **A connected city with every machine on the map.** The floating archipelago is
+      replaced by one 2,670×1,290-stud ground-level city plate. A complete road grid links
+      all 55 blocks at the same playable Y, with a seawall and foundation making it read as
+      one place rather than a baseplate. Each block hides exactly one machine inside one of
+      five street contexts — warehouse, alley, construction yard, underpass, or bunker —
+      and keeps the stat-specific Chest bay, Arms cage, Back tower, Core court, or Legs lane
+      inside. Two ordinary buildings disguise most entrances as part of the street instead
+      of announcing another freestanding gym.
+      Tier/stat pairs are seeded and shuffled across the whole grid: every stat still has
+      eleven multiplier levels, but adjacent doors can lead to unrelated stats and tiers.
+      Small private `GymZone` volumes replace district-wide volumes, preserving gain math,
+      token eligibility and mount gates without recreating level neighborhoods invisibly.
+      Every station now carries a unique `TravelId`. `TravelService` publishes all 55
+      destinations with stat, equipment, tier, requirement, multiplier and server-known
+      coordinates, then lands beside the exact selected machine's `TrainExit`. The Map tab
+      renders all 55 immediately, colours pins by stat, dims rather than hides locked spots,
+      and shows the selected machine and tier before travel. Verified live: 55 unique ids,
+      11 destinations per stat, five per tier, 55 rendered pins, and a client travel request
+      landed within one stud of the chosen Arms machine.
 ---
 
 ## Milestone 1 — Vertical Slice
