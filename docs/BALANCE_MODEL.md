@@ -8,6 +8,12 @@ numbers from `scripts/_balance_inputs.luau`, generated from the actual configs b
 `scripts/extract_balance.py`. `check.sh` fails if that generated file is stale, so a
 balance change cannot silently invalidate these results.
 
+> **Five-location build note (#109):** the world currently spawns only the Garage-rate
+> destination for each stat. The 10 higher zone rows remain future configuration, so
+> district-unlock times below are a projection for reactivating those tiers—not current
+> playable progression. First-upgrade, rank, combo-loss, and Garage-rate findings still
+> describe the shipping five-location slice.
+
 **What is measured and what is assumed.** Everything about the *game's* numbers is
 measured from the configs. Everything about *player behavior* — training uptime, how
 often someone is killed, how long they take to remount — is a stated assumption, listed

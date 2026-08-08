@@ -62,6 +62,8 @@ type Destination = {
 	VariantId: string,
 	ExerciseFamily: string,
 	RequiresFlight: boolean,
+	LocationName: string,
+	LocationTagline: string,
 }
 
 type MapFeature = {
@@ -75,7 +77,7 @@ type MapFeature = {
 	Color: Color3,
 }
 
--- All 55 training locations come from the server because StreamingEnabled means
+-- All training locations come from the server because StreamingEnabled means
 -- most physical stations do not exist in the spawn client's Workspace yet.
 local destinations: { Destination } = {}
 local destinationsById: { [string]: Destination } = {}
@@ -300,6 +302,8 @@ function MenuController:_fetchDestinations()
 				then entry.ExerciseFamily
 				else entry.StatId,
 			RequiresFlight = entry.RequiresFlight == true,
+			LocationName = if type(entry.LocationName) == "string" then entry.LocationName else entry.ZoneId,
+			LocationTagline = if type(entry.LocationTagline) == "string" then entry.LocationTagline else "",
 		}
 		table.insert(destinations, destination)
 		destinationsById[destination.Id] = destination
@@ -575,6 +579,7 @@ function MenuController:_renderMap(parent: Frame)
 		pin:SetAttribute("VariantId", destination.VariantId)
 		pin:SetAttribute("AccessKind", destination.AccessKind)
 		pin:SetAttribute("RequiresFlight", destination.RequiresFlight)
+		pin:SetAttribute("LocationName", destination.LocationName)
 		pin.Parent = pinLayer
 
 		local pinCorner = Instance.new("UICorner")
@@ -869,7 +874,7 @@ function MenuController:_renderDestination(parent: Frame, power: number)
 		then `sky deck at {math.round(destination.Position.Y)} studs · flight required`
 		elseif destination.FloorIndex > 1 then `floor {destination.FloorIndex} interior`
 		else "street level"
-	tagline.Text = `{zone.DisplayName} location  ·  {access}  ·  {zone.Tagline}`
+	tagline.Text = `{destination.LocationName}  ·  {access}  ·  {destination.LocationTagline}`
 
 	local action = row(parent, 44, 5)
 	local detail = UI.Label("Detail", action)
@@ -963,7 +968,7 @@ end
 --[[
 	Keeps the Train panel live while it is the tab on screen.
 
-	Polling rather than pushing: occupancy changes constantly across 55 stations and
+	Polling rather than pushing: occupancy changes constantly across training stations and
 	sending every change to every client would cost far more bandwidth than answering
 	the handful of players who actually have the panel open. The loop ends as soon as
 	the panel is not showing, so it is not a background cost.
@@ -1129,7 +1134,6 @@ function MenuController:_renderTrain(parent: Frame)
 
 	for index, spot in spots do
 		local destination = spot.Destination
-		local zone = ZoneConfig.Get(destination.ZoneId)
 		local status = spotStatus[destination.Id]
 		local here = currentSpotId == destination.Id
 
@@ -1139,7 +1143,7 @@ function MenuController:_renderTrain(parent: Frame)
 		title.Size = UDim2.new(1, -110, 0, 24)
 		title.Position = UDim2.fromOffset(0, 5)
 		title.TextColor3 = if spot.Unlocked then stat.Color else UI.Palette.TextMuted
-		local zoneName = if zone ~= nil then zone.DisplayName else destination.ZoneId
+		local zoneName = destination.LocationName
 		title.Text = `{spot.Equipment.DisplayName}  <font color="#8A93A8">{zoneName}</font>`
 			.. (if here then `  <font color="#7EE7FF">· YOU ARE HERE</font>` else "")
 
@@ -1183,6 +1187,18 @@ function MenuController:_renderTrain(parent: Frame)
 			locked.Text = "LOCKED"
 		end
 	end
+end
+
+-- Opens the one destination for a muscle from the persistent five-stat hotbar.
+-- The same method remains valid if a later season adds more locations: Train still
+-- owns the list and selection, while the HUD only names the stat it wants to inspect.
+function MenuController:OpenTrain(statId: string)
+	if StatConfig.Get(statId) == nil then
+		warn(`[MenuController] No stat named "{statId}"`)
+		return
+	end
+	selectedMuscle = statId
+	self:Open("Train")
 end
 
 function MenuController:_renderUpgrades(parent: Frame)

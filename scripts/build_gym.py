@@ -181,7 +181,8 @@ def anchor_standing(frame):
 
 def machine(name, equipment_id, origin, children, travel_id=None,
             access_kind=None, floor_index=None, exercise_family=None,
-            environment_id=None, requires_flight=False):
+            environment_id=None, requires_flight=False, location_name=None,
+            location_tagline=None):
     # Atomic streaming: a machine arrives whole or not at all. Under the default
     # mode Roblox streams a model's parts in one at a time, and a bench press
     # missing its rack — or worse, missing the TrainAnchor the server pivots you
@@ -199,6 +200,10 @@ def machine(name, equipment_id, origin, children, travel_id=None,
     if environment_id is not None:
         attributes["EnvironmentId"] = environment_id
     attributes["RequiresFlight"] = requires_flight
+    if location_name is not None:
+        attributes["LocationName"] = location_name
+    if location_tagline is not None:
+        attributes["LocationTagline"] = location_tagline
     return {
         "name": name,
         "className": "Model",
@@ -2343,107 +2348,112 @@ def _assignment_is_varied(assignments):
 
 
 def connected_locations():
-    """All 55 tier/family pairs, balanced across variants and environments."""
-    starters = []
-    starter_sites = [
-        (-62, -42, 32), (54, -56, -24), (-70, 35, 112),
-        (12, 68, 188), (70, 20, 254),
-    ]
-    for family, equipment_id, (x, z, yaw) in zip(
-            FAMILY_ORDER, MACHINE_ORDER, starter_sites):
-        origin = mul(cf(x, 0, z), rot_y(yaw))
-        starters.append({
-            "id": f"Garage-{equipment_id}",
-            "zone": "Garage",
-            "family": family,
-            "slot": equipment_id,
-            "equipment": equipment_id,
-            "site_x": x,
-            "site_z": z,
-            "ground_origin": origin,
-            "origin": origin,
+    """Five authored destinations: one memorable exercise for each muscle.
+
+    The 15 machine builders remain available for future seasons, but the shipping
+    world deliberately exposes one exercise per family.  Environment replaces tier
+    repetition as the discovery layer: street, warehouse, underpass, upper floor and
+    sky all ask the player to read the city differently.
+    """
+    authored = [
+        {
+            "id": "Training-Arms",
+            "family": "Arms",
+            "equipment": "Dumbbells",
             "style": "starter",
-            "seed": f"Garage:{equipment_id}:starter",
-            "starter": True,
-            "landmark": False,
             "region_id": "Hub",
-            "environment_id": "Hub",
+            "site": mul(cf(-54, 0, -34), rot_y(28)),
+            "starter": True,
             "neighborhood": "Garage",
-            "requires_flight": False,
-        })
-
-    zone_ids = [row["zone"] for row in DISTRICTS if row["zone"] != "Garage"]
-    records = []
-    for zone_index, zone_id in enumerate(zone_ids):
-        for family_index, family in enumerate(FAMILY_ORDER):
-            variants = STAT_VARIANTS[family]
-            sequence_index = (zone_index + family_index * 2) % len(NON_STARTER_VARIANT_SEQUENCE)
-            equipment_id = variants[NON_STARTER_VARIANT_SEQUENCE[sequence_index]]
-            records.append({
-                "zone": zone_id,
-                "zone_index": zone_index + 1,
-                "family": family,
-                "family_index": family_index,
-                "slot": MACHINE_ORDER[family_index],
-                "equipment": equipment_id,
-            })
-
-    slots = [
-        (region["id"], index, site)
-        for region in REGIONS
-        for index, site in enumerate(region_sites(region))
+            "location_name": "Starter Iron Yard",
+            "location_tagline": "Open-air dumbbells inside the protected plaza.",
+        },
+        {
+            "id": "Training-Chest",
+            "family": "Chest",
+            "equipment": "BenchPress",
+            "style": "warehouse",
+            "region_id": "Harbor",
+            "site": region_sites(REGION_BY_ID["Harbor"])[1],
+            "starter": False,
+            "neighborhood": "Powerhouse",
+            "location_name": "Dockside Warehouse",
+            "location_tagline": "A bench press hidden behind the freight sheds.",
+        },
+        {
+            "id": "Training-Back",
+            "family": "Back",
+            "equipment": "PullUpBar",
+            "style": "tower",
+            "region_id": "OldTown",
+            "site": region_sites(REGION_BY_ID["OldTown"])[2],
+            "starter": False,
+            "neighborhood": "Iron",
+            "location_name": "Old Town Walk-Up",
+            "location_tagline": "Climb to the third-floor pull-up room.",
+        },
+        {
+            "id": "Training-Core",
+            "family": "Core",
+            "equipment": "SitUpBench",
+            "style": "underpass",
+            "region_id": "VoidRail",
+            "site": region_sites(REGION_BY_ID["VoidRail"])[3],
+            "starter": False,
+            "neighborhood": "Void",
+            "location_name": "Railway Fight Gym",
+            "location_tagline": "A sit-up bench beneath the old elevated line.",
+        },
+        {
+            "id": "Training-Legs",
+            "family": "Legs",
+            "equipment": "Treadmill",
+            "style": "sky",
+            "region_id": "Highrise",
+            "site": region_sites(REGION_BY_ID["Highrise"])[4],
+            "starter": False,
+            "neighborhood": "Skydeck",
+            "location_name": "Highrise Running Deck",
+            "location_tagline": "Fly above downtown to reach the rooftop treadmill.",
+            "altitude": 152,
+        },
     ]
-    assignments = None
-    for attempt in range(2000):
-        shuffled = list(records)
-        random.Random(f"irregular-city-v3:{attempt}").shuffle(shuffled)
-        candidate = [
-            (record, region_id, site_index, site)
-            for record, (region_id, site_index, site) in zip(shuffled, slots)
-        ]
-        if _assignment_is_varied(candidate):
-            assignments = candidate
-            break
-    if assignments is None:
-        raise RuntimeError("could not distribute training sites across varied regions")
 
-    out = list(starters)
-    ground_style_bag = (GROUND_STYLES * 10)[:50]
-    random.Random("irregular-city-v3:styles").shuffle(ground_style_bag)
-    for index, (record, region_id, site_index, site) in enumerate(assignments):
-        zone_rank = record["zone_index"]
-        family_index = record["family_index"]
-        requires_flight = zone_rank >= 3 and (zone_rank * 3 + family_index) % 4 == 0
-        third_floor = not requires_flight and (zone_rank + family_index * 2) % 7 == 0
-        style = "sky" if requires_flight else ("tower" if third_floor else ground_style_bag[index])
-        altitude = 0
-        if requires_flight:
-            altitude = 110 + ((zone_rank + family_index) % 4) * 42
-        origin = mul(site, cf(0, altitude if requires_flight else (
-            THIRD_FLOOR_Y if third_floor else 0), 0))
-        region = REGION_BY_ID[region_id]
-        equipment_id = record["equipment"]
-        travel_id = f"{record['zone']}-{record['slot']}"
-        site_x, _, site_z = site[0]
+    out = []
+    for row in authored:
+        ground_origin = row["site"]
+        requires_flight = row["style"] == "sky"
+        elevated = row["altitude"] if requires_flight else (
+            THIRD_FLOOR_Y if row["style"] == "tower" else 0
+        )
+        origin = mul(ground_origin, cf(0, elevated, 0))
+        site_x, _, site_z = ground_origin[0]
         out.append({
-            "id": travel_id,
-            "zone": record["zone"],
-            "family": record["family"],
-            "slot": record["slot"],
-            "equipment": equipment_id,
+            "id": row["id"],
+            # Five destinations are available immediately. Progression remains in
+            # permanent per-stat multipliers; the dormant zone catalog is future
+            # expansion data rather than five copies of the same machine.
+            "zone": "Garage",
+            "family": row["family"],
+            "slot": row["equipment"],
+            "equipment": row["equipment"],
             "site_x": site_x,
             "site_z": site_z,
-            "ground_origin": site,
+            "ground_origin": ground_origin,
             "origin": origin,
-            "style": style,
-            "seed": f"{record['zone']}:{record['family']}:{region_id}",
-            "starter": False,
-            "landmark": site_index == 0,
-            "region_id": region_id,
-            "environment_id": f"Sky-{travel_id}" if requires_flight else region_id,
-            "neighborhood": region["theme"],
+            "style": row["style"],
+            "seed": f"five-locations-v1:{row['id']}",
+            "starter": row["starter"],
+            "landmark": True,
+            "region_id": row["region_id"],
+            "environment_id": (
+                f"Sky-{row['id']}" if requires_flight else row["region_id"]
+            ),
+            "neighborhood": row["neighborhood"],
             "requires_flight": requires_flight,
-            "altitude": altitude,
+            "altitude": row.get("altitude", 0),
+            "location_name": row["location_name"],
+            "location_tagline": row["location_tagline"],
         })
     return out
 
@@ -2966,6 +2976,8 @@ def build_connected_world():
             exercise_family=location["family"],
             environment_id=location["environment_id"],
             requires_flight=location["requires_flight"],
+            location_name=location["location_name"],
+            location_tagline=location["location_tagline"],
         ))
 
     # connected_ground creates Hub first so replace that minimal environment with

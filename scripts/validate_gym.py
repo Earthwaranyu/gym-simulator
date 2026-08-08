@@ -10,7 +10,7 @@ It uses only the Python standard library and never writes to the workspace.
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter
 import hashlib
 import importlib.util
 import json
@@ -40,11 +40,13 @@ REQUIRED_STATION_ATTRIBUTES = {
     "AccessKind",
     "FloorIndex",
     "RequiresFlight",
+    "LocationName",
+    "LocationTagline",
 }
 
-MIN_STATIONS = 55
+EXPECTED_STATIONS = 5
 EXPECTED_BUILDERS = 15
-MIN_SKY_STATIONS = 8
+EXPECTED_SKY_STATIONS = 1
 MIN_SKY_PIN_SEPARATION = 32.0
 MAX_MAP_FEATURES = 400
 MAX_BASE_PARTS = 7_000
@@ -244,8 +246,14 @@ def validate_locations(
     family_by_equipment: dict[str, str],
 ) -> dict[str, Node]:
     locations = list(builder.connected_locations())
-    validator.check(len(locations) == MIN_STATIONS, f"expected 55 generated locations, found {len(locations)}")
-    validator.check(len(stations) == MIN_STATIONS, f"expected 55 TrainingStation models, found {len(stations)}")
+    validator.check(
+        len(locations) == EXPECTED_STATIONS,
+        f"expected five generated locations, found {len(locations)}",
+    )
+    validator.check(
+        len(stations) == EXPECTED_STATIONS,
+        f"expected five TrainingStation models, found {len(stations)}",
+    )
 
     location_by_id: dict[str, dict[str, Any]] = {}
     for location in locations:
@@ -259,9 +267,8 @@ def validate_locations(
 
     station_by_id: dict[str, Node] = {}
     family_counts: Counter[str] = Counter()
-    zone_counts: Counter[str] = Counter()
-    pair_counts: Counter[tuple[str, str]] = Counter()
-    variant_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    equipment_counts: Counter[str] = Counter()
+    access_counts: Counter[str] = Counter()
     sky_ids: list[str] = []
 
     for station in stations:
@@ -290,6 +297,8 @@ def validate_locations(
         environment_id = attributes.get("EnvironmentId")
         floor_index = attributes.get("FloorIndex")
         requires_flight = attributes.get("RequiresFlight")
+        location_name = attributes.get("LocationName")
+        location_tagline = attributes.get("LocationTagline")
         zone_id = location.get("zone")
 
         validator.check(equipment_id in family_by_equipment, f'{travel_id}: unknown EquipmentId "{equipment_id}"')
@@ -312,6 +321,20 @@ def validate_locations(
             f"{travel_id}: FloorIndex must be a positive number",
         )
         validator.check(isinstance(requires_flight, bool), f"{travel_id}: RequiresFlight must be boolean")
+        validator.check(
+            isinstance(location_name, str) and bool(location_name.strip()),
+            f"{travel_id}: LocationName must be a non-empty string",
+        )
+        validator.check(
+            isinstance(location_tagline, str) and bool(location_tagline.strip()),
+            f"{travel_id}: LocationTagline must be a non-empty string",
+        )
+        validator.check(location_name == location.get("location_name"), f"{travel_id}: LocationName differs from layout")
+        validator.check(
+            location_tagline == location.get("location_tagline"),
+            f"{travel_id}: LocationTagline differs from layout",
+        )
+        validator.check(zone_id == "Garage", f"{travel_id}: five-location build must be open from spawn")
 
         expected_access = "Sky" if location.get("style") == "sky" else (
             "ThirdFloor" if location.get("style") == "tower" else "Street"
@@ -330,9 +353,8 @@ def validate_locations(
             validator.check(floor_index == 1, f"{travel_id}: {access_kind} station must use FloorIndex 1")
 
         family_counts[family] += 1
-        zone_counts[zone_id] += 1
-        pair_counts[(zone_id, family)] += 1
-        variant_counts[family][equipment_id] += 1
+        equipment_counts[equipment_id] += 1
+        access_counts[access_kind] += 1
 
         base_parts = named_parts(station, "Base")
         anchors = named_parts(station, "TrainAnchor")
@@ -352,38 +374,22 @@ def validate_locations(
                 )
 
     validator.check(set(station_by_id) == set(location_by_id), "station and location TravelId sets differ")
+    primary_equipment = set(getattr(builder, "MACHINE_ORDER", ()))
     for family in FAMILIES:
-        validator.check(family_counts[family] == 11, f"{family}: expected 11 stations, found {family_counts[family]}")
-        expected_variants = set(getattr(builder, "STAT_VARIANTS", {}).get(family, ()))
-        actual = variant_counts[family]
-        validator.check(set(actual) == expected_variants, f"{family}: not every configured variant is used")
-        if actual:
-            counts = list(actual.values())
-            validator.check(
-                max(counts) - min(counts) <= 1,
-                f"{family}: variant use is unbalanced ({dict(sorted(actual.items()))})",
-            )
+        validator.check(family_counts[family] == 1, f"{family}: expected one station, found {family_counts[family]}")
 
     zone_order = [row.get("zone") for row in getattr(builder, "DISTRICTS", [])]
     validator.check(len(zone_order) == 11, f"expected 11 DISTRICTS, found {len(zone_order)}")
-    for zone_id in zone_order:
-        validator.check(zone_counts[zone_id] == 5, f"{zone_id}: expected five stations, found {zone_counts[zone_id]}")
     validator.check(
-        len(pair_counts) == 55 and all(count == 1 for count in pair_counts.values()),
-        "every (zone, ExerciseFamily) pair must occur exactly once",
+        set(equipment_counts) == primary_equipment and all(count == 1 for count in equipment_counts.values()),
+        "the playable world must spawn each primary exercise exactly once",
     )
-
-    if "Strongman" in zone_order:
-        allowed_sky_zones = set(zone_order[zone_order.index("Strongman"):])
-        for travel_id in sky_ids:
-            zone_id = location_by_id[travel_id].get("zone")
-            validator.check(
-                zone_id in allowed_sky_zones,
-                f"{travel_id}: flight-only station is below the Strongman tier",
-            )
-    else:
-        validator.fail("DISTRICTS has no Strongman tier from which to derive sky eligibility")
-    validator.check(len(sky_ids) >= MIN_SKY_STATIONS, f"expected at least eight Sky stations, found {len(sky_ids)}")
+    validator.check(
+        len(sky_ids) == EXPECTED_SKY_STATIONS,
+        f"expected one Sky station, found {len(sky_ids)}",
+    )
+    validator.check(access_counts["ThirdFloor"] == 1, "expected one third-floor training location")
+    validator.check(access_counts["Street"] == 3, "expected three street/interior training locations")
 
     return station_by_id
 
@@ -440,8 +446,8 @@ def validate_irregular_map(
             station_positions[travel_id] = at
     x_levels = {round(at[0], 1) for at in station_positions.values()}
     z_levels = {round(at[2], 1) for at in station_positions.values()}
-    validator.check(len(x_levels) > 4, f"station layout has only {len(x_levels)} distinct X levels")
-    validator.check(len(z_levels) > 4, f"station layout has only {len(z_levels)} distinct Z levels")
+    validator.check(len(x_levels) == EXPECTED_STATIONS, f"station layout has only {len(x_levels)} distinct X levels")
+    validator.check(len(z_levels) == EXPECTED_STATIONS, f"station layout has only {len(z_levels)} distinct Z levels")
 
     sky_ids = [
         travel_id
@@ -539,7 +545,7 @@ def run() -> int:
 
     print(
         "Gym validation passed: "
-        f"55 stations, 15 variants, {instance_count} instances, "
+        f"5 stations, 5 playable exercises / 15 configured, {instance_count} instances, "
         f"{base_part_count} BaseParts, build {short_hash(first_canonical)}"
     )
     return 0

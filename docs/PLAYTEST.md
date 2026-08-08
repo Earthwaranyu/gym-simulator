@@ -4,7 +4,7 @@ Everything static is already enforced by `./scripts/check.sh` — build, lints, 
 `--!strict` types, plus `python3 scripts/validate_gym.py` for the generated world. This
 file covers what only a running game can answer.
 
-Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v2. If a
+Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v6. If a
 step below contradicts that file, the step is stale — fix it.
 
 Run a **two-client Studio playtest** (Test → Clients and Servers → 2 players) unless a
@@ -21,10 +21,9 @@ economy events. Two real bugs were found that way — a DataStore error aborting
 boot, and gym zones tagged on floor slabs so tokens never accrued.
 
 **Explicitly *not* carried forward.** The world has since been rebuilt twice (commits
-`57edbb3`, `9830780`) from 10 machines to **55 stations / 15 variants / 11 zones**, flight
-was enabled from spawn (`895d0e3`), and training interruption changed from hit-stagger to
-**kill-only**. Every box below is therefore unchecked: the old session is context, not
-evidence.
+`57edbb3`, `9830780`) and now again into a **five-location vertical slice with one exercise
+per stat**. Flight is enabled from spawn and training interruption is **kill-only**. Every
+box below is therefore unchecked: the old session is context, not evidence.
 
 **Two standing caveats from that session.** Poses were verified by *measuring* joint
 positions, not by watching them — `screen_capture` does not work while playing, so the
@@ -40,15 +39,15 @@ and whether any balance number feels right.
 ## 1. It boots
 
 - [ ] `wally install` then `./scripts/check.sh` — all checks pass.
-- [ ] `python3 scripts/validate_gym.py` reports **55 stations, 15 variants** and a build hash.
+- [ ] `python3 scripts/validate_gym.py` reports **5 stations, 5 playable exercises / 15 configured** and a build hash.
 - [ ] `rojo serve`, connect the Studio plugin, press Play.
-- [ ] Output shows `[Loader/Server] Ignited 25 systems` and `[Loader/Client] Ignited 17
+- [ ] Output shows `[Loader/Server] Ignited 26 systems` and `[Loader/Client] Ignited 20
       systems`. A lower number means a system failed to load silently.
 - [ ] Output shows `[DevService] Studio session — dev commands are ACTIVE`. This warning
       must **never** appear on a live server.
 - [ ] Output shows `[CombatService] Loaded 1 abilities` — **one**, not three. Slam and Dash
       are deferred.
-- [ ] No red errors in Output. No station warnings — every one of the 55 stations must
+- [ ] No red errors in Output. No station warnings — every one of the five stations must
       resolve its definition, its `TrainAnchor` spots, and its prompt.
 - [ ] Expected warnings, and only these:
   - `[DataService] Studio session using the MOCK store` — see step 7 before launch.
@@ -66,7 +65,7 @@ and whether any balance number feels right.
 - [ ] **Hold E again** to dismount. Then remount and **press Space** — that must also
       dismount you (`StopTraining`). Then remount and **jump** — same. All three paths work
       and the combo resets on each.
-- [ ] **Watch the pose on every one of the 15 variants.** Angles in `PoseConfig` are the
+- [ ] **Watch the pose on all five playable exercises.** Angles in `PoseConfig` are the
       thing most likely to look wrong: you should lie *on* the bench not through it, hang
       *from* the bar not above it, and limbs should bend the way a body bends. Tune in that
       one file.
@@ -112,10 +111,10 @@ The rule under test: **a hit does not dismount; only death does.**
 - [ ] Fly between distant districts with StreamingEnabled on — machines must not pop in
       late. If they do, raise `StreamingMinRadius` in `default.project.json`.
 - [ ] Open the map. It is a **light** board, not a dark one, and every district, road
-      and building is legible against it. All **55** locations are present and
+      and building is legible against it. All **five** locations are present and
       selectable; zoom, pan, and selection survive a refresh.
-- [ ] Locked pins are washed out but still clearly pins — they must not vanish into the
-      paper.
+- [ ] All five pins are muscle-coloured and immediately usable; none is accidentally
+      rendered as locked.
 - [ ] Run and fly through scenery — containers, palms, bollards, kerbs. None of it
       blocks you. Buildings, ground and platforms still do.
 - [ ] **Without the Fast Travel pass**, pick any destination. You are NOT moved: a
@@ -134,10 +133,9 @@ The rule under test: **a hit does not dismount; only death does.**
 ## 4b. Finding a machine (Train tab)
 
 - [ ] Open the menu → **Train**. It opens on the muscle you are furthest behind on.
-- [ ] Click each of the five muscle chips. Every station for that muscle is listed —
-      11 for most muscles, 55 across all five.
-- [ ] Usable machines sort above locked ones, **weakest gain/second first** within each
-      group — the list reads as a ladder, not a trophy cabinet.
+- [ ] Click each of the five bottom muscle buttons. Exactly one named location appears
+      for each muscle, and the matching Train chip is selected.
+- [ ] Every current machine is open from spawn; none shows a power shortfall.
 - [ ] Free/busy counts are live: have a second player mount a machine and confirm the
       count drops within ~2 seconds without reopening the panel.
 - [ ] While you are training, that station reads **YOU ARE HERE** and its button says
@@ -166,12 +164,11 @@ The rule under test: **a hit does not dismount; only death does.**
 
 - [ ] Stand anywhere with machines in sight. Each carries an outline in its muscle's
       colour and a glowing ring on the floor at its base.
-- [ ] Locked machines are marked in grey, not hidden — you can see what you are
-      training toward.
+- [ ] All five current machines use their muscle colour because all are open from spawn.
 - [ ] Outlines do **not** shine through buildings (DepthMode is Occluded). If the city
       looks like a christmas tree, that setting regressed.
-- [ ] Run across a district and confirm marks hand off to the nearest machines without
-      accumulating — at most 14 outlines and 14 rings exist at once.
+- [ ] Run across the city and confirm marks hand off to nearby machines without
+      accumulating — at most five outlines and five rings can exist in this build.
 - [ ] Respawn and confirm rings/outlines come back rather than vanishing for the
       session.
 
@@ -186,9 +183,8 @@ The rule under test: **a hit does not dismount; only death does.**
 - [ ] Shop tab: buy a Protein Shake with cash and confirm the boost applies and expires.
 - [ ] Reputation drops toward Criminal after killing a peaceful player, and rises after
       killing someone already marked Criminal.
-- [ ] Zone gates: crossing a zone's power requirement lets its gate teleport you; below it,
-      the gate refuses with a "needs X more power" toast. Spot-check at least three of the
-      11 zones, including Ascendant.
+- [ ] All five location volumes award the same Garage base rate; permanent stat multipliers
+      change progression without requiring repeated tier copies of each exercise.
 
 ## 6. Leaderboards and roster
 
@@ -230,7 +226,7 @@ Nothing is purchasable until these are filled in. **All four ids are currently `
 - [ ] Playtest with 10+ players and watch server script activity. The per-frame loops to
       watch are `TrainingService` (per *mounted* player per frame), `MuscleController` and
       `TrainingPoseController` (both per character per frame, client-side).
-- [ ] Walk and fly the full 55-station map at 10+ players and watch memory and frame time.
+- [ ] Walk and fly the full five-location city at 10+ players and watch memory and frame time.
 
 ## 10. Balance questions only players can answer
 
@@ -243,5 +239,5 @@ validated against a real player, and #100 (the economy simulator) supersedes gue
 - [ ] Do the hits-to-kill on an equal opponent feel right, or is combat too long?
 - [ ] Does a doubling multiplier against the `1.35^level` cost curve pace well past level 20?
 - [ ] Does reputation swing too fast per murder / per justice kill?
-- [ ] Are 55 stations across 11 zones legible, or is the map overwhelming? (This is what
-      #114's progressive disclosure exists to answer.)
+- [ ] Can a first-time player understand the five-location map immediately, then remember
+      which environment trains each muscle without reopening it?

@@ -8,7 +8,7 @@ mid-training-set, interrupting reps to annoy them.
 (training anti-exploit) were withdrawn by design, not skipped: reps are server-driven
 with no client remote to exploit.
 
-**Growth roadmap: 0 / 73 items complete (#96–#168).** The checked foundation proves a
+**Current roadmap: 7 / 14 items complete (#96–#109).** The checked foundation proves a
 large playable prototype; it does **not** mean the product is ready for a public launch.
 
 **Current public-launch blockers:** `DataService` still uses the Studio mock store, four
@@ -653,8 +653,8 @@ The product loop this roadmap optimizes is:
 
 | Area | What is genuinely present | Largest gap before growth |
 |---|---|---|
-| Core fantasy | 55 locations, 15 exercises, muscle growth, five meaningful stats, flight, PvP, reputation | A new player is not taught or directed through the fantasy |
-| World | Irregular connected city, interiors, sky gyms, vector map, streaming-aware travel | The full map is information overload and low-population servers disperse encounters |
+| Core fantasy | 5 locations, one exercise per stat, muscle growth, flight, PvP, reputation; 15 exercise definitions remain available for future drops | A new player is not taught or directed through the fantasy |
+| World | Irregular connected city, warehouse, third-floor, underpass and sky training, vector map, streaming-aware travel | The five-location slice still needs human route/readability evidence |
 | Progression | ranks, tokens, multipliers, two daily quests, one one-shot quest | no balanced first-hour path, mastery, weekly goals, comeback loop, or post-endgame purpose |
 | Combat | authoritative Punch, damage, kills, bounties, safe zones; interruption settled as kill-only (#96) | only one ability — Slam/Dash deferred to #122; paid-peace fairness still open (Phase 26) |
 | Social | roster, kill feed, global Power/Kills boards | no parties, friend co-training, invites, rivals, crews, co-op events, or shareable moments |
@@ -785,7 +785,7 @@ Execution rules:
       baseline (commit `c2d0612`, world `8b56982091cc`), the four sessions to run,
       what analytics already captures automatically versus what must be written down
       by hand, the interview questions in order, and the failures we already expect
-      (keyboard-only flight, no onboarding, all 55 map pins at once) so a confirmed
+      (keyboard-only flight and no onboarding) so a confirmed
       expectation is not mistaken for a discovery. Fill it in as
       `docs/alpha/<date>-<platform>.md`; until then no "how it feels" claim has
       evidence.*
@@ -814,7 +814,7 @@ Execution rules:
 - [ ] 107. **Hermetic CI and Studio contracts.** Pin/checksum tool definitions and make a
       clean clone install dependencies, lint/typecheck, run self-tests, validate generated
       JSON/config/migrations, and `rojo build` reproducibly. Add automated Studio contracts
-      for all 55/15 world entries, every remote failure path, profile load/save, receipts,
+      for all 5 playable / 15 configured world entries, every remote failure path, profile load/save, receipts,
       training/travel, and a two-client PvP scenario; no launch claim depends only on a
       manual memory.
 - [ ] 108. **Scale the existing runtime before adding systems.** Cache immutable map and
@@ -824,3 +824,24 @@ Execution rules:
       3× allowance. At target capacity, meet script/network/memory budgets with no per-frame
       descendant scans, stale rig leaks, or repeated static Workspace scans.
 
+## Phase 20 — Five memorable training locations
+
+- [x] 109. **Ship the five-location vertical slice.** Replace the repeated 55-station
+      tier matrix with exactly one playable exercise per stat while retaining all 15
+      original builders and poses as dormant future content. Arms starts in the protected
+      plaza; Chest hides in a dockside warehouse; Back sits on the third floor of an
+      enterable Old Town building; Core trains beneath the railway; Legs uses a flight-only
+      high-rise deck. Every destination is open from spawn and carries an original name,
+      route hint, environment/access metadata, and a unique map pin. Replace the permanent
+      seven-button slab with one MENU entry and a bottom five-stat training dock whose
+      buttons open the matching Train view. Regenerate the Rojo world and make the static
+      contract prove exactly five stations, one family and primary exercise each, one sky
+      location, one third-floor location, three street/interior locations, deterministic
+      output, fresh committed JSON, valid held props, distinct pin coordinates, and budget
+      compliance. Verified statically by `./scripts/check.sh`: 5 stations, 5 playable
+      exercises / 15 configured, 923 instances, 854 BaseParts, build `ed9b6b379389`.
+      Verified live through Studio: five prompts and five private GymZones bind; all exits
+      have collidable support exactly three studs below; the third-floor route succeeds
+      with 31 path waypoints; the destination remote and rendered map both return five
+      named pins plus 61 map features; clicking Legs in the HUD opens TRAIN with exactly
+      one open `Highrise Running Deck` treadmill entry.

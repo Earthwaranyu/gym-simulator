@@ -1,32 +1,15 @@
 --!strict
 --[[
-	MenuBarController — the buttons down the left of the screen.
+	MenuBarController — one persistent MENU button.
 
-	Everything the menu holds used to be behind either the M key or a walk back to
-	the plaza to talk to somebody. Neither is discoverable: a player who never
-	presses M never learns the game has upgrades, and one out on Storm Peak cannot
-	reach the shop without travelling home first.
+	The reference experience uses one strong menu entry and leaves the action HUD
+	compact. This project follows that hierarchy without copying its artwork: one
+	original map-pin tile opens the full tabbed menu, while the five stat routes are
+	always available from HudController's bottom training dock.
 
-	Quests deliberately has no button. Coach standing in the plaza is how you are
-	meant to find those, and a button beside the others would make him scenery.
-	Which tabs appear is `OnBar` on the tab itself, defaulting to true, so the bar
-	never names a screen and a new tab arrives with a button already.
-
-	Three things about the shape of it, all of which the first version got wrong:
-
-	  * **Left, not right.** On a phone the right half of the screen is where you
-	    drag to turn the camera. Buttons there compete with looking around, and it
-	    is not where anyone looks for navigation either.
-	  * **A real touch target.** Tiles are sized from TILE, which is above the
-	    ~48px floor for a finger and separated by SPACING so neighbours are not
-	    mis-tapped. The old bar was 38px tall on every device.
-	  * **Icon first.** Five dark rectangles of text read as more HUD panels. A
-	    glyph is what makes a button look like a button, and it is what a player of
-	    this genre is scanning for.
-
-	The bar keeps clear of the two corners Roblox owns on touch — the thumbstick at
-	bottom-left and the jump button at bottom-right — by sitting on the vertical
-	centre, and clear of Roblox's own menu by staying off the top-right.
+	The button stays on the right edge above Roblox's jump corner, uses a 56-pixel
+	touch target, and visibly fills with the accent colour whenever any menu tab is
+	open. Keyboard M and every internal tab continue to work unchanged.
 ]]
 
 local Players = game:GetService("Players")
@@ -81,11 +64,9 @@ export type Plan = { Mode: string, Scale: number, Anchor: number }
 	Decides how the bar is laid out on a given screen. Pure, so it can be checked
 	against a table of real device sizes without a device to hand.
 
-	A column of five 56px buttons needs 312px. That is fine on a desktop, where the
-	whole height is usable — and fits on no phone at all once the bottom 40% is
-	given back to the thumbstick and the jump button: an iPhone 14 in landscape has
-	about 126px between the HUD and the touch zone. So a short screen gets the same
-	buttons as a horizontal strip under the HUD instead, where the space is.
+	The helper remains count-driven so the control can grow without another layout
+	rewrite. A short screen uses a horizontal strip if a future update adds entries;
+	the current one-button build naturally stays a full labelled touch target.
 
 	The mode is computed from the geometry rather than switched on `TouchEnabled`,
 	so a large tablet keeps the column it has room for.
@@ -144,16 +125,18 @@ end
 
 function MenuBarController:_refresh(openTab: string?)
 	for _, entry in entries do
-		paint(entry, entry.Id == openTab)
+		paint(entry, openTab ~= nil)
 	end
 end
 
 function MenuBarController:_build()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-	-- Read the tabs in Start rather than Init: MenuController fills its own table
-	-- in Init, and every Init finishes before any Start begins.
-	local tabs = MenuController:GetBarTabs()
+	-- One obvious entry opens the full tabbed menu. The five muscle routes live in
+	-- the HUD hotbar, so seven permanent navigation slabs would only add clutter.
+	local tabs = {
+		{ Id = "Menu", DisplayName = "Menu", Icon = "Map" },
+	}
 
 	local screen = Instance.new("ScreenGui")
 	screenGui = screen
@@ -237,9 +220,11 @@ function MenuBarController:_build()
 		})
 
 		button.Activated:Connect(function()
-			-- Toggling on the id means a second press closes it again, which is
-			-- what a button that is always on screen has to do.
-			MenuController:Toggle(tab.Id)
+			if MenuController:GetOpenTab() ~= nil then
+				MenuController:Toggle()
+			else
+				MenuController:Open("Map")
+			end
 		end)
 
 		table.insert(entries, {
@@ -282,17 +267,17 @@ function MenuBarController:_arrange()
 	local span = #entries * TILE + math.max(0, #entries - 1) * SPACING
 	-- Anchor is in real pixels; the bar's own offsets are multiplied by the
 	-- UIScale, so the position has to be divided by it to land where planned.
-	local anchor = plan.Anchor / plan.Scale
 	local margin = EDGE_MARGIN / plan.Scale
 
 	if column then
 		bar.Size = UDim2.fromOffset(width, span)
-		bar.AnchorPoint = Vector2.new(0, 0.5)
+		bar.AnchorPoint = Vector2.new(1, 0.5)
 	else
 		bar.Size = UDim2.fromOffset(span, TILE)
-		bar.AnchorPoint = Vector2.new(0, 0)
+		bar.AnchorPoint = Vector2.new(1, 0.5)
 	end
-	bar.Position = UDim2.fromOffset(margin, anchor)
+	-- Right-side, above the jump-control corner and clear of the bottom stat dock.
+	bar.Position = UDim2.new(1, -margin, 0.62, 0)
 end
 
 function MenuBarController:Start()

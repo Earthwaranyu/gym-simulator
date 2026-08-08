@@ -188,6 +188,8 @@ function TravelService:GetDestinations(): { any }
 		local variantId = station:GetAttribute("VariantId")
 		local exerciseFamily = station:GetAttribute("ExerciseFamily")
 		local requiresFlight = station:GetAttribute("RequiresFlight")
+		local locationName = station:GetAttribute("LocationName")
+		local locationTagline = station:GetAttribute("LocationTagline")
 		table.insert(out, {
 			Id = travelId,
 			ZoneId = zone.Id,
@@ -204,6 +206,8 @@ function TravelService:GetDestinations(): { any }
 			VariantId = if type(variantId) == "string" then variantId else definition.Id,
 			ExerciseFamily = if type(exerciseFamily) == "string" then exerciseFamily else definition.StatId,
 			RequiresFlight = requiresFlight == true,
+			LocationName = if type(locationName) == "string" then locationName else zone.DisplayName,
+			LocationTagline = if type(locationTagline) == "string" then locationTagline else zone.Tagline,
 		})
 	end
 	table.sort(out, function(a, b)

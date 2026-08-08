@@ -28,8 +28,7 @@ local PUNCH_COOLDOWN = 0.6
 local FEED_LINES = 4
 -- Wide enough for the worst case a chip has to hold: a stat in the trillions with
 -- a multiplier beside it, which is about 110px of text at this size.
-local CHIP_WIDTH = 116
-local STATS_WIDTH = CHIP_WIDTH * 3 + 8 + 24
+local CHIP_WIDTH = 108
 
 local HudController = {
 	Name = "HudController",
@@ -39,6 +38,7 @@ local HudController = {
 local ProfileController: any = nil
 local TrainingController: any = nil
 local CombatController: any = nil
+local MenuController: any = nil
 
 local statLabels: { [Types.StatId]: TextLabel } = {}
 local powerLabel: TextLabel
@@ -55,6 +55,7 @@ function HudController:Init()
 	ProfileController = Loader.Get("ProfileController")
 	TrainingController = Loader.Get("TrainingController")
 	CombatController = Loader.Get("CombatController")
+	MenuController = Loader.Get("MenuController")
 end
 
 function HudController:_build()
@@ -77,18 +78,17 @@ function HudController:_build()
 	-- the button bar so the two cannot drift into each other.
 	UI.ScaleWithViewport(screen)
 
-	-- Top-left: power, tokens, and every stat, in one block.
+	-- Top-left: only the two global currencies. Muscle values live in the five-button
+	-- training dock below, where each number is also a direct route to its location.
 	--
-	-- This was two stacked panels 250px tall, which owned the whole left column and
-	-- left the button bar nowhere to go. Stats are a wrapping row of chips now
-	-- instead of five full-width rows: the numbers are the same, they are read at a
-	-- glance rather than studied, and the block is a third of the height.
+	-- This was two stacked panels 250px tall. The compact header now leaves the
+	-- world visible and the muscle-specific information sits with its action button.
 	--
 	-- y = 16 is 16 below Roblox's own top bar, not 16 below the screen edge, because
 	-- this ScreenGui no longer ignores the inset — see the note where it is built.
 	local summary = UI.Panel("Summary", screen)
 	summary.Position = UDim2.fromOffset(16, 16)
-	summary.Size = UDim2.fromOffset(STATS_WIDTH, 84)
+	summary.Size = UDim2.fromOffset(300, 42)
 
 	UI.VerticalList(summary, 4)
 
@@ -112,36 +112,74 @@ function HudController:_build()
 	tokenLabel.TextXAlignment = Enum.TextXAlignment.Right
 	tokenLabel.TextColor3 = UI.Palette.Token
 
-	-- One chip per stat, generated from config, wrapping onto as many lines as it
-	-- takes. A sixth stat still needs no edit here.
-	local chips = Instance.new("Frame")
-	chips.Name = "Stats"
-	chips.BackgroundTransparency = 1
-	chips.Size = UDim2.new(1, 0, 0, 44)
-	chips.LayoutOrder = 2
-	chips.Parent = summary
+	-- Bottom-centre: five persistent stat buttons, inspired by the reference game's
+	-- compact stat hotbar but redrawn in this project's gritty gym style. Clicking a
+	-- muscle opens its single current training destination in the Train menu.
+	local chips = UI.Panel("TrainingDock", screen)
+	chips.AnchorPoint = Vector2.new(0.5, 1)
+	chips.Position = UDim2.new(0.5, 0, 1, -12)
+	chips.Size = UDim2.fromOffset(580, 64)
+	chips.BackgroundTransparency = 0.16
 
 	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.fromOffset(CHIP_WIDTH, 20)
-	grid.CellPadding = UDim2.fromOffset(4, 2)
+	grid.CellSize = UDim2.fromOffset(CHIP_WIDTH, 48)
+	grid.CellPadding = UDim2.fromOffset(4, 0)
+	grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	grid.VerticalAlignment = Enum.VerticalAlignment.Center
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = chips
 
 	for index, definition in StatConfig.List do
-		local chip = UI.Label(definition.Id, chips)
-		chip.LayoutOrder = index
-		chip.TextSize = 13
-		chip.TextColor3 = definition.Color
+		local button = Instance.new("TextButton")
+		button.Name = definition.Id
+		button.LayoutOrder = index
+		button.BackgroundColor3 = UI.Palette.Backdrop
+		button.BackgroundTransparency = 0.08
+		button.BorderSizePixel = 0
+		button.AutoButtonColor = false
+		button.Text = ""
+		button.Parent = chips
+		UI.Pressable(button)
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 7)
+		corner.Parent = button
+
+		local accent = Instance.new("Frame")
+		accent.Name = "Accent"
+		accent.Size = UDim2.fromOffset(5, 48)
+		accent.BackgroundColor3 = definition.Color
+		accent.BorderSizePixel = 0
+		accent.Parent = button
+
+		local initial = UI.Label("Initial", button)
+		initial.Position = UDim2.fromOffset(10, 4)
+		initial.Size = UDim2.fromOffset(24, 20)
+		initial.Font = UI.Font.Heading
+		initial.TextSize = 18
+		initial.TextColor3 = definition.Color
+		initial.Text = string.sub(definition.DisplayName, 1, 1)
+
+		local chip = UI.Label("Value", button)
+		chip.Position = UDim2.fromOffset(34, 3)
+		chip.Size = UDim2.new(1, -38, 1, -6)
+		chip.TextSize = 12
+		chip.TextColor3 = UI.Palette.Text
+		chip.TextWrapped = true
 		-- Numbers here run to the trillions. Truncating keeps a long one inside its
 		-- own chip rather than letting it run over the stat next to it.
 		chip.TextTruncate = Enum.TextTruncate.AtEnd
 		statLabels[definition.Id] = chip
+
+		button.Activated:Connect(function()
+			MenuController:OpenTrain(definition.Id)
+		end)
 	end
 
 	-- Bottom-centre: the vitals the player watches while training and fighting.
 	local vitals = UI.Panel("Vitals", screen)
 	vitals.AnchorPoint = Vector2.new(0.5, 1)
-	vitals.Position = UDim2.new(0.5, 0, 1, -16)
+	vitals.Position = UDim2.new(0.5, 0, 1, -84)
 	vitals.Size = UDim2.fromOffset(380, 94)
 
 	UI.VerticalList(vitals, 6)
@@ -159,10 +197,10 @@ function HudController:_build()
 	abilityLabel.TextColor3 = UI.Palette.TextMuted
 	abilityLabel.LayoutOrder = 3
 
-	-- Bottom-right: combat feed.
+	-- Under the compact summary: combat feed. The right side belongs to the roster
+	-- and Menu button, while the bottom belongs to the training dock and controls.
 	local feed = UI.Panel("Feed", screen)
-	feed.AnchorPoint = Vector2.new(1, 1)
-	feed.Position = UDim2.new(1, -16, 1, -16)
+	feed.Position = UDim2.fromOffset(16, 68)
 	feed.Size = UDim2.fromOffset(260, 20 * FEED_LINES + 20)
 	feed.BackgroundTransparency = 0.45
 
