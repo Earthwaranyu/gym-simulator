@@ -708,11 +708,14 @@ Execution rules:
       *Done: `docs/PRODUCT_TRUTH.md` v1 is the versioned inventory. Interruption is
       kill-only; Slam/Dash explicitly deferred; PLAYTEST rewritten for 55 stations, 15
       variants, 11 zones, current flight and travel.*
-- [ ] 97. **Own one KPI scorecard.** Add a concise product brief and dashboard definition
+- [x] 97. **Own one KPI scorecard.** Add a concise product brief and dashboard definition
       for qPTR, qualified plays by source, join→first rep/upgrade/flight, onboarding,
       session length, 5/10-minute survival, D1/D7/D30, activity variety, intentional
       co-play, invite conversion, payer metrics, PvP-victim churn, saves, receipts, crashes,
       OOMs, FPS, and server heartbeat. Assign an owner and review cadence to every metric.
+      *Done: `docs/KPI_SCORECARD.md` v1 — product brief, six owner roles, four cadences,
+      the internal gates, and every metric tagged WIRED / PARTIAL / NOT WIRED. Most are
+      NOT WIRED today; #98 is what closes that, and a NOT WIRED metric may not be cited.*
 - [ ] 98. **Analytics contract v2.** Version a server-validated event schema and wire the
       missing FirstMultiplier and FirstPurchase steps plus moved, prompt seen, training
       started/ended, map opened, first flight, first travel, zone/rank unlock, interruption,

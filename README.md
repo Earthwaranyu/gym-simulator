@@ -13,7 +13,8 @@ disagrees with it, the doc is wrong. Highlights: 55 stations across 11 zones, 15
 variants, 5 stats, **one** combat ability (Punch), keyboard-only flight, and no purchasable
 product yet — every `AssetId` is still `0`.
 
-Manual test passes live in [`docs/PLAYTEST.md`](docs/PLAYTEST.md).
+Manual test passes live in [`docs/PLAYTEST.md`](docs/PLAYTEST.md), and the metrics we
+steer by in [`docs/KPI_SCORECARD.md`](docs/KPI_SCORECARD.md).
 
 ## Setup
 
