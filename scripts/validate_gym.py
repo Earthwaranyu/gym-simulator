@@ -482,13 +482,78 @@ def rotated_aabb(node: Node) -> tuple[float, float, float, float] | None:
 
 def validate_irregular_map(
     validator: Validator,
+    builder: ModuleType,
     structure: Any,
     station_by_id: dict[str, Node],
 ) -> None:
     features = [node for node in walk(structure) if "MapFeature" in tags(node)]
     land = [node for node in features if node.get("attributes", {}).get("MapKind") == "Land"]
+    water = [node for node in features if node.get("attributes", {}).get("MapKind") == "Water"]
+    roads = [node for node in features if node.get("attributes", {}).get("MapKind") == "Road"]
     validator.check(len(features) <= MAX_MAP_FEATURES, f"MapFeature budget exceeded: {len(features)} > {MAX_MAP_FEATURES}")
     validator.check(len(land) >= 10, f"irregular map needs at least ten Land features, found {len(land)}")
+    validator.check(len(roads) == 0, f"bridge-free archipelago still has {len(roads)} Road features")
+    connector_names = {"RoadNetwork", "LandCorridor"}
+    connectors = [node for node in walk(structure) if node.get("name") in connector_names]
+    validator.check(len(connectors) == 0, f"bridge-free archipelago still has {len(connectors)} connector nodes")
+    validator.check(len(water) == 25, f"walkable ocean must contain 25 map/collision tiles, found {len(water)}")
+    for node in water:
+        validator.check(
+            node.get("properties", {}).get("CanCollide", True) is True,
+            f"{node.get('name', '<water>')}: water must be walkable",
+        )
+
+    regions = getattr(builder, "REGIONS", [])
+    centers = [region.get("center") for region in regions if isinstance(region, dict)]
+    validator.check(len(centers) == 10, f"expected ten scattered island centers, found {len(centers)}")
+    if len(centers) == 10:
+        radii = [math.hypot(center[0], center[1]) for center in centers]
+        mean_radius = sum(radii) / len(radii)
+        radius_variance = sum((radius - mean_radius) ** 2 for radius in radii) / len(radii)
+        radius_cv = math.sqrt(radius_variance) / mean_radius
+        validator.check(radius_cv >= 0.22, f"islands still form a predictable ring (radius CV {radius_cv:.3f})")
+        for index, center in enumerate(centers):
+            validator.check(
+                math.hypot(center[0], center[1]) >= 1350,
+                f"island {index + 1} is too close to the central hub",
+            )
+            for other in centers[index + 1:]:
+                separation = math.hypot(center[0] - other[0], center[1] - other[1])
+                validator.check(
+                    separation >= 1750,
+                    f"island centers are only {separation:.1f} studs apart",
+                )
+
+    shore_steps = [node for node in walk(structure) if str(node.get("name", "")).startswith("ShoreStep_")]
+    validator.check(len(shore_steps) == 110, f"eleven islands need ten shore steps each, found {len(shore_steps)}")
+    for node in shore_steps:
+        validator.check(
+            node.get("properties", {}).get("CanCollide", True) is True,
+            f"{node.get('name', '<step>')}: shore access must be walkable",
+        )
+
+    water_models = [node for node in walk(structure) if node.get("attributes", {}).get("WalkableWater") is True]
+    validator.check(len(water_models) == 1, f"expected one persistent walkable-water model, found {len(water_models)}")
+    if len(water_models) == 1:
+        validator.check(
+            water_models[0].get("properties", {}).get("ModelStreamingMode") == "Persistent",
+            "walkable water must stream persistently",
+        )
+
+    boundaries = [node for node in walk(structure) if node.get("attributes", {}).get("WorldBoundary") is True]
+    validator.check(len(boundaries) == 1, f"expected one persistent world boundary, found {len(boundaries)}")
+    if len(boundaries) == 1:
+        boundary_parts = [node for node in descendants(boundaries[0]) if is_base_part(node)]
+        validator.check(len(boundary_parts) == 20, f"world boundary needs 20 tiled walls, found {len(boundary_parts)}")
+        validator.check(
+            boundaries[0].get("properties", {}).get("ModelStreamingMode") == "Persistent",
+            "world boundary must stream persistently",
+        )
+        for node in boundary_parts:
+            validator.check(
+                node.get("properties", {}).get("CanCollide", True) is True,
+                f"{node.get('name', '<boundary>')}: world boundary must collide",
+            )
 
     land_bounds = [bounds for node in land if (bounds := rotated_aabb(node)) is not None]
     validator.check(len(land_bounds) == len(land), "every Land MapFeature must have a valid CFrame and Size")
@@ -499,8 +564,8 @@ def validate_irregular_map(
         global_max_z = max(bounds[3] for bounds in land_bounds)
         global_width = max(global_max_x - global_min_x, 1)
         global_depth = max(global_max_z - global_min_z, 1)
-        validator.check(global_width >= 4700, f"world is only {global_width:.0f} studs wide")
-        validator.check(global_depth >= 4300, f"world is only {global_depth:.0f} studs deep")
+        validator.check(global_width >= 7500, f"world is only {global_width:.0f} studs wide")
+        validator.check(global_depth >= 6000, f"world is only {global_depth:.0f} studs deep")
         for node, bounds in zip(land, land_bounds):
             shape = node.get("attributes", {}).get("MapShape", "Rect")
             if shape != "Rect":
@@ -585,15 +650,19 @@ def validate_world_foundation(
         "playable foundation must keep the stable WorldFoundation name",
     )
     validator.check(
-        foundation.get("className") == "Folder",
-        "WorldFoundation must be a tiled Folder, not an oversized BasePart",
+        foundation.get("className") == "Model",
+        "WorldFoundation must be a tiled Model, not an oversized BasePart",
+    )
+    validator.check(
+        foundation.get("properties", {}).get("ModelStreamingMode") == "Persistent",
+        "WorldFoundation must stream persistently",
     )
     validator.check(
         isinstance(width, (int, float))
         and isinstance(depth, (int, float))
-        and width >= 6000
-        and depth >= 5400,
-        "WorldFoundation must be at least 6,000 x 5,400 studs",
+        and width >= 9800
+        and depth >= 8800,
+        "WorldFoundation must be at least 9,800 x 8,800 studs",
     )
     validator.check(
         isinstance(center_x, (int, float)) and isinstance(center_z, (int, float)),
@@ -610,8 +679,8 @@ def validate_world_foundation(
     columns = attributes.get("TileColumns")
     rows = attributes.get("TileRows")
     validator.check(
-        columns == 4 and rows == 4 and len(tiles) == 16,
-        f"WorldFoundation must contain a 4 x 4 tile grid, found {len(tiles)} tiles",
+        columns == 5 and rows == 5 and len(tiles) == 25,
+        f"WorldFoundation must contain a 5 x 5 tile grid, found {len(tiles)} tiles",
     )
     tile_bounds = [bounds for tile in tiles if (bounds := rotated_aabb(tile)) is not None]
     validator.check(len(tile_bounds) == len(tiles), "every foundation tile needs valid geometry")
@@ -699,7 +768,7 @@ def run() -> int:
         family_by_equipment = validate_equipment_tables(validator, builder)
         stations = [node for node in walk(first_machines) if "TrainingStation" in tags(node)]
         station_by_id = validate_locations(validator, builder, stations, family_by_equipment)
-        validate_irregular_map(validator, first_structure, station_by_id)
+        validate_irregular_map(validator, builder, first_structure, station_by_id)
         validate_world_foundation(validator, first_structure, first_machines)
         instance_count, base_part_count = validate_instance_budgets(
             validator,

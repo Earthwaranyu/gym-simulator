@@ -8,7 +8,7 @@ mid-training-set, interrupting reps to annoy them.
 (training anti-exploit) were withdrawn by design, not skipped: reps are server-driven
 with no client remote to exploit.
 
-**Current roadmap: 10 / 17 items complete (#96–#112).** The checked foundation proves a
+**Current roadmap: 11 / 18 items complete (#96–#113).** The checked foundation proves a
 large playable prototype; it does **not** mean the product is ready for a public launch.
 
 **Current public-launch blockers:** `DataService` still uses the Studio mock store, four
@@ -654,7 +654,7 @@ The product loop this roadmap optimizes is:
 | Area | What is genuinely present | Largest gap before growth |
 |---|---|---|
 | Core fantasy | 35 locations, seven unique exercises and exact +1/s–+64/s tiers per muscle, athletic muscle growth, Legs sprint/flight, PvP, reputation | A new player is not taught or directed through the fantasy |
-| World | Massive irregular connected city, interiors, third floors and skyline training, vector map, streaming-aware travel | The 35-pin map and long routes still need human readability evidence |
+| World | Massive bridge-free scattered archipelago, walkable water, interiors, third floors and skyline training, vector map, streaming-aware travel | The 35-pin map and long water routes still need human readability evidence |
 | Progression | ranks, tokens, multipliers, two daily quests, one one-shot quest | no balanced first-hour path, mastery, weekly goals, comeback loop, or post-endgame purpose |
 | Combat | authoritative Punch, damage, kills, bounties, safe zones; interruption settled as kill-only (#96) | only one ability — Slam/Dash deferred to #122; paid-peace fairness still open (Phase 26) |
 | Social | roster, kill feed, global Power/Kills boards | no parties, friend co-training, invites, rivals, crews, co-op events, or shareable moments |
@@ -916,3 +916,24 @@ Execution rules:
       independently measures 4,868 × 4,471 visible studs, 16 foundation tiles, 16 water
       tiles, 132 map features, 35 stations/zones, zero escaped or oversized parts, floor
       support beneath all 35 exits, and five successful third-floor routes.
+
+- [x] 113. **Replace the connected city with a safe, bridge-free archipelago.** Delete every
+      generated road, causeway and land corridor. Deterministically scatter the ten themed
+      islands with no ring/grid pattern, at least 1,750 studs center-to-center and 1,350
+      studs from the spawn island, across ≈8,037 × 6,547 visible studs. Expand the hidden
+      foundation to 10,000 × 9,000 and make the 9,600 × 8,600 ocean a seamless, persistent,
+      collidable 5×5 surface so walking and Legs sprint work on water. Give the hub and all
+      ten islands shallow shore stairs so flight is not required for water travel. Enclose
+      the ocean with 20 persistent boundary-wall tiles, stop flight from applying downward
+      force at the waterline, and enforce the same Y/X/Z safety envelope on the server so a
+      flying or falling player cannot pass under the water or leave the map.
+
+      **Verified 2026-08-08:** `./scripts/check.sh`, strict Luau analysis, generated-world
+      validation and `rojo build` pass. Deterministic output reports 35 stations / 35 unique
+      exercises, 1,933 instances, 1,767 BaseParts and build `a1917590d228`. Connected Studio
+      finds zero bridges/roads, 25 walkable water tiles at surface Y=-7.5, 110 shore steps,
+      20 persistent boundary walls, 35 supported exits and five successful indoor routes.
+      In Play, a falling character lands on Glass at root Y=-4.5, server sprint changes
+      16→24→16 while on water, a forced root at Y=-20 recovers to -4.5005, and a forced
+      X=6,000 position recovers to X=4,790. Runtime output contains only the documented
+      mock-DataStore/API and zero-product-id warnings.

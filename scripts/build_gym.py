@@ -2620,60 +2620,83 @@ def build_world():
 
 
 # --------------------------------------------------------------------------
-# Connected city world.
+# Scattered training archipelago.
 #
 # The original district geometry remains above as a record of the island pass
-# and as a library of props/builders. Shipping now uses this layout: one flat,
-# continuous street grid with one hidden training location per city block.
-# Tier and stat are deliberately shuffled across the grid, so the world is not
-# eleven level islands or five stat rows. The map UI reveals every location;
-# physically finding its doorway is the exploration layer.
+# and as a library of props/builders. Shipping now uses a bridge-free field of
+# distant islands over walkable water. Tier and stat are deliberately shuffled,
+# so neither position nor island theme reveals progression. The map UI reveals
+# every location; physically finding its doorway remains the exploration layer.
 # --------------------------------------------------------------------------
 
 THIRD_FLOOR_Y = 24
 MAP_FEATURE_TAG = "MapFeature"
 GROUND_STYLES = ["warehouse", "alley", "yard", "underpass", "bunker"]
 
-# The connected world is an irregular coastal loop rather than a rectangular
-# grid. A region is a visual landmark, not a progression tier: the 30 non-starter
+# The world is an irregular archipelago rather than a rectangular grid or ring.
+# A region is a visual landmark, not a progression tier: the 30 non-starter
 # tier/family pairs are shuffled across all ten. The large hidden foundation is
-# only a fall catcher; visible land remains an irregular chain of districts.
-WORLD_FOUNDATION_SIZE = (6200, 5600)
-WORLD_WATER_SIZE = (6000, 5400)
-REGIONS = [
-    {"id": "OldTown", "theme": "Iron", "center": (-790, 300),
-     "size": (660, 520), "yaw": -12, "shape": "Rect", "count": 6},
-    {"id": "Harbor", "theme": "Powerhouse", "center": (-1950, -260),
-     "size": (790, 510), "yaw": 16, "shape": "Rect", "count": 7},
-    {"id": "Beach", "theme": "Strongman", "center": (-1690, -1260),
-     "size": (660, 660), "yaw": 0, "shape": "Circle", "count": 3},
-    {"id": "Quarry", "theme": "Titan", "center": (-360, -1780),
-     "size": (700, 700), "yaw": -18, "shape": "Circle", "count": 4},
-    {"id": "Highrise", "theme": "Skydeck", "center": (1020, -1410),
-     "size": (790, 570), "yaw": 21, "shape": "Rect", "count": 7},
-    {"id": "SolarWorks", "theme": "Solar", "center": (2040, -470),
-     "size": (750, 530), "yaw": -14, "shape": "Rect", "count": 5},
-    {"id": "Stormworks", "theme": "Storm", "center": (1950, 890),
-     "size": (660, 660), "yaw": 0, "shape": "Circle", "count": 4},
-    {"id": "NeonMarket", "theme": "Nebula", "center": (780, 1650),
-     "size": (790, 550), "yaw": 27, "shape": "Rect", "count": 6},
-    {"id": "Observatory", "theme": "Ascendant", "center": (-550, 1920),
-     "size": (660, 660), "yaw": 0, "shape": "Circle", "count": 3},
-    {"id": "VoidRail", "theme": "Void", "center": (-1650, 1270),
-     "size": (750, 550), "yaw": -24, "shape": "Rect", "count": 5},
+# only a fall catcher; visible land remains ten unrelated island silhouettes.
+WORLD_FOUNDATION_SIZE = (10000, 9000)
+WORLD_WATER_SIZE = (9600, 8600)
+WATER_SURFACE_Y = FLOOR_TOP - 8.5
+REGION_SPECS = [
+    {"id": "OldTown", "theme": "Iron", "size": (660, 520),
+     "shape": "Rect", "count": 6},
+    {"id": "Harbor", "theme": "Powerhouse", "size": (790, 510),
+     "shape": "Rect", "count": 7},
+    {"id": "Beach", "theme": "Strongman", "size": (660, 660),
+     "shape": "Circle", "count": 3},
+    {"id": "Quarry", "theme": "Titan", "size": (700, 700),
+     "shape": "Circle", "count": 4},
+    {"id": "Highrise", "theme": "Skydeck", "size": (790, 570),
+     "shape": "Rect", "count": 7},
+    {"id": "SolarWorks", "theme": "Solar", "size": (750, 530),
+     "shape": "Rect", "count": 5},
+    {"id": "Stormworks", "theme": "Storm", "size": (660, 660),
+     "shape": "Circle", "count": 4},
+    {"id": "NeonMarket", "theme": "Nebula", "size": (790, 550),
+     "shape": "Rect", "count": 6},
+    {"id": "Observatory", "theme": "Ascendant", "size": (660, 660),
+     "shape": "Circle", "count": 3},
+    {"id": "VoidRail", "theme": "Void", "size": (750, 550),
+     "shape": "Rect", "count": 5},
 ]
+
+
+def scattered_regions():
+    """Seeded rejection sampling: far-apart islands without a visible ring/grid."""
+    rng = random.Random("scattered-archipelago-v2")
+    centers = []
+    for _spec in REGION_SPECS:
+        for _attempt in range(100000):
+            x = round(rng.uniform(-3850, 3850) / 10) * 10
+            z = round(rng.uniform(-3350, 3350) / 10) * 10
+            if math.hypot(x, z) < 1350:
+                continue
+            if any(math.hypot(x - other_x, z - other_z) < 1750
+                   for other_x, other_z in centers):
+                continue
+            centers.append((x, z))
+            break
+        else:
+            raise RuntimeError("could not scatter all training islands")
+
+    out = []
+    for spec, center in zip(REGION_SPECS, centers):
+        region = dict(spec)
+        region["center"] = center
+        region["yaw"] = rng.randrange(-35, 36)
+        out.append(region)
+    return out
+
+
+REGIONS = scattered_regions()
 REGION_BY_ID = {region["id"]: region for region in REGIONS}
-REGION_LINKS = [
-    ("OldTown", "Harbor"), ("Harbor", "Beach"), ("Beach", "Quarry"),
-    ("Quarry", "Highrise"), ("Highrise", "SolarWorks"),
-    ("SolarWorks", "Stormworks"), ("Stormworks", "NeonMarket"),
-    ("NeonMarket", "Observatory"), ("Observatory", "VoidRail"),
-    ("VoidRail", "OldTown"),
-]
 
 # Seven irregular local sites, consumed in different quantities by each region.
 # Rotating and scaling these per patch yields 50 non-axial, well-separated sites
-# while keeping their authored doors close enough to a road to be found on foot.
+# while keeping their authored doors readable within each island.
 REGION_SITE_PATTERN = [
     (-0.31, -0.24), (0.29, -0.27), (-0.34, 0.23), (0.32, 0.25),
     (-0.02, 0.01), (0.00, -0.42), (-0.04, 0.42),
@@ -2717,6 +2740,65 @@ def tiled_surface(name, width, depth, height, y, color, material,
             )
             out.append(map_feature(node, map_kind) if map_kind else node)
     return out
+
+
+def persistent_model(name, children, attributes=None):
+    """Small always-streamed collision model used for global traversal surfaces."""
+    return {
+        "name": name,
+        "className": "Model",
+        "attributes": dict(attributes or {}),
+        "properties": {"ModelStreamingMode": "Persistent"},
+        "children": children,
+    }
+
+
+def shore_access(frame, edge, accent):
+    """Ten shallow steps let walkers climb from the water onto one island."""
+    out = []
+    low_base = WATER_SURFACE_Y - 0.5
+    rise = FLOOR_TOP - WATER_SURFACE_Y
+    for index in range(10):
+        top = WATER_SURFACE_Y + rise * (index + 1) / 10
+        height = top - low_base
+        local = cf(0, low_base + height / 2, edge + 38 - index * 4)
+        out.append(place(frame, part(
+            f"ShoreStep_{index + 1:02d}", [22, height, 5], local,
+            [0.29, 0.30, 0.31], "Concrete",
+        )))
+    out.append(place(frame, map_footprint(
+        "ShoreAccessMap", 22, 44,
+        cf(0, WATER_SURFACE_Y + 0.15, edge + 20), accent, "Park",
+    )))
+    return out
+
+
+def world_boundary():
+    """Persistent physical perimeter that cannot be outrun by fast flight."""
+    width, depth = WORLD_WATER_SIZE
+    wall_height = 2048
+    wall_y = WATER_SURFACE_Y + wall_height / 2 - 32
+    out = []
+    for side in (-1, 1):
+        for segment in range(5):
+            z = -depth / 2 + depth / 5 * (segment + 0.5)
+            out.append(part(
+                f"BoundaryX_{side}_{segment + 1}", [12, wall_height, depth / 5 + 4],
+                cf(side * width / 2, wall_y, z), [0.06, 0.10, 0.14], "ForceField",
+                Transparency=1, CanTouch=False, CanQuery=False, CastShadow=False,
+            ))
+            x = -width / 2 + width / 5 * (segment + 0.5)
+            out.append(part(
+                f"BoundaryZ_{side}_{segment + 1}", [width / 5 + 4, wall_height, 12],
+                cf(x, wall_y, side * depth / 2), [0.06, 0.10, 0.14], "ForceField",
+                Transparency=1, CanTouch=False, CanQuery=False, CastShadow=False,
+            ))
+    return persistent_model("WorldBoundary", out, {
+        "WorldBoundary": True,
+        "HalfWidth": width / 2,
+        "HalfDepth": depth / 2,
+        "WaterSurfaceY": WATER_SURFACE_Y,
+    })
 
 
 def region_frame(region):
@@ -2807,8 +2889,8 @@ def connected_locations():
                 "equipment": STAT_VARIANTS[family][zone_index],
             })
 
-    # Three active sites in every neighborhood makes the whole 5,000-stud city
-    # meaningful while avoiding the old tell of exactly five machines per district.
+    # Three active sites per island makes the whole archipelago meaningful while
+    # avoiding the old tell of exactly five machines per progression district.
     slots = [
         (region["id"], site_index, site)
         for region in REGIONS
@@ -3011,36 +3093,8 @@ def environment_model(environment_id, kind, children, atomic=False,
     }
 
 
-def road_between(name, start, finish):
-    """A walkable causeway and road segment between two irregular patches."""
-    x1, z1 = start
-    x2, z2 = finish
-    dx, dz = x2 - x1, z2 - z1
-    length = math.hypot(dx, dz)
-    yaw = math.degrees(math.atan2(dx, dz))
-    frame = mul(cf((x1 + x2) / 2, 0, (z1 + z2) / 2), rot_y(yaw))
-    out = [
-        place(frame, map_feature(
-            part("LandCorridor", [78, 4, length + 44], cf(0, FLOOR_TOP - 2, 0),
-                 [0.22, 0.23, 0.23], "Ground"),
-            "Land",
-        )),
-        place(frame, map_feature(
-            part("Road", [40, 0.45, length + 18], cf(0, FLOOR_TOP + 0.03, 0),
-                 ROAD, "Asphalt", CanCollide=False),
-            "Road",
-        )),
-    ]
-    for offset in range(-int(length / 2) + 18, int(length / 2) - 16, 42):
-        out.append(place(frame, part(
-            "RoadLine", [1.1, 0.1, 15], cf(0, FLOOR_TOP + 0.31, offset),
-            ROAD_LINE, "SmoothPlastic", CanCollide=False, CastShadow=False,
-        )))
-    return folder(name, out)
-
-
 def region_ground(region):
-    """A non-uniform coastal patch whose top remains the shared street Y=1."""
+    """One non-uniform island whose top remains the shared ground Y=1."""
     visual = next(row for row in DISTRICTS if row["zone"] == region["theme"])
     width, depth = region["size"]
     frame = region_frame(region)
@@ -3085,13 +3139,15 @@ def region_ground(region):
                 cf(side * width * 0.43, FLOOR_TOP + 0.1, side * depth * 0.22),
                 visual["ground"], "Land", "Circle",
             )))
+    shore_edge = min(width, depth) / 2 if region["shape"] == "Circle" else depth / 2
+    out.extend(shore_access(frame, shore_edge, visual["accent"]))
     return out
 
 
 def _decorate(node):
     """Make a scenery node non-blocking, in place, and return it.
 
-    Props exist to make the city look like a place. They are not obstacles, and
+    Props exist to make each island look like a place. They are not obstacles, and
     every one of them that collides is something to get snagged on while running a
     hundred studs between machines or flying between districts — a shipping
     container is 26 studs deep and a crane leg is 62 tall.
@@ -3150,54 +3206,47 @@ def region_scenery(region, locations):
 
 
 def connected_ground():
-    """Large foundation, water background, and irregular causeway graph."""
-    out = [
-        {
-            "name": "WorldFoundation",
-            "className": "Folder",
-            "attributes": {
-                "PlayableFoundation": True,
-                "Purpose": "WorldBoundsAndFallCatcher",
-                "FoundationCenterX": 0,
-                "FoundationCenterZ": 0,
-                "FoundationWidth": WORLD_FOUNDATION_SIZE[0],
-                "FoundationDepth": WORLD_FOUNDATION_SIZE[1],
-                "TileColumns": 4,
-                "TileRows": 4,
-            },
-            "children": tiled_surface(
-                "FoundationTile", WORLD_FOUNDATION_SIZE[0], WORLD_FOUNDATION_SIZE[1],
-                6, FLOOR_TOP - 12.5, [0.055, 0.06, 0.07], "Rock",
-                CanTouch=False, CanQuery=False,
-            ),
-        },
-        folder("WorldWater", tiled_surface(
-            "OceanTile", WORLD_WATER_SIZE[0], WORLD_WATER_SIZE[1],
-            3, FLOOR_TOP - 10, [0.08, 0.20, 0.27], "Glass",
-            map_kind="Water", CanCollide=False, CanTouch=False,
-            CanQuery=False, Transparency=0.18,
-        )),
-        environment_model("Hub", "Ground", [
-            disc("HubGround", 5, 470, FLOOR_TOP - 2.5,
-                 [0.22, 0.23, 0.23], "Ground"),
-            disc("HubFoundation", 5, 482, FLOOR_TOP - 7.5,
-                 [0.13, 0.14, 0.15], "Rock"),
-            map_footprint("HubLandMap", 470, 470, cf(0, FLOOR_TOP + 0.1, 0),
-                          [0.22, 0.23, 0.23], "Land", "Circle"),
-        ]),
+    """Persistent walkable water beneath a bridge-free scattered archipelago."""
+    foundation = persistent_model("WorldFoundation", tiled_surface(
+        "FoundationTile", WORLD_FOUNDATION_SIZE[0], WORLD_FOUNDATION_SIZE[1],
+        6, WATER_SURFACE_Y - 4, [0.055, 0.06, 0.07], "Rock",
+        columns=5, rows=5, CanTouch=False, CanQuery=False,
+    ), {
+        "PlayableFoundation": True,
+        "Purpose": "WorldBoundsAndFallCatcher",
+        "FoundationCenterX": 0,
+        "FoundationCenterZ": 0,
+        "FoundationWidth": WORLD_FOUNDATION_SIZE[0],
+        "FoundationDepth": WORLD_FOUNDATION_SIZE[1],
+        "TileColumns": 5,
+        "TileRows": 5,
+    })
+    water = persistent_model("WorldWater", tiled_surface(
+        "OceanTile", WORLD_WATER_SIZE[0], WORLD_WATER_SIZE[1],
+        3, WATER_SURFACE_Y - 1.5, [0.08, 0.20, 0.27], "Glass",
+        columns=5, rows=5, map_kind="Water", CanCollide=True,
+        CanTouch=False, CanQuery=True, Transparency=0.18,
+    ), {
+        "WalkableWater": True,
+        "WaterSurfaceY": WATER_SURFACE_Y,
+        "TileColumns": 5,
+        "TileRows": 5,
+    })
+    hub_children = [
+        disc("HubGround", 5, 470, FLOOR_TOP - 2.5,
+             [0.22, 0.23, 0.23], "Ground"),
+        disc("HubFoundation", 5, 482, FLOOR_TOP - 7.5,
+             [0.13, 0.14, 0.15], "Rock"),
+        map_footprint("HubLandMap", 470, 470, cf(0, FLOOR_TOP + 0.1, 0),
+                      [0.22, 0.23, 0.23], "Land", "Circle"),
     ]
-    road_nodes = []
-    for index, (start_id, finish_id) in enumerate(REGION_LINKS):
-        road_nodes.append(road_between(
-            f"RingRoad{index + 1}", REGION_BY_ID[start_id]["center"],
-            REGION_BY_ID[finish_id]["center"],
-        ))
-    for region_id in ("OldTown", "Highrise", "NeonMarket"):
-        road_nodes.append(road_between(
-            f"HubRoad{region_id}", (0, 0), REGION_BY_ID[region_id]["center"],
-        ))
-    out.append(folder("RoadNetwork", road_nodes))
-    return out
+    hub_children.extend(shore_access(cf(), 235, ACCENT_STARTER))
+    return [
+        foundation,
+        water,
+        world_boundary(),
+        environment_model("Hub", "Ground", hub_children),
+    ]
 
 
 def connected_plaza():
@@ -3416,8 +3465,8 @@ def build_connected_world():
             location_tagline=location["location_tagline"],
         ))
 
-    # connected_ground creates Hub first so replace that minimal environment with
-    # its complete plaza/starter campus while preserving the road/water siblings.
+    # connected_ground creates Hub first, so extend that environment with its
+    # complete plaza and starter campus while preserving global water/boundary siblings.
     for index, node in enumerate(structure):
         if node.get("name") == "Environment_Hub":
             node["children"].extend(hub_children)
@@ -3434,7 +3483,7 @@ def build_connected_world():
     structure.extend(sky_environments)
 
     return (
-        {"className": "Folder", "children": [folder("IrregularCoastCity", structure)]},
+        {"className": "Folder", "children": [folder("ScatteredTrainingArchipelago", structure)]},
         {"className": "Folder", "children": machines},
     )
 

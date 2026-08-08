@@ -7,7 +7,9 @@
 	matter what we do, so a server that tried to simulate flight would be fighting
 	the owner of the parts it was moving, and a cheater who wanted to hover could do
 	it whether or not this file existed. What the server can hold is the *rule* —
-	and the rules here exist to protect the PvP hook, not to stop teleport exploits.
+	and the rules here exist to protect the PvP hook. The one movement correction the
+	server does own is the generated world's safety envelope: a character below the
+	walkable ocean or beyond its perimeter is returned to the nearest legal point.
 
 	Permission is published as a character attribute rather than a remote so every
 	client can see who may fly, which is what lets an attacker read the situation.
@@ -28,6 +30,7 @@ local MovementConfig = require(ReplicatedStorage.Modules.MovementConfig)
 -- Permission is re-evaluated on a slow tick as well as on events, because total
 -- power creeps upward continuously and nothing fires when it crosses the line.
 local REFRESH_INTERVAL = 1
+local SAFETY_INTERVAL = 0.1
 
 local FlightService = {
 	Name = "FlightService",
@@ -83,6 +86,30 @@ function FlightService:_refresh(player: Player)
 	end
 end
 
+function FlightService:_enforceWorldBounds(player: Player)
+	local character = player.Character
+	local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	local humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
+	if root == nil or not root:IsA("BasePart") or humanoid == nil or humanoid.Health <= 0 then
+		return
+	end
+
+	local at = root.Position
+	local minimumY = MovementConfig.WATER_SURFACE_Y + MovementConfig.FLIGHT_WATER_CLEARANCE
+	local corrected = Vector3.new(
+		math.clamp(at.X, -MovementConfig.FLIGHT_WORLD_HALF_WIDTH, MovementConfig.FLIGHT_WORLD_HALF_WIDTH),
+		math.max(at.Y, minimumY),
+		math.clamp(at.Z, -MovementConfig.FLIGHT_WORLD_HALF_DEPTH, MovementConfig.FLIGHT_WORLD_HALF_DEPTH)
+	)
+	if (corrected - at).Magnitude <= 0.05 then
+		return
+	end
+
+	root.CFrame += corrected - at
+	root.AssemblyLinearVelocity = Vector3.zero
+	root.AssemblyAngularVelocity = Vector3.zero
+end
+
 function FlightService:Start()
 	Players.PlayerRemoving:Connect(function(player: Player)
 		groundedUntil[player] = nil
@@ -100,6 +127,15 @@ function FlightService:Start()
 				self:_refresh(player)
 			end
 			task.wait(REFRESH_INTERVAL)
+		end
+	end)
+
+	task.spawn(function()
+		while true do
+			for _, player in Players:GetPlayers() do
+				self:_enforceWorldBounds(player)
+			end
+			task.wait(SAFETY_INTERVAL)
 		end
 	end)
 

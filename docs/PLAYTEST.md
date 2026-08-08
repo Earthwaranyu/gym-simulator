@@ -4,7 +4,7 @@ Everything static is already enforced by `./scripts/check.sh` — build, lints, 
 `--!strict` types, plus `python3 scripts/validate_gym.py` for the generated world. This
 file covers what only a running game can answer.
 
-Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v8. If a
+Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v10. If a
 step below contradicts that file, the step is stale — fix it.
 
 Run a **two-client Studio playtest** (Test → Clients and Servers → 2 players) unless a
@@ -21,8 +21,8 @@ economy events. Two real bugs were found that way — a DataStore error aborting
 boot, and gym zones tagged on floor slabs so tokens never accrued.
 
 **Explicitly *not* carried forward.** The world has since been rebuilt twice (commits
-`57edbb3`, `9830780`) and now again into a **35-location, seven-tier massive city**. Flight
-is enabled from spawn and training interruption is **kill-only**. Every
+`57edbb3`, `9830780`) and now again into a **35-location, seven-tier scattered
+archipelago**. Flight is enabled from spawn and training interruption is **kill-only**. Every
 box below is therefore unchecked: the old session is context, not evidence.
 
 **Two standing caveats from that session.** Poses were verified by *measuring* joint
@@ -113,10 +113,17 @@ The rule under test: **a hit does not dismount; only death does.**
       than the old 140-stud launch; even maximum Legs never exceeds 120.
 - [ ] Fly between distant districts with StreamingEnabled on — machines must not pop in
       late. If they do, raise `StreamingMinRadius` in `default.project.json`.
-- [ ] Traverse the expanded world edge to edge. The connected visible land should span
-      roughly 4,868 × 4,471 studs, with every road, district, machine and sky platform
-      horizontally contained by the 6,200 × 5,600 `WorldFoundation`. Falling into the
-      surrounding water lands on the hidden rock catcher instead of the void.
+- [ ] Traverse the expanded world edge to edge. Ten irregular training islands plus the
+      spawn island should be scattered with no ring/grid and no bridges, roads or causeways.
+      Visible land spans roughly 8,037 × 6,547 studs inside the 10,000 × 9,000 foundation.
+- [ ] Step down the hub's shore stairs and walk across the water. The character stands at
+      root Y≈-4.5 on Glass, can sprint 16→24+ with Shift, and can climb the ten shallow
+      shore steps onto every island without flying.
+- [ ] Dive into the water while flying. The avatar must stop with its root at or above
+      Y=-4.5, never pass beneath the surface, and remain flying/controllable.
+- [ ] Fly into every outer edge at maximum Legs speed. The persistent wall and safety
+      envelope must keep X within ±4,790 and Z within ±4,290; the player cannot leave the
+      ocean or fall into the void.
 - [ ] Open the map. It is a **light** board, not a dark one, and every district, road
       and building is legible against it. All **35** locations are present and
       selectable; zoom, pan, and selection survive a refresh.

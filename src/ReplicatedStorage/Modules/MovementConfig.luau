@@ -3,14 +3,8 @@
 	MovementConfig — the walk-run-fly ladder, as data.
 
 	Walking is the stable floor, Shift sprinting is Legs (Formulas.SprintSpeed), and
-	flying is available from spawn but paced by Legs (Formulas.FlightSpeed). The map is
-	built so the three rungs and the tier ladder are the same climb: the first three
-	districts stand on the ground, and everything past them floats higher and higher,
-	so unlocking flight is what opens the back half of the world.
-
-	Note the split: total power decides WHETHER you fly, Legs decides HOW FAST. The
-	gate is matched to how high the districts float and belongs to the map; the speed
-	is a stat and belongs to the player.
+	flying is available from spawn but paced by Legs (Formulas.FlightSpeed). Walkable
+	water links the bridge-free islands, while flying remains the faster route.
 
 	Flight is deliberately not free of the game's rules. A player who could take off
 	the instant a fight started would make the training interrupt meaningless — being
@@ -30,6 +24,15 @@ MovementConfig.FLIGHT_POWER = 0
 MovementConfig.FLIGHT_ACCELERATION = 14
 -- Vertical movement is intentionally slower than level flight for readable landings.
 MovementConfig.FLIGHT_CLIMB_RATIO = 0.62
+
+-- The generated ocean is a solid traversal surface. Keep a flying root one standing
+-- character-height above it, and inside the physical perimeter, even when the camera
+-- is aimed steeply down or out of the world. The persistent collision geometry is the
+-- authoritative safety net; these limits prevent the client mover from fighting it.
+MovementConfig.WATER_SURFACE_Y = -7.5
+MovementConfig.FLIGHT_WATER_CLEARANCE = 3
+MovementConfig.FLIGHT_WORLD_HALF_WIDTH = 4790
+MovementConfig.FLIGHT_WORLD_HALF_DEPTH = 4290
 
 -- Seconds after taking a hit before a player may take off again. The same span as
 -- TrainingService's stagger, so one punch buys an attacker one window in which the

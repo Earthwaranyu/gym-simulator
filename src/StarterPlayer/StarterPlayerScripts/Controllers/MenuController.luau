@@ -385,8 +385,9 @@ function MenuController:_renderMap(parent: Frame)
 		return
 	end
 
-	-- Bounds come from the real generated land footprint, not from the outermost
-	-- pins. That keeps roads, blocks and buildings in their true proportions.
+	-- Bounds come from the generated walkable water and island footprints, not from
+	-- the outermost pins. The whole safe traversal field and its scattered islands
+	-- therefore stay in their true proportions.
 	local minX, maxX = math.huge, -math.huge
 	local minZ, maxZ = math.huge, -math.huge
 	local function includeFeature(feature: MapFeature)
@@ -399,14 +400,14 @@ function MenuController:_renderMap(parent: Frame)
 		minZ, maxZ = math.min(minZ, feature.Z - halfZ), math.max(maxZ, feature.Z + halfZ)
 	end
 
-	local foundLand = false
+	local foundWorld = false
 	for _, feature in mapFeatures do
-		if feature.Kind == "Land" then
+		if feature.Kind == "Land" or feature.Kind == "Water" then
 			includeFeature(feature)
-			foundLand = true
+			foundWorld = true
 		end
 	end
-	if not foundLand then
+	if not foundWorld then
 		for _, feature in mapFeatures do
 			includeFeature(feature)
 		end

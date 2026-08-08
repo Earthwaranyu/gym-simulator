@@ -223,6 +223,40 @@ local function inputDirection(): Vector3
 	return direction + Vector3.new(0, vertical * speed * MovementConfig.FLIGHT_CLIMB_RATIO, 0)
 end
 
+local function constrainToWorld(part: BasePart, requested: Vector3): Vector3
+	local at = part.Position
+	local x, y, z = requested.X, requested.Y, requested.Z
+	local minRootY = MovementConfig.WATER_SURFACE_Y + MovementConfig.FLIGHT_WATER_CLEARANCE
+	local halfWidth = MovementConfig.FLIGHT_WORLD_HALF_WIDTH
+	local halfDepth = MovementConfig.FLIGHT_WORLD_HALF_DEPTH
+	local corrected = Vector3.new(
+		math.clamp(at.X, -halfWidth, halfWidth),
+		math.max(at.Y, minRootY),
+		math.clamp(at.Z, -halfDepth, halfDepth)
+	)
+	if (corrected - at).Magnitude > 1e-3 then
+		part.CFrame += corrected - at
+		part.AssemblyLinearVelocity = Vector3.zero
+		at = corrected
+	end
+
+	-- Collision stops the rig physically; this removes the downward force just before
+	-- contact so LinearVelocity cannot keep pressing the avatar through the water seam.
+	if at.Y <= minRootY + 1.5 and y < 0 then
+		y = 0
+	end
+
+	if (at.X <= -halfWidth + 2 and x < 0) or (at.X >= halfWidth - 2 and x > 0) then
+		x = 0
+	end
+
+	if (at.Z <= -halfDepth + 2 and z < 0) or (at.Z >= halfDepth - 2 and z > 0) then
+		z = 0
+	end
+
+	return Vector3.new(x, y, z)
+end
+
 function FlightController:_step(delta: number)
 	if not flying then
 		return
@@ -239,6 +273,7 @@ function FlightController:_step(delta: number)
 	-- direction carries a little momentum instead of reading as teleporting.
 	local blend = math.min(1, MovementConfig.FLIGHT_ACCELERATION * delta)
 	velocity = velocity:Lerp(inputDirection(), blend)
+	velocity = constrainToWorld(part, velocity)
 	force.VectorVelocity = velocity
 
 	-- Face the way you are moving, upright. Held level rather than banked into the
