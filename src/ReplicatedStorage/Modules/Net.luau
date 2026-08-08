@@ -68,6 +68,10 @@ local FUNCTION_NAMES: { string } = {
 	"GetLeaderboard",
 	-- Client -> server: travel to a district by id. Returns ok, message.
 	"Travel",
+	-- Client -> server: live occupancy for every station, plus which one the caller is
+	-- on. Streaming means most stations are absent from a client's Workspace, so this
+	-- is the only way the Train panel can say whether a machine across town is free.
+	"GetSpotStatus",
 	-- Client -> server: every district's landing pad in world space, for the
 	-- travel map's pins. Streaming means the client cannot measure them itself.
 	"GetDestinations",

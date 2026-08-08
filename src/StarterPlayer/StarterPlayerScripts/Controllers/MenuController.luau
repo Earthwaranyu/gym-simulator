@@ -82,6 +82,17 @@ local destinationsById: { [string]: Destination } = {}
 local mapFeatures: { MapFeature } = {}
 local mapLoaded = false
 local selectedDestination: string? = nil
+
+-- Train panel: which muscle group is being shown, and the last live status the server
+-- sent. Status is a snapshot rather than a subscription — the panel polls while it is
+-- open and stops the moment it is not, so a menu nobody is looking at costs nothing.
+local selectedMuscle: string? = nil
+local spotStatus: { [string]: any } = {}
+local currentSpotId: string? = nil
+-- Incremented on every poll start so an in-flight refresh from a closed panel, or from
+-- a muscle the player has since switched away from, discards itself instead of
+-- redrawing the screen out from under them.
+local trainPollToken = 0
 local mapZoom = 1
 local mapCenter = Vector2.new(0.5, 0.5)
 
@@ -166,6 +177,13 @@ function MenuController:Init()
 			DisplayName = "Map",
 			Render = function(parent)
 				self:_renderMap(parent)
+			end,
+		},
+		{
+			Id = "Train",
+			DisplayName = "Train",
+			Render = function(parent)
+				self:_renderTrain(parent)
 			end,
 		},
 		{
@@ -854,6 +872,246 @@ function MenuController:_renderDestination(parent: Frame, power: number)
 	end)
 end
 
+--[[
+	Asks the server for live occupancy and where the player is currently training.
+
+	Wrapped in pcall because a remote can fail while a district streams or a player
+	leaves mid-call, and a menu that errors is worse than a menu showing slightly stale
+	occupancy.
+]]
+function MenuController:_fetchSpotStatus()
+	local ok, status = pcall(function()
+		return Net.Function("GetSpotStatus"):InvokeServer()
+	end)
+	if not ok or type(status) ~= "table" or type(status.Spots) ~= "table" then
+		return
+	end
+
+	spotStatus = status.Spots
+	currentSpotId = if type(status.CurrentSpot) == "string" then status.CurrentSpot else nil
+end
+
+--[[
+	Keeps the Train panel live while it is the tab on screen.
+
+	Polling rather than pushing: occupancy changes constantly across 55 stations and
+	sending every change to every client would cost far more bandwidth than answering
+	the handful of players who actually have the panel open. The loop ends as soon as
+	the panel is not showing, so it is not a background cost.
+]]
+function MenuController:_pollTrainPanel()
+	trainPollToken += 1
+	local token = trainPollToken
+
+	task.spawn(function()
+		while token == trainPollToken and isOpen and activeTab == "Train" do
+			task.wait(2)
+			if token ~= trainPollToken or not isOpen or activeTab ~= "Train" then
+				return
+			end
+			self:_fetchSpotStatus()
+			if token == trainPollToken and isOpen and activeTab == "Train" then
+				self:_refresh()
+			end
+		end
+	end)
+end
+
+--[[
+	Train — "where do I train this muscle, right now?"
+
+	The map answers "where is everything"; this answers the question a player actually
+	has while standing in a district wondering why their Back is behind. Pick a muscle,
+	see every station in the game that trains it, sorted by what it is worth, with the
+	ones you can use right now first and a live free/busy count on each.
+]]
+function MenuController:_renderTrain(parent: Frame)
+	self:_fetchDestinations()
+
+	local data = ProfileController:Get()
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+
+	if selectedMuscle == nil then
+		-- Default to the muscle the player is furthest behind on, which is the reason
+		-- they opened this panel in nearly every case.
+		local lowest: string? = nil
+		for _, definition in StatConfig.List do
+			local value = if data ~= nil then (data.Stats[definition.Id] or 0) else 0
+			local lowestValue = if lowest ~= nil and data ~= nil then (data.Stats[lowest] or 0) else math.huge
+			if lowest == nil or value < lowestValue then
+				lowest = definition.Id
+			end
+		end
+		selectedMuscle = lowest or StatConfig.List[1].Id
+	end
+
+	-- === Muscle chips ====================================================
+
+	local chips = Instance.new("Frame")
+	chips.Name = "Muscles"
+	chips.BackgroundTransparency = 1
+	chips.Size = UDim2.new(1, 0, 0, 38)
+	chips.LayoutOrder = 1
+	chips.Parent = parent
+
+	local chipLayout = Instance.new("UIListLayout")
+	chipLayout.FillDirection = Enum.FillDirection.Horizontal
+	chipLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	chipLayout.Padding = UDim.new(0, 6)
+	chipLayout.Parent = chips
+
+	for index, definition in StatConfig.List do
+		local selected = definition.Id == selectedMuscle
+
+		local chip = Instance.new("TextButton")
+		chip.Name = definition.Id
+		chip.LayoutOrder = index
+		chip.Size = UDim2.new(0.2, -5, 1, 0)
+		chip.BackgroundColor3 = if selected then definition.Color else UI.Palette.Backdrop
+		chip.BackgroundTransparency = if selected then 0 else 0.4
+		chip.BorderSizePixel = 0
+		chip.AutoButtonColor = false
+		chip.Font = UI.Font.Heading
+		chip.TextSize = 13
+		chip.TextColor3 = if selected then UI.Palette.Backdrop else definition.Color
+		chip.Text = string.upper(definition.DisplayName)
+		chip.Parent = chips
+		UI.Pressable(chip)
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 6)
+		corner.Parent = chip
+
+		chip.Activated:Connect(function()
+			selectedMuscle = definition.Id
+			self:_refresh()
+		end)
+	end
+
+	local stat = StatConfig.Get(selectedMuscle :: string)
+	if stat == nil then
+		return
+	end
+
+	-- === The stations for that muscle ====================================
+
+	local spots = {}
+	for _, destination in destinations do
+		if destination.StatId ~= selectedMuscle then
+			continue
+		end
+		local equipment = EquipmentConfig.Get(destination.EquipmentId)
+		if equipment == nil then
+			continue
+		end
+		-- Base rate before the player's own multipliers: what this machine is worth
+		-- relative to the others, which is the comparison the panel exists to make.
+		local perSecond = (equipment.BaseGain / equipment.RepInterval) * destination.GainMultiplier
+		table.insert(spots, {
+			Destination = destination,
+			Equipment = equipment,
+			PerSecond = perSecond,
+			Unlocked = power >= destination.RequiredPower,
+		})
+	end
+
+	-- Usable machines first, best rate first within each group. A locked machine is
+	-- still shown — it is the thing being grinded toward — but never above one that
+	-- can be walked to right now.
+	table.sort(spots, function(a, b)
+		if a.Unlocked ~= b.Unlocked then
+			return a.Unlocked
+		end
+		if a.Unlocked then
+			return a.PerSecond > b.PerSecond
+		end
+		return a.Destination.RequiredPower < b.Destination.RequiredPower
+	end)
+
+	local summary = UI.Label("Summary", parent)
+	summary.Size = UDim2.new(1, 0, 0, 20)
+	summary.LayoutOrder = 2
+	summary.TextSize = 13
+	summary.TextColor3 = UI.Palette.TextMuted
+	local open = 0
+	for _, spot in spots do
+		if spot.Unlocked then
+			open += 1
+		end
+	end
+	summary.Text = `{open} of {#spots} {stat.DisplayName} stations open to you  ·  `
+		.. `<font color="#8A93A8">live free/busy, refreshed every 2s</font>`
+
+	if #spots == 0 then
+		local empty = UI.Label("Empty", parent)
+		empty.Size = UDim2.new(1, 0, 0, 40)
+		empty.LayoutOrder = 3
+		empty.TextColor3 = UI.Palette.TextMuted
+		empty.Text = "The map is still loading."
+		return
+	end
+
+	for index, spot in spots do
+		local destination = spot.Destination
+		local zone = ZoneConfig.Get(destination.ZoneId)
+		local status = spotStatus[destination.Id]
+		local here = currentSpotId == destination.Id
+
+		local line = row(parent, 54, index + 2)
+
+		local title = UI.Label("Title", line)
+		title.Size = UDim2.new(1, -110, 0, 24)
+		title.Position = UDim2.fromOffset(0, 5)
+		title.TextColor3 = if spot.Unlocked then stat.Color else UI.Palette.TextMuted
+		local zoneName = if zone ~= nil then zone.DisplayName else destination.ZoneId
+		title.Text = `{spot.Equipment.DisplayName}  <font color="#8A93A8">{zoneName}</font>`
+			.. (if here then `  <font color="#7EE7FF">· YOU ARE HERE</font>` else "")
+
+		-- Free/busy is the "current" half of the question. Absent status means the
+		-- station has not bound on the server yet, which is different from being full.
+		local occupancy = if type(status) == "table"
+			then `{math.max(0, status.Capacity - status.Occupied)}/{status.Capacity} free`
+			else "checking…"
+
+		local detail = UI.Label("Detail", line)
+		detail.Size = UDim2.new(1, -110, 0, 18)
+		detail.Position = UDim2.fromOffset(0, 29)
+		detail.TextSize = 13
+		detail.TextColor3 = UI.Palette.TextMuted
+
+		local access = if destination.AccessKind == "Sky"
+			then "flight required"
+			elseif destination.FloorIndex > 1 then `floor {destination.FloorIndex}`
+			else "street level"
+
+		if spot.Unlocked then
+			detail.Text = `{NumberFormat.Format(spot.PerSecond)}/s  ·  `
+				.. `x{NumberFormat.Format(destination.GainMultiplier)}  ·  {occupancy}  ·  {access}`
+
+			button(line, if here then "Here" else "Go", stat.Color, function()
+				local ok, message = Net.Function("Travel"):InvokeServer(destination.Id)
+				toast(message)
+				if ok then
+					self:Toggle()
+				end
+			end)
+		else
+			local shortfall = destination.RequiredPower - power
+			detail.Text = `<font color="#FF5C5C">needs {NumberFormat.Format(shortfall)} more power</font>`
+				.. `  ·  {NumberFormat.Format(spot.PerSecond)}/s  ·  {access}`
+
+			local locked = UI.Label("Locked", line)
+			locked.AnchorPoint = Vector2.new(1, 0.5)
+			locked.Position = UDim2.fromScale(1, 0.5)
+			locked.Size = UDim2.fromOffset(96, 28)
+			locked.TextXAlignment = Enum.TextXAlignment.Center
+			locked.Font = UI.Font.Heading
+			locked.TextColor3 = UI.Palette.TextMuted
+			locked.Text = "LOCKED"
+		end
+	end
+end
+
 function MenuController:_renderUpgrades(parent: Frame)
 	local data = ProfileController:Get()
 
@@ -1049,6 +1307,7 @@ function MenuController:_renderTabStrip()
 
 		btn.Activated:Connect(function()
 			activeTab = tab.Id
+			self:_enterTab()
 			self:_refresh()
 			self:_publish()
 		end)
@@ -1073,7 +1332,12 @@ function MenuController:Toggle(tabId: string?)
 		if tabId ~= nil then
 			activeTab = tabId
 		end
+		self:_enterTab()
 		self:_refresh()
+	else
+		-- Closing invalidates any in-flight Train poll, so a panel nobody is looking
+		-- at stops asking the server questions.
+		trainPollToken += 1
 	end
 
 	self:_publish()
@@ -1137,8 +1401,25 @@ function MenuController:Open(tabId: string)
 
 	isOpen = true
 	screen.Enabled = true
+	self:_enterTab()
 	self:_refresh()
 	self:_publish()
+end
+
+--[[
+	Work a tab needs done before its first frame, rather than after it.
+
+	The Train panel fetches live occupancy here so it opens showing real free/busy
+	counts instead of "checking…" for two seconds — the first frame is the one the
+	player actually reads.
+]]
+function MenuController:_enterTab()
+	if activeTab == "Train" then
+		self:_fetchSpotStatus()
+		self:_pollTrainPanel()
+	else
+		trainPollToken += 1
+	end
 end
 
 function MenuController:_build()

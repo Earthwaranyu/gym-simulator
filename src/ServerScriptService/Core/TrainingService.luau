@@ -101,6 +101,12 @@ TrainingService.TrainingChanged = Signal.new()
 function TrainingService:Init()
 	DataService = Loader.Get("DataService")
 	StatService = Loader.Get("StatService")
+
+	-- Rate-limited like every other remote. The Train panel polls this while it is
+	-- open, so the budget allows a steady refresh and nothing more.
+	Net.BindFunction("GetSpotStatus", 3, function(player: Player)
+		return self:GetSpotStatus(player)
+	end)
 end
 
 --[[
@@ -169,6 +175,50 @@ end
 
 function TrainingService:IsTraining(player: Player): boolean
 	return sessions[player] ~= nil
+end
+
+--[[
+	Live occupancy for every bound station, keyed by travel id, plus which station the
+	asking player is on right now.
+
+	The client cannot read this for itself. Station occupancy lives in attributes on
+	the station model, and with StreamingEnabled most of the 55 machines do not exist
+	in a given client's Workspace — so "is the bench across the city free?" is a
+	question only the server can answer.
+
+	Returned as plain data rather than instances so the answer stays valid even if the
+	station streams out the moment after it is sent.
+]]
+function TrainingService:GetSpotStatus(player: Player): { [string]: any }
+	local status: { [string]: any } = {}
+
+	for station, record in stations do
+		local travelId = station:GetAttribute(EquipmentConfig.TRAVEL_ATTRIBUTE)
+		if type(travelId) ~= "string" then
+			continue
+		end
+
+		local used = 0
+		for _ in record.occupants do
+			used += 1
+		end
+
+		status[travelId] = {
+			Occupied = used,
+			Capacity = #record.anchors,
+			ZoneMultiplier = record.zoneMultiplier,
+		}
+	end
+
+	local session = sessions[player]
+	local currentId = if session ~= nil
+		then session.station:GetAttribute(EquipmentConfig.TRAVEL_ATTRIBUTE)
+		else nil
+
+	return {
+		Spots = status,
+		CurrentSpot = if type(currentId) == "string" then currentId else nil,
+	}
 end
 
 function TrainingService:GetStaggerRemaining(player: Player): number

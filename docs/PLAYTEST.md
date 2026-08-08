@@ -4,7 +4,7 @@ Everything static is already enforced by `./scripts/check.sh` — build, lints, 
 `--!strict` types, plus `python3 scripts/validate_gym.py` for the generated world. This
 file covers what only a running game can answer.
 
-Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v1. If a
+Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v2. If a
 step below contradicts that file, the step is stale — fix it.
 
 Run a **two-client Studio playtest** (Test → Clients and Servers → 2 players) unless a
@@ -42,9 +42,10 @@ and whether any balance number feels right.
 - [ ] `wally install` then `./scripts/check.sh` — all checks pass.
 - [ ] `python3 scripts/validate_gym.py` reports **55 stations, 15 variants** and a build hash.
 - [ ] `rojo serve`, connect the Studio plugin, press Play.
-- [ ] Output shows `[Loader/Server] Ignited N systems` and `[Loader/Client] Ignited N systems`.
-      Record both numbers here the first time you run it; a later drop means a system failed
-      to load silently.
+- [ ] Output shows `[Loader/Server] Ignited 25 systems` and `[Loader/Client] Ignited 17
+      systems`. A lower number means a system failed to load silently.
+- [ ] Output shows `[DevService] Studio session — dev commands are ACTIVE`. This warning
+      must **never** appear on a live server.
 - [ ] Output shows `[CombatService] Loaded 1 abilities` — **one**, not three. Slam and Dash
       are deferred.
 - [ ] No red errors in Output. No station warnings — every one of the 55 stations must
@@ -110,6 +111,19 @@ The rule under test: **a hit does not dismount; only death does.**
       to nothing.
 - [ ] Die mid-flight and mid-travel. You respawn cleanly with no stuck camera, no residual
       velocity, and no half-applied travel.
+
+## 4b. Finding a machine (Train tab)
+
+- [ ] Open the menu → **Train**. It opens on the muscle you are furthest behind on.
+- [ ] Click each of the five muscle chips. Every station for that muscle is listed —
+      11 for most muscles, 55 across all five.
+- [ ] Usable machines sort above locked ones, best gain/second first within each group.
+- [ ] Free/busy counts are live: have a second player mount a machine and confirm the
+      count drops within ~2 seconds without reopening the panel.
+- [ ] While you are training, that station reads **YOU ARE HERE** and its button says
+      "Here".
+- [ ] Close the panel and confirm the polling stops (no further `GetSpotStatus` traffic).
+- [ ] Locked entries show the shortfall in power, not a Go button.
 
 ## 5. Progression
 

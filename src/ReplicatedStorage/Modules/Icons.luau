@@ -144,8 +144,25 @@ local function drawSettings(parent: GuiObject, color: Color3, _hole: Color3)
 	end
 end
 
+--[[
+	Train — a dumbbell: a bar with a plate stack at each end.
+
+	Deliberately horizontal where Upgrades is vertical and Top is three uprights, so
+	the three read apart in a row of 28-pixel tiles without relying on colour.
+]]
+local function drawTrain(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "Bar", 0.5, 0.5, 0.44, 0.12, color, 0, 1)
+	for _, side in { -1, 1 } do
+		-- Inner plate short, outer plate tall: the silhouette of a loaded bar, and it
+		-- survives being drawn a third this size.
+		shape(parent, `Inner{side}`, 0.5 + side * 0.28, 0.5, 0.11, 0.42, color, 0, 0.3)
+		shape(parent, `Outer{side}`, 0.5 + side * 0.42, 0.5, 0.11, 0.66, color, 0, 0.3)
+	end
+end
+
 local ICONS: { [string]: Builder } = {
 	Map = drawMap,
+	Train = drawTrain,
 	Upgrades = drawUpgrades,
 	Shop = drawShop,
 	Top = drawTop,
