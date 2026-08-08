@@ -1955,6 +1955,164 @@ PROPS = {
 }
 
 
+# --- Ground clutter -------------------------------------------------------
+#
+# PROPS above builds one landmark kit per island: a crane, a lifeguard tower, a
+# row of containers. Those are the things you navigate by, and there are about a
+# dozen of them on a ring near the coast. They are not enough to fill an island,
+# and once the islands grew 2.5x they read as an empty plate with a decorated rim.
+#
+# Clutter is the other half: small, cheap, repeated pieces scattered across the
+# whole surface so the ground between two gyms is somewhere rather than nothing.
+# One function per kind, registered in CLUTTER, and a per-theme recipe in
+# CLUTTER_KITS naming which kinds an island uses and how often — so a new piece of
+# scenery is a new function and a new dict key, never an edit to the scatter pass.
+#
+# Every function returns nodes in island-local space around the origin. The caller
+# places, filters and strips collision from them; none of that belongs here.
+
+
+def clutter_rock(rng, accent, ground):
+    scale = rng.uniform(1.6, 4.2)
+    return [part("Rock", [scale * 1.7, scale * 1.3, scale * 1.5],
+                 mul(rot_y(rng.uniform(0, 360)),
+                     cf(0, FLOOR_TOP + scale * 0.5, 0)),
+                 [c * rng.uniform(0.72, 0.95) for c in ground], "Rock")]
+
+
+def clutter_shrub(rng, accent, ground):
+    height = rng.uniform(2.4, 4.6)
+    green = [0.16 + rng.uniform(0, 0.09), 0.30 + rng.uniform(0, 0.14), 0.15]
+    return [
+        cylinder("ShrubStem", height, 0.5, cf(0, FLOOR_TOP + height / 2, 0),
+                 [0.24, 0.17, 0.11], "Wood"),
+        part("ShrubCanopy", [height * 1.1, height * 0.8, height * 1.1],
+             mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height, 0)),
+             green, "Grass"),
+    ]
+
+
+def clutter_grass(rng, accent, ground):
+    out = []
+    for _index in range(rng.randint(2, 4)):
+        blade = rng.uniform(1.0, 2.2)
+        out.append(part("GrassTuft", [rng.uniform(1.4, 2.6), blade, rng.uniform(1.4, 2.6)],
+                        mul(rot_y(rng.uniform(0, 360)),
+                            cf(rng.uniform(-3, 3), FLOOR_TOP + blade / 2, rng.uniform(-3, 3))),
+                        [0.18, 0.28 + rng.uniform(0, 0.12), 0.14], "Grass"))
+    return out
+
+
+def clutter_crate(rng, accent, ground):
+    out = []
+    for level in range(rng.randint(1, 3)):
+        side = rng.uniform(3.0, 4.4)
+        out.append(part("Crate", [side, side, side],
+                        mul(rot_y(rng.uniform(0, 360)),
+                            cf(rng.uniform(-1, 1), FLOOR_TOP + side * (level + 0.5),
+                               rng.uniform(-1, 1))),
+                        [c * rng.uniform(0.85, 1.15) for c in WOOD], "WoodPlanks"))
+    return out
+
+
+def clutter_barrel(rng, accent, ground):
+    height = rng.uniform(3.2, 4.2)
+    return [cylinder("Barrel", height, rng.uniform(2.4, 3.2),
+                     cf(0, FLOOR_TOP + height / 2, 0),
+                     rng.choice([[0.42, 0.16, 0.12], [0.16, 0.28, 0.34],
+                                 [0.36, 0.34, 0.14]]), "CorrodedMetal")]
+
+
+def clutter_lamp(rng, accent, ground):
+    height = rng.uniform(14, 20)
+    return [
+        cylinder("LampPost", height, 0.9, cf(0, FLOOR_TOP + height / 2, 0),
+                 [0.14, 0.15, 0.17], "Metal"),
+        part("LampHead", [2.6, 1.0, 2.6], cf(0, FLOOR_TOP + height, 0),
+             accent, "Neon"),
+    ]
+
+
+def clutter_sign(rng, accent, ground):
+    height = rng.uniform(8, 13)
+    return [
+        cylinder("SignPost", height, 0.7, cf(0, FLOOR_TOP + height / 2, 0),
+                 [0.17, 0.18, 0.20], "Metal"),
+        part("SignBoard", [rng.uniform(5, 8), rng.uniform(2.4, 3.6), 0.4],
+             mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height, 0)),
+             accent, "SmoothPlastic"),
+    ]
+
+
+def clutter_pillar(rng, accent, ground):
+    height = rng.uniform(9, 18)
+    return [part("Pillar", [rng.uniform(2.4, 4.0), height, rng.uniform(2.4, 4.0)],
+                 mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height / 2, 0)),
+                 [c * 0.85 for c in ground], "Slate")]
+
+
+def clutter_palm(rng, accent, ground):
+    height = rng.uniform(16, 24)
+    lean = rng.uniform(-9, 9)
+    out = [cylinder("PalmTrunk", height, 1.5,
+                    mul(rot_z(lean), cf(0, FLOOR_TOP + height / 2, 0)),
+                    [0.34, 0.25, 0.16], "Wood")]
+    for index in range(6):
+        out.append(part("PalmFrond", [11, 0.5, 2.6],
+                        mul(mul(rot_y(index * 60 + rng.uniform(-10, 10)),
+                                cf(5, FLOOR_TOP + height, 0)), rot_z(-16)),
+                        [0.18, 0.36, 0.18], "Grass"))
+    return out
+
+
+def clutter_debris(rng, accent, ground):
+    out = []
+    for _index in range(rng.randint(2, 5)):
+        out.append(part("Debris", [rng.uniform(2, 5), rng.uniform(0.4, 1.1), rng.uniform(2, 5)],
+                        mul(rot_y(rng.uniform(0, 360)),
+                            cf(rng.uniform(-4, 4), FLOOR_TOP + 0.4, rng.uniform(-4, 4))),
+                        [c * rng.uniform(0.6, 0.9) for c in ground], "Rock"))
+    return out
+
+
+CLUTTER = {
+    "rock": clutter_rock,
+    "shrub": clutter_shrub,
+    "grass": clutter_grass,
+    "crate": clutter_crate,
+    "barrel": clutter_barrel,
+    "lamp": clutter_lamp,
+    "sign": clutter_sign,
+    "pillar": clutter_pillar,
+    "palm": clutter_palm,
+    "debris": clutter_debris,
+}
+
+# Which kinds each themed island uses, and how heavily. The None entry is the
+# fallback for a district whose row names no prop kit — which is how Iron/OldTown
+# ends up with scenery despite having no landmark set of its own.
+CLUTTER_KITS = {
+    "docks": (("crate", 4), ("barrel", 4), ("debris", 2), ("lamp", 2), ("sign", 1)),
+    "beach": (("palm", 4), ("rock", 2), ("shrub", 3), ("grass", 5)),
+    "quarry": (("rock", 6), ("debris", 4), ("pillar", 2), ("crate", 1)),
+    "rooftop": (("crate", 2), ("lamp", 4), ("sign", 3), ("pillar", 2), ("debris", 1)),
+    "peak": (("rock", 5), ("pillar", 3), ("debris", 3), ("shrub", 1)),
+    "void": (("pillar", 5), ("rock", 3), ("lamp", 2), ("debris", 2)),
+    "solar": (("pillar", 3), ("barrel", 3), ("debris", 3), ("lamp", 2), ("rock", 2)),
+    "nebula": (("lamp", 5), ("sign", 4), ("crate", 2), ("pillar", 2)),
+    "celestial": (("pillar", 5), ("lamp", 3), ("shrub", 2), ("grass", 2)),
+    None: (("rock", 3), ("shrub", 3), ("grass", 4), ("debris", 2), ("crate", 2)),
+}
+
+# Scatter points per island, not parts — a point expands to between one and six
+# parts depending on the kind it draws.
+CLUTTER_PER_ISLAND = 120
+# Hard ceiling per island, asserted at build time. The validator's global budget is
+# 7,000 BaseParts; ten islands at this cap plus the existing world stays near 68%
+# of it, which leaves room for later content instead of spending the lot on grass.
+CLUTTER_PART_BUDGET = 300
+
+
 def volume(zone_id, name, size, frame):
     """One invisible box token accrual and machine tiering test against.
 
@@ -2641,25 +2799,25 @@ WORLD_FOUNDATION_SIZE = (10000, 9000)
 WORLD_WATER_SIZE = (9600, 8600)
 WATER_SURFACE_Y = FLOOR_TOP - 8.5
 REGION_SPECS = [
-    {"id": "OldTown", "theme": "Iron", "size": (660, 520),
+    {"id": "OldTown", "theme": "Iron", "size": (1060, 830),
      "shape": "Rect", "count": 6},
-    {"id": "Harbor", "theme": "Powerhouse", "size": (790, 510),
+    {"id": "Harbor", "theme": "Powerhouse", "size": (1260, 820),
      "shape": "Rect", "count": 7},
-    {"id": "Beach", "theme": "Strongman", "size": (660, 660),
+    {"id": "Beach", "theme": "Strongman", "size": (1060, 1060),
      "shape": "Circle", "count": 3},
-    {"id": "Quarry", "theme": "Titan", "size": (700, 700),
+    {"id": "Quarry", "theme": "Titan", "size": (1120, 1120),
      "shape": "Circle", "count": 4},
-    {"id": "Highrise", "theme": "Skydeck", "size": (790, 570),
+    {"id": "Highrise", "theme": "Skydeck", "size": (1260, 910),
      "shape": "Rect", "count": 7},
-    {"id": "SolarWorks", "theme": "Solar", "size": (750, 530),
+    {"id": "SolarWorks", "theme": "Solar", "size": (1200, 850),
      "shape": "Rect", "count": 5},
-    {"id": "Stormworks", "theme": "Storm", "size": (660, 660),
+    {"id": "Stormworks", "theme": "Storm", "size": (1060, 1060),
      "shape": "Circle", "count": 4},
-    {"id": "NeonMarket", "theme": "Nebula", "size": (790, 550),
+    {"id": "NeonMarket", "theme": "Nebula", "size": (1260, 880),
      "shape": "Rect", "count": 6},
-    {"id": "Observatory", "theme": "Ascendant", "size": (660, 660),
+    {"id": "Observatory", "theme": "Ascendant", "size": (1060, 1060),
      "shape": "Circle", "count": 3},
-    {"id": "VoidRail", "theme": "Void", "size": (750, 550),
+    {"id": "VoidRail", "theme": "Void", "size": (1200, 880),
      "shape": "Rect", "count": 5},
 ]
 
@@ -2694,14 +2852,20 @@ def scattered_regions():
 REGIONS = scattered_regions()
 REGION_BY_ID = {region["id"]: region for region in REGIONS}
 
-# Seven irregular local sites, consumed in different quantities by each region.
-# Rotating and scaling these per patch yields 50 non-axial, well-separated sites
-# while keeping their authored doors readable within each island.
-REGION_SITE_PATTERN = [
-    (-0.31, -0.24), (0.29, -0.27), (-0.34, 0.23), (0.32, 0.25),
-    (-0.02, 0.01), (0.00, -0.42), (-0.04, 0.42),
-]
-NON_STARTER_VARIANT_SEQUENCE = (1, 2, 0, 1, 2, 0, 1, 2, 0, 1)
+# How far a site must stay inside its island's edge. A SitePavement is 86x88 and
+# the shell around it reaches roughly 33 studs further on +Z, so anything closer to
+# the water than this hangs a building off the coastline.
+SITE_EDGE_INSET = 110
+# Minimum distance between two sites on the same island. The validator only demands
+# 48, which is less than one 88-stud pavement — that number stops two machines being
+# the same machine, not two gyms looking like one building. 220 keeps each site a
+# separate place you walk to.
+SITE_MIN_SEPARATION = 220
+# The shore ramp lands on local +Z, 22 studs wide, running from edge+38 to edge-2
+# (see shore_access). Sites inside this lane would put a wall across the only
+# walk-up from the water.
+SITE_SHORE_CORRIDOR_HALF_WIDTH = 70
+SITE_SHORE_CORRIDOR_DEPTH = 150
 
 
 def map_feature(node, kind, shape="Rect"):
@@ -2806,15 +2970,84 @@ def region_frame(region):
     return mul(cf(x, 0, z), rot_y(region["yaw"]))
 
 
-def region_sites(region):
-    """World-space site CFrames for one irregular region."""
+def region_footprint_contains(region, local_x, local_z, inset):
+    """Is this island-local point on solid ground, `inset` studs clear of the edge?
+
+    Mirrors the two branches of region_ground: a Circle island is a disc of the
+    shorter dimension, a Rect island is the full slab. Both the machine sites and
+    the scenery scatter test against this one function, so decoration cannot end up
+    on a piece of ground the layout does not consider part of the island.
+    """
     width, depth = region["size"]
+    if region["shape"] == "Circle":
+        radius = min(width, depth) / 2 - inset
+        return radius > 0 and math.hypot(local_x, local_z) <= radius
+    return abs(local_x) <= width / 2 - inset and abs(local_z) <= depth / 2 - inset
+
+
+def region_in_shore_corridor(region, local_x, local_z):
+    """The walk-up lane from the water, which nothing may be built across."""
+    width, depth = region["size"]
+    edge = min(width, depth) / 2 if region["shape"] == "Circle" else depth / 2
+    return (abs(local_x) < SITE_SHORE_CORRIDOR_HALF_WIDTH
+            and local_z > edge - SITE_SHORE_CORRIDOR_DEPTH)
+
+
+# Cached per island id rather than per region dict, which is unhashable. The
+# validator builds the world twice in one process and compares the two results
+# byte for byte, so every consumer has to see the same sites both times.
+_REGION_SITES_CACHE = {}
+
+
+def region_sites(region):
+    """World-space site CFrames, scattered rather than stamped from one pattern.
+
+    Every island used to reuse the same seven offsets, scaled and rotated. That is
+    readable from the air after visiting two islands: the machines sit in the same
+    constellation every time. Here each island rejection-samples its own points
+    inside its own footprint, seeded by its id, so the arrangement differs from
+    island to island and still reproduces exactly on every rebuild.
+    """
+    cached = _REGION_SITES_CACHE.get(region["id"])
+    if cached is not None:
+        return cached
+
+    rng = random.Random(f"scattered-archipelago-sites-v1:{region['id']}")
+    width, depth = region["size"]
+    accepted = []
+    for _index in range(region["count"]):
+        for _attempt in range(4000):
+            if region["shape"] == "Circle":
+                # sqrt-corrected, or a uniform radius piles points into the middle.
+                radius = (min(width, depth) / 2 - SITE_EDGE_INSET) * math.sqrt(rng.random())
+                angle = rng.uniform(0, 2 * math.pi)
+                local_x, local_z = radius * math.cos(angle), radius * math.sin(angle)
+            else:
+                local_x = rng.uniform(-1, 1) * (width / 2 - SITE_EDGE_INSET)
+                local_z = rng.uniform(-1, 1) * (depth / 2 - SITE_EDGE_INSET)
+            if not region_footprint_contains(region, local_x, local_z, SITE_EDGE_INSET):
+                continue
+            if region_in_shore_corridor(region, local_x, local_z):
+                continue
+            if any(math.hypot(local_x - other_x, local_z - other_z) < SITE_MIN_SEPARATION
+                   for other_x, other_z in accepted):
+                continue
+            accepted.append((local_x, local_z))
+            break
+        else:
+            raise RuntimeError(f"could not scatter sites on {region['id']}")
+
     frame = region_frame(region)
     out = []
-    for index, (unit_x, unit_z) in enumerate(REGION_SITE_PATTERN[:region["count"]]):
-        local = cf(unit_x * width, 0, unit_z * depth)
-        yaw_jitter = (-8, -4, 0, 4, 8)[index % 5]
-        out.append(mul(mul(frame, local), rot_y(yaw_jitter)))
+    for local_x, local_z in accepted:
+        # Face the door roughly back toward the middle of the island, then throw it
+        # off by up to 40 degrees. Pointing every door at the centre is its own
+        # pattern; pure random yaw makes buildings look dropped rather than built.
+        inward = math.degrees(math.atan2(-local_x, -local_z))
+        yaw = inward + rng.uniform(-40, 40)
+        out.append(mul(mul(frame, cf(local_x, 0, local_z)), rot_y(yaw)))
+
+    _REGION_SITES_CACHE[region["id"]] = out
     return out
 
 
@@ -3127,7 +3360,7 @@ def region_ground(region):
 
         # Two rounded lobes break the silhouette of each rotated slab and make
         # actual coves/peninsulas on both the world and its plan map.
-        lobe_diameter = min(depth * 0.48, 150)
+        lobe_diameter = min(depth * 0.48, 260)
         for side in (-1, 1):
             lobe_frame = mul(frame, cf(side * width * 0.43, 0, side * depth * 0.22))
             out.append(place(lobe_frame, disc(
@@ -3202,6 +3435,71 @@ def region_scenery(region, locations):
         placed = place(region_frame(region), piece)
         if not _node_hits_sites(placed, site_positions):
             out.append(_decorate(placed))
+    return out
+
+
+def _count_parts(node):
+    properties = node.get("properties", {})
+    own = 1 if ("Size" in properties or "CFrame" in properties) else 0
+    return own + sum(_count_parts(child) for child in node.get("children", []))
+
+
+def region_clutter(region, locations):
+    """Scatter small scenery across a whole island, not just around its rim.
+
+    region_scenery places one landmark kit on a single circle near the coast, which
+    is what you steer by. This fills everything inside that circle, so the walk
+    between two gyms crosses ground that looks used.
+
+    Points are laid on a jittered grid rather than sampled freely: uniform random
+    points clump, and a clump of six shrubs beside forty studs of nothing reads as a
+    bug rather than as planting. Every point is filtered against the machine sites
+    with the same PROP_CLEARANCE the landmark pass uses, and everything that
+    survives goes through _decorate, so none of it can be walked into.
+    """
+    visual = next(row for row in DISTRICTS if row["zone"] == region["theme"])
+    kit = CLUTTER_KITS.get(visual.get("props")) or CLUTTER_KITS[None]
+    kinds = [kind for kind, weight in kit for _repeat in range(weight)]
+
+    rng = random.Random(f"archipelago-clutter-v1:{region['id']}")
+    width, depth = region["size"]
+    site_positions = [(location["site_x"], location["site_z"])
+                      for location in locations]
+    frame = region_frame(region)
+
+    # A grid just big enough to hold the requested point count, walked in a fixed
+    # order so the result is reproducible.
+    columns = max(1, int(round(math.sqrt(CLUTTER_PER_ISLAND * width / depth))))
+    rows = max(1, -(-CLUTTER_PER_ISLAND // columns))
+    cell_width, cell_depth = width / columns, depth / rows
+
+    out = []
+    parts = 0
+    for row_index in range(rows):
+        for column_index in range(columns):
+            local_x = -width / 2 + (column_index + 0.5) * cell_width
+            local_z = -depth / 2 + (row_index + 0.5) * cell_depth
+            local_x += rng.uniform(-0.42, 0.42) * cell_width
+            local_z += rng.uniform(-0.42, 0.42) * cell_depth
+            if not region_footprint_contains(region, local_x, local_z, 24):
+                continue
+            if region_in_shore_corridor(region, local_x, local_z):
+                continue
+
+            spot = mul(frame, cf(local_x, 0, local_z))
+            pieces = CLUTTER[rng.choice(kinds)](rng, visual["accent"], visual["ground"])
+            for piece in pieces:
+                placed = place(spot, piece)
+                if _node_hits_sites(placed, site_positions):
+                    continue
+                parts += _count_parts(placed)
+                out.append(_decorate(placed))
+
+    if parts > CLUTTER_PART_BUDGET:
+        raise RuntimeError(
+            f"{region['id']} clutter is {parts} parts, over the "
+            f"{CLUTTER_PART_BUDGET} budget"
+        )
     return out
 
 
@@ -3477,6 +3775,7 @@ def build_connected_world():
         region_locations = [location for location in locations
                             if location.get("region_id") == region["id"]]
         region_children[region["id"]].extend(region_scenery(region, region_locations))
+        region_children[region["id"]].extend(region_clutter(region, region_locations))
         structure.append(environment_model(
             region["id"], "Ground", region_children[region["id"]]
         ))

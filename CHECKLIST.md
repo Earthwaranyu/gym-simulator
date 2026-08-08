@@ -636,6 +636,38 @@ block, both the next location and the machine waiting there were easy to predict
       Q created `FlightVelocity` and platform stand, and Q again returned control to the
       Humanoid.
 
+## Phase 19 — Islands worth crossing
+
+The archipelago was walkable and unpredictable, but each island was still a mostly
+empty plate: one ring of landmark props near the coast, nothing in the middle, and
+machines stamped from a single seven-point pattern that every island reused.
+
+- [x] 96. **Bigger, denser, individually-arranged islands.** Every island in
+      `REGION_SPECS` grows 1.6x — 2.56x the area — which the measured foundation
+      containment box (±5000 x ±4500) allows with no change to the ocean, the world
+      foundation, or the ±3850/±3350 centre-sampling box. Re-scattering centres was
+      deliberately avoided: the same seed yields different centres the moment the box
+      moves, which would re-roll every travel coordinate in the game. The tightest pair,
+      Beach↔NeonMarket, keeps a ~442-stud water lane. `region_ground`'s hard
+      `lobe_diameter` cap rises 150 → 260 so coves stay proportional instead of leaving a
+      rectangle with two pimples.
+      `REGION_SITE_PATTERN` is gone. `region_sites` now rejection-samples each island's
+      own points inside its own footprint, seeded by island id, honouring a 110-stud edge
+      inset, a 220-stud minimum separation (the validator only demands 48, which is less
+      than one 88-stud pavement) and a keep-out lane over the shore ramp. Doors face
+      roughly inward with up to 40 degrees of jitter. Results are memoised per island id
+      because the validator builds the world twice in one process and compares byte for
+      byte.
+      A `CLUTTER` registry beside `PROPS` adds ten small scenery kinds and a per-theme
+      `CLUTTER_KITS` recipe, scattered on a jittered grid across the whole island rather
+      than one coastal ring — so a new decoration is a new function plus a dict key, never
+      an edit to the scatter pass. Everything passes through the existing
+      `PROP_CLEARANCE` site filter and `_decorate`, so no clutter can be collided with.
+      A build-time per-island part budget fails the generator rather than the validator.
+      Islands go from 68–180 parts to 244–465; `Iron`/OldTown, which names no prop kit and
+      was therefore **completely bare**, now picks up the fallback kit. World total 3,759 /
+      7,000 BaseParts. Rebuilds are byte-identical and `check.sh` passes.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
@@ -684,256 +716,3 @@ traffic exists:
 | Monetization | 100% idempotent grants; no statistically meaningful D1/D7 or non-payer/PvP-victim regression after a store change |
 | Reliability | crash-free sessions ≥99.5%; OOM exits <0.1%; p95 join→interactive ≤10s; p50 ≥55 FPS on the chosen low-end mobile tier; healthy server heartbeat at capacity |
 
-Execution rules:
-
-1. Finish P0 truth, telemetry, onboarding, fairness, mobile, data, and performance gates
-   before public acquisition.
-2. Every experiment has one hypothesis, one primary metric, guardrails, a deterministic
-   cohort, a minimum observation window, and a keep/revert decision.
-3. Compare new-player, returning-player, payer/non-payer, solo/social, platform, locale,
-   and PvP-victim cohorts. An average must not conceal a harmed group.
-4. Do not buy traffic to diagnose a product problem. Paid acquisition starts only after
-   retention and session quality meet the live peer benchmark.
-5. Each implementation item below lands as one reviewable commit after its automated and
-   human acceptance evidence is recorded. This roadmap edit itself is documentation only.
-
-## Phase 19 — P0: Make the roadmap true and measurable
-
-- [x] 96. **Reconcile product truth.** Audit `AGENTS.md`, `CLAUDE.md`, this checklist,
-      `README.md`, `docs/PLAYTEST.md`, and the live build as one versioned inventory.
-      Decide hit-vs-kill training interruption; either deliver or explicitly defer Slam
-      and Dash; correct board/system/count/control claims; rewrite playtests for 55 stations,
-      15 variants, current flight, and current map. No checked claim may lack code or test
-      evidence.
-      *Done: `docs/PRODUCT_TRUTH.md` v1 is the versioned inventory. Interruption is
-      kill-only; Slam/Dash explicitly deferred; PLAYTEST rewritten for 55 stations, 15
-      variants, 11 zones, current flight and travel.*
-- [x] 97. **Own one KPI scorecard.** Add a concise product brief and dashboard definition
-      for qPTR, qualified plays by source, join→first rep/upgrade/flight, onboarding,
-      session length, 5/10-minute survival, D1/D7/D30, activity variety, intentional
-      co-play, invite conversion, payer metrics, PvP-victim churn, saves, receipts, crashes,
-      OOMs, FPS, and server heartbeat. Assign an owner and review cadence to every metric.
-      *Done: `docs/KPI_SCORECARD.md` v1 — product brief, six owner roles, four cadences,
-      the internal gates, and every metric tagged WIRED / PARTIAL / NOT WIRED. Most are
-      NOT WIRED today; #98 is what closes that, and a NOT WIRED metric may not be cited.*
-- [x] 98. **Analytics contract v2.** Version a server-validated event schema and wire the
-      missing FirstMultiplier and FirstPurchase steps plus moved, prompt seen, training
-      started/ended, map opened, first flight, first travel, zone/rank unlock, interruption,
-      death/kill, quest completion, item viewed, purchase prompt/result/grant, session end,
-      device/input, locale, acquisition source, and friend/co-play context. Add funnel,
-      custom, and economy self-tests; telemetry failure can never stop gameplay.
-      *Done: `AnalyticsSchema.luau` is the versioned contract (v2) — every event, its
-      funnel step, its payload shape, and whether a client may report it. Validation
-      rejects unknown names/fields, wrong types, NaN/Inf, and oversized strings; its
-      self-test runs in `scripts/selftest.luau` and again at server Init. Wired the
-      dead FirstMultiplier/FirstPurchase steps plus training start/end, interruption,
-      death/kill, quest, zone/rank, travel, purchase prompt/result/grant, session end,
-      and co-play. `AnalyticsController` reports the client-only facts (device, locale,
-      moved, prompt seen, map opened, first flight) through one rate-limited remote
-      allowlisted by `ClientReportable`. Every emit is pcall-wrapped and every failure
-      warns and returns false.*
-- [x] 99. **Feature flags and honest experiments.** Add persistent deterministic cohorts,
-      typed remote configuration, safe defaults, per-feature kill switches, exposure
-      logging, and a Studio override. Flags may select config/UX, never trust client
-      rewards, and never change saved shape without a migration and rollback path.
-      *Done: `FlagConfig.luau` declares flags and weighted variants as data, with a
-      deterministic FNV-1a+avalanche assignment on `(UserId, flag id)` — the self-test
-      proves stability, weight accuracy, and that two flags do not correlate (raw
-      FNV-1a's low bits do, which would have made two experiments secretly one).
-      `FlagService` resolves server-side through kill switch → live typed override on
-      a `FlagOverrides` Configuration → cohort → default, ignoring any override of the
-      wrong type, and logs exposure on first *read* rather than on assignment.
-      `FlagController` holds outcomes only. `ShopEnabled` is a real kill switch on both
-      purchase paths that never blocks fulfillment of an existing receipt.*
-- [x] 100. **Progression and economy simulator.** Build a headless deterministic model
-      from fresh spawn through every district and beyond Ascendant for active, casual,
-      social, boosted, frequently-killed, and returning play styles. Gate balance changes
-      on documented time-to-first-upgrade/rank/zone, sources/sinks, stall points, inflation,
-      and sensitivity ranges instead of intuition.
-      *Done: `scripts/simulate.luau` runs six play styles to a 24h horizon using the
-      game's real `Formulas` plus `scripts/_balance_inputs.luau`, generated from the
-      configs by `extract_balance.py` and staleness-checked by `check.sh`. Findings in
-      `docs/BALANCE_MODEL.md`: first upgrade at 2.5m for every style including the
-      constantly-killed one; 11 districts inside a day; the only hard stall is after
-      Ascendant, which is a content gap (#152). Two results change how balance should
-      be tuned — `BaseGain` moves number size but not pacing at all, and being killed
-      every 2 minutes costs 72% of 24h power, which is far more than "time and combo
-      only" implies. That fairness question goes to Phase 26.*
-- [x] 101. **Finite-number and hostile-input safety.** Define behavior above the current
-      suffix range; cap or safely display every stat, multiplier, damage, and datastore
-      value; fuzz formulas and runtime remote schemas with NaN/Inf/oversized/malformed
-      inputs; rate-limit endpoints; and record impossible gains without immediately
-      auto-banning. A hostile client must not grant value, corrupt replication, or crash a
-      server.
-      *Done: `Formulas.MAX_STAT` (1e63, the top of the readable suffix range) plus
-      `IsFinite`/`SanitizeStat`; every formula now sanitizes its own arguments, and
-      `NumberFormat` switches to scientific notation above the last suffix instead of
-      rendering "12345.67Vg". The fuzz pass in `Formulas.RunSelfTest` found **94 real
-      cases** where a formula returned NaN or infinity — including MuscleScale
-      returning -inf, which Roblox would have assigned straight to a part's Size.
-      `StatService` sanitizes on the way in and out and records implausible gains
-      through analytics without auto-banning. Remotes were already rate-limited by
-      `Net`; fuzzing them end-to-end needs a running client and belongs to #107's
-      Studio contracts.*
-- [~] 102. **Baseline before feature work.** Run instrumented human alpha sessions on
-      keyboard, touch, and gamepad; capture first-rep/upgrade timing, confusion, deaths,
-      session exits, frame/memory/network traces, and qualitative notes. Freeze the first
-      beta targets from evidence and record the baseline commit/build so every later claim
-      has a comparison.
-      *BLOCKED on humans — this is the one item in Phase 19 that cannot be produced
-      from the repo. `docs/ALPHA_PROTOCOL.md` has everything around it: the frozen
-      baseline (commit `c2d0612`, world `8b56982091cc`), the four sessions to run,
-      what analytics already captures automatically versus what must be written down
-      by hand, the interview questions in order, and the failures we already expect
-      (keyboard-only flight and no onboarding) so a confirmed
-      expectation is not mistaken for a discovery. Fill it in as
-      `docs/alpha/<date>-<platform>.md`; until then no "how it feels" claim has
-      evidence.*
-- [ ] 103. **Deterministic service readiness.** Replace concurrently spawned, best-effort
-      startup with explicit dependencies/readiness and critical-vs-optional health. Joiners
-      present before or during boot cannot miss profile, entitlement, quest, analytics, or
-      replication setup; a critical failure fails the build/server visibly instead of
-      leaving a half-alive game. Prove 100 boot/join cycles initialize every service once.
-- [ ] 104. **Durable profile boundary.** Add an in-flight load guard, environment-specific
-      dev/stage/prod store names, schema/version checks, finite/range sanitization, historical
-      migration fixtures, corruption repair, and a typed allowlisted client DTO that never
-      exposes receipt ids. Order persistent stat/cash/quest/reward mutations transactionally
-      enough that disconnecting after any step produces all-or-none durable results.
-- [ ] 105. **Commit receipts before acknowledgement.** Replace in-memory-only receipt
-      acknowledgement with a durable idempotent receipt journal/commit-before-ack design,
-      keep tombstone handlers for retired products, fail startup on duplicate ids, and alert
-      on pending/unknown receipts. Fault-inject before/after grant, journal, save, and ack:
-      ownership lands exactly once and a paid receipt is never acknowledged without a
-      durable grant. A shop kill switch must never stop fulfillment of an existing receipt.
-- [ ] 106. **Authorize movement and travel.** Validate every movement/combat/travel payload,
-      issue narrow server teleport authority, enforce speed/position envelopes that respect
-      maximum Legs flight and network latency, and revalidate travel after every streaming
-      yield. A hit, death, respawn, exploit teleport, or stale character cannot escape combat,
-      enter locked training, or bypass Fast Travel; legitimate maximum-speed flight at the
-      supported latency has no false positives.
-- [ ] 107. **Hermetic CI and Studio contracts.** Pin/checksum tool definitions and make a
-      clean clone install dependencies, lint/typecheck, run self-tests, validate generated
-      JSON/config/migrations, and `rojo build` reproducibly. Add automated Studio contracts
-      for all 35 playable / 35 configured world entries, every remote failure path, profile load/save, receipts,
-      training/travel, and a two-client PvP scenario; no launch claim depends only on a
-      manual memory.
-- [ ] 108. **Scale the existing runtime before adding systems.** Cache immutable map and
-      entitlement data, replace per-second full-roster/profile broadcasts with versioned
-      deltas/coalescing, batch leaderboard/name work, and clean character/streaming caches on
-      respawn/removal. Ratchet world budgets near the measured build rather than the old
-      3× allowance. At target capacity, meet script/network/memory budgets with no per-frame
-      descendant scans, stale rig leaks, or repeated static Workspace scans.
-
-## Phase 20 — Training-world direction
-
-- [x] 109. **Ship the five-location vertical slice.** Replace the repeated 55-station
-      tier matrix with exactly one playable exercise per stat while retaining all 15
-      original builders and poses as dormant future content. Arms starts in the protected
-      plaza; Chest hides in a dockside warehouse; Back sits on the third floor of an
-      enterable Old Town building; Core trains beneath the railway; Legs uses a flight-only
-      high-rise deck. Every destination is open from spawn and carries an original name,
-      route hint, environment/access metadata, and a unique map pin. Replace the permanent
-      seven-button slab with one MENU entry and a bottom five-stat training dock whose
-      buttons open the matching Train view. Regenerate the Rojo world and make the static
-      contract prove exactly five stations, one family and primary exercise each, one sky
-      location, one third-floor location, three street/interior locations, deterministic
-      output, fresh committed JSON, valid held props, distinct pin coordinates, and budget
-      compliance. Verified statically by `./scripts/check.sh`: 5 stations, 5 playable
-      exercises / 15 configured, 923 instances, 854 BaseParts, build `ed9b6b379389`.
-      Verified live through Studio: five prompts and five private GymZones bind; all exits
-      have collidable support exactly three studs below; the third-floor route succeeds
-      with 31 path waypoints; the destination remote and rendered map both return five
-      named pins plus 61 map features; clicking Legs in the HUD opens TRAIN with exactly
-      one open `Highrise Running Deck` treadmill entry.
-
-- [x] 110. **Supersede the vertical slice with a massive seven-tier city.** Expand the
-      connected world to roughly 3,000 × 2,700 studs and spawn exactly 35 stations: one
-      recognizable primary exercise for every `(muscle, tier)` pair. Location multipliers
-      double exactly x1, x2, x4, x8, x16, x32 and x64; power gates rise with them. Keep all
-      five x1 stations around the central safe spawn, then deterministically shuffle the
-      other 30 across ten visually distinct neighborhoods so neither muscle nor tier forms
-      a visible row. Give every muscle one third-floor secret and one x64 flight-only sky
-      platform, with the remaining 25 stations at varied street-level warehouses, yards,
-      alleys, bunkers and underpasses. Keep the compact five-stat HUD and single MENU entry;
-      every muscle button opens its seven-location ladder, and every map pin prints both
-      muscle and multiplier. Preserve original primitive geometry and procedural poses—copy
-      the reference's progression clarity and world scale, not its artwork or assets.
-
-      **Verified 2026-08-08:** `./scripts/check.sh` passes formatting, lint, strict types,
-      self-tests, generated-world validation and balance freshness. The deterministic build
-      reports 35 stations, 7 tiers × 5 muscles, 2,384 instances / 2,184 BaseParts and hash
-      `4c572a6de1e6`; `rojo build` also succeeds. In connected Studio Edit mode there are
-      exactly 35 TrainingStations/GymZones, seven per muscle, five each at x1–x64, with
-      Street/ThirdFloor/Sky = 25/5/5; every landing ray has support and all five third-floor
-      entrance routes succeed (22–27 waypoints). A clean Play session creates exactly 35
-      prompts and returns 35 destinations / 117 map features. The client renders five muscle
-      shortcuts, one MENU entry and the training-first `Gym Rat` main goal; only documented
-      mock-DataStore and zero-product-id warnings appear.
-
-- [x] 111. **Make every tier an honest, different exercise and fix traversal/physique.**
-      Normalize every equipment row so `BaseGain == RepInterval`: a fresh profile now sees
-      and earns +1/s at Garage, then +2/+4/+8/+16/+32/+64 per second across the seven
-      locations before combo/permanent bonuses. Replace the repeated five primary machines
-      with 35 original primitive-built stations and 35 matching procedural R15 poses—seven
-      distinct presses/flys/dips, curls/extensions/ropes, pulls/rows/hinges, core patterns,
-      and run/squat/press/isolation movements. Replicate the resolved location rate onto
-      each station so its billboard includes the correct tier. Separate walking from
-      running: walking stays 16, holding LeftShift requests a server-resolved Legs sprint
-      from 24 to a capped 64; Q flight now starts at 40, scales with Legs to 120, and uses
-      LeftControl to descend. Retune the physique from the inflated 2.5 cap to an athletic
-      2.2 cap with V-tapered chest/waist, tapered limbs, restrained height, and later/subtler
-      vascularity. Extend generated-world and balance extraction contracts for all 35 rows.
-
-      **Verified 2026-08-08:** `./scripts/check.sh`, `rojo build`, `git diff --check`, all
-      five pure self-test suites, and the regenerated 24-hour balance simulation pass. The
-      deterministic world reports 35 unique exercises, 2,012 instances / 1,835 BaseParts,
-      build `580b192a698f`. Connected Studio resolves 35 definitions, 35 unique pose IDs and
-      one spawned use of every equipment ID; all five third-floor routes succeed and all 35
-      exits have floor support. A clean Play session binds 35 prompts and fresh-profile
-      billboards expose the exact `{1,2,4,8,16,32,64}/s` set. Server sprint changes the live
-      Humanoid 16→24→16, fresh flight resolves to 40, and Cable Crossover, Battle Ropes,
-      Deadlift, Ab Wheel and Stair Climber all move current R15 `AnimationConstraint` joints.
-      At the 2.2 physique cap, measured upper torso is ≈3.27×1.79×1.45 and upper arm
-      ≈1.34×1.36×1.34, preserving a visible taper rather than the previous inflated shape.
-
-- [x] 112. **Expand the city beyond the original baseplate footprint.** Spread the ten
-      connected neighborhoods across ≈4,868 × 4,471 studs of visible land while preserving
-      their irregular coastal silhouettes, causeway connections, shuffled exercises, five
-      enterable third-floor gyms, and five intentional skyline gyms. Add one 6,200 × 5,600
-      `WorldFoundation` beneath the water as a seamless 4×4 tile grid—Roblox clamps a single
-      BasePart axis to 2,048 studs—forming a physical world boundary and fall catcher;
-      do not expose it as a rectangular map feature or flatten the visible city into a plain
-      square. Expand the water/map background with the world, keep all structure and machine
-      X/Z bounds inside the foundation, and make the generated-world validator reject a
-      smaller footprint or any escaped geometry.
-
-      **Verified 2026-08-08:** deterministic generation and `python3
-      scripts/validate_gym.py` pass with 35 stations / 35 unique exercises, 2,230 instances,
-      2,051 BaseParts and build `a343c75bb4ba`. The validator measures at least 4,700 ×
-      4,300 studs of irregular visible land, requires exactly one tiled foundation at least
-      6,000 × 5,400, rejects any part over Roblox's 2,048-stud axis limit, and checks every
-      generated BasePart against the foundation's horizontal boundary. Connected Studio
-      independently measures 4,868 × 4,471 visible studs, 16 foundation tiles, 16 water
-      tiles, 132 map features, 35 stations/zones, zero escaped or oversized parts, floor
-      support beneath all 35 exits, and five successful third-floor routes.
-
-- [x] 113. **Replace the connected city with a safe, bridge-free archipelago.** Delete every
-      generated road, causeway and land corridor. Deterministically scatter the ten themed
-      islands with no ring/grid pattern, at least 1,750 studs center-to-center and 1,350
-      studs from the spawn island, across ≈8,037 × 6,547 visible studs. Expand the hidden
-      foundation to 10,000 × 9,000 and make the 9,600 × 8,600 ocean a seamless, persistent,
-      collidable 5×5 surface so walking and Legs sprint work on water. Give the hub and all
-      ten islands shallow shore stairs so flight is not required for water travel. Enclose
-      the ocean with 20 persistent boundary-wall tiles, stop flight from applying downward
-      force at the waterline, and enforce the same Y/X/Z safety envelope on the server so a
-      flying or falling player cannot pass under the water or leave the map.
-
-      **Verified 2026-08-08:** `./scripts/check.sh`, strict Luau analysis, generated-world
-      validation and `rojo build` pass. Deterministic output reports 35 stations / 35 unique
-      exercises, 1,933 instances, 1,767 BaseParts and build `a1917590d228`. Connected Studio
-      finds zero bridges/roads, 25 walkable water tiles at surface Y=-7.5, 110 shore steps,
-      20 persistent boundary walls, 35 supported exits and five successful indoor routes.
-      In Play, a falling character lands on Glass at root Y=-4.5, server sprint changes
-      16→24→16 while on water, a forced root at Y=-20 recovers to -4.5005, and a forced
-      X=6,000 position recovers to X=4,790. Runtime output contains only the documented
-      mock-DataStore/API and zero-product-id warnings.
