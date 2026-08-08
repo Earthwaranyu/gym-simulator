@@ -98,8 +98,14 @@ system that consumes it:
 - [x] 30. Damage/health model derived from stats (Arms + Chest → damage, Core → max HP, Legs → walkspeed).
       *Superseded by Phase 14: that wiring disagreed with `CLAUDE.md` on four of the five
       stats and left Back doing nothing. See #86–#90.*
-- [x] 31. **Ability registry** — folder of ability modules sharing one interface (`Cost`, `Cooldown`, `Validate`, `Execute`). Punch, Slam, Dash ship first; new abilities are new files only.
-- [x] 32. **Training interrupt** — the core hook. Being hit knocks you off the machine for 3s and resets the rep combo. With training otherwise free, this stagger is the *entire* cost of being attacked — and the whole reason to attack a trainer.
+- [x] 31. **Ability registry** — folder of ability modules sharing one interface (`Cost`, `Cooldown`, `Validate`, `Execute`); new abilities are new files only.
+      *Corrected by #96: only **Punch** ships. Slam and Dash are **deferred** to the
+      three-move kit in #122 — no doc may imply they exist. See `docs/PRODUCT_TRUTH.md`.*
+- [x] 32. **Training interrupt** — the core hook.
+      *Superseded by #96: interruption is now **kill-only**. A hit damages and grounds
+      the victim but leaves them mounted; only death dismounts them and resets the
+      combo. The attacker must commit to a full kill, so the cost of interrupting is
+      proportional to the effort of causing it.*
 - [x] 33. Death & respawn — respawn timer, rep-streak reset, in-flight token tick forfeited. **No stat, cash, or token loss on death.** *(ragdoll deferred to #56 VFX)*
 - [x] 34. **Reputation system** — data-driven tiers (Criminal → Neutral → Guardian → Hero). Killing peaceful trainers pushes you toward Criminal; killing Criminals pushes you toward Hero. Tier table is config, not code.
 - [x] 35. **Immortality + barrier** — `CombatService` nullifies all damage while a potion is active, and the player wears a visible body barrier so attackers can see it before swinging.
@@ -650,7 +656,7 @@ The product loop this roadmap optimizes is:
 | Core fantasy | 55 locations, 15 exercises, muscle growth, five meaningful stats, flight, PvP, reputation | A new player is not taught or directed through the fantasy |
 | World | Irregular connected city, interiors, sky gyms, vector map, streaming-aware travel | The full map is information overload and low-population servers disperse encounters |
 | Progression | ranks, tokens, multipliers, two daily quests, one one-shot quest | no balanced first-hour path, mastery, weekly goals, comeback loop, or post-endgame purpose |
-| Combat | authoritative Punch, damage, kills, bounties, safe zones | checklist claims Slam/Dash that do not exist; interruption behavior and paid protection need a fairness decision |
+| Combat | authoritative Punch, damage, kills, bounties, safe zones; interruption settled as kill-only (#96) | only one ability — Slam/Dash deferred to #122; paid-peace fairness still open (Phase 26) |
 | Social | roster, kill feed, global Power/Kills boards | no parties, friend co-training, invites, rivals, crews, co-op events, or shareable moments |
 | Monetization | receipt architecture and four configured product definitions | every id is `0`; paid peace can still permit aggression; no live receipt evidence or cosmetic catalog |
 | Analytics | partial onboarding and economy logging | declared FirstMultiplier/FirstPurchase steps are not wired; no social, tutorial, interruption, source, or experiment telemetry |
@@ -693,12 +699,15 @@ Execution rules:
 
 ## Phase 19 — P0: Make the roadmap true and measurable
 
-- [ ] 96. **Reconcile product truth.** Audit `AGENTS.md`, `CLAUDE.md`, this checklist,
+- [x] 96. **Reconcile product truth.** Audit `AGENTS.md`, `CLAUDE.md`, this checklist,
       `README.md`, `docs/PLAYTEST.md`, and the live build as one versioned inventory.
       Decide hit-vs-kill training interruption; either deliver or explicitly defer Slam
       and Dash; correct board/system/count/control claims; rewrite playtests for 55 stations,
       15 variants, current flight, and current map. No checked claim may lack code or test
       evidence.
+      *Done: `docs/PRODUCT_TRUTH.md` v1 is the versioned inventory. Interruption is
+      kill-only; Slam/Dash explicitly deferred; PLAYTEST rewritten for 55 stations, 15
+      variants, 11 zones, current flight and travel.*
 - [ ] 97. **Own one KPI scorecard.** Add a concise product brief and dashboard definition
       for qPTR, qualified plays by source, join→first rep/upgrade/flight, onboarding,
       session length, 5/10-minute survival, D1/D7/D30, activity variety, intentional
