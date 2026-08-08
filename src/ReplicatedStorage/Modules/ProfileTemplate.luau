@@ -42,6 +42,9 @@ local ProfileTemplate: Types.ProfileData = {
 
 	Kills = 0,
 	Deaths = 0,
+	-- Kills keyed by the victim's reputation tier id at the moment they died.
+	-- Reconcile fills missing top-level keys, so this needs no migration.
+	KillsByReputation = {},
 
 	TotalPlaytime = 0,
 

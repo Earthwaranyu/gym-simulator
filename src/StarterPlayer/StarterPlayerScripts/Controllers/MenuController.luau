@@ -20,6 +20,9 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
+local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
+local ReputationConfig = require(ReplicatedStorage.Modules.ReputationConfig)
+local Icons = require(ReplicatedStorage.Modules.Icons)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
@@ -45,7 +48,7 @@ local body: Frame
 local titleLabel: TextLabel
 local tabStrip: Frame
 local isOpen = false
-local activeTab = "Map"
+local activeTab = "Info"
 local quests: { any } = {}
 
 type Destination = {
@@ -199,10 +202,45 @@ function MenuController:Init()
 	ProfileController = Loader.Get("ProfileController")
 	ToastController = Loader.Get("ToastController")
 
+	-- Three tabs, not seven.
+	--
+	-- The seven-tab strip put Map, Train, Upgrades, Quests, Shop, Top and Settings
+	-- behind one button, which meant the two screens a player opens constantly — the
+	-- map and their own stats — were the same number of clicks away as the ones they
+	-- open twice a session. Map, Ranks and Quests are now their own HUD surfaces
+	-- (see MenuBarController and HudController's goal card), and Train's picker lives
+	-- with the map it belongs to. What is left is genuinely a menu: who you are, what
+	-- you can buy, and what you can switch off.
+	--
+	-- The render functions for the promoted screens are unchanged and still live
+	-- here; only their route in changed.
 	tabs = {
+		{
+			Id = "Info",
+			DisplayName = "Info",
+			Render = function(parent)
+				self:_renderInfo(parent)
+			end,
+		},
+		{
+			Id = "Shop",
+			DisplayName = "Shop",
+			Render = function(parent)
+				self:_renderShop(parent)
+			end,
+		},
+		{
+			Id = "Settings",
+			DisplayName = "Settings",
+			Render = function(parent)
+				self:_renderSettings(parent)
+			end,
+		},
+		-- Reachable by Open() from the HUD buttons rather than from the tab strip.
 		{
 			Id = "Map",
 			DisplayName = "Map",
+			OnBar = false,
 			Render = function(parent)
 				self:_renderMap(parent)
 			end,
@@ -210,15 +248,9 @@ function MenuController:Init()
 		{
 			Id = "Train",
 			DisplayName = "Train",
+			OnBar = false,
 			Render = function(parent)
 				self:_renderTrain(parent)
-			end,
-		},
-		{
-			Id = "Upgrades",
-			DisplayName = "Upgrades",
-			Render = function(parent)
-				self:_renderUpgrades(parent)
 			end,
 		},
 		{
@@ -230,29 +262,20 @@ function MenuController:Init()
 			end,
 		},
 		{
-			Id = "Shop",
-			DisplayName = "Shop",
-			Render = function(parent)
-				self:_renderShop(parent)
-			end,
-		},
-		{
 			Id = "Ranks",
 			DisplayName = "Top",
 			Icon = "Top",
+			OnBar = false,
 			Render = function(parent)
 				self:_renderLeaderboard(parent)
 			end,
 		},
-		{
-			Id = "Settings",
-			DisplayName = "Settings",
-			Render = function(parent)
-				self:_renderSettings(parent)
-			end,
-		},
 	}
 end
+
+-- Which tabs the strip across the top of the menu draws. The others are real tabs
+-- that Open() can reach, they simply have their own button somewhere else.
+local STRIP_TABS = { Info = true, Shop = true, Settings = true }
 
 -- Pull every map-enabled training station from the server once.
 function MenuController:_fetchDestinations()
@@ -1205,38 +1228,116 @@ function MenuController:OpenTrain(statId: string)
 	self:Open("Train")
 end
 
-function MenuController:_renderUpgrades(parent: Frame)
+--[[
+	Info — the character sheet, and the multiplier shop that used to be its own tab.
+
+	Who you are and what you are buying belong on one screen: every row here is a
+	stat, its current worth, and the price of doubling it. Splitting them meant
+	reading a number on one tab and paying for it on another.
+]]
+function MenuController:_renderInfo(parent: Frame)
 	local data = ProfileController:Get()
+	local stats = if data ~= nil then data.Stats else {}
+	local power = Formulas.TotalPower(stats)
+	local rank = RankConfig.Get(power)
+
+	local header = row(parent, 78, 1)
+
+	local name = UI.Label("Name", header)
+	name.Size = UDim2.new(1, 0, 0, 24)
+	name.Position = UDim2.fromOffset(0, 6)
+	name.Font = UI.Font.Heading
+	name.TextSize = 17
+	name.Text = `Name: {Players.LocalPlayer.DisplayName}`
+
+	local rankLabel = UI.Label("Rank", header)
+	rankLabel.Size = UDim2.new(1, 0, 0, 20)
+	rankLabel.Position = UDim2.fromOffset(0, 30)
+	rankLabel.TextSize = 14
+	rankLabel.TextColor3 = rank.Color
+	rankLabel.Text =
+		`Rank: {rank.DisplayName}  <font color="#8A93A8">· {NumberFormat.Format(power)} power</font>`
+
+	-- Who you have killed, by what they were when they died. Built from
+	-- ReputationConfig rather than from three named counters, so rebanding the
+	-- tiers changes this line without touching it.
+	local record = if data ~= nil then data.KillsByReputation else {}
+	local parts = {}
+	for _, tier in ReputationConfig.List do
+		table.insert(parts, `{tier.DisplayName} killed: {record[tier.Id] or 0}`)
+	end
+
+	local kills = UI.Label("Kills", header)
+	kills.Size = UDim2.new(1, 0, 0, 18)
+	kills.Position = UDim2.fromOffset(0, 52)
+	kills.TextSize = 12
+	kills.TextColor3 = UI.Palette.TextMuted
+	kills.TextTruncate = Enum.TextTruncate.AtEnd
+	kills.Text = table.concat(parts, "   ")
 
 	for index, definition in StatConfig.List do
 		local level = if data ~= nil then (data.MultiplierLevels[definition.Id] or 0) else 0
 		local cost = Formulas.MultiplierCost(level)
+		local current = Formulas.MultiplierValue(level)
+		local next = Formulas.MultiplierValue(level + 1)
 
-		local line = row(parent, 56, index)
+		local line = row(parent, 62, index + 1)
+
+		local glyphHolder = Instance.new("Frame")
+		glyphHolder.Name = "Glyph"
+		glyphHolder.BackgroundTransparency = 1
+		glyphHolder.AnchorPoint = Vector2.new(0, 0.5)
+		glyphHolder.Position = UDim2.fromScale(0, 0.5)
+		glyphHolder.Size = UDim2.fromOffset(28, 28)
+		glyphHolder.Parent = line
+		-- Arms is the fist, because the fist is how you train it and how you fight.
+		Icons.Draw(
+			if definition.Id == "Arms" then "Fist" else "Train",
+			glyphHolder,
+			definition.Color,
+			UI.Palette.Backdrop
+		)
 
 		local label = UI.Label("Text", line)
-		label.Size = UDim2.new(1, -120, 0, 26)
-		label.Position = UDim2.fromOffset(0, 6)
+		label.Position = UDim2.fromOffset(36, 6)
+		label.Size = UDim2.new(1, -156, 0, 26)
 		label.TextColor3 = definition.Color
-		label.Text = `{definition.DisplayName}  <font color="#8A93A8">lvl {level} · </font>`
-			.. `x{NumberFormat.Format(Formulas.MultiplierValue(level))}`
+		label.Text = `{definition.DisplayName}: {NumberFormat.Format(stats[definition.Id] or 0)}  `
+			.. `<font color="#8A93A8">x{NumberFormat.Format(current)}</font>`
 
-		-- What the stat is currently worth, from the stat's own definition. The
-		-- number you are about to buy a multiplier on, shown before you buy it.
 		local effect = UI.Label("Effect", line)
-		effect.Size = UDim2.new(1, -120, 0, 18)
-		effect.Position = UDim2.fromOffset(0, 30)
+		effect.Position = UDim2.fromOffset(36, 32)
+		effect.Size = UDim2.new(1, -156, 0, 18)
 		effect.TextSize = 13
 		effect.TextColor3 = UI.Palette.TextMuted
-		effect.Text = definition.Effect(if data ~= nil then data.Stats else {})
+		effect.TextTruncate = Enum.TextTruncate.AtEnd
+		effect.Text = definition.Effect(stats)
 
-		button(line, `{NumberFormat.Format(cost)} 🪙`, UI.Palette.Token, function()
-			local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)
-			toast(message)
-			if ok then
-				self:_refresh()
+		-- The ladder button from the sketch: it names the multiplier you are buying,
+		-- not the level number, because "x8" is the thing the player wants and
+		-- "level 3" is bookkeeping.
+		button(
+			line,
+			`x{NumberFormat.Format(next)}  ·  {NumberFormat.Format(cost)}`,
+			UI.Palette.Token,
+			function()
+				UI.Confirm(screen, {
+					Title = `Upgrade {definition.DisplayName} Multiplier`,
+					Body = `Raise your {definition.DisplayName} multiplier from ` .. `x{NumberFormat.Format(
+						current
+					)} to x{NumberFormat.Format(next)} ` .. `for {NumberFormat.Format(cost)} tokens?`,
+					ConfirmText = "Confirm",
+					CancelText = "Cancel",
+					OnConfirm = function()
+						local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)
+						toast(message)
+						if ok then
+							self:_refresh()
+						end
+					end,
+				})
 			end
-		end)
+		)
 	end
 end
 
@@ -1265,22 +1366,102 @@ function MenuController:_renderQuests(parent: Frame)
 	end
 end
 
+--[[
+	Shop — Robux products first, then the cash catalogue, in headed sections you
+	scroll through.
+
+	The Robux rows come from the server's product registry rather than from a table
+	here, so a new file in PurchaseService/Products appears in this list with no
+	client edit. The server also decides what is available: an unconfigured AssetId
+	reports as unavailable here instead of being offered and then refused after the
+	player has already committed to buying it.
+]]
 function MenuController:_renderShop(parent: Frame)
-	for index, item in ShopConfig.List do
-		local line = row(parent, 46, index)
+	local order = 0
 
-		local label = UI.Label("Text", line)
-		label.Size = UDim2.new(1, -120, 1, 0)
-		label.TextSize = 13
-		label.Text = `{item.DisplayName}\n<font color="#8A93A8">{item.Description}</font>`
+	local function heading(text: string)
+		order += 1
+		local label = UI.Label("Heading", parent)
+		label.Size = UDim2.new(1, 0, 0, 28)
+		label.LayoutOrder = order
+		label.Font = UI.Font.Heading
+		label.TextSize = 15
+		label.TextColor3 = UI.Palette.Accent
+		label.Text = string.upper(text)
+	end
 
-		button(line, `${NumberFormat.Format(item.Price)}`, UI.Palette.Accent, function()
-			local ok, message = Net.Function("PurchaseShopItem"):InvokeServer(item.Id)
-			toast(message)
-			if ok then
-				self:_refresh()
-			end
-		end)
+	local ok, catalogue = pcall(function()
+		return Net.Function("GetProductCatalogue"):InvokeServer()
+	end)
+
+	local sections: { [string]: { any } } = { Gamepass = {}, Potion = {}, Token = {} }
+	if ok and type(catalogue) == "table" then
+		for _, product in catalogue do
+			-- Grouped by what the thing is to the player, not by Roblox's product
+			-- kind: a potion and a token pack are both DevProducts and belong in
+			-- different parts of a shop.
+			local group = if product.Kind == "Gamepass"
+				then "Gamepass"
+				elseif string.find(tostring(product.Id), "TokenPack") ~= nil then "Token"
+				else "Potion"
+			table.insert(sections[group], product)
+		end
+	end
+
+	for _, group in { "Gamepass", "Potion", "Token" } do
+		if #sections[group] == 0 then
+			continue
+		end
+		heading(group)
+
+		for _, product in sections[group] do
+			order += 1
+			local line = row(parent, 50, order)
+
+			local label = UI.Label("Text", line)
+			label.Size = UDim2.new(1, -120, 1, 0)
+			label.TextSize = 13
+			label.Text = `{product.DisplayName}\n<font color="#8A93A8">{product.Description}</font>`
+
+			local text = if product.Owned
+				then "OWNED"
+				elseif not product.Available then "SOON"
+				else `R$ {NumberFormat.Format(product.RobuxPrice)}`
+			local colour = if product.Owned or not product.Available
+				then UI.Palette.TextMuted
+				else UI.Palette.Accent
+
+			button(line, text, colour, function()
+				if product.Owned or not product.Available then
+					return
+				end
+				local bought, message = Net.Function("PromptProduct"):InvokeServer(product.Id)
+				if not bought then
+					toast(message)
+				end
+			end)
+		end
+	end
+
+	if #ShopConfig.List > 0 then
+		heading("Supplements")
+		for _, item in ShopConfig.List do
+			order += 1
+			local line = row(parent, 50, order)
+
+			local label = UI.Label("Text", line)
+			label.Size = UDim2.new(1, -120, 1, 0)
+			label.TextSize = 13
+			label.Text = `{item.DisplayName}\n<font color="#8A93A8">{item.Description}</font>`
+
+			button(line, `${NumberFormat.Format(item.Price)}`, UI.Palette.Power, function()
+				local bought, message = Net.Function("PurchaseShopItem"):InvokeServer(item.Id)
+				toast(message)
+				if bought then
+					self:_refresh()
+				end
+			end)
+		end
 	end
 end
 
@@ -1384,11 +1565,16 @@ function MenuController:_renderTabStrip()
 	layout.Parent = tabStrip
 
 	for index, tab in tabs do
+		if not STRIP_TABS[tab.Id] then
+			continue
+		end
+
 		local btn = Instance.new("TextButton")
 		btn.BackgroundColor3 = if tab.Id == activeTab then UI.Palette.Accent else UI.Palette.Backdrop
 		btn.BackgroundTransparency = if tab.Id == activeTab then 0 else 0.4
 		btn.BorderSizePixel = 0
-		btn.Size = UDim2.fromOffset(96, 30)
+		-- Three tabs share the width the seven used to divide between them.
+		btn.Size = UDim2.fromOffset(132, 32)
 		btn.LayoutOrder = index
 		btn.Font = UI.Font.Heading
 		btn.TextSize = 14

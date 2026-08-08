@@ -160,6 +160,65 @@ local function drawTrain(parent: GuiObject, color: Color3, _hole: Color3)
 	end
 end
 
+--[[
+	Info — a sheet with writing on it. Deliberately a portrait rectangle where Shop
+	and Train are landscape, so the tab strip reads apart at a glance.
+]]
+local function drawInfo(parent: GuiObject, color: Color3, hole: Color3)
+	shape(parent, "Sheet", 0.5, 0.5, 0.66, 0.86, color, 0, 0.14)
+	-- Three ruled lines knocked out of the page. The top one is short, which reads
+	-- as a heading rather than as a fourth line of body text.
+	for index, spec in { { 0.3, 0.26 }, { 0.5, 0.42 }, { 0.66, 0.42 } } do
+		local y, width = spec[1], spec[2]
+		shape(parent, `Line{index}`, 0.5 - (0.42 - width) / 2, y, width, 0.07, hole, 0, 1)
+	end
+end
+
+--[[
+	Fist — the attack, and the Arms slot. A blocky knuckle line over a wrist, which
+	is the part of a fist that still reads when it is 28 pixels tall; fingers do not.
+]]
+local function drawFist(parent: GuiObject, color: Color3, hole: Color3)
+	shape(parent, "Hand", 0.5, 0.44, 0.74, 0.56, color, 0, 0.26)
+	shape(parent, "Wrist", 0.5, 0.82, 0.5, 0.24, color, 0, 0.18)
+	-- Knuckle gaps, knocked out rather than drawn, so the shape stays one silhouette.
+	for index = 1, 3 do
+		shape(parent, `Knuckle{index}`, 0.26 + (index - 1) * 0.24, 0.3, 0.05, 0.2, hole, 0, 1)
+	end
+end
+
+--[[
+	Potion — a flask: narrow neck, round body. Reads as "drink this" without needing
+	the bubbles that vanish at tile size.
+]]
+local function drawPotion(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "Cork", 0.5, 0.14, 0.2, 0.16, color, 0, 0.3)
+	shape(parent, "Neck", 0.5, 0.32, 0.14, 0.24, color, 0, 0.2)
+	shape(parent, "Body", 0.5, 0.68, 0.66, 0.5, color, 0, 0.42)
+end
+
+--[[
+	Vip — a crown. Three peaks on a band; the notches are knocked out so the whole
+	glyph stays a single silhouette at size.
+]]
+local function drawVip(parent: GuiObject, color: Color3, hole: Color3)
+	shape(parent, "Band", 0.5, 0.74, 0.86, 0.2, color, 0, 0.16)
+	shape(parent, "Peaks", 0.5, 0.44, 0.86, 0.42, color, 0, 0.1)
+	for _, x in { 0.32, 0.68 } do
+		shape(parent, `Notch{x}`, x, 0.34, 0.14, 0.3, hole, 0, 0.3)
+	end
+end
+
+--[[
+	Quest — a checklist: a board with a tick. The tick is two bars at opposing
+	angles, which is the only way to draw one out of rectangles.
+]]
+local function drawQuest(parent: GuiObject, color: Color3, hole: Color3)
+	shape(parent, "Board", 0.5, 0.52, 0.78, 0.84, color, 0, 0.14)
+	shape(parent, "TickShort", 0.38, 0.58, 0.1, 0.26, hole, 45, 1)
+	shape(parent, "TickLong", 0.56, 0.48, 0.1, 0.46, hole, -40, 1)
+end
+
 local ICONS: { [string]: Builder } = {
 	Map = drawMap,
 	Train = drawTrain,
@@ -167,6 +226,17 @@ local ICONS: { [string]: Builder } = {
 	Shop = drawShop,
 	Top = drawTop,
 	Settings = drawSettings,
+	Info = drawInfo,
+	Fist = drawFist,
+	Potion = drawPotion,
+	Vip = drawVip,
+	Quest = drawQuest,
+	-- The dumbbell is the token mark throughout the HUD, and Train already is one.
+	-- Aliased rather than copied so the two cannot drift apart in a restyle.
+	Token = drawTrain,
+	-- Rank is the podium. Same glyph as the leaderboard tab because they are the
+	-- same idea seen from two places.
+	Rank = drawTop,
 }
 
 function Icons.Has(name: string): boolean

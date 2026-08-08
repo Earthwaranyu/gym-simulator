@@ -180,6 +180,45 @@ function PurchaseService:Start()
 		return self:_processReceipt(receiptInfo)
 	end
 
+	--[[
+		What the shop screen draws. Built from the same registry the prompt path uses,
+		so a new file in Products/ appears in the UI with no client edit — and an
+		unconfigured AssetId is reported as unavailable here rather than being offered
+		and then refused after the player has already tried to buy it.
+	]]
+	Net.BindFunction("GetProductCatalogue", 2, function(player: Player)
+		local FlagService = Loader.Get("FlagService")
+		local open = FlagService:Get(player, "ShopEnabled") ~= false
+
+		local rows = {}
+		for _, product in products do
+			table.insert(rows, {
+				Id = product.Id,
+				Kind = product.Kind,
+				DisplayName = product.DisplayName,
+				Description = product.Description,
+				RobuxPrice = product.RobuxPrice,
+				Available = open and product.AssetId ~= 0,
+				Owned = product.Kind == "Gamepass" and self:OwnsGamepass(player, product.AssetId),
+			})
+		end
+
+		-- Sorted server-side so every client shows the same order. Dictionary
+		-- iteration order is not stable, and a shop whose rows move between openings
+		-- is one the player has to re-read every time.
+		table.sort(rows, function(left, right)
+			if left.Kind ~= right.Kind then
+				return left.Kind < right.Kind
+			end
+			if left.RobuxPrice ~= right.RobuxPrice then
+				return left.RobuxPrice < right.RobuxPrice
+			end
+			return left.Id < right.Id
+		end)
+
+		return rows
+	end)
+
 	Net.BindFunction("PromptProduct", 2, function(player: Player, productId: any)
 		if type(productId) ~= "string" then
 			return false, "Invalid request."

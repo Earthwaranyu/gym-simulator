@@ -44,6 +44,9 @@ local EffectsController: any = nil
 
 type Entry = {
 	Id: string,
+	-- Which MenuController tab this tile shows. Not the same as Id: the Rank tile
+	-- opens the tab MenuController calls "Ranks".
+	Tab: string,
 	Button: TextButton,
 	Tile: Frame,
 	Label: TextLabel,
@@ -125,17 +128,27 @@ end
 
 function MenuBarController:_refresh(openTab: string?)
 	for _, entry in entries do
-		paint(entry, openTab ~= nil)
+		-- Only the tile whose screen is actually showing lights up. Lighting all
+		-- three whenever anything was open, which is what the single-button version
+		-- did, would now say "you are in the map" while you are in the shop.
+		paint(entry, openTab == entry.Tab)
 	end
 end
 
 function MenuBarController:_build()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-	-- One obvious entry opens the full tabbed menu. The five muscle routes live in
-	-- the HUD hotbar, so seven permanent navigation slabs would only add clutter.
+	-- Three entries, because three screens are worth a permanent button.
+	--
+	-- The menu itself opens on Info, the character sheet. Map and Rank get their own
+	-- tiles rather than sitting behind the tab strip: they are the two screens a
+	-- player opens most often, and behind a strip both cost two clicks. The five
+	-- muscle routes stay in the HUD hotbar and Quests stays on the goal card, so the
+	-- bar still never grows past what a thumb can reach.
 	local tabs = {
-		{ Id = "Menu", DisplayName = "Menu", Icon = "Map" },
+		{ Id = "Menu", DisplayName = "Menu", Icon = "Info", Tab = "Info" },
+		{ Id = "Map", DisplayName = "Map", Icon = "Map", Tab = "Map" },
+		{ Id = "Rank", DisplayName = "Rank", Icon = "Rank", Tab = "Ranks" },
 	}
 
 	local screen = Instance.new("ScreenGui")
@@ -219,16 +232,15 @@ function MenuBarController:_build()
 			end,
 		})
 
+		-- Toggle by tab: pressing the tile you are already on closes the menu, and
+		-- pressing a different one switches to it rather than closing.
 		button.Activated:Connect(function()
-			if MenuController:GetOpenTab() ~= nil then
-				MenuController:Toggle()
-			else
-				MenuController:Open("Map")
-			end
+			MenuController:Toggle(tab.Tab)
 		end)
 
 		table.insert(entries, {
 			Id = tab.Id,
+			Tab = tab.Tab,
 			Button = button,
 			Tile = tile,
 			Label = label,

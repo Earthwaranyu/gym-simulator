@@ -60,6 +60,7 @@ export type ProfileData = {
 
 	Kills: number,
 	Deaths: number,
+	KillsByReputation: { [string]: number },
 
 	TotalPlaytime: number,
 

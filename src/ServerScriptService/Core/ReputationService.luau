@@ -91,8 +91,18 @@ function ReputationService:Start()
 
 		-- Judged on what the victim was at the moment of death, so a killer cannot
 		-- farm reputation by pushing someone into Criminal first.
+		local victimTier = ReputationConfig.Get(self:Get(victim))
 		local delta = ReputationConfig.DeltaForKill(self:Get(victim))
 		self:Add(killer, delta)
+
+		-- The Info page's "who have you killed" line. Recorded by tier id rather than
+		-- as three named counters, so rebanding or renaming a tier in
+		-- ReputationConfig stays a one-file change and never needs a migration.
+		local data: Types.ProfileData? = DataService:GetData(killer)
+		if data ~= nil then
+			data.KillsByReputation[victimTier.Id] = (data.KillsByReputation[victimTier.Id] or 0) + 1
+			DataService:MarkDirty(killer)
+		end
 	end)
 
 	-- Drift back toward Neutral, so one bad night does not brand someone forever.

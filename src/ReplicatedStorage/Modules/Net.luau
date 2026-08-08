@@ -65,6 +65,9 @@ local FUNCTION_NAMES: { string } = {
 	"PurchaseShopItem",
 	-- Client -> server: prompt a Robux purchase by product id. Returns ok, message.
 	"PromptProduct",
+	-- Client -> server: the Robux catalogue for the shop screen. Returns a list of
+	-- display rows, so adding a product file is enough to make it appear in the UI.
+	"GetProductCatalogue",
 	-- Client -> server: claim the VIP daily potion. Returns ok, message.
 	"ClaimVipDaily",
 	-- Client -> server: read the global leaderboards. Returns a list.

@@ -13,6 +13,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
@@ -22,6 +23,7 @@ local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local Types = require(ReplicatedStorage.Modules.Types)
+local Icons = require(ReplicatedStorage.Modules.Icons)
 
 -- Punch's cooldown, mirrored for the cooldown sweep. The server remains the
 -- authority; this only decides when the pip looks ready.
@@ -30,6 +32,12 @@ local FEED_LINES = 4
 -- Wide enough for the worst case a chip has to hold: a stat in the trillions with
 -- a multiplier beside it, which is about 110px of text at this size.
 local CHIP_WIDTH = 108
+-- Which stat the fist belongs to. Named rather than inlined because two places
+-- below branch on it, and "Arms" appearing twice as a literal is how those two
+-- quietly disagree later.
+local ARMS_STAT = "Arms"
+-- How long a press has to last to count as a hold rather than a tap.
+local HOLD_SECONDS = 0.35
 
 local HudController = {
 	Name = "HudController",
@@ -112,10 +120,25 @@ function HudController:_build()
 
 	tokenLabel = UI.Label("Tokens", headline)
 	tokenLabel.AnchorPoint = Vector2.new(1, 0)
-	tokenLabel.Position = UDim2.fromScale(1, 0)
-	tokenLabel.Size = UDim2.fromScale(0.4, 1)
+	-- Shifted left by the glyph's width plus its gap, so the number and the mark sit
+	-- beside each other rather than on top of each other.
+	tokenLabel.Position = UDim2.new(1, -24, 0, 0)
+	tokenLabel.Size = UDim2.new(0.4, -24, 1, 0)
 	tokenLabel.TextXAlignment = Enum.TextXAlignment.Right
+	tokenLabel.Font = UI.Font.Numeric
 	tokenLabel.TextColor3 = UI.Palette.Token
+
+	-- The dumbbell mark rather than the word "Tokens". The currency is named by its
+	-- glyph everywhere it appears — the goal card's reward, the shop's prices, and
+	-- here — so the three read as the same thing without spelling it out each time.
+	local tokenGlyph = Instance.new("Frame")
+	tokenGlyph.Name = "TokenGlyph"
+	tokenGlyph.BackgroundTransparency = 1
+	tokenGlyph.AnchorPoint = Vector2.new(1, 0.5)
+	tokenGlyph.Position = UDim2.fromScale(1, 0.5)
+	tokenGlyph.Size = UDim2.fromOffset(20, 20)
+	tokenGlyph.Parent = headline
+	Icons.Draw("Token", tokenGlyph, UI.Palette.Token, UI.Palette.Backdrop)
 
 	-- Bottom-centre: five persistent stat buttons, inspired by the reference game's
 	-- compact stat hotbar but redrawn in this project's gritty gym style. Clicking a
@@ -144,7 +167,6 @@ function HudController:_build()
 		button.AutoButtonColor = false
 		button.Text = ""
 		button.Parent = chips
-		UI.Pressable(button)
 
 		local corner = Instance.new("UICorner")
 		corner.CornerRadius = UDim.new(0, 7)
@@ -157,13 +179,30 @@ function HudController:_build()
 		accent.BorderSizePixel = 0
 		accent.Parent = button
 
-		local initial = UI.Label("Initial", button)
-		initial.Position = UDim2.fromOffset(10, 4)
-		initial.Size = UDim2.fromOffset(24, 20)
-		initial.Font = UI.Font.Heading
-		initial.TextSize = 18
-		initial.TextColor3 = definition.Color
-		initial.Text = string.sub(definition.DisplayName, 1, 1)
+		-- The slot number, as drawn in the sketch. It is what the number keys bind to,
+		-- so the binding is legible without a tutorial.
+		local slot = UI.Label("Slot", button)
+		slot.Position = UDim2.fromOffset(9, 2)
+		slot.Size = UDim2.fromOffset(12, 12)
+		slot.Font = UI.Font.Numeric
+		slot.TextSize = 11
+		slot.TextColor3 = UI.Palette.TextMuted
+		slot.Text = tostring(index)
+
+		-- Arms wears the fist: it is the muscle you train by punching, and slot one is
+		-- also the attack. Everything else gets the dumbbell.
+		local glyph = Instance.new("Frame")
+		glyph.Name = "Glyph"
+		glyph.BackgroundTransparency = 1
+		glyph.Position = UDim2.fromOffset(10, 16)
+		glyph.Size = UDim2.fromOffset(22, 22)
+		glyph.Parent = button
+		Icons.Draw(
+			if definition.Id == ARMS_STAT then "Fist" else "Train",
+			glyph,
+			definition.Color,
+			UI.Palette.Backdrop
+		)
 
 		local chip = UI.Label("Value", button)
 		chip.Position = UDim2.fromOffset(34, 3)
@@ -176,8 +215,36 @@ function HudController:_build()
 		chip.TextTruncate = Enum.TextTruncate.AtEnd
 		statLabels[definition.Id] = chip
 
+		-- Slot one is the fist, so tapping it throws a punch instead of opening a
+		-- menu: it is the one slot that is an action rather than a destination. The
+		-- Arms route is still reachable — hold the same slot for it, which is the
+		-- gesture the note in the training dock explains.
+		UI.Pressable(button, {
+			OnPress = function()
+				if definition.Id == ARMS_STAT then
+					CombatController:Attack()
+				end
+			end,
+		})
+
 		button.Activated:Connect(function()
-			MenuController:OpenTrain(definition.Id)
+			if definition.Id ~= ARMS_STAT then
+				MenuController:OpenTrain(definition.Id)
+			end
+		end)
+
+		-- Hold to open the route, for every slot. On the fist that is the only way in;
+		-- on the others it is a second path to the same place a tap already opens.
+		local holdStarted: number? = nil
+		button.MouseButton1Down:Connect(function()
+			holdStarted = os.clock()
+		end)
+		button.MouseButton1Up:Connect(function()
+			local began = holdStarted
+			holdStarted = nil
+			if began ~= nil and os.clock() - began >= HOLD_SECONDS then
+				MenuController:OpenTrain(definition.Id)
+			end
 		end)
 	end
 
@@ -419,6 +486,26 @@ function HudController:Start()
 			self:_pushFeed(`{payload.Attacker} hit you for {NumberFormat.Format(payload.Damage)}`)
 		elseif payload.Kind == "Blocked" or payload.Kind == "Rejected" then
 			self:_pushFeed(tostring(payload.Reason))
+		end
+	end)
+
+	-- Number keys drive the dock, matching the slot numbers printed on it. Slot one
+	-- is the fist and punches; the rest open their muscle's route. F still punches
+	-- too — this adds a binding rather than moving one, because a player who learned
+	-- F should not have it taken away.
+	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
+		if processed then
+			return
+		end
+		for index, definition in StatConfig.List do
+			if input.KeyCode == (Enum.KeyCode :: any)[`{index}`] then
+				if definition.Id == ARMS_STAT then
+					CombatController:Attack()
+				else
+					MenuController:OpenTrain(definition.Id)
+				end
+				break
+			end
 		end
 	end)
 

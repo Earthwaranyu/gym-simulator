@@ -668,6 +668,47 @@ machines stamped from a single seven-point pattern that every island reused.
       was therefore **completely bare**, now picks up the fallback kit. World total 3,759 /
       7,000 BaseParts. Rebuilds are byte-identical and `check.sh` passes.
 
+## Phase 20 — The menu the sketches asked for
+
+The seven-tab menu put the two screens a player opens constantly — the map and their
+own stats — behind the same strip as the ones they open twice a session, and the
+multiplier ladder spent tokens on a single unconfirmed click of a button whose price
+doubles every level.
+
+- [x] 97. **Three tabs, promoted buttons, and a confirm before spending.** The menu is
+      Info / Shop / Settings. `Map`, `Train`, `Quests` and `Ranks` stay real tabs that
+      `Open()` reaches, but leave the strip via a new `OnBar`/`STRIP_TABS` split, so
+      nothing lost a route in. `MenuBarController` stops hardcoding one tile and draws
+      three — Menu, Map, Rank — each lighting only when its own screen is open rather
+      than all lighting whenever anything is.
+      `_renderInfo` replaces `_renderUpgrades` as the character sheet the game never had:
+      display name, `RankConfig` rank in its rank colour, a kill breakdown built by
+      iterating `ReputationConfig.List`, and the five stat rows carrying the multiplier
+      ladder. A new `KillsByReputation` map on the profile records kills by the victim's
+      tier id at the moment of death — a top-level key, so `Reconcile` fills it with no
+      migration and no schema bump.
+      `UI.Confirm` adds a modal over a real scrim button, so the ladder now names the
+      multiplier it is buying and the price before anything is spent. The server remains
+      the only authority on affordability.
+      The Shop grows Gamepass / Potion / Token sections fed by a new `GetProductCatalogue`
+      remote over `PurchaseService`'s existing registry, so a new file in `Products/`
+      appears in the UI with no client edit; the four token packs are exactly that. Rows
+      whose `AssetId` is still `0` render as "SOON" rather than being offered and then
+      refused after the player commits.
+      Eleven new procedural glyphs in `Icons.luau`, `Token` and `Rank` aliased to existing
+      builders so a restyle cannot split them. The hotbar gains the sketch's slot numbers
+      bound to keys 1-5 and per-stat icons; slot one is the fist, which punches on a tap
+      and opens the Arms route on a hold. A landed Punch now pays `0.25` Arms through
+      `StatService`, so the fist really is arm training — worth ~0.42/s against a machine's
+      1/s, so fighting adds to a session without ever beating training.
+      Verified in a Studio play session: 26 server and 20 client systems ignite with no
+      errors, all four token packs register and warn on `AssetId 0`, the bar draws
+      Menu/Map/Rank, the hotbar draws 1-5 with Arms on the fist, the Info tab renders name,
+      rank and all five tier counters, the Shop renders all four sections with every Robux
+      row reading SOON, all seven new glyphs draw, the confirm dialog lays out with
+      non-overlapping buttons, and `AddStat(player, "Arms", 0.25)` grants exactly 0.25
+      while a mistyped stat id is refused.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

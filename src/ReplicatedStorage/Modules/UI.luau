@@ -303,6 +303,107 @@ function UI.ScaleWithViewport(screen: ScreenGui): UIScale
 	return scale
 end
 
+export type ConfirmOptions = {
+	Title: string,
+	Body: string,
+	ConfirmText: string?,
+	CancelText: string?,
+	OnConfirm: () -> (),
+}
+
+--[[
+	A modal yes/no over a dimming scrim.
+
+	This exists because spending is irreversible and the multiplier ladder used to
+	buy on the first click of a button whose cost had just changed underneath it —
+	the price doubles every level, so a double-click on a cheap upgrade could spend
+	several times what the player read.
+
+	The scrim is a real button, not a decorative frame. Without one, clicks land on
+	whatever is behind the dialog, and on a phone the panel underneath scrolls while
+	the modal sits on top of it.
+
+	Presentation only: the server still decides whether the purchase is affordable
+	and its reply is what the player is told. Nothing here is a permission check.
+]]
+function UI.Confirm(parent: Instance, options: ConfirmOptions): Frame
+	local scrim = Instance.new("TextButton")
+	scrim.Name = "ConfirmScrim"
+	scrim.Size = UDim2.fromScale(1, 1)
+	scrim.BackgroundColor3 = UI.Palette.Backdrop
+	scrim.BackgroundTransparency = 0.35
+	scrim.BorderSizePixel = 0
+	scrim.AutoButtonColor = false
+	scrim.Text = ""
+	-- Above whatever it is covering, whatever that happens to be.
+	scrim.ZIndex = 50
+	scrim.Parent = parent
+
+	local dialog = UI.Panel("Confirm", scrim)
+	dialog.AnchorPoint = Vector2.new(0.5, 0.5)
+	dialog.Position = UDim2.fromScale(0.5, 0.5)
+	dialog.Size = UDim2.fromOffset(320, 172)
+	dialog.BackgroundTransparency = 0.02
+	dialog.ZIndex = 51
+
+	local title = UI.Label("Title", dialog)
+	title.Size = UDim2.new(1, 0, 0, 24)
+	title.Font = UI.Font.Heading
+	title.TextSize = 16
+	title.TextColor3 = UI.Palette.Accent
+	title.Text = options.Title
+	title.ZIndex = 51
+
+	local body = UI.Label("Body", dialog)
+	body.Position = UDim2.fromOffset(0, 32)
+	body.Size = UDim2.new(1, 0, 0, 72)
+	body.TextSize = 14
+	body.TextWrapped = true
+	body.TextYAlignment = Enum.TextYAlignment.Top
+	body.Text = options.Body
+	body.ZIndex = 51
+
+	local function choice(name: string, text: string, color: Color3, onPress: () -> ()): TextButton
+		local button = Instance.new("TextButton")
+		button.Name = name
+		button.Size = UDim2.new(0.5, -6, 0, 34)
+		button.BackgroundColor3 = color
+		button.BorderSizePixel = 0
+		button.AutoButtonColor = false
+		button.Font = UI.Font.Heading
+		button.TextSize = 14
+		button.TextColor3 = UI.Palette.Backdrop
+		button.Text = text
+		button.ZIndex = 51
+		button.Parent = dialog
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 7)
+		corner.Parent = button
+
+		UI.Pressable(button)
+		button.Activated:Connect(onPress)
+		return button
+	end
+
+	local function close()
+		scrim:Destroy()
+	end
+
+	local confirm = choice("Confirm", options.ConfirmText or "Confirm", UI.Palette.Accent, function()
+		close()
+		options.OnConfirm()
+	end)
+	confirm.Position = UDim2.new(0, 0, 1, -34)
+
+	local cancel = choice("Cancel", options.CancelText or "Cancel", UI.Palette.Danger, close)
+	cancel.Position = UDim2.new(0.5, 6, 1, -34)
+
+	scrim.Activated:Connect(close)
+
+	return dialog
+end
+
 --[[
 	Locks an element's shape across screen sizes, which is what keeps square badges
 	square on ultrawide monitors and phones alike.
