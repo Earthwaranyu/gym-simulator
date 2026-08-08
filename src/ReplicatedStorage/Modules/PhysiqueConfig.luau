@@ -68,10 +68,9 @@ local BASE_SIZE: { [string]: { W: number, H: number, D: number } } = {
 
 PhysiqueConfig.BASE_SIZE = BASE_SIZE
 
--- How much thicker, relative to its own length, a part may become. 1.6 means a limb
--- may end up 60% stouter in proportion than it started — a lot, and about where a
--- heavy bodybuilder sits. Past it the part stops reading as the thing it was.
-PhysiqueConfig.MAX_RELATIVE_THICKENING = 1.6
+-- Athletic proportions need visible mass without the balloon/disc silhouette that
+-- the former 2.5-scale body produced. Girth may lead length by 50%, never 60%.
+PhysiqueConfig.MAX_RELATIVE_THICKENING = 1.5
 -- Limbs additionally may not become wider than they are long. Torsos are exempt: a
 -- chest is legitimately wider than it is tall, on any body.
 PhysiqueConfig.LIMB_PARTS = {
@@ -88,43 +87,32 @@ PhysiqueConfig.LIMB_PARTS = {
 --[[
 	Weights are quoted as "what this part measures at full growth", because that is the
 	number a human can judge and the weight is not. Full growth is MAX_MUSCLE_SCALE
-	(2.5), so growth = 1.5 and weight = (target - 1) / 1.5.
+	(2.2), so growth = 1.2 and weight = (target - 1) / 1.2.
 ]]
 local WEIGHTS: { [string]: AxisWeights } = {
-	-- Chest: 1.9x wide and deep against 1.38x tall. Depth matters as much as width —
-	-- width alone makes a signboard.
-	UpperTorso = { X = 0.6, Y = 0.25, Z = 0.6 },
-	-- Waist: 1.3x wide against the chest's 1.9x. That gap IS the V; the waist still
-	-- grows a little because an unchanged waist under a doubled chest looks broken.
-	LowerTorso = { X = 0.2, Y = 0.18, Z = 0.23 },
+	-- At the 2.2 cap this produces a 1.65x shoulder line, 1.45x chest depth and
+	-- only 1.12x height: broad and tapered rather than square or barrel-shaped.
+	UpperTorso = { X = 0.54, Y = 0.1, Z = 0.38 },
+	LowerTorso = { X = 0.17, Y = 0.07, Z = 0.17 },
 
-	-- Upper arm: 1.69x girth, 1.45x length — a thick arm that is still an arm.
-	--
-	-- The length growth is not padding. An R15 upper arm starts 1.00 wide by 1.17
-	-- long, so girth alone hits "wider than it is long" almost immediately; letting
-	-- the limb lengthen with it is what buys the girth room to be dramatic. The whole
-	-- character ends up around 1.4x taller at full growth, which is the correct look
-	-- for someone whose stats are in the trillions.
-	LeftUpperArm = { X = 0.46, Y = 0.3, Z = 0.46 },
-	RightUpperArm = { X = 0.46, Y = 0.3, Z = 0.46 },
-	-- Forearm behind the upper arm, so the limb tapers toward the wrist.
-	LeftLowerArm = { X = 0.28, Y = 0.25, Z = 0.28 },
-	RightLowerArm = { X = 0.28, Y = 0.25, Z = 0.28 },
+	-- Upper limbs grow more than lower limbs, with just enough length to preserve
+	-- an athletic taper and keep elbows/wrists seated cleanly.
+	LeftUpperArm = { X = 0.29, Y = 0.14, Z = 0.29 },
+	RightUpperArm = { X = 0.29, Y = 0.14, Z = 0.29 },
+	LeftLowerArm = { X = 0.21, Y = 0.17, Z = 0.21 },
+	RightLowerArm = { X = 0.21, Y = 0.17, Z = 0.21 },
 
-	-- Thigh 1.72x girth: the deepest muscle on the body, and the one that sells size
-	-- from behind.
-	LeftUpperLeg = { X = 0.48, Y = 0.28, Z = 0.48 },
-	RightUpperLeg = { X = 0.48, Y = 0.28, Z = 0.48 },
-	-- Calf, same taper logic as the forearm.
-	LeftLowerLeg = { X = 0.4, Y = 0.24, Z = 0.4 },
-	RightLowerLeg = { X = 0.4, Y = 0.24, Z = 0.4 },
+	-- Quads lead calves, but neither becomes a round pillar.
+	LeftUpperLeg = { X = 0.33, Y = 0.13, Z = 0.33 },
+	RightUpperLeg = { X = 0.33, Y = 0.13, Z = 0.33 },
+	LeftLowerLeg = { X = 0.25, Y = 0.09, Z = 0.25 },
+	RightLowerLeg = { X = 0.25, Y = 0.09, Z = 0.25 },
 
-	-- Hands and feet grow just enough not to look stuck onto a giant. They are the
-	-- fastest way to make a character read as a cartoon, so: barely.
-	LeftHand = { X = 0.18, Y = 0.16, Z = 0.18 },
-	RightHand = { X = 0.18, Y = 0.16, Z = 0.18 },
-	LeftFoot = { X = 0.16, Y = 0.14, Z = 0.18 },
-	RightFoot = { X = 0.16, Y = 0.14, Z = 0.18 },
+	-- Extremities change only enough to connect naturally to the tapered limbs.
+	LeftHand = { X = 0.08, Y = 0.06, Z = 0.08 },
+	RightHand = { X = 0.08, Y = 0.06, Z = 0.08 },
+	LeftFoot = { X = 0.08, Y = 0.05, Z = 0.1 },
+	RightFoot = { X = 0.08, Y = 0.05, Z = 0.1 },
 }
 
 PhysiqueConfig.WEIGHTS = WEIGHTS
@@ -143,16 +131,16 @@ end
 
 -- Below this overall scale nobody is veiny; a lean beginner with cords standing out
 -- of their arms looks ill rather than strong.
-PhysiqueConfig.VEIN_THRESHOLD = 1.35
+PhysiqueConfig.VEIN_THRESHOLD = 1.6
 -- Fully drawn by here. Between the two the veins fade in with the muscle.
-PhysiqueConfig.VEIN_FULL = 2.0
+PhysiqueConfig.VEIN_FULL = 2.15
 
 -- Vein colour. A desaturated blue-green under skin, not a blue tube — anything
 -- saturated reads as a wire glued to the arm.
 PhysiqueConfig.VEIN_COLOR = { R = 96, G = 104, B = 118 }
 -- How transparent veins are at full growth. They are meant to be noticed on a second
 -- look, not to be the first thing you see.
-PhysiqueConfig.VEIN_MIN_TRANSPARENCY = 0.35
+PhysiqueConfig.VEIN_MIN_TRANSPARENCY = 0.55
 
 export type Vein = {
 	-- Which part it lies on.
@@ -323,7 +311,7 @@ function PhysiqueConfig.RunSelfTest(): { string }
 
 	-- The check that would have caught the disc: what do these weights actually
 	-- produce on the real rig at full growth?
-	local FULL = 2.5
+	local FULL = 2.2
 	for partName in BASE_SIZE do
 		local x, y, z = PhysiqueConfig.AxisScale(partName, FULL)
 		local girthGrowth = math.max(x, z)

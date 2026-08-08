@@ -719,22 +719,405 @@ def leg_press(pad_color, accent):
     return out
 
 
+def _held_bar(name, length, y, z, accent, diameter=0.38):
+    """A collision-free two-hand prop whose long axis is local X."""
+    return group(name, [cylinder(
+        "Grip", length, diameter, cf(0, y, z), accent, "Metal",
+        CanCollide=False, CanTouch=False, CanQuery=False,
+    )])
+
+
+def push_up_deck(pad_color, accent):
+    """Low weighted push-up platform with parallel hand blocks."""
+    out = [floor_mat(11, 12)]
+    out.extend([
+        part("Base", [8.5, 0.65, 10.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
+        part("Deck", [7.5, 0.3, 9.0], cf(0, FLOOR_TOP + 0.8, 0), pad_color, "Rubber"),
+        cylinder("RightHandle", 2.2, 0.45, cf(-2.0, FLOOR_TOP + 1.25, -2.2), CHROME),
+        cylinder("LeftHandle", 2.2, 0.45, cf(2.0, FLOOR_TOP + 1.25, -2.2), CHROME),
+        part("WeightMarker", [5.0, 0.2, 0.7], cf(0, FLOOR_TOP + 1.0, 2.8), accent, "Neon"),
+        marker("TrainAnchor", [2, 2, 1],
+               axes((0, FLOOR_TOP + 2.25, 0.5), (-1, 0, 0), (0, 0, -1))),
+        marker("TrainExit", [2, 2, 1], cf(5.0, FLOOR_TOP + ROOT_HEIGHT, 1.5)),
+    ])
+    return out
+
+
+def cable_crossover(pad_color, accent):
+    """Twin cable towers with independent hand grips."""
+    out = [floor_mat(14, 12)]
+    for side in (-1, 1):
+        out.extend([
+            part("Tower", [2.4, 10.5, 3.0], cf(side * 5.2, FLOOR_TOP + 5.25, -1.5),
+                 STEEL_LIGHT, "Metal"),
+            part("PulleyArm", [4.2, 0.65, 0.65], cf(side * 3.7, FLOOR_TOP + 9.8, -1.5),
+                 STEEL, "Metal"),
+            part("Cable", [0.1, 6.0, 0.1], cf(side * 2.0, FLOOR_TOP + 6.7, -1.5),
+                 RUBBER, "SmoothPlastic", CanCollide=False),
+        ])
+    out.extend([
+        part("Base", [12.8, 0.55, 5.0], cf(0, FLOOR_TOP + 0.28, -1.5), STEEL, "DiamondPlate"),
+        part("CrossBeam", [12.0, 0.65, 0.65], cf(0, FLOOR_TOP + 10.3, -1.5), accent, "Metal"),
+        group("Spot", [
+            anchor_standing(cf(0, FLOOR_TOP, 2.0)),
+            _held_bar("HeldRight", 1.2, FLOOR_TOP + 5.0, -0.5, CHROME),
+            _held_bar("HeldLeft", 1.2, FLOOR_TOP + 5.0, -2.4, CHROME),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 5.2)),
+    ])
+    return out
+
+
+def chest_dip(pad_color, accent):
+    """Raised parallel dip bars with a recovery step."""
+    out = [floor_mat(10, 10)]
+    out.extend([
+        part("Base", [8.5, 0.7, 7.0], cf(0, FLOOR_TOP + 0.35, -0.5), STEEL, "DiamondPlate"),
+        part("BackPost", [1.1, 8.5, 1.1], cf(0, FLOOR_TOP + 4.25, -2.8), STEEL, "Metal"),
+        part("Step", [4.0, 0.6, 2.0], cf(0, FLOOR_TOP + 1.4, 2.5), pad_color, "Rubber"),
+        part("TopSign", [6.0, 0.5, 1.2], cf(0, FLOOR_TOP + 8.2, -2.8), accent, "Neon"),
+    ])
+    for side in (-1, 1):
+        out.append(cylinder("DipBar", 6.0, 0.48,
+                            mul(cf(side * 1.8, FLOOR_TOP + 5.2, 0), rot_y(90)), CHROME))
+    out.extend([
+        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 5.1, -0.2)),
+        marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 4.2)),
+    ])
+    return out
+
+
+def decline_press(pad_color, accent):
+    """Head-low decline bench with a carried loaded bar."""
+    out = [floor_mat(11, 13)]
+    pad = mul(cf(0, FLOOR_TOP + 2.1, 0), rot_x(18))
+    out.extend([
+        part("Base", [3.2, 0.6, 8.2], pad, pad_color, "Fabric"),
+        part("Frame", [0.7, 1.0, 9.0], cf(0, FLOOR_TOP + 0.7, 0), STEEL, "DiamondPlate"),
+        cylinder("AnkleRoller", 4.0, 1.1, cf(0, FLOOR_TOP + 3.7, 3.6), RUBBER, "Pebble"),
+        part("Rack", [8.5, 6.0, 0.7], cf(0, FLOOR_TOP + 3.0, -4.1), STEEL, "Metal"),
+        part("RackStripe", [8.7, 0.4, 0.9], cf(0, FLOOR_TOP + 5.8, -4.1), accent, "Neon"),
+        group("Spot", [
+            marker("TrainAnchor", [2, 2, 1], mul(pad, mul(cf(0, 1.35, 0), rot_x(90)))),
+            _held_bar("HeldBoth", 7.5, FLOOR_TOP + 4.7, -1.0, CHROME),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(4.5, FLOOR_TOP + ROOT_HEIGHT, 2.0)),
+    ])
+    return out
+
+
+def hammer_curl(pad_color, accent):
+    """Vertical-grip dumbbell rack for neutral-grip curls."""
+    out = [floor_mat(10, 9)]
+    out.extend([
+        part("Base", [8.5, 0.65, 4.2], cf(0, FLOOR_TOP + 0.33, -2.2), STEEL, "DiamondPlate"),
+        part("Rack", [8.0, 4.5, 1.0], cf(0, FLOOR_TOP + 2.3, -3.2), STEEL_LIGHT, "Metal"),
+        part("Stripe", [8.2, 0.4, 1.2], cf(0, FLOOR_TOP + 4.3, -3.2), accent, "Neon"),
+        group("Spot", [
+            anchor_standing(cf(0, FLOOR_TOP, 1.0)),
+            _held_bar("HeldRight", 1.6, FLOOR_TOP + 2.8, -2.4, CHROME, 0.65),
+            _held_bar("HeldLeft", 1.6, FLOOR_TOP + 2.8, -1.0, CHROME, 0.65),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
+    ])
+    return out
+
+
+def preacher_curl(pad_color, accent):
+    """Angled arm pad and EZ-bar cradle."""
+    out = [floor_mat(10, 11)]
+    pad = mul(cf(0, FLOOR_TOP + 4.2, -0.5), rot_x(-48))
+    out.extend([
+        part("Base", [7.0, 0.6, 8.5], cf(0, FLOOR_TOP + 0.3, 0), STEEL, "DiamondPlate"),
+        part("Seat", [4.0, 0.65, 3.5], cf(0, FLOOR_TOP + 2.2, 2.7), pad_color, "Fabric"),
+        part("PreacherPad", [5.6, 0.8, 4.6], pad, pad_color, "Fabric"),
+        part("PadPost", [0.8, 4.0, 0.8], cf(0, FLOOR_TOP + 2.0, -0.4), STEEL, "Metal"),
+        part("Cradle", [6.0, 0.4, 1.0], cf(0, FLOOR_TOP + 2.1, -3.1), accent, "Metal"),
+        group("Spot", [
+            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.2, 2.7)),
+            _held_bar("HeldBoth", 5.5, FLOOR_TOP + 2.6, -2.5, CHROME),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.8)),
+    ])
+    return out
+
+
+def skull_crusher(pad_color, accent):
+    """Flat triceps bench with a short EZ bar above the forehead."""
+    out = [floor_mat(10, 12)]
+    out.extend([
+        part("Base", [3.3, 0.65, 8.0], cf(0, FLOOR_TOP + 1.7, 0), pad_color, "Fabric"),
+        part("BenchFrame", [0.7, 1.2, 9.0], cf(0, FLOOR_TOP + 0.7, 0), STEEL, "DiamondPlate"),
+        part("BarStand", [7.0, 4.8, 0.6], cf(0, FLOOR_TOP + 2.4, -4.0), STEEL, "Metal"),
+        part("WarningStripe", [7.2, 0.4, 0.8], cf(0, FLOOR_TOP + 4.6, -4.0), accent, "Neon"),
+        group("Spot", [
+            marker("TrainAnchor", [2, 2, 1],
+                   axes((0, FLOOR_TOP + 2.9, 0), (-1, 0, 0), (0, 0, -1))),
+            _held_bar("HeldBoth", 5.8, FLOOR_TOP + 4.2, -1.2, CHROME),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 1.5)),
+    ])
+    return out
+
+
+def battle_ropes(pad_color, accent):
+    """Two long ropes anchored to a weighted floor post."""
+    out = [floor_mat(14, 14)]
+    out.extend([
+        cylinder("Base", 0.8, 4.5, mul(cf(0, FLOOR_TOP + 0.4, -5.0), rot_z(90)),
+                 STEEL, "DiamondPlate"),
+        part("AnchorPost", [1.2, 3.5, 1.2], cf(0, FLOOR_TOP + 1.75, -5.0), STEEL, "Metal"),
+        part("RopeRight", [0.35, 0.35, 8.5], mul(cf(-1.0, FLOOR_TOP + 0.8, -0.7), rot_x(-4)),
+             accent, "Fabric", CanCollide=False),
+        part("RopeLeft", [0.35, 0.35, 8.5], mul(cf(1.0, FLOOR_TOP + 0.8, -0.7), rot_x(4)),
+             accent, "Fabric", CanCollide=False),
+        group("Spot", [
+            anchor_standing(cf(0, FLOOR_TOP, 4.0)),
+            _held_bar("HeldRight", 1.2, FLOOR_TOP + 3.5, 1.3, accent),
+            _held_bar("HeldLeft", 1.2, FLOOR_TOP + 3.5, 2.7, accent),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(5.5, FLOOR_TOP + ROOT_HEIGHT, 4.0)),
+    ])
+    return out
+
+
+def deadlift_platform(pad_color, accent):
+    """Reinforced lifting platform with a heavy carried barbell."""
+    out = [floor_mat(13, 11)]
+    out.extend([
+        part("Base", [12.0, 0.8, 9.0], cf(0, FLOOR_TOP + 0.4, 0), STEEL, "DiamondPlate"),
+        part("OakCenter", [6.5, 0.2, 8.2], cf(0, FLOOR_TOP + 0.9, 0), pad_color, "WoodPlanks"),
+        part("BackStop", [12.0, 1.0, 1.0], cf(0, FLOOR_TOP + 1.2, -4.5), accent, "Metal"),
+        group("Spot", [
+            anchor_standing(cf(0, FLOOR_TOP + 0.8, 1.1)),
+            _held_bar("HeldBoth", 10.5, FLOOR_TOP + 1.8, -0.6, CHROME, 0.5),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 5.5)),
+    ])
+    return out
+
+
+def t_bar_row(pad_color, accent):
+    """Landmine row rail with chest brace and close handle."""
+    out = [floor_mat(11, 13)]
+    rail = mul(cf(0, FLOOR_TOP + 1.4, -0.4), rot_x(-10))
+    out.extend([
+        part("Base", [7.5, 0.65, 11.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
+        part("TBarRail", [0.7, 0.7, 10.0], rail, CHROME, "Metal"),
+        part("ChestPad", [4.0, 0.8, 3.5], mul(cf(0, FLOOR_TOP + 4.0, 2.2), rot_x(-35)),
+             pad_color, "Fabric"),
+        part("PlateStop", [5.5, 2.0, 1.0], cf(0, FLOOR_TOP + 1.4, -4.6), accent, "Metal"),
+        group("Spot", [
+            marker("TrainAnchor", [2, 2, 1], mul(cf(0, FLOOR_TOP + 3.4, 2.5), rot_x(25))),
+            _held_bar("HeldBoth", 3.0, FLOOR_TOP + 2.2, -0.5, CHROME),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(4.5, FLOOR_TOP + ROOT_HEIGHT, 3.0)),
+    ])
+    return out
+
+
+def back_extension_bench(pad_color, accent):
+    """Forty-five-degree Roman chair with hip and ankle pads."""
+    out = [floor_mat(10, 12)]
+    slope = mul(cf(0, FLOOR_TOP + 3.5, 0), rot_x(-45))
+    out.extend([
+        part("Base", [7.0, 0.6, 10.0], cf(0, FLOOR_TOP + 0.3, 0), STEEL, "DiamondPlate"),
+        part("HipPad", [5.0, 1.0, 3.0], slope, pad_color, "Fabric"),
+        part("Frame", [1.0, 5.5, 1.0], cf(0, FLOOR_TOP + 2.75, 0), STEEL, "Metal"),
+        cylinder("AnkleRoller", 5.0, 1.1, cf(0, FLOOR_TOP + 1.5, 4.0), RUBBER, "Pebble"),
+        part("AngleMarker", [5.5, 0.35, 0.8], cf(0, FLOOR_TOP + 5.4, -1.5), accent, "Neon"),
+        marker("TrainAnchor", [2, 2, 1], mul(slope, mul(cf(0, 1.1, 0), rot_x(90)))),
+        marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
+    ])
+    return out
+
+
+def rope_climb(pad_color, accent):
+    """Tall rope gantry; the avatar climbs in place under a crash mat."""
+    out = [floor_mat(10, 10)]
+    out.extend([
+        part("Base", [9.0, 0.8, 8.0], cf(0, FLOOR_TOP + 0.4, 0), pad_color, "Rubber"),
+        part("LeftPost", [1.0, 14.0, 1.0], cf(-3.8, FLOOR_TOP + 7.0, 0), STEEL, "Metal"),
+        part("RightPost", [1.0, 14.0, 1.0], cf(3.8, FLOOR_TOP + 7.0, 0), STEEL, "Metal"),
+        part("TopBeam", [8.5, 1.0, 1.0], cf(0, FLOOR_TOP + 13.6, 0), accent, "Metal"),
+        cylinder("ClimbRope", 12.0, 0.55, mul(cf(0, FLOOR_TOP + 7.0, 0), rot_z(90)),
+                 RUBBER, "Fabric", CanCollide=False),
+        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 7.0, 0)),
+        marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 4.5)),
+    ])
+    return out
+
+
+def plank_deck(pad_color, accent):
+    """Long rubber deck with elbow targets and a weighted timer arch."""
+    out = [floor_mat(10, 13)]
+    out.extend([
+        part("Base", [8.0, 0.65, 11.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
+        part("Mat", [6.8, 0.25, 9.8], cf(0, FLOOR_TOP + 0.8, 0), pad_color, "Rubber"),
+        part("ElbowTargets", [5.0, 0.15, 1.5], cf(0, FLOOR_TOP + 1.0, -3.0), accent, "Neon"),
+        part("TimerArch", [8.0, 4.5, 0.6], cf(0, FLOOR_TOP + 2.3, -5.0), STEEL, "Metal"),
+        marker("TrainAnchor", [2, 2, 1],
+               axes((0, FLOOR_TOP + 2.15, 0.5), (-1, 0, 0), (0, 0, -1))),
+        marker("TrainExit", [2, 2, 1], cf(4.5, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
+    ])
+    return out
+
+
+def cable_crunch(pad_color, accent):
+    """High pulley with a kneeling pad and rope attachment."""
+    out = [floor_mat(10, 11)]
+    out.extend([
+        part("Base", [5.0, 0.7, 5.0], cf(0, FLOOR_TOP + 0.35, -3.0), STEEL, "DiamondPlate"),
+        part("Tower", [4.0, 10.0, 2.8], cf(0, FLOOR_TOP + 5.0, -3.6), STEEL_LIGHT, "Metal"),
+        part("Pulley", [1.0, 1.0, 4.0], cf(0, FLOOR_TOP + 9.5, -1.7), accent, "Metal"),
+        part("KneePad", [5.0, 0.5, 4.0], cf(0, FLOOR_TOP + 0.6, 2.4), pad_color, "Fabric"),
+        group("Spot", [
+            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 2.2, 2.2)),
+            _held_bar("HeldBoth", 2.5, FLOOR_TOP + 6.4, 0.2, RUBBER, 0.55),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
+    ])
+    return out
+
+
+def ab_wheel_runway(pad_color, accent):
+    """Kneeling rollout lane with a carried ab wheel."""
+    out = [floor_mat(9, 14)]
+    wheel = [
+        cylinder("Wheel", 0.8, 2.2, mul(cf(0, FLOOR_TOP + 1.5, -1.8), rot_y(90)),
+                 RUBBER, "Rubber", CanCollide=False, CanTouch=False, CanQuery=False),
+        cylinder("Handle", 4.2, 0.35, cf(0, FLOOR_TOP + 1.5, -1.8), CHROME, "Metal",
+                 CanCollide=False, CanTouch=False, CanQuery=False),
+    ]
+    out.extend([
+        part("Base", [7.0, 0.65, 12.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
+        part("Runway", [5.5, 0.25, 10.8], cf(0, FLOOR_TOP + 0.8, 0), pad_color, "Rubber"),
+        part("Finish", [5.7, 0.2, 0.7], cf(0, FLOOR_TOP + 1.0, -4.5), accent, "Neon"),
+        group("Spot", [
+            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 2.2, 2.0)),
+            group("HeldBoth", wheel),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
+    ])
+    return out
+
+
+def wood_chop_station(pad_color, accent):
+    """Single cable tower with high-to-low diagonal handle path."""
+    out = [floor_mat(11, 11)]
+    out.extend([
+        part("Base", [5.0, 0.7, 5.0], cf(-3.0, FLOOR_TOP + 0.35, -2.5), STEEL, "DiamondPlate"),
+        part("Tower", [3.0, 10.0, 3.0], cf(-3.0, FLOOR_TOP + 5.0, -3.0), STEEL_LIGHT, "Metal"),
+        part("DiagonalGuide", [0.5, 9.0, 0.5],
+             mul(cf(-1.0, FLOOR_TOP + 5.4, -1.0), rot_z(-25)), accent, "Neon"),
+        group("Spot", [
+            anchor_standing(cf(1.5, FLOOR_TOP, 1.8)),
+            _held_bar("HeldBoth", 2.2, FLOOR_TOP + 7.2, -0.8, CHROME),
+        ]),
+        marker("TrainExit", [2, 2, 1], cf(4.8, FLOOR_TOP + ROOT_HEIGHT, 2.8)),
+    ])
+    return out
+
+
+def leg_extension(pad_color, accent):
+    """Seated quad extension with a front ankle roller."""
+    out = [floor_mat(10, 11)]
+    out.extend([
+        part("Base", [7.5, 0.65, 8.5], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
+        part("Seat", [4.5, 0.7, 4.0], cf(0, FLOOR_TOP + 2.4, 1.8), pad_color, "Fabric"),
+        part("BackPad", [4.5, 5.5, 0.7], cf(0, FLOOR_TOP + 5.1, 3.4), pad_color, "Fabric"),
+        cylinder("AnkleRoller", 5.5, 1.2, cf(0, FLOOR_TOP + 1.6, -2.2), RUBBER, "Pebble"),
+        part("Pivot", [1.0, 4.0, 1.0], cf(0, FLOOR_TOP + 2.0, -0.5), accent, "Metal"),
+        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.5, 1.8)),
+        marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.6)),
+    ])
+    return out
+
+
+def hamstring_curl(pad_color, accent):
+    """Prone leg-curl bench with heel roller and selector stack."""
+    out = [floor_mat(10, 13)]
+    out.extend([
+        part("Base", [4.8, 0.7, 10.0], cf(0, FLOOR_TOP + 1.7, 0), pad_color, "Fabric"),
+        part("Frame", [1.0, 1.5, 11.0], cf(0, FLOOR_TOP + 0.8, 0), STEEL, "DiamondPlate"),
+        part("WeightStack", [3.5, 6.0, 2.5], cf(0, FLOOR_TOP + 3.0, -5.0), STEEL_LIGHT, "Metal"),
+        cylinder("HeelRoller", 6.0, 1.25, cf(0, FLOOR_TOP + 2.8, 4.2), RUBBER, "Pebble"),
+        part("StackStripe", [3.7, 0.4, 2.7], cf(0, FLOOR_TOP + 5.5, -5.0), accent, "Neon"),
+        marker("TrainAnchor", [2, 2, 1],
+               axes((0, FLOOR_TOP + 2.9, 0), (-1, 0, 0), (0, 0, -1))),
+        marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
+    ])
+    return out
+
+
+def calf_raise(pad_color, accent):
+    """Standing calf block with shoulder pads and safety rails."""
+    out = [floor_mat(10, 10)]
+    out.extend([
+        part("Base", [8.0, 0.7, 7.5], cf(0, FLOOR_TOP + 0.35, 0), STEEL, "DiamondPlate"),
+        part("ToeBlock", [6.0, 0.8, 2.5], cf(0, FLOOR_TOP + 1.1, 1.5), pad_color, "Rubber"),
+        part("Frame", [7.5, 9.0, 0.8], cf(0, FLOOR_TOP + 4.5, -3.0), STEEL, "Metal"),
+        part("ShoulderPads", [5.5, 0.8, 2.0], cf(0, FLOOR_TOP + 6.2, -0.2), pad_color, "Fabric"),
+        part("TopStripe", [7.7, 0.4, 1.0], cf(0, FLOOR_TOP + 8.7, -3.0), accent, "Neon"),
+        anchor_standing(cf(0, FLOOR_TOP + 0.8, 0.3)),
+        marker("TrainExit", [2, 2, 1], cf(4.3, FLOOR_TOP + ROOT_HEIGHT, 2.8)),
+    ])
+    return out
+
+
+def stair_climber(pad_color, accent):
+    """Compact rotating stair machine with hand rails and console."""
+    out = [floor_mat(10, 12)]
+    out.extend([
+        part("Base", [7.0, 0.7, 10.0], cf(0, FLOOR_TOP + 0.35, 0), STEEL, "DiamondPlate"),
+        part("StepLow", [5.5, 0.8, 2.2], cf(0, FLOOR_TOP + 1.2, 3.0), pad_color, "Rubber"),
+        part("StepMid", [5.5, 1.5, 2.2], cf(0, FLOOR_TOP + 1.8, 0.8), pad_color, "Rubber"),
+        part("StepHigh", [5.5, 2.2, 2.2], cf(0, FLOOR_TOP + 2.5, -1.4), pad_color, "Rubber"),
+        part("Console", [5.0, 4.0, 1.0], cf(0, FLOOR_TOP + 6.0, -4.0), STEEL_LIGHT, "Metal"),
+        part("Readout", [4.2, 1.8, 0.2], cf(0, FLOOR_TOP + 6.6, -3.4), accent, "Neon"),
+        cylinder("Handlebar", 6.0, 0.45, cf(0, FLOOR_TOP + 5.0, -2.8), CHROME),
+        anchor_standing(cf(0, FLOOR_TOP + 2.1, 0.0)),
+        marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 3.0)),
+    ])
+    return out
+
+
 BUILDERS = {
     "BenchPress": bench_press,
     "InclinePress": incline_press,
     "PecDeck": pec_deck,
+    "PushUps": push_up_deck,
+    "CableCrossover": cable_crossover,
+    "ChestDip": chest_dip,
+    "DeclinePress": decline_press,
     "Dumbbells": dumbbell_rack,
     "BarbellCurl": barbell_curl,
     "TricepsPushdown": triceps_pushdown,
+    "HammerCurl": hammer_curl,
+    "PreacherCurl": preacher_curl,
+    "SkullCrusher": skull_crusher,
+    "BattleRopes": battle_ropes,
     "PullUpBar": pull_up_rig,
     "SeatedRow": seated_row,
     "LatPulldown": lat_pulldown,
+    "Deadlift": deadlift_platform,
+    "TBarRow": t_bar_row,
+    "BackExtension": back_extension_bench,
+    "RopeClimb": rope_climb,
     "SitUpBench": sit_up_bench,
     "KneeRaise": knee_raise,
     "TorsoTwist": torso_twist,
+    "Plank": plank_deck,
+    "CableCrunch": cable_crunch,
+    "AbWheel": ab_wheel_runway,
+    "WoodChop": wood_chop_station,
     "Treadmill": treadmill,
     "SquatRack": squat_rack,
     "LegPress": leg_press,
+    "LegExtension": leg_extension,
+    "HamstringCurl": hamstring_curl,
+    "CalfRaise": calf_raise,
+    "StairClimber": stair_climber,
 }
 
 
@@ -1617,11 +2000,16 @@ def zone_volume(row):
 
 FAMILY_ORDER = ["Chest", "Arms", "Back", "Core", "Legs"]
 STAT_VARIANTS = {
-    "Chest": ("BenchPress", "InclinePress", "PecDeck"),
-    "Arms": ("Dumbbells", "BarbellCurl", "TricepsPushdown"),
-    "Back": ("PullUpBar", "SeatedRow", "LatPulldown"),
-    "Core": ("SitUpBench", "KneeRaise", "TorsoTwist"),
-    "Legs": ("Treadmill", "SquatRack", "LegPress"),
+    "Chest": ("BenchPress", "InclinePress", "PecDeck", "PushUps",
+              "CableCrossover", "ChestDip", "DeclinePress"),
+    "Arms": ("Dumbbells", "BarbellCurl", "TricepsPushdown", "HammerCurl",
+             "PreacherCurl", "SkullCrusher", "BattleRopes"),
+    "Back": ("PullUpBar", "SeatedRow", "LatPulldown", "Deadlift",
+             "TBarRow", "BackExtension", "RopeClimb"),
+    "Core": ("SitUpBench", "KneeRaise", "TorsoTwist", "Plank",
+             "CableCrunch", "AbWheel", "WoodChop"),
+    "Legs": ("Treadmill", "SquatRack", "LegPress", "LegExtension",
+             "HamstringCurl", "CalfRaise", "StairClimber"),
 }
 MACHINE_ORDER = [STAT_VARIANTS[family][0] for family in FAMILY_ORDER]
 EQUIPMENT_FAMILY = {
@@ -2353,7 +2741,7 @@ def connected_locations():
     The first five form a readable x1 ring around spawn. The other thirty are
     deterministically shuffled over ten far-apart neighborhoods so multiplier,
     muscle and scenery never collapse into rows. Each family keeps one recognizable
-    exercise while the environment supplies the discovery fantasy.
+    exercise at every tier, while the environment supplies the discovery fantasy.
     """
     tier_rows = DISTRICTS[:7]
     starters = []
@@ -2389,14 +2777,13 @@ def connected_locations():
 
     records = []
     for zone_index, zone_row in enumerate(tier_rows[1:], 1):
-        for family_index, (family, equipment_id) in enumerate(
-                zip(FAMILY_ORDER, MACHINE_ORDER)):
+        for family_index, family in enumerate(FAMILY_ORDER):
             records.append({
                 "zone": zone_row["zone"],
                 "zone_index": zone_index,
                 "family": family,
                 "family_index": family_index,
-                "equipment": equipment_id,
+                "equipment": STAT_VARIANTS[family][zone_index],
             })
 
     # Three active sites in every neighborhood makes the whole 2,500-stud city

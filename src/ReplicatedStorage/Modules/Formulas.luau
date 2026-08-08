@@ -146,7 +146,7 @@ end
 
 -- Nothing may exceed this many times its original size, or limbs detach from their
 -- joints and characters stop fitting through doorways.
-Formulas.MAX_MUSCLE_SCALE = 2.5
+Formulas.MAX_MUSCLE_SCALE = 2.2
 
 --[[
 	How much a body part swells for a given stat value. Log-scaled and hard-capped, so
@@ -254,8 +254,14 @@ end
 	neither can reach. CombatService's damage falloff is what protects a weaker
 	player now, not the inability to run away.
 ]]
-function Formulas.WalkSpeed(legsStat: number): number
-	return 16 + math.min(96, softScale(Formulas.SanitizeStat(legsStat), 7))
+function Formulas.WalkSpeed(_legsStat: number): number
+	return 16
+end
+
+-- Shift sprint is where Legs matters on the ground. A fresh player runs at 24,
+-- while extreme Legs approaches 64 rather than the previous 112-stud blur.
+function Formulas.SprintSpeed(legsStat: number): number
+	return 24 + math.min(40, softScale(Formulas.SanitizeStat(legsStat), 3))
 end
 
 --[[
@@ -264,13 +270,12 @@ end
 	regardless of what they had trained, which made Legs stop mattering at exactly
 	the point the map starts being vertical.
 
-	The floor is above WalkSpeed's ceiling, so taking off is always an upgrade the
-	moment flight unlocks, even on zero Legs. The unlock itself stays on total power
-	(MovementConfig.FLIGHT_POWER) — that gate is matched to how high the districts
-	float, and this changes only how fast you cross once you are up.
+	A fresh 40-stud flight is useful without turning the 3,000-stud city into a blur.
+	Legs then raises it toward a hard 120-stud ceiling, so traversal improves but a
+	player still has time to read landmarks and land accurately.
 ]]
 function Formulas.FlightSpeed(legsStat: number): number
-	return 140 + math.min(220, softScale(Formulas.SanitizeStat(legsStat), 16))
+	return 40 + math.min(80, softScale(Formulas.SanitizeStat(legsStat), 4))
 end
 
 --[[
@@ -415,16 +420,16 @@ function Formulas.RunSelfTest(): { string }
 	check("an even build deals what it always did, low", math.abs(Formulas.AttackDamage(1e3) - 35) < 0.5)
 	check("an even build deals what it always did, high", math.abs(Formulas.AttackDamage(1e12) - 116) < 0.5)
 
-	-- Flight must always beat running, or the rung above the ladder is a downgrade.
-	check("flight beats the fastest possible run", Formulas.FlightSpeed(0) > Formulas.WalkSpeed(1e30))
-	check("flight rewards legs", Formulas.FlightSpeed(1e12) > Formulas.FlightSpeed(1e3) * 1.3)
-	check("flight is capped", Formulas.FlightSpeed(1e30) <= 360)
+	-- Flight begins useful without crossing the city in seconds, then grows with Legs.
+	check("fresh flight beats fresh sprint", Formulas.FlightSpeed(0) > Formulas.SprintSpeed(0))
+	check("flight rewards legs", Formulas.FlightSpeed(1e12) > Formulas.FlightSpeed(1e3) * 1.15)
+	check("flight is capped", Formulas.FlightSpeed(1e30) <= 120)
 
 	check("walkspeed floor", Formulas.WalkSpeed(0) == 16)
-	check("walkspeed capped", Formulas.WalkSpeed(1e30) <= 112)
-	-- Crossing the map has to visibly improve, or Legs is not a traversal stat and
-	-- the outer tiers are a permanent walk.
-	check("walkspeed rewards Legs", Formulas.WalkSpeed(1e9) > Formulas.WalkSpeed(1e3) * 1.5)
+	check("ordinary walking is stable", Formulas.WalkSpeed(1e30) == 16)
+	check("fresh sprint starts at 24", Formulas.SprintSpeed(0) == 24)
+	check("sprint rewards Legs", Formulas.SprintSpeed(1e9) > Formulas.SprintSpeed(1e3) * 1.15)
+	check("sprint is capped", Formulas.SprintSpeed(1e30) <= 64)
 
 	-- Back is a counter to Arms, not a tax on everyone. If equal investment ever
 	-- stops cancelling, every balance number above it silently changes meaning.

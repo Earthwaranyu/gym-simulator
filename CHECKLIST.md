@@ -8,7 +8,7 @@ mid-training-set, interrupting reps to annoy them.
 (training anti-exploit) were withdrawn by design, not skipped: reps are server-driven
 with no client remote to exploit.
 
-**Current roadmap: 8 / 15 items complete (#96–#110).** The checked foundation proves a
+**Current roadmap: 9 / 16 items complete (#96–#111).** The checked foundation proves a
 large playable prototype; it does **not** mean the product is ready for a public launch.
 
 **Current public-launch blockers:** `DataService` still uses the Studio mock store, four
@@ -653,7 +653,7 @@ The product loop this roadmap optimizes is:
 
 | Area | What is genuinely present | Largest gap before growth |
 |---|---|---|
-| Core fantasy | 35 locations, seven exact x1–x64 tiers per muscle, muscle growth, flight, PvP, reputation; 15 exercise definitions remain available for future drops | A new player is not taught or directed through the fantasy |
+| Core fantasy | 35 locations, seven unique exercises and exact +1/s–+64/s tiers per muscle, athletic muscle growth, Legs sprint/flight, PvP, reputation | A new player is not taught or directed through the fantasy |
 | World | Massive irregular connected city, interiors, third floors and skyline training, vector map, streaming-aware travel | The 35-pin map and long routes still need human readability evidence |
 | Progression | ranks, tokens, multipliers, two daily quests, one one-shot quest | no balanced first-hour path, mastery, weekly goals, comeback loop, or post-endgame purpose |
 | Combat | authoritative Punch, damage, kills, bounties, safe zones; interruption settled as kill-only (#96) | only one ability — Slam/Dash deferred to #122; paid-peace fairness still open (Phase 26) |
@@ -814,7 +814,7 @@ Execution rules:
 - [ ] 107. **Hermetic CI and Studio contracts.** Pin/checksum tool definitions and make a
       clean clone install dependencies, lint/typecheck, run self-tests, validate generated
       JSON/config/migrations, and `rojo build` reproducibly. Add automated Studio contracts
-      for all 35 playable / 15 configured world entries, every remote failure path, profile load/save, receipts,
+      for all 35 playable / 35 configured world entries, every remote failure path, profile load/save, receipts,
       training/travel, and a two-client PvP scenario; no launch claim depends only on a
       manual memory.
 - [ ] 108. **Scale the existing runtime before adding systems.** Cache immutable map and
@@ -869,3 +869,29 @@ Execution rules:
       prompts and returns 35 destinations / 117 map features. The client renders five muscle
       shortcuts, one MENU entry and the training-first `Gym Rat` main goal; only documented
       mock-DataStore and zero-product-id warnings appear.
+
+- [x] 111. **Make every tier an honest, different exercise and fix traversal/physique.**
+      Normalize every equipment row so `BaseGain == RepInterval`: a fresh profile now sees
+      and earns +1/s at Garage, then +2/+4/+8/+16/+32/+64 per second across the seven
+      locations before combo/permanent bonuses. Replace the repeated five primary machines
+      with 35 original primitive-built stations and 35 matching procedural R15 poses—seven
+      distinct presses/flys/dips, curls/extensions/ropes, pulls/rows/hinges, core patterns,
+      and run/squat/press/isolation movements. Replicate the resolved location rate onto
+      each station so its billboard includes the correct tier. Separate walking from
+      running: walking stays 16, holding LeftShift requests a server-resolved Legs sprint
+      from 24 to a capped 64; Q flight now starts at 40, scales with Legs to 120, and uses
+      LeftControl to descend. Retune the physique from the inflated 2.5 cap to an athletic
+      2.2 cap with V-tapered chest/waist, tapered limbs, restrained height, and later/subtler
+      vascularity. Extend generated-world and balance extraction contracts for all 35 rows.
+
+      **Verified 2026-08-08:** `./scripts/check.sh`, `rojo build`, `git diff --check`, all
+      five pure self-test suites, and the regenerated 24-hour balance simulation pass. The
+      deterministic world reports 35 unique exercises, 2,012 instances / 1,835 BaseParts,
+      build `580b192a698f`. Connected Studio resolves 35 definitions, 35 unique pose IDs and
+      one spawned use of every equipment ID; all five third-floor routes succeed and all 35
+      exits have floor support. A clean Play session binds 35 prompts and fresh-profile
+      billboards expose the exact `{1,2,4,8,16,32,64}/s` set. Server sprint changes the live
+      Humanoid 16→24→16, fresh flight resolves to 40, and Cable Crossover, Battle Ropes,
+      Deadlift, Ab Wheel and Stair Climber all move current R15 `AnimationConstraint` joints.
+      At the 2.2 physique cap, measured upper torso is ≈3.27×1.79×1.45 and upper arm
+      ≈1.34×1.36×1.34, preserving a visible taper rather than the previous inflated shape.

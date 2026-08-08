@@ -4,7 +4,7 @@ Everything static is already enforced by `./scripts/check.sh` — build, lints, 
 `--!strict` types, plus `python3 scripts/validate_gym.py` for the generated world. This
 file covers what only a running game can answer.
 
-Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v7. If a
+Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v8. If a
 step below contradicts that file, the step is stale — fix it.
 
 Run a **two-client Studio playtest** (Test → Clients and Servers → 2 players) unless a
@@ -39,7 +39,7 @@ and whether any balance number feels right.
 ## 1. It boots
 
 - [ ] `wally install` then `./scripts/check.sh` — all checks pass.
-- [ ] `python3 scripts/validate_gym.py` reports **35 stations, 7 tiers × 5 muscles / 15 configured exercises** and a build hash.
+- [ ] `python3 scripts/validate_gym.py` reports **35 stations, 7 tiers × 5 muscles / 35 unique exercises** and a build hash.
 - [ ] `rojo serve`, connect the Studio plugin, press Play.
 - [ ] Output shows `[Loader/Server] Ignited 26 systems` and `[Loader/Client] Ignited 20
       systems`. A lower number means a system failed to load silently.
@@ -99,15 +99,18 @@ The rule under test: **a hit does not dismount; only death does.**
 ## 4. Movement, flight, and travel
 
 - [ ] Flight is available **from spawn** — no unlock gate.
+- [ ] Ordinary walking stays at 16. Hold **LeftShift** to sprint: a fresh player reaches
+      24 and Legs increases it toward the 64 cap. Releasing Shift returns to 16.
 - [ ] **Q** toggles flight. **Double-tapping Space** while grounded also takes off.
-      **Space** ascends and **LeftShift** descends once airborne — confirm a double-tap
+      **Space** ascends and **LeftControl** descends once airborne — confirm a double-tap
       in the air does not land you, and that Space still dismounts a machine.
 - [ ] Flight follows the camera: pitch down and hold forward, you dive; pitch up, you
       climb. Velocity should track the camera's look direction, not the horizon.
 - [ ] The character stays **upright and facing its heading** the whole flight. Any
       tumbling or continuous spin means the `AlignOrientation` regressed.
 - [ ] Clip a building mid-flight and confirm it does not start the rig rotating.
-- [ ] Higher Legs visibly raises both run and flight speed.
+- [ ] Higher Legs visibly raises both sprint and flight speed. Fresh flight is 40 rather
+      than the old 140-stud launch; even maximum Legs never exceeds 120.
 - [ ] Fly between distant districts with StreamingEnabled on — machines must not pop in
       late. If they do, raise `StreamingMinRadius` in `default.project.json`.
 - [ ] Open the map. It is a **light** board, not a dark one, and every district, road
@@ -187,8 +190,9 @@ The rule under test: **a hit does not dismount; only death does.**
 - [ ] Shop tab: buy a Protein Shake with cash and confirm the boost applies and expires.
 - [ ] Reputation drops toward Criminal after killing a peaceful player, and rises after
       killing someone already marked Criminal.
-- [ ] Each muscle's seven locations award exact base-location rates x1, x2, x4, x8, x16,
-      x32 and x64. Spot-check every tier and verify its power gate.
+- [ ] Each muscle's seven locations use seven different machine silhouettes and seven
+      different poses. Fresh-profile billboards award exact base-location rates +1/s,
+      +2/s, +4/s, +8/s, +16/s, +32/s and +64/s; spot-check every gate.
 
 ## 6. Leaderboards and roster
 

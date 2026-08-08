@@ -1341,12 +1341,14 @@ function MenuController:_renderSettings(parent: Frame)
 	end)
 
 	local note = UI.Label("Note", parent)
-	note.Size = UDim2.new(1, 0, 0, 60)
+	note.Size = UDim2.new(1, 0, 0, 92)
 	note.LayoutOrder = 2
 	note.TextSize = 13
 	note.TextWrapped = true
 	note.TextColor3 = UI.Palette.TextMuted
 	note.Text = "Walk up to any machine to train automatically.\n"
+		.. "Hold Left Shift to sprint — Legs makes sprinting faster.\n"
+		.. "Q flies, Space climbs, Left Control descends.\n"
 		.. "Press F to punch whoever you are looking at.\n"
 		.. "Tab toggles the player list."
 end

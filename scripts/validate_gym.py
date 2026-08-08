@@ -47,7 +47,7 @@ REQUIRED_STATION_ATTRIBUTES = {
 
 EXPECTED_STATIONS = 35
 EXPECTED_ACTIVE_TIERS = 7
-EXPECTED_BUILDERS = 15
+EXPECTED_BUILDERS = 35
 EXPECTED_SKY_STATIONS = 5
 MIN_SKY_PIN_SEPARATION = 32.0
 MAX_MAP_FEATURES = 400
@@ -143,7 +143,7 @@ def named_parts(node: Node, name: str) -> list[Node]:
     return [child for child in descendants(node) if child.get("name") == name and is_base_part(child)]
 
 
-def parse_equipment_config() -> dict[str, dict[str, str]]:
+def parse_equipment_config() -> dict[str, dict[str, Any]]:
     """Extract the simple data rows without needing a Luau parser/runtime."""
     text = EQUIPMENT_CONFIG_PATH.read_text(encoding="utf-8")
     start = text.find("local definitions")
@@ -152,15 +152,20 @@ def parse_equipment_config() -> dict[str, dict[str, str]]:
         raise RuntimeError("could not locate EquipmentConfig definitions table")
     section = text[start:end]
 
-    rows: dict[str, dict[str, str]] = {}
+    rows: dict[str, dict[str, Any]] = {}
     entry_pattern = re.compile(
-        r"\{\s*Id\s*=\s*\"(?P<id>[^\"]+)\"\s*,(?P<body>.*?)\n\s*\},",
-        re.DOTALL,
+        r'equipment\("(?P<id>[^"]+)",\s*"[^"]+",\s*"(?P<family>[^"]+)",\s*'
+        r'(?P<interval>\d+(?:\.\d+)?),\s*"(?P<pose>[^"]+)",\s*"[^"]+"\)'
     )
-    field_pattern = re.compile(r"\b(?P<key>ExerciseFamily|StatId|PoseId)\s*=\s*\"(?P<value>[^\"]+)\"")
     for match in entry_pattern.finditer(section):
         equipment_id = match.group("id")
-        fields = {field.group("key"): field.group("value") for field in field_pattern.finditer(match.group("body"))}
+        fields = {
+            "ExerciseFamily": match.group("family"),
+            "StatId": match.group("family"),
+            "PoseId": match.group("pose"),
+            "BaseGain": float(match.group("interval")),
+            "RepInterval": float(match.group("interval")),
+        }
         if equipment_id in rows:
             raise RuntimeError(f'duplicate EquipmentConfig id "{equipment_id}"')
         rows[equipment_id] = fields
@@ -238,9 +243,9 @@ def validate_equipment_tables(validator: Validator, builder: ModuleType) -> dict
     config = parse_equipment_config()
     config_ids = set(config)
 
-    validator.check(len(builders) == EXPECTED_BUILDERS, f"expected 15 BUILDERS, found {len(builders)}")
-    validator.check(len(flattened) == EXPECTED_BUILDERS, f"expected 15 STAT_VARIANTS ids, found {len(flattened)}")
-    validator.check(len(config) == EXPECTED_BUILDERS, f"expected 15 EquipmentConfig definitions, found {len(config)}")
+    validator.check(len(builders) == EXPECTED_BUILDERS, f"expected 35 BUILDERS, found {len(builders)}")
+    validator.check(len(flattened) == EXPECTED_BUILDERS, f"expected 35 STAT_VARIANTS ids, found {len(flattened)}")
+    validator.check(len(config) == EXPECTED_BUILDERS, f"expected 35 EquipmentConfig definitions, found {len(config)}")
     validator.check(builder_ids == flattened, f"BUILDERS and STAT_VARIANTS differ: {sorted(builder_ids ^ flattened)}")
     validator.check(builder_ids == config_ids, f"BUILDERS and EquipmentConfig differ: {sorted(builder_ids ^ config_ids)}")
     validator.check(set(variants) == set(FAMILIES), f"STAT_VARIANTS families must be {list(FAMILIES)}")
@@ -248,7 +253,7 @@ def validate_equipment_tables(validator: Validator, builder: ModuleType) -> dict
     family_by_equipment: dict[str, str] = {}
     for family in FAMILIES:
         family_variants = tuple(variants.get(family, ()))
-        validator.check(len(family_variants) == 3, f"{family}: expected exactly three variants, found {len(family_variants)}")
+        validator.check(len(family_variants) == 7, f"{family}: expected exactly seven variants, found {len(family_variants)}")
         for equipment_id in family_variants:
             family_by_equipment[equipment_id] = family
             row = config.get(equipment_id, {})
@@ -261,6 +266,10 @@ def validate_equipment_tables(validator: Validator, builder: ModuleType) -> dict
                 f'{equipment_id}: EquipmentConfig StatId should be "{family}"',
             )
             validator.check(bool(row.get("PoseId")), f"{equipment_id}: EquipmentConfig is missing PoseId")
+            validator.check(
+                row.get("BaseGain") == row.get("RepInterval"),
+                f"{equipment_id}: BaseGain must equal RepInterval for exactly +1/s base rate",
+            )
 
     return family_by_equipment
 
@@ -405,7 +414,6 @@ def validate_locations(
                 )
 
     validator.check(set(station_by_id) == set(location_by_id), "station and location TravelId sets differ")
-    primary_equipment = set(getattr(builder, "MACHINE_ORDER", ()))
     for family in FAMILIES:
         validator.check(family_counts[family] == 7, f"{family}: expected seven stations, found {family_counts[family]}")
         validator.check(family_access_counts[(family, "Sky")] == 1, f"{family}: expected one Sky destination")
@@ -428,8 +436,9 @@ def validate_locations(
         "every active (zone, ExerciseFamily) pair must occur exactly once",
     )
     validator.check(
-        set(equipment_counts) == primary_equipment and all(count == 7 for count in equipment_counts.values()),
-        "the playable world must spawn each primary exercise exactly seven times",
+        set(equipment_counts) == set(family_by_equipment)
+        and all(count == 1 for count in equipment_counts.values()),
+        "the playable world must spawn every one of the 35 exercises exactly once",
     )
 
     zone_progression = parse_zone_progression()
@@ -616,7 +625,7 @@ def run() -> int:
 
     print(
         "Gym validation passed: "
-        f"35 stations, 7 tiers x 5 muscles / 15 configured exercises, {instance_count} instances, "
+        f"35 stations, 7 tiers x 5 muscles / 35 unique exercises, {instance_count} instances, "
         f"{base_part_count} BaseParts, build {short_hash(first_canonical)}"
     )
     return 0

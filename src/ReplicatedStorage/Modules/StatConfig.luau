@@ -105,7 +105,7 @@ local definitions: { StatDefinition } = {
 		Description = "Ground speed and air speed. The stat that makes the map smaller.",
 		Effect = function(stats)
 			local legs = get(stats, "Legs")
-			return `{string.format("%.0f", Formulas.WalkSpeed(legs))} run · `
+			return `{string.format("%.0f", Formulas.SprintSpeed(legs))} sprint · `
 				.. `{string.format("%.0f", Formulas.FlightSpeed(legs))} fly`
 		end,
 		BodyScales = {

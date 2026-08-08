@@ -3,7 +3,8 @@
 	FlightController — the "fly" rung of the movement ladder.
 
 	Q takes off and lands, once the server has said this character may. WASD steers
-	relative to the camera, Space climbs, Shift drops. The server publishes
+	relative to the camera, Space climbs, and Control drops. Shift is reserved for
+	Legs-scaled sprinting while grounded. The server publishes
 	permission as a character attribute (see FlightService); this file never asks for
 	it and never argues when it is taken away mid-flight — losing permission drops
 	you, which is exactly what happens when somebody punches you out of the sky.
@@ -21,6 +22,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
+local Net = require(ReplicatedStorage.Modules.Net)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MovementConfig = require(ReplicatedStorage.Modules.MovementConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
@@ -138,6 +140,7 @@ function FlightController:_takeOff()
 	orienter = orient
 	velocity = part.AssemblyLinearVelocity
 	flying = true
+	Net.Event("SprintChanged"):FireServer(false)
 
 	-- The humanoid would otherwise keep trying to walk, and fight the velocity every
 	-- frame while standing on nothing.
@@ -303,6 +306,11 @@ function FlightController:Start()
 			return
 		end
 
+		if input.KeyCode == MovementConfig.SPRINT_KEY and not flying then
+			Net.Event("SprintChanged"):FireServer(true)
+			return
+		end
+
 		-- Double-tap jump to take off. Only while grounded: in the air Space is
 		-- already the climb key, and turning a climb into a landing would make
 		-- ascending impossible to hold.
@@ -314,6 +322,12 @@ function FlightController:Start()
 			else
 				lastJumpTapAt = now
 			end
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input: InputObject)
+		if input.KeyCode == MovementConfig.SPRINT_KEY then
+			Net.Event("SprintChanged"):FireServer(false)
 		end
 	end)
 

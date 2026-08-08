@@ -2,8 +2,8 @@
 --[[
 	MovementConfig — the walk-run-fly ladder, as data.
 
-	Walking is the floor, running is Legs (Formulas.WalkSpeed), and flying is bought
-	with total power and then *also* paced by Legs (Formulas.FlightSpeed). The map is
+	Walking is the stable floor, Shift sprinting is Legs (Formulas.SprintSpeed), and
+	flying is available from spawn but paced by Legs (Formulas.FlightSpeed). The map is
 	built so the three rungs and the tier ladder are the same climb: the first three
 	districts stand on the ground, and everything past them floats higher and higher,
 	so unlocking flight is what opens the back half of the world.
@@ -28,10 +28,8 @@ MovementConfig.FLIGHT_POWER = 0
 -- How fast the flier settles into a new direction. Low enough to feel like a body
 -- with mass rather than a camera.
 MovementConfig.FLIGHT_ACCELERATION = 14
--- Vertical speed as a share of level flight. Climbing used to be a flat 130
--- against a flat 220; keeping it a ratio means it follows Legs along with
--- everything else instead of becoming the slow part of flying for a maxed player.
-MovementConfig.FLIGHT_CLIMB_RATIO = 130 / 220
+-- Vertical movement is intentionally slower than level flight for readable landings.
+MovementConfig.FLIGHT_CLIMB_RATIO = 0.62
 
 -- Seconds after taking a hit before a player may take off again. The same span as
 -- TrainingService's stagger, so one punch buys an attacker one window in which the
@@ -46,7 +44,10 @@ MovementConfig.FLIGHT_ATTRIBUTE = "FlightAllowed"
 -- Q, because F is Punch, E is mount, M is the menu and Tab is the player list.
 MovementConfig.TOGGLE_KEY = Enum.KeyCode.Q
 MovementConfig.ASCEND_KEY = Enum.KeyCode.Space
-MovementConfig.DESCEND_KEY = Enum.KeyCode.LeftShift
+-- Shift is the ground sprint key. Control descends in flight so the two actions do
+-- not fight over one input when a player takes off during a run.
+MovementConfig.SPRINT_KEY = Enum.KeyCode.LeftShift
+MovementConfig.DESCEND_KEY = Enum.KeyCode.LeftControl
 
 -- Double-tapping jump also takes off, which is the gesture most flight games use and
 -- the one players try before reading any control list. Long enough that a deliberate

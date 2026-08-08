@@ -144,7 +144,7 @@ local function applyCharacter(character: Model, deltaTime: number)
 		local scale = math.clamp(value.Value, 1, Formulas.MAX_MUSCLE_SCALE)
 
 		-- Per axis, not uniform. Scaling a limb evenly makes it longer as well as
-		-- thicker, and a body at 2.5x uniform stops reading as a person and starts
+		-- thicker, and a body at the old 2.5x uniform cap stopped reading as a person and started
 		-- reading as a box. PhysiqueConfig keeps the height weights low and the waist
 		-- behind the chest, which is what produces a taper instead of a barrel.
 		local axisX, axisY, axisZ = PhysiqueConfig.AxisScale(value.Name, scale)

@@ -110,6 +110,28 @@ def _collect(path: Path, table_name: str, fields: dict[str, type]) -> list[dict]
     return rows
 
 
+def _equipment_rows(path: Path) -> list[dict]:
+    """Parse the compact equipment(...) calls used to enforce +1 base stat/second."""
+    source = path.read_text()
+    pattern = re.compile(
+        r'equipment\("(?P<id>[^"]+)",\s*"[^"]+",\s*"(?P<family>[^"]+)",\s*'
+        r'(?P<interval>\d+(?:\.\d+)?),\s*"[^"]+",\s*"[^"]+"\)'
+    )
+    rows = []
+    for match in pattern.finditer(source):
+        interval = float(match.group("interval"))
+        rows.append({
+            "Id": match.group("id"),
+            "StatId": match.group("family"),
+            "BaseGain": interval,
+            "RepInterval": interval,
+            "UnlockPower": 0.0,
+        })
+    if len(rows) != 35:
+        raise SystemExit(f"[extract_balance] Expected 35 equipment() rows, found {len(rows)}")
+    return rows
+
+
 def _constant(path: Path, name: str) -> float:
     source = path.read_text()
     match = re.search(rf"^local {name} = (-?[\d.eE+]+)$", source, re.MULTILINE)
@@ -123,7 +145,7 @@ def _number(value: float) -> str:
 
 
 def render() -> str:
-    equipment = _collect(MODULES / "EquipmentConfig.luau", "definitions", EQUIPMENT_FIELDS)
+    equipment = _equipment_rows(MODULES / "EquipmentConfig.luau")
     zones = _collect(MODULES / "ZoneConfig.luau", "zones", ZONE_FIELDS)
     ranks = _collect(MODULES / "RankConfig.luau", "ranks", RANK_FIELDS)
 

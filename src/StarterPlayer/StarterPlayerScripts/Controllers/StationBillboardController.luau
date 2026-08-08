@@ -144,7 +144,12 @@ function StationBillboardController:_refresh()
 		if unlocked then
 			-- Show the rate the player would actually get, multipliers included.
 			local level = if data ~= nil then (data.MultiplierLevels[definition.StatId] or 0) else 0
-			local perSecond = definition.BaseGain * Formulas.MultiplierValue(level) / definition.RepInterval
+			local locationMultiplier = entry.station:GetAttribute("GainMultiplier")
+			local zoneRate = if type(locationMultiplier) == "number" then locationMultiplier else 1
+			local perSecond = definition.BaseGain
+				* zoneRate
+				* Formulas.MultiplierValue(level)
+				/ definition.RepInterval
 
 			-- The third line is what the stat is FOR. A player standing at the
 			-- pull-up bar could previously read that it trains Back and how fast,

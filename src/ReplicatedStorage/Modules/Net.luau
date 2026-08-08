@@ -33,6 +33,9 @@ local EVENT_NAMES: { string } = {
 	"TrainingChanged",
 	-- Client -> server: fire an ability by id at an optional target.
 	"AbilityActivate",
+	-- Client -> server: Shift sprint began/ended. The server resolves the actual
+	-- speed from Legs; the client only reports the held-button intent.
+	"SprintChanged",
 	-- Server -> client: combat feedback (hit landed, staggered, killed).
 	"CombatFeedback",
 	-- Server -> client: transient toast/notification text.

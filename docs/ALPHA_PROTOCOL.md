@@ -15,12 +15,12 @@ Freeze these before the first session. Every later comparison is against this ro
 
 | What | Value |
 |---|---|
-| Commit | `c2d0612` |
-| World build hash | `8b56982091cc` (55 stations, 15 variants, 2863 instances) |
+| Commit | checklist #111 build (record the final commit in each filled sheet) |
+| World build hash | `580b192a698f` (35 stations, 35 unique exercises, 2012 instances) |
 | Interruption rule | kill-only |
 | Abilities | Punch only |
 | Products | all four `AssetId` still `0` — nothing purchasable |
-| Model prediction, active player | first upgrade 2.5m, first rank 2.7m, second district 18.0m |
+| Model prediction, active player | first upgrade 2.5m, first rank 13.7m, second tier 5.8m |
 
 If any of these changed, note it in the filled sheet. A session run against a different
 world is a different baseline.
@@ -84,7 +84,7 @@ State these before running, so a confirmed expectation is not mistaken for a dis
   flight step entirely. That is #135's problem, and this session is here to size it.
 - **There is no onboarding.** Nothing tells a new player what to do; the Coach path is
   #109 and does not exist. Expect the "what was this game about?" answer to be vague.
-- **The map shows all 55 locations at once.** Expect it to be overwhelming; #114 exists
+- **The map shows all 35 locations at once.** Expect it to be overwhelming; #114 exists
   because of that expectation, and this session is what confirms or kills it.
 - **Nothing is purchasable.** Any store interaction ends in "not available yet".
 
@@ -97,7 +97,7 @@ State these before running, so a confirmed expectation is not mistaken for a dis
 | Join → first rep | — | | | |
 | Join → first upgrade | 2.5m | | | |
 | Join → first flight | — | | | |
-| Reached second district | 18.0m | | | |
+| Reached second tier | 5.8m | | | |
 | Session length before disengaging | — | | | |
 | Distinct activities | — | | | |
 | p50 FPS | — | | | |

@@ -595,6 +595,9 @@ function TrainingService:_bindStation(station: Instance)
 		occupants = {},
 	}
 	stations[station] = record
+	-- Replicate the resolved rate to streamed clients. The zone volume is server-only
+	-- knowledge at long range, while billboards must say +1/s through +64/s honestly.
+	station:SetAttribute("GainMultiplier", record.zoneMultiplier)
 
 	prompt.Triggered:Connect(function(player: Player)
 		self:_onTriggered(player, station)

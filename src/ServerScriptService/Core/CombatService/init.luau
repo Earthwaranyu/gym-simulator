@@ -47,6 +47,7 @@ local abilities: { [Types.AbilityId]: Types.Ability } = {}
 local cooldowns: { [Player]: { [Types.AbilityId]: number } } = {}
 -- victim -> killer -> os.clock() of the last kill, for the repeat-farm check.
 local recentKills: { [Player]: { [Player]: number } } = {}
+local sprinting: { [Player]: boolean } = {}
 
 local DataService: any = nil
 local StatService: any = nil
@@ -409,13 +410,26 @@ function CombatService:_applyVitals(player: Player)
 		humanoid.Health = math.clamp(ratio * maxHealth, 1, maxHealth)
 	end
 
-	local walkSpeed = Formulas.WalkSpeed(StatService:GetStat(player, "Legs"))
+	local legs = StatService:GetStat(player, "Legs")
+	local character = player.Character
+	local training = character ~= nil and character:GetAttribute("TrainingPose") ~= nil
+	local walkSpeed = if training
+		then 0
+		else if sprinting[player] == true then Formulas.SprintSpeed(legs) else Formulas.WalkSpeed(legs)
 	if math.abs(humanoid.WalkSpeed - walkSpeed) > 0.01 then
 		humanoid.WalkSpeed = walkSpeed
 	end
 end
 
 function CombatService:Start()
+	Net.BindEvent("SprintChanged", 8, function(player: Player, wantsSprint: any)
+		if type(wantsSprint) ~= "boolean" then
+			return
+		end
+		sprinting[player] = wantsSprint
+		self:_applyVitals(player)
+	end)
+
 	-- Comfortably above the fastest ability cooldown, so honest play never trips it.
 	Net.BindEvent("AbilityActivate", 8, function(player: Player, abilityId: any, target: any)
 		if type(abilityId) ~= "string" then
@@ -434,6 +448,7 @@ function CombatService:Start()
 	Players.PlayerAdded:Connect(function(player: Player)
 		player.CharacterAdded:Connect(function()
 			cooldowns[player] = {}
+			sprinting[player] = false
 			-- Wait a beat for the Humanoid to finish setting itself up.
 			task.defer(function()
 				self:_applyVitals(player)
@@ -443,6 +458,7 @@ function CombatService:Start()
 
 	Players.PlayerRemoving:Connect(function(player: Player)
 		cooldowns[player] = nil
+		sprinting[player] = nil
 		recentKills[player] = nil
 		for _, byKiller in recentKills do
 			byKiller[player] = nil
