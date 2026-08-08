@@ -775,11 +775,20 @@ Execution rules:
       through analytics without auto-banning. Remotes were already rate-limited by
       `Net`; fuzzing them end-to-end needs a running client and belongs to #107's
       Studio contracts.*
-- [ ] 102. **Baseline before feature work.** Run instrumented human alpha sessions on
+- [~] 102. **Baseline before feature work.** Run instrumented human alpha sessions on
       keyboard, touch, and gamepad; capture first-rep/upgrade timing, confusion, deaths,
       session exits, frame/memory/network traces, and qualitative notes. Freeze the first
       beta targets from evidence and record the baseline commit/build so every later claim
       has a comparison.
+      *BLOCKED on humans — this is the one item in Phase 19 that cannot be produced
+      from the repo. `docs/ALPHA_PROTOCOL.md` has everything around it: the frozen
+      baseline (commit `c2d0612`, world `8b56982091cc`), the four sessions to run,
+      what analytics already captures automatically versus what must be written down
+      by hand, the interview questions in order, and the failures we already expect
+      (keyboard-only flight, no onboarding, all 55 map pins at once) so a confirmed
+      expectation is not mistaken for a discovery. Fill it in as
+      `docs/alpha/<date>-<platform>.md`; until then no "how it feels" claim has
+      evidence.*
 - [ ] 103. **Deterministic service readiness.** Replace concurrently spawned, best-effort
       startup with explicit dependencies/readiness and critical-vs-optional health. Joiners
       present before or during boot cannot miss profile, entitlement, quest, analytics, or
