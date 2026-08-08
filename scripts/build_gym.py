@@ -487,18 +487,18 @@ DISTRICTS = [
     # first thing a new player can see from where they land is the thing the game
     # is about — no walk, no directions, no wondering where the gym is.
     #
-    # Its zone volume covers the plaza in the middle of the ring, which would once
+    # Its zone volume covers the plaza in the middle of the spread, which would once
     # have made the plaza a safe AFK farm. TokenService refuses to pay inside a
     # safe zone now, so the geometry no longer has to dodge the shelter.
     #
-    # The ring radius is set by the safe zone, not by taste: a five-point ring
-    # always puts a machine 36 degrees off an axis, where a box of half H reaches
-    # H / cos(36) = 1.24H. At H = 58 the nearest machine has to sit past 72 for the
-    # whole of it to be attackable, and 92 leaves room to walk between them.
+    # The starter venues stay around the safe plaza, but their bearings and distance
+    # vary. That keeps every machine attackable without making the first view look
+    # like five copies arranged by a level designer's compass.
     {
         "zone": "Garage",
         "bearing": 0, "radius": 0, "altitude": 0, "facing": 0,
-        "shape": "plaza", "half": 104, "layout": "ring", "ring_radius": 92,
+        "shape": "plaza", "half": 104, "layout": "scatter",
+        "scatter_min": 82, "scatter_max": 99,
         "pad_at": 40, "pad_size": 18,
         "ground": [0.19, 0.19, 0.21], "ground_material": "Asphalt",
         "rock": [0.13, 0.13, 0.15], "rock_material": "Rock",
@@ -509,7 +509,8 @@ DISTRICTS = [
     {
         "zone": "Iron",
         "bearing": 315, "radius": 359, "altitude": 0, "facing": 180,
-        "shape": "lot", "half": 66, "layout": "rows",
+        "shape": "lot", "half": 66, "layout": "scatter",
+        "scatter_min": 40, "scatter_max": 45,
         "ground": [0.17, 0.18, 0.21], "ground_material": "Concrete",
         "rock": [0.12, 0.13, 0.16], "rock_material": "Rock",
         "accent": ACCENT_IRON, "pad": PAD_BLUE,
@@ -517,7 +518,7 @@ DISTRICTS = [
     {
         "zone": "Powerhouse",
         "bearing": 90, "radius": 570, "altitude": 0,
-        "shape": "slab", "half": 128, "layout": "rows",
+        "shape": "slab", "half": 128, "layout": "scatter",
         "props": "docks",
         "ground": [0.30, 0.30, 0.31], "ground_material": "Concrete",
         "rock": [0.16, 0.16, 0.17], "rock_material": "Rock",
@@ -526,7 +527,7 @@ DISTRICTS = [
     {
         "zone": "Strongman",
         "bearing": 200, "radius": 680, "altitude": 130,
-        "shape": "round", "half": 138, "layout": "ring",
+        "shape": "round", "half": 138, "layout": "scatter",
         "props": "beach",
         "ground": [0.82, 0.72, 0.51], "ground_material": "Sand",
         "rock": [0.45, 0.39, 0.30], "rock_material": "Sandstone",
@@ -535,7 +536,7 @@ DISTRICTS = [
     {
         "zone": "Titan",
         "bearing": 300, "radius": 800, "altitude": 270,
-        "shape": "mesa", "half": 142, "layout": "ring",
+        "shape": "mesa", "half": 142, "layout": "scatter",
         "props": "quarry",
         "ground": [0.62, 0.50, 0.34], "ground_material": "Sandstone",
         "rock": [0.38, 0.31, 0.22], "rock_material": "Rock",
@@ -544,7 +545,7 @@ DISTRICTS = [
     {
         "zone": "Skydeck",
         "bearing": 20, "radius": 920, "altitude": 430,
-        "shape": "slab", "half": 126, "layout": "rows",
+        "shape": "slab", "half": 126, "layout": "scatter",
         "props": "rooftop",
         "ground": [0.24, 0.26, 0.30], "ground_material": "Concrete",
         "rock": [0.15, 0.17, 0.20], "rock_material": "Slate",
@@ -553,7 +554,7 @@ DISTRICTS = [
     {
         "zone": "Storm",
         "bearing": 140, "radius": 1040, "altitude": 610,
-        "shape": "crag", "half": 136, "layout": "ring",
+        "shape": "crag", "half": 136, "layout": "scatter",
         "props": "peak",
         "ground": [0.36, 0.38, 0.44], "ground_material": "Slate",
         "rock": [0.22, 0.24, 0.30], "rock_material": "Rock",
@@ -562,7 +563,7 @@ DISTRICTS = [
     {
         "zone": "Void",
         "bearing": 255, "radius": 1150, "altitude": 810,
-        "shape": "slab", "half": 130, "layout": "rows",
+        "shape": "slab", "half": 130, "layout": "scatter",
         "props": "void",
         "ground": [0.07, 0.06, 0.10], "ground_material": "Basalt",
         "rock": [0.04, 0.03, 0.06], "rock_material": "Basalt",
@@ -571,7 +572,7 @@ DISTRICTS = [
     {
         "zone": "Solar",
         "bearing": 345, "radius": 1260, "altitude": 1030,
-        "shape": "crag", "half": 140, "layout": "ring",
+        "shape": "crag", "half": 140, "layout": "scatter",
         "props": "solar",
         "ground": [0.24, 0.13, 0.10], "ground_material": "Basalt",
         "rock": [0.14, 0.07, 0.06], "rock_material": "CrackedLava",
@@ -580,7 +581,7 @@ DISTRICTS = [
     {
         "zone": "Nebula",
         "bearing": 175, "radius": 1370, "altitude": 1270,
-        "shape": "slab", "half": 144, "layout": "rows",
+        "shape": "slab", "half": 144, "layout": "scatter",
         "props": "nebula",
         "ground": [0.16, 0.11, 0.20], "ground_material": "Metal",
         "rock": [0.10, 0.07, 0.14], "rock_material": "Slate",
@@ -589,7 +590,7 @@ DISTRICTS = [
     {
         "zone": "Ascendant",
         "bearing": 285, "radius": 1480, "altitude": 1530,
-        "shape": "round", "half": 152, "layout": "ring",
+        "shape": "round", "half": 152, "layout": "scatter",
         "props": "celestial",
         "ground": [0.86, 0.84, 0.78], "ground_material": "Marble",
         "rock": [0.55, 0.53, 0.48], "rock_material": "Limestone",
@@ -843,7 +844,8 @@ def island_plaza(row, _rng):
     the gym is and posts to give the ring an edge. Anything more would be a
     second floor laid on top of the first.
     """
-    radius = row["ring_radius"]
+    spots = machine_spots(row)
+    radius = max(math.hypot(spot[0][0], spot[0][2]) for spot in spots)
     # Poured concrete, lighter than the asphalt around it. The machines are steel
     # and rubber; on a dark pad they disappear into it from any distance.
     out = [disc("Apron", 0.3, (radius + 24) * 2, FLOOR_TOP + 0.15,
@@ -852,26 +854,24 @@ def island_plaza(row, _rng):
                     [c * 0.5 for c in row["accent"]], "Neon", CanCollide=False))
 
     # A painted bay under each machine — the cheapest thing that turns a slab into
-    # a floor somebody planned. Angles come from ring_angle, not from a second
-    # copy of the formula: the first version restated it and landed 18 degrees off,
-    # which put every bay in the gap beside its machine.
-    for index in range(MACHINE_COUNT):
-        angle = ring_angle(index, MACHINE_COUNT)
-        spot = mul(rot_y(angle), cf(0, 0, radius))
+    # a floor somebody planned. The bay reads the actual generated spot so the
+    # deliberately uneven layout cannot drift away from its floor markings.
+    for spot in spots:
         out.append(part("Bay", [26, 0.2, 26],
-                        mul(cf(spot[0][0], FLOOR_TOP + 0.3, spot[0][2]), rot_y(angle)),
+                        ((spot[0][0], FLOOR_TOP + 0.3, spot[0][2]), spot[1]),
                         [0.30, 0.30, 0.32], "Concrete", CanCollide=False))
         out.append(part("BayLine", [26, 0.25, 1.2],
-                        mul(cf(spot[0][0], FLOOR_TOP + 0.35, spot[0][2]), rot_y(angle)),
+                        ((spot[0][0], FLOOR_TOP + 0.35, spot[0][2]), spot[1]),
                         [c * 0.7 for c in row["accent"]], "Neon", CanCollide=False))
 
     # Posts between the machines rather than behind them, so they read as the
     # gym's corners instead of as clutter.
-    # Posts land halfway between machines, which is what "between" has to mean once
-    # the machine angles are a function rather than a number.
+    # Five uneven edge posts preserve the open-gym silhouette without visually
+    # snapping the venues back onto a perfect ring.
+    rng = random.Random(f"{row['zone']}:posts")
     for index in range(MACHINE_COUNT):
-        angle = ring_angle(index, MACHINE_COUNT) + 180.0 / MACHINE_COUNT
-        spot = mul(rot_y(angle), cf(0, 0, radius + 16))
+        angle = 360.0 * index / MACHINE_COUNT + rng.uniform(-22, 22)
+        spot = mul(rot_y(angle), cf(0, 0, radius + rng.uniform(13, 18)))
         out.append(part("GymPost", [3, 15, 3],
                         cf(spot[0][0], FLOOR_TOP + 7.5, spot[0][2]),
                         [0.17, 0.17, 0.19], "Metal"))
@@ -1311,8 +1311,9 @@ def zone_volume(row):
 
 
 # --------------------------------------------------------------------------
-# Machine layouts. Where the five machines stand on a district, as CFrames in
-# its local space. A new arrangement is a function plus a LAYOUTS entry.
+# Machine layouts. Where stat-specific training venues stand in a district, as
+# CFrames in its local space. Random layouts are seeded by zone id: authored
+# variety survives a rebuild instead of becoming a moving target in source control.
 # --------------------------------------------------------------------------
 
 MACHINE_ORDER = ["BenchPress", "Dumbbells", "PullUpBar", "SitUpBench", "Treadmill"]
@@ -1349,10 +1350,129 @@ def layout_rows(row, count):
     return out
 
 
+def layout_scatter(row, count):
+    """A reproducible, irregular spread with one venue in each loose sector.
+
+    Sectoring prevents all five random points landing on one side of an island;
+    jittered angle and radius keep it from reading as another machine ring. The
+    spawn district uses a tighter outer band so its venues clear the safe plaza.
+    """
+    rng = random.Random(f"{row['zone']}:training-spots")
+    minimum = row.get("scatter_min", row["half"] * 0.22)
+    maximum = row.get("scatter_max", row["half"] * 0.58)
+    phase = rng.uniform(0, 360)
+    out = []
+
+    for index in range(count):
+        position = None
+        angle = 0.0
+        # Venue pads are 30 studs wide. Keep their centres at least 38 studs
+        # apart so rotated corners and the longer Legs lane do not merge into a
+        # neighbouring stat area. With five angular sectors this converges in a
+        # handful of attempts, but a bounded loop keeps bad row data harmless.
+        for _attempt in range(64):
+            angle = phase + 360.0 * index / count + rng.uniform(-18, 18)
+            radius = rng.uniform(minimum, maximum)
+            candidate = mul(rot_y(angle), cf(0, 0, radius))
+            if all(math.hypot(candidate[0][0] - prior[0][0],
+                              candidate[0][2] - prior[0][2]) >= 38
+                   for prior in out):
+                position = candidate
+                break
+        if position is None:
+            angle = phase + 360.0 * index / count
+            position = mul(rot_y(angle), cf(0, 0, maximum))
+        # Face the machine toward the district interior, leaving its architecture
+        # behind it and the approach side open.
+        out.append(mul(position, rot_y(angle + 180)))
+
+    return out
+
+
 LAYOUTS = {
     "ring": layout_ring,
     "rows": layout_rows,
+    "scatter": layout_scatter,
 }
+
+
+def machine_spots(row):
+    """The single source of truth for machine and venue positions."""
+    return LAYOUTS[row["layout"]](row, len(MACHINE_ORDER))
+
+
+# Architecture makes the stat legible before the machine label streams in.
+# These are gameplay venues, not decorative copies of the machine itself: an
+# Arms cage, Chest bay, Back tower, Core court and Legs lane have different
+# silhouettes and use the stat colour as a restrained wayfinding stripe.
+STAT_COLORS = {
+    "BenchPress": [0.92, 0.25, 0.22],
+    "Dumbbells": [0.95, 0.55, 0.18],
+    "PullUpBar": [0.20, 0.57, 0.94],
+    "SitUpBench": [0.64, 0.35, 0.88],
+    "Treadmill": [0.24, 0.76, 0.43],
+}
+
+
+def training_venue(equipment_id, district_accent):
+    """Original part-built architecture wrapped around one training machine."""
+    color = STAT_COLORS[equipment_id]
+    dark = [0.12, 0.13, 0.15]
+    concrete = [0.31, 0.31, 0.32]
+    out = [
+        part("VenuePad", [30, 0.22, 30], cf(0, FLOOR_TOP + 0.11, 0),
+             concrete, "Concrete", CanCollide=False),
+        part("StatStripe", [30, 0.12, 1.1], cf(0, FLOOR_TOP + 0.26, 13.6),
+             color, "Neon", CanCollide=False, CastShadow=False),
+    ]
+
+    if equipment_id == "BenchPress":
+        # A heavy open-front press bay: concrete sides, lit lintel, no front wall.
+        out.extend([
+            part("ChestWall", [30, 12, 1.2], cf(0, FLOOR_TOP + 6, -14), dark, "Concrete"),
+            part("ChestWing", [1.2, 9, 13], cf(-14.4, FLOOR_TOP + 4.5, -7.5), dark, "Concrete"),
+            part("ChestWing", [1.2, 9, 13], cf(14.4, FLOOR_TOP + 4.5, -7.5), dark, "Concrete"),
+            part("ChestLintel", [28, 1.0, 1.5], cf(0, FLOOR_TOP + 11.5, -13.4), color, "Neon"),
+        ])
+    elif equipment_id == "Dumbbells":
+        # A steel street cage; open sides keep the three curl spots reachable.
+        for x in (-14, 14):
+            for z in (-13, 13):
+                out.append(part("ArmsPost", [1.0, 14, 1.0], cf(x, FLOOR_TOP + 7, z), dark, "Metal"))
+        out.extend([
+            part("ArmsCanopy", [30, 0.8, 30], cf(0, FLOOR_TOP + 14.2, 0), dark, "Metal"),
+            part("ArmsBeam", [30, 0.7, 0.8], cf(0, FLOOR_TOP + 12.6, 13.4), color, "Neon"),
+        ])
+    elif equipment_id == "PullUpBar":
+        # A tall back-training tower visible over nearby props.
+        out.extend([
+            part("BackTower", [24, 18, 1.2], cf(0, FLOOR_TOP + 9, -14), dark, "Metal"),
+            part("BackCutout", [18, 11, 0.3], cf(0, FLOOR_TOP + 7.5, -13.3),
+                 [0.22, 0.24, 0.28], "DiamondPlate"),
+            part("BackTop", [26, 1.2, 2.0], cf(0, FLOOR_TOP + 18.3, -14), color, "Neon"),
+        ])
+    elif equipment_id == "SitUpBench":
+        # A low court keeps sightlines open while marking a dedicated Core area.
+        for x, z, sx, sz in ((0, -14, 30, 1), (-14, 0, 1, 28), (14, 0, 1, 28)):
+            out.append(part("CoreWall", [sx, 3.2, sz], cf(x, FLOOR_TOP + 1.6, z), dark, "Concrete"))
+        for x in (-12, 12):
+            out.append(part("CoreBeacon", [1.0, 8, 1.0], cf(x, FLOOR_TOP + 4, -13), color, "Neon"))
+    else:
+        # The treadmill sits on a long marked running lane with a finish gantry.
+        out.extend([
+            part("LegsLane", [12, 0.18, 42], cf(0, FLOOR_TOP + 0.22, 5),
+                 [0.16, 0.17, 0.19], "Asphalt", CanCollide=False),
+            part("LaneLine", [0.35, 0.12, 42], cf(-5, FLOOR_TOP + 0.36, 5), color, "Neon", CanCollide=False),
+            part("LaneLine", [0.35, 0.12, 42], cf(5, FLOOR_TOP + 0.36, 5), color, "Neon", CanCollide=False),
+            part("LegsGantry", [16, 1.0, 1.0], cf(0, FLOOR_TOP + 11, -14), color, "Neon"),
+            part("LegsPost", [1.0, 11, 1.0], cf(-7.5, FLOOR_TOP + 5.5, -14), dark, "Metal"),
+            part("LegsPost", [1.0, 11, 1.0], cf(7.5, FLOOR_TOP + 5.5, -14), dark, "Metal"),
+        ])
+
+    # One small district-colour marker ties the venue back to its progression zone.
+    out.append(part("DistrictMarker", [2.2, 5.5, 2.2], cf(12.5, FLOOR_TOP + 2.75, 12.5),
+                    district_accent, "Neon", CanCollide=False))
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -1772,9 +1892,16 @@ def build_world():
                 place(origin, piece) for piece in PROPS[theme](row, rng)
             ]))
 
+        spots = machine_spots(row)
+        children.append(folder("TrainingAreas", [
+            group(f"{equipment_id}Area", [
+                place(mul(origin, spot), piece)
+                for piece in training_venue(equipment_id, row["accent"])
+            ], class_name="Folder")
+            for equipment_id, spot in zip(MACHINE_ORDER, spots)
+        ]))
         structure.append(folder(row["zone"], children))
 
-        spots = LAYOUTS[row["layout"]](row, len(MACHINE_ORDER))
         machines.append(folder(row["zone"], [
             machine(f"{row['zone']}{equipment_id}", equipment_id, mul(origin, spot),
                     BUILDERS[equipment_id](row["pad"], row["accent"]))

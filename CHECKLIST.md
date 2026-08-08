@@ -4,7 +4,7 @@ Gym-training game in the vein of **Gym League**, with the key differentiator bor
 **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each other
 mid-training-set, interrupting reps to annoy them.
 
-**Progress: 88 built / 90** — every phase complete. #22 (stamina) and #24 (training
+**Progress: 89 built / 91** — every phase complete. #22 (stamina) and #24 (training
 anti-exploit) were withdrawn by design, not skipped: reps are server-driven with no
 client remote to exploit.
 
@@ -497,6 +497,29 @@ one job with Chest, and Legs only affected running.
       and stamina pool" when stamina was withdrawn in #22 and health had never been its
       job, and Back said "broadens the frame", which was only accurate because it did
       nothing else.
+
+## Phase 15 — Training belongs to places
+
+The district pass made eleven memorable destinations, but the training inside each one
+still exposed the generator: the same five machines sat in a perfect ring or two neat
+rows at every power tier. From above, each district read as one compact level rather than
+part of an open world with things to discover.
+
+- [x] 91. **Stat venues, scattered through the world.** Every district still supplies all
+      five core stats so progression cannot strand a build, but they no longer share one
+      obvious gym cluster. A seeded `scatter` layout gives each district a stable irregular
+      arrangement: rebuilds reproduce it exactly, while loose angular sectors prevent five
+      random rolls from piling onto one edge. Garage Gym uses a tighter outside band so its
+      venues remain beyond the safe plaza and PvP still reaches every trainee.
+      Each machine now owns a piece of architecture that advertises its purpose before its
+      UI label is readable: an open-front **Chest bay**, steel **Arms cage**, tall **Back
+      tower**, low **Core court**, or marked **Legs lane**. Stat colours provide wayfinding;
+      a smaller district-colour beacon still communicates the progression tier. Venue
+      geometry lives in a `TrainingAreas` folder beside the machine folder, keeping the
+      `TrainingStation` model contract unchanged and preserving streaming, prompts, held
+      props, zone gain multipliers, and travel gates. Garage's floor bays now derive from
+      the actual generated positions instead of a second layout formula, so decoration and
+      machines cannot drift apart.
 ---
 
 ## Milestone 1 — Vertical Slice
