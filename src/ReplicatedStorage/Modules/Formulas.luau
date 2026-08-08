@@ -29,6 +29,62 @@ end
 
 Formulas.SoftScale = softScale
 
+-- === Finite-number safety ===================================================
+
+--[[
+	The ceiling on any single stat.
+
+	1e63 is the top of NumberFormat's suffix range, so a capped stat always has a name
+	a player can read, and it is far below the point where a double loses integer
+	precision or a sum of five of them reaches infinity. Nothing in the progression
+	model gets within astronomical distance of it — the 24h simulation tops out around
+	1e17 — so this is a hostile-input rail, not a gameplay limit.
+
+	The rail matters because a single inf or NaN that reaches a profile is permanent:
+	it saves, it reloads, it poisons total power, and every comparison against it is
+	false, so the player's UI silently stops working and no error is ever raised.
+]]
+Formulas.MAX_STAT = 1e63
+
+--[[
+	Whether a number is safe to store or compute with. NaN fails its own equality
+	test; both infinities are excluded explicitly.
+]]
+function Formulas.IsFinite(value: any): boolean
+	return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
+--[[
+	Forces any input into a usable stat value.
+
+	Anything that is not a finite number becomes 0 rather than propagating: a NaN that
+	is allowed to flow becomes a NaN in the profile, and the only safe answer to
+	"how much stat is NaN?" is none.
+]]
+function Formulas.SanitizeStat(value: any): number
+	if not Formulas.IsFinite(value) then
+		return 0
+	end
+	return math.clamp(value :: number, 0, Formulas.MAX_STAT)
+end
+
+--[[
+	Forces any input into a usable upgrade level: a whole number in [0, cap].
+
+	Every formula below sanitizes its own arguments rather than trusting the caller.
+	That looks redundant when the caller is a service that already validated — but
+	these are pure functions reachable from combat, UI, replication, and a profile
+	written years ago, and the fuzz pass in RunSelfTest showed most of them happily
+	returning NaN or infinity when handed one. A formula that can produce NaN is a
+	formula that can freeze a player's progression with no error anywhere.
+]]
+local function level(value: any): number
+	if not Formulas.IsFinite(value) then
+		return 0
+	end
+	return math.clamp(math.floor(value :: number), 0, Formulas.MULTIPLIER_LEVEL_CAP)
+end
+
 -- === Training ===============================================================
 
 --[[
@@ -37,7 +93,10 @@ Formulas.SoftScale = softScale
 	the growth comes from equipment tiers and multipliers, which are both data.
 ]]
 function Formulas.GainPerRep(baseGain: number, multiplier: number): number
-	return baseGain * multiplier
+	if not Formulas.IsFinite(baseGain) or not Formulas.IsFinite(multiplier) then
+		return 0
+	end
+	return math.clamp(baseGain * multiplier, 0, Formulas.MAX_STAT)
 end
 
 -- === Token multipliers ======================================================
@@ -57,16 +116,16 @@ Formulas.MULTIPLIER_LEVEL_CAP = 128
 	Level is clamped to MULTIPLIER_LEVEL_CAP so the value can never reach inf
 	and poison a saved profile.
 ]]
-function Formulas.MultiplierValue(level: number): number
-	return 2 ^ math.min(level, Formulas.MULTIPLIER_LEVEL_CAP)
+function Formulas.MultiplierValue(upgradeLevel: number): number
+	return 2 ^ level(upgradeLevel)
 end
 
 --[[
 	Token cost of buying the next level. Exponential, so upgrades stay meaningful
 	purchases rather than something you buy out in one session.
 ]]
-function Formulas.MultiplierCost(level: number): number
-	return math.floor(10 * 1.35 ^ level)
+function Formulas.MultiplierCost(upgradeLevel: number): number
+	return math.floor(10 * 1.35 ^ level(upgradeLevel))
 end
 
 -- === Token accrual ==========================================================
@@ -98,8 +157,14 @@ Formulas.MAX_MUSCLE_SCALE = 2.5
 	part responds relative to others driven by the same stat.
 ]]
 function Formulas.MuscleScale(statValue: number, weight: number): number
-	local growth = softScale(statValue, 0.12) * weight
-	return 1 + math.min(Formulas.MAX_MUSCLE_SCALE - 1, growth)
+	-- A negative or absent weight means "does not grow", not "shrinks": a part scaled
+	-- below 1 pulls limbs out of their sockets, and a huge negative weight took the
+	-- result to -inf, which Roblox would happily assign to a part's Size.
+	if not Formulas.IsFinite(weight) or weight <= 0 then
+		return 1
+	end
+	local growth = softScale(Formulas.SanitizeStat(statValue), 0.12) * weight
+	return 1 + math.clamp(growth, 0, Formulas.MAX_MUSCLE_SCALE - 1)
 end
 
 -- === Combat =================================================================
@@ -113,7 +178,7 @@ end
 	input changed — the curve is untouched, so nobody's health moved.
 ]]
 function Formulas.MaxHealth(chestStat: number): number
-	return 100 + softScale(chestStat, 40)
+	return 100 + softScale(Formulas.SanitizeStat(chestStat), 40)
 end
 
 --[[
@@ -126,7 +191,7 @@ end
 	reassignment, not a rebalance, and the time-to-kill check below proves it.
 ]]
 function Formulas.AttackDamage(armsStat: number): number
-	return 8 + softScale(armsStat, 9)
+	return 8 + softScale(Formulas.SanitizeStat(armsStat), 9)
 end
 
 --[[
@@ -144,7 +209,8 @@ end
 ]]
 function Formulas.DamageResistance(backStat: number, attackerArmsStat: number): number
 	-- Orders of magnitude the defender's Back leads the attacker's Arms by.
-	local advantage = softScale(backStat, 1) - softScale(attackerArmsStat, 1)
+	local advantage = softScale(Formulas.SanitizeStat(backStat), 1)
+		- softScale(Formulas.SanitizeStat(attackerArmsStat), 1)
 	if advantage <= 0 then
 		return 0
 	end
@@ -167,7 +233,10 @@ end
 	the attacker on Chest as well, which is a build rather than a free ride.
 ]]
 function Formulas.Retaliation(coreStat: number, damageTaken: number): number
-	return damageTaken * math.min(0.35, softScale(coreStat, 0.03))
+	if not Formulas.IsFinite(damageTaken) or damageTaken <= 0 then
+		return 0
+	end
+	return damageTaken * math.min(0.35, softScale(Formulas.SanitizeStat(coreStat), 0.03))
 end
 
 --[[
@@ -186,7 +255,7 @@ end
 	player now, not the inability to run away.
 ]]
 function Formulas.WalkSpeed(legsStat: number): number
-	return 16 + math.min(96, softScale(legsStat, 7))
+	return 16 + math.min(96, softScale(Formulas.SanitizeStat(legsStat), 7))
 end
 
 --[[
@@ -201,7 +270,7 @@ end
 	float, and this changes only how fast you cross once you are up.
 ]]
 function Formulas.FlightSpeed(legsStat: number): number
-	return 140 + math.min(220, softScale(legsStat, 16))
+	return 140 + math.min(220, softScale(Formulas.SanitizeStat(legsStat), 16))
 end
 
 --[[
@@ -210,7 +279,9 @@ end
 	the less damage lands. This is the anti-grief dial — a maxed player can still kill
 	a beginner, it just is not instant, so being farmed stays survivable.
 ]]
-function Formulas.PowerGapFalloff(attackerPower: number, victimPower: number): number
+function Formulas.PowerGapFalloff(rawAttackerPower: number, rawVictimPower: number): number
+	local attackerPower = Formulas.SanitizeStat(rawAttackerPower)
+	local victimPower = Formulas.SanitizeStat(rawVictimPower)
 	if attackerPower <= victimPower then
 		return 1
 	end
@@ -227,7 +298,7 @@ end
 function Formulas.TotalPower(stats: { [string]: number }): number
 	local total = 0
 	for _, value in stats do
-		total += value
+		total += Formulas.SanitizeStat(value)
 	end
 	return total
 end
@@ -246,6 +317,67 @@ function Formulas.RunSelfTest(): { string }
 			table.insert(failures, label)
 		end
 	end
+
+	-- === Hostile input ===================================================
+	--
+	-- Every value below either arrives from a client, or is derived from a stat that
+	-- one day will. The rule is the same for all of them: a formula may return a
+	-- boring number, but it may never return NaN, infinity, or an error. A NaN that
+	-- escapes here reaches a profile, saves, reloads, and makes every comparison
+	-- against that player false — a bug with no error message and no way back.
+	local HOSTILE = { 0 / 0, math.huge, -math.huge, -1, -1e308, 1e308, 0, 1e63, 2 ^ 53 }
+
+	local function fuzz(label: string, fn: (...any) -> ...any, arity: number)
+		for _, first in HOSTILE do
+			for _, second in HOSTILE do
+				-- An if-expression truncates a multi-value call to one value, which would
+				-- silently discard pcall's result and make this test always pass.
+				local ok, result
+				if arity == 1 then
+					ok, result = pcall(fn, first)
+				else
+					ok, result = pcall(fn, first, second)
+				end
+				if not ok then
+					table.insert(failures, `{label} errored on ({first}, {second})`)
+				elseif type(result) == "number" and not Formulas.IsFinite(result) then
+					table.insert(failures, `{label} returned {result} for ({first}, {second})`)
+				end
+				if arity == 1 then
+					break
+				end
+			end
+		end
+	end
+
+	fuzz("SanitizeStat", Formulas.SanitizeStat, 1)
+	fuzz("MultiplierValue", Formulas.MultiplierValue, 1)
+	fuzz("MultiplierCost", Formulas.MultiplierCost, 1)
+	fuzz("MaxHealth", Formulas.MaxHealth, 1)
+	fuzz("AttackDamage", Formulas.AttackDamage, 1)
+	fuzz("WalkSpeed", Formulas.WalkSpeed, 1)
+	fuzz("FlightSpeed", Formulas.FlightSpeed, 1)
+	fuzz("MuscleScale", Formulas.MuscleScale, 2)
+	fuzz("GainPerRep", Formulas.GainPerRep, 2)
+	fuzz("DamageResistance", Formulas.DamageResistance, 2)
+	fuzz("Retaliation", Formulas.Retaliation, 2)
+	fuzz("PowerGapFalloff", Formulas.PowerGapFalloff, 2)
+
+	check("sanitize rejects NaN", Formulas.SanitizeStat(0 / 0) == 0)
+	-- Infinity becomes 0, not the cap. Clamping it to MAX_STAT would hand an exploit
+	-- the largest legal value in the game as a reward for sending a broken one.
+	check("sanitize rejects inf", Formulas.SanitizeStat(math.huge) == 0)
+	check("sanitize rejects negatives", Formulas.SanitizeStat(-5) == 0)
+	check("sanitize rejects non-numbers", Formulas.SanitizeStat("1e9") == 0)
+	check("sanitize passes ordinary values", Formulas.SanitizeStat(1234.5) == 1234.5)
+	check("gain never exceeds the cap", Formulas.GainPerRep(1e60, 1e60) <= Formulas.MAX_STAT)
+	check("five capped stats stay finite", Formulas.TotalPower({
+		a = Formulas.MAX_STAT,
+		b = Formulas.MAX_STAT,
+		c = Formulas.MAX_STAT,
+		d = Formulas.MAX_STAT,
+		e = Formulas.MAX_STAT,
+	}) < math.huge)
 
 	check("level 0 multiplier is 1x", Formulas.MultiplierValue(0) == 1)
 	check("multiplier doubles each level", Formulas.MultiplierValue(5) == 2 * Formulas.MultiplierValue(4))

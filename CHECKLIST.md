@@ -759,12 +759,22 @@ Execution rules:
       be tuned — `BaseGain` moves number size but not pacing at all, and being killed
       every 2 minutes costs 72% of 24h power, which is far more than "time and combo
       only" implies. That fairness question goes to Phase 26.*
-- [ ] 101. **Finite-number and hostile-input safety.** Define behavior above the current
+- [x] 101. **Finite-number and hostile-input safety.** Define behavior above the current
       suffix range; cap or safely display every stat, multiplier, damage, and datastore
       value; fuzz formulas and runtime remote schemas with NaN/Inf/oversized/malformed
       inputs; rate-limit endpoints; and record impossible gains without immediately
       auto-banning. A hostile client must not grant value, corrupt replication, or crash a
       server.
+      *Done: `Formulas.MAX_STAT` (1e63, the top of the readable suffix range) plus
+      `IsFinite`/`SanitizeStat`; every formula now sanitizes its own arguments, and
+      `NumberFormat` switches to scientific notation above the last suffix instead of
+      rendering "12345.67Vg". The fuzz pass in `Formulas.RunSelfTest` found **94 real
+      cases** where a formula returned NaN or infinity — including MuscleScale
+      returning -inf, which Roblox would have assigned straight to a part's Size.
+      `StatService` sanitizes on the way in and out and records implausible gains
+      through analytics without auto-banning. Remotes were already rate-limited by
+      `Net`; fuzzing them end-to-end needs a running client and belongs to #107's
+      Studio contracts.*
 - [ ] 102. **Baseline before feature work.** Run instrumented human alpha sessions on
       keyboard, touch, and gamepad; capture first-rep/upgrade timing, confusion, deaths,
       session exits, frame/memory/network traces, and qualitative notes. Freeze the first

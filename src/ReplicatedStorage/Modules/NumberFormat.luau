@@ -79,6 +79,15 @@ function NumberFormat.Format(value: number, decimals: number?): string
 
 	local places = decimals or 2
 	local tier = math.floor(math.log(magnitude, THRESHOLD))
+
+	-- Above the last suffix there is no name left to give, so the number switches to
+	-- scientific notation rather than piling digits in front of "Vg" and rendering
+	-- something like "12345.67Vg". Stats are capped below this (Formulas.MAX_STAT), so
+	-- reaching it means a value that should not exist — and it should look like one.
+	if tier > #SUFFIXES then
+		return `{sign}{string.format(`%.{places}e`, magnitude)}`
+	end
+
 	tier = math.clamp(tier, 1, #SUFFIXES)
 
 	local scaled = magnitude / THRESHOLD ^ tier
@@ -173,6 +182,28 @@ function NumberFormat.RunSelfTest(): { string }
 
 	expect("duration", NumberFormat.Duration(75), "1:15")
 	expect("duration hours", NumberFormat.Duration(3725), "1:02:05")
+
+	-- Above the suffix range. These values should be unreachable — stats are capped at
+	-- Formulas.MAX_STAT — but "unreachable" is exactly the assumption an exploit
+	-- breaks, and a display that silently produces "12345.67Vg" hides it.
+	expect("last named tier", NumberFormat.Format(1e63), "1Vg")
+	expect("beyond the last tier", NumberFormat.Format(1e69), "1.00e+69")
+	expect("far beyond, negative", NumberFormat.Format(-1e100), "-1.00e+100")
+
+	-- Hostile input: every one of these must produce a string, not an error and not a
+	-- number that lies. The UI renders whatever comes back, so a crash here is a
+	-- broken HUD for the rest of the session.
+	local hostile = { 0 / 0, math.huge, -math.huge, -0, 1e308, -1e308, 2 ^ 53, 0.1 }
+	for _, value in hostile do
+		local ok, result = pcall(NumberFormat.Format, value)
+		if not ok or type(result) ~= "string" or #result == 0 then
+			table.insert(failures, `Format({value}) did not return a string`)
+		end
+		local commaOk, commaResult = pcall(NumberFormat.Comma, value)
+		if not commaOk or type(commaResult) ~= "string" then
+			table.insert(failures, `Comma({value}) did not return a string`)
+		end
+	end
 
 	return failures
 end

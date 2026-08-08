@@ -112,6 +112,9 @@ local EVENTS: { [string]: EventDefinition } = {
 	-- counting assignment would include players who never reached the feature and
 	-- dilute every result toward zero.
 	FlagExposure = { Kind = "Custom", Fields = { FlagId = str(true), Variant = str(true), Value = str() } },
+	-- A gain no legitimate rep could produce. Recorded, never auto-punished: a ban
+	-- triggered by a number bans whatever bug produced the number first.
+	ImplausibleGain = { Kind = "Custom", Fields = { StatId = str(true), Amount = num(true) } },
 	CoPlayContext = {
 		Kind = "Custom",
 		Fields = { FriendsPresent = num(true), Intentional = { Kind = "boolean" } },

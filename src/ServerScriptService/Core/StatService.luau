@@ -112,13 +112,18 @@ end
 
 	Rejects unknown stat ids and non-positive amounts rather than erroring, since the
 	caller may be acting on client-supplied equipment data.
+
+	Every number that reaches a profile goes through `Formulas.SanitizeStat`. A single
+	NaN or infinity that gets saved is permanent: it reloads, it poisons total power,
+	and every comparison against it is false, so the player's progression silently
+	stops working and nothing ever errors.
 ]]
 function StatService:AddStat(player: Player, statId: Types.StatId, baseAmount: number): number
 	if not StatConfig.IsValid(statId) then
 		warn(`[StatService] Rejected gain for unknown stat "{statId}"`)
 		return 0
 	end
-	if baseAmount <= 0 then
+	if not Formulas.IsFinite(baseAmount) or baseAmount <= 0 then
 		return 0
 	end
 
@@ -128,13 +133,49 @@ function StatService:AddStat(player: Player, statId: Types.StatId, baseAmount: n
 	end
 
 	local gained = Formulas.GainPerRep(baseAmount, self:GetMultiplier(player, statId))
-	local newValue = (data.Stats[statId] or 0) + gained
+	local current = Formulas.SanitizeStat(data.Stats[statId])
+	local newValue = Formulas.SanitizeStat(current + gained)
+
+	-- What actually landed, after the cap. A gain that was clipped must not be
+	-- reported as if it were paid in full, or the HUD promises what the profile does
+	-- not hold.
+	gained = newValue - current
+
+	self:_recordIfImpossible(player, statId, gained)
+
 	data.Stats[statId] = newValue
 
 	DataService:MarkDirty(player)
 	StatService.StatChanged:Fire(player, statId, newValue, gained)
 
 	return gained
+end
+
+--[[
+	Notes a gain that no legitimate rep could produce.
+
+	Deliberately does NOT punish. An automated ban on a number is a ban on whatever bug
+	produced that number, and the first victims of a false positive are the players who
+	found an edge case rather than the ones exploiting it. This records the event and
+	leaves the decision to a human looking at a pattern.
+
+	The ceiling is generous on purpose: the strongest legitimate rep in the game is the
+	best machine's base gain times the endgame zone multiplier times the multiplier
+	stack, and this sits well above that so ordinary endgame play never trips it.
+]]
+local IMPOSSIBLE_GAIN = 1e30
+
+function StatService:_recordIfImpossible(player: Player, statId: string, gained: number)
+	if gained <= IMPOSSIBLE_GAIN then
+		return
+	end
+
+	warn(`[StatService] Implausible {statId} gain for {player.Name}: {gained}`)
+
+	local AnalyticsService = Loader.Get("AnalyticsService")
+	if AnalyticsService ~= nil then
+		AnalyticsService:Log(player, "ImplausibleGain", { StatId = statId, Amount = gained })
+	end
 end
 
 --[[
@@ -145,7 +186,15 @@ function StatService:GetTotalPower(player: Player): number
 	if data == nil then
 		return 0
 	end
-	return Formulas.TotalPower(data.Stats)
+	-- Sanitized on the way out too. A profile written before these rails existed, or
+	-- repaired badly by hand, must not be able to make total power NaN — every
+	-- comparison against NaN is false, which silently disables ranks, gates, and the
+	-- power-gap falloff all at once.
+	local safe: { [string]: number } = {}
+	for statId, value in data.Stats do
+		safe[statId] = Formulas.SanitizeStat(value)
+	end
+	return Formulas.TotalPower(safe)
 end
 
 return StatService
