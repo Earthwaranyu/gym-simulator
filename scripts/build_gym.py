@@ -180,7 +180,8 @@ def anchor_standing(frame):
 
 
 def machine(name, equipment_id, origin, children, travel_id=None,
-            access_kind=None, floor_index=None):
+            access_kind=None, floor_index=None, exercise_family=None,
+            environment_id=None, requires_flight=False):
     # Atomic streaming: a machine arrives whole or not at all. Under the default
     # mode Roblox streams a model's parts in one at a time, and a bench press
     # missing its rack — or worse, missing the TrainAnchor the server pivots you
@@ -192,6 +193,12 @@ def machine(name, equipment_id, origin, children, travel_id=None,
         attributes["AccessKind"] = access_kind
     if floor_index is not None:
         attributes["FloorIndex"] = floor_index
+    if exercise_family is not None:
+        attributes["ExerciseFamily"] = exercise_family
+    attributes["VariantId"] = equipment_id
+    if environment_id is not None:
+        attributes["EnvironmentId"] = environment_id
+    attributes["RequiresFlight"] = requires_flight
     return {
         "name": name,
         "className": "Model",
@@ -437,12 +444,292 @@ def treadmill(pad_color, accent):
     return out
 
 
+def incline_press(pad_color, accent):
+    """Incline dumbbell press on a 32-degree adjustable bench."""
+    out = [floor_mat(11, 13)]
+    bench = mul(cf(0, FLOOR_TOP + 2.15, 0.5), rot_x(-32))
+    out.extend([
+        part("BenchSpine", [0.6, 0.5, 8.0], bench, STEEL, "DiamondPlate"),
+        part("Base", [3.2, 0.65, 5.2], bench, pad_color, "Fabric"),
+        part("SeatPad", [3.2, 0.65, 2.4],
+             mul(cf(0, FLOOR_TOP + 1.45, 3.0), rot_x(8)), pad_color, "Fabric"),
+        part("RearFoot", [4.4, 1.8, 0.55], cf(0, FLOOR_TOP + 0.9, -2.6), STEEL, "Metal"),
+        part("FrontFoot", [4.4, 0.55, 1.8], cf(0, FLOOR_TOP + 0.28, 3.0), STEEL, "Metal"),
+        part("AngleBrace", [0.55, 3.5, 0.55], cf(0, FLOOR_TOP + 1.75, -1.8), accent, "Metal"),
+    ])
+
+    def dumbbell(name, x):
+        pieces = [cylinder("Handle", 1.5, 0.3, cf(x, FLOOR_TOP + 2.1, 1.0),
+                           CHROME, "Metal", CanCollide=False, CanTouch=False,
+                           CanQuery=False)]
+        for side in (-1, 1):
+            pieces.append(cylinder("Head", 0.72, 1.5,
+                                   cf(x + side * 0.92, FLOOR_TOP + 2.1, 1.0),
+                                   RUBBER, "Pebble", CanCollide=False,
+                                   CanTouch=False, CanQuery=False))
+        return group(name, pieces)
+
+    out.append(group("Spot", [
+        marker("TrainAnchor", [2, 2, 1],
+               mul(bench, mul(cf(0, 1.25, 0.2), rot_x(90)))),
+        dumbbell("HeldRight", -2.0),
+        dumbbell("HeldLeft", 2.0),
+    ]))
+    out.append(marker("TrainExit", [2, 2, 1],
+                      mul(cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 1.5), rot_y(-90))))
+    return out
+
+
+def pec_deck(pad_color, accent):
+    """Selectorised fly station; the hands sweep two independent grips inward."""
+    out = [floor_mat(12, 12)]
+    out.extend([
+        part("Base", [8.0, 0.55, 8.5], cf(0, FLOOR_TOP + 0.28, -0.2), STEEL, "DiamondPlate"),
+        part("SeatPost", [1.2, 2.2, 1.2], cf(0, FLOOR_TOP + 1.1, 1.8), STEEL, "Metal"),
+        part("Seat", [4.0, 0.6, 4.0], cf(0, FLOOR_TOP + 2.35, 1.8), pad_color, "Fabric"),
+        part("BackPad", [4.4, 6.0, 0.7], cf(0, FLOOR_TOP + 5.2, 3.4), pad_color, "Fabric"),
+        part("TopBeam", [11.0, 0.7, 0.8], cf(0, FLOOR_TOP + 9.0, 1.2), STEEL, "Metal"),
+    ])
+    for side in (-1, 1):
+        out.extend([
+            part("WeightTower", [2.0, 8.5, 2.4],
+                 cf(side * 4.6, FLOOR_TOP + 4.25, 1.2), STEEL_LIGHT, "Metal"),
+            part("FlyArm", [0.55, 5.2, 0.55],
+                 mul(cf(side * 3.7, FLOOR_TOP + 6.4, 0.2), rot_z(side * 35)),
+                 accent, "Metal"),
+        ])
+
+    def grip(name, x):
+        return group(name, [cylinder(
+            "Grip", 1.4, 0.48, cf(x, FLOOR_TOP + 5.0, -0.2),
+            CHROME, "Pebble", CanCollide=False, CanTouch=False, CanQuery=False,
+        )])
+
+    out.append(group("Spot", [
+        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.4, 1.8)),
+        grip("HeldRight", -2.6),
+        grip("HeldLeft", 2.6),
+    ]))
+    out.append(marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 5.7)))
+    return out
+
+
+def barbell_curl(pad_color, accent):
+    """A short street rack for synchronized standing barbell curls."""
+    out = [floor_mat(11, 10)]
+    out.extend([
+        part("Base", [10.0, 0.55, 4.0], cf(0, FLOOR_TOP + 0.28, -2.5), STEEL, "DiamondPlate"),
+        part("RackBack", [10.0, 3.8, 0.6], cf(0, FLOOR_TOP + 2.0, -3.7), STEEL_LIGHT, "Metal"),
+        part("RackStripe", [10.0, 0.35, 0.75], cf(0, FLOOR_TOP + 3.6, -3.35), accent, "Neon"),
+    ])
+    for side in (-1, 1):
+        out.append(part("CurlHook", [0.6, 2.5, 2.0],
+                        cf(side * 3.5, FLOOR_TOP + 1.25, -2.4), STEEL, "Metal"))
+
+    bar = [cylinder("Bar", 7.2, 0.3, cf(0, FLOOR_TOP + 2.1, -2.2),
+                    CHROME, "Metal", Reflectance=0.3, CanCollide=False,
+                    CanTouch=False, CanQuery=False)]
+    for side in (-1, 1):
+        bar.append(cylinder("Plate", 0.6, 1.8,
+                            cf(side * 3.0, FLOOR_TOP + 2.1, -2.2),
+                            RUBBER, "Pebble", CanCollide=False, CanTouch=False,
+                            CanQuery=False))
+    out.append(group("Spot", [
+        anchor_standing(cf(0, FLOOR_TOP, 0.8)),
+        group("HeldBoth", bar),
+    ]))
+    out.append(marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 4.7)))
+    return out
+
+
+def triceps_pushdown(pad_color, accent):
+    """A cable-stack pushdown station with a short two-hand bar."""
+    out = [floor_mat(10, 11)]
+    out.extend([
+        part("Base", [5.0, 0.65, 5.0], cf(0, FLOOR_TOP + 0.33, -3.0), STEEL, "DiamondPlate"),
+        part("WeightStack", [3.8, 8.0, 2.5], cf(0, FLOOR_TOP + 4.0, -3.4), STEEL_LIGHT, "Metal"),
+        part("StackStripe", [4.0, 0.45, 2.7], cf(0, FLOOR_TOP + 6.8, -3.4), accent, "Neon"),
+        part("PulleyPost", [0.8, 10.5, 0.8], cf(0, FLOOR_TOP + 5.25, -2.0), STEEL, "Metal"),
+        part("PulleyArm", [0.8, 0.8, 4.0], cf(0, FLOOR_TOP + 10.1, -0.4), STEEL, "Metal"),
+        cylinder("Pulley", 0.8, 1.7, cf(0, FLOOR_TOP + 9.4, 1.2), CHROME, "Metal"),
+        part("Cable", [0.12, 5.0, 0.12], cf(0, FLOOR_TOP + 7.0, 1.2), RUBBER,
+             "SmoothPlastic", CanCollide=False, CanTouch=False, CanQuery=False),
+    ])
+    bar = [cylinder("PushBar", 4.0, 0.38, cf(0, FLOOR_TOP + 4.6, 1.2),
+                    CHROME, "Metal", CanCollide=False, CanTouch=False,
+                    CanQuery=False)]
+    out.append(group("Spot", [
+        anchor_standing(cf(0, FLOOR_TOP, 2.5)),
+        group("HeldBoth", bar),
+    ]))
+    out.append(marker("TrainExit", [2, 2, 1], cf(3.8, FLOOR_TOP + ROOT_HEIGHT, 2.5)))
+    return out
+
+
+def seated_row(pad_color, accent):
+    """Low cable row with a seat, foot plates, stack and close-grip handle."""
+    out = [floor_mat(10, 13)]
+    out.extend([
+        part("Base", [4.5, 0.55, 10.0], cf(0, FLOOR_TOP + 0.28, 0), STEEL, "DiamondPlate"),
+        part("Seat", [4.2, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 2.7), pad_color, "Fabric"),
+        part("SeatPost", [1.0, 1.8, 1.0], cf(0, FLOOR_TOP + 0.9, 2.7), STEEL, "Metal"),
+        part("WeightTower", [4.0, 7.5, 2.4], cf(0, FLOOR_TOP + 3.75, -4.4), STEEL_LIGHT, "Metal"),
+        part("TowerStripe", [4.2, 0.45, 2.6], cf(0, FLOOR_TOP + 6.3, -4.4), accent, "Neon"),
+    ])
+    for side in (-1, 1):
+        out.append(part("FootPlate", [3.0, 0.4, 3.4],
+                        mul(cf(side * 2.1, FLOOR_TOP + 1.2, -0.7), rot_z(side * 28)),
+                        STEEL, "DiamondPlate"))
+    handle = [cylinder("RowHandle", 3.2, 0.4, cf(0, FLOOR_TOP + 3.5, -1.6),
+                       CHROME, "Metal", CanCollide=False, CanTouch=False,
+                       CanQuery=False)]
+    out.append(group("Spot", [
+        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.2, 2.7)),
+        group("HeldBoth", handle),
+    ]))
+    out.append(marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 3.6)))
+    return out
+
+
+def lat_pulldown(pad_color, accent):
+    """Tall dual-tower pulldown with thigh restraint and an overhead bar."""
+    out = [floor_mat(12, 12)]
+    out.extend([
+        part("Base", [10.0, 0.6, 9.0], cf(0, FLOOR_TOP + 0.3, -0.2), STEEL, "DiamondPlate"),
+        part("Seat", [4.0, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 1.8), pad_color, "Fabric"),
+        part("SeatPost", [1.0, 1.8, 1.0], cf(0, FLOOR_TOP + 0.9, 1.8), STEEL, "Metal"),
+        cylinder("ThighRoller", 5.0, 1.0, cf(0, FLOOR_TOP + 3.5, 0.2), RUBBER, "Pebble"),
+        part("TopCrossbar", [10.5, 0.8, 0.8], cf(0, FLOOR_TOP + 11.0, -1.5), STEEL, "Metal"),
+    ])
+    for side in (-1, 1):
+        out.append(part("WeightTower", [2.1, 10.5, 2.3],
+                        cf(side * 4.4, FLOOR_TOP + 5.25, -1.5), STEEL_LIGHT, "Metal"))
+    bar = [cylinder("LatBar", 8.0, 0.38, cf(0, FLOOR_TOP + 9.5, 0),
+                    CHROME, "Metal", CanCollide=False, CanTouch=False,
+                    CanQuery=False)]
+    out.append(group("Spot", [
+        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.2, 1.8)),
+        group("HeldBoth", bar),
+    ]))
+    out.append(marker("TrainExit", [2, 2, 1], cf(4.6, FLOOR_TOP + ROOT_HEIGHT, 3.6)))
+    return out
+
+
+def knee_raise(pad_color, accent):
+    """Captain's chair for supported hanging knee raises."""
+    out = [floor_mat(10, 10)]
+    out.extend([
+        part("Base", [8.0, 0.65, 6.0], cf(0, FLOOR_TOP + 0.33, -1.0), STEEL, "DiamondPlate"),
+        part("BackFrame", [6.0, 9.0, 0.8], cf(0, FLOOR_TOP + 5.0, -3.0), STEEL, "Metal"),
+        part("BackPad", [4.4, 5.5, 0.65], cf(0, FLOOR_TOP + 6.0, -2.45), pad_color, "Fabric"),
+        part("TopStripe", [6.2, 0.5, 1.0], cf(0, FLOOR_TOP + 9.7, -2.7), accent, "Neon"),
+    ])
+    for side in (-1, 1):
+        out.extend([
+            part("ArmRest", [2.0, 0.65, 4.5],
+                 cf(side * 2.7, FLOOR_TOP + 6.0, -0.2), pad_color, "Fabric"),
+            cylinder("Handle", 2.3, 0.42,
+                     mul(cf(side * 2.7, FLOOR_TOP + 6.35, 1.2), rot_y(90)),
+                     CHROME, "Metal"),
+        ])
+    out.append(marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 5.4, -0.5)))
+    out.append(marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 4.2)))
+    return out
+
+
+def torso_twist(pad_color, accent):
+    """Seated torso-rotation station with a medicine ball held in both hands."""
+    out = [floor_mat(10, 10)]
+    out.extend([
+        cylinder("Base", 0.7, 7.0, mul(cf(0, FLOOR_TOP + 0.35, 0), rot_z(90)),
+                 STEEL, "DiamondPlate"),
+        part("SeatPost", [1.0, 1.8, 1.0], cf(0, FLOOR_TOP + 0.9, 0), STEEL, "Metal"),
+        part("Seat", [4.4, 0.65, 4.2], cf(0, FLOOR_TOP + 2.2, 0), pad_color, "Fabric"),
+        part("FootBrace", [7.0, 0.5, 2.5], cf(0, FLOOR_TOP + 0.8, 2.3), STEEL, "Metal"),
+        part("ArcGauge", [8.0, 0.35, 0.8], cf(0, FLOOR_TOP + 0.25, -3.0), accent, "Neon"),
+    ])
+    ball = [part("MedicineBall", [2.2, 2.2, 2.2], cf(0, FLOOR_TOP + 4.5, -1.2),
+                 accent, "Rubber", Shape="Ball", CanCollide=False,
+                 CanTouch=False, CanQuery=False)]
+    out.append(group("Spot", [
+        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.2, 0)),
+        group("HeldBoth", ball),
+    ]))
+    out.append(marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.0)))
+    return out
+
+
+def squat_rack(pad_color, accent):
+    """Open squat cage with a locally carried barbell."""
+    out = [floor_mat(12, 12)]
+    for side in (-1, 1):
+        for z in (-3.8, 3.8):
+            out.append(part("RackPost", [0.75, 10.0, 0.75],
+                            cf(side * 4.4, FLOOR_TOP + 5.0, z), STEEL, "DiamondPlate"))
+        out.append(part("RackTop", [0.75, 0.75, 8.3],
+                        cf(side * 4.4, FLOOR_TOP + 9.7, 0), STEEL, "Metal"))
+    out.extend([
+        part("Base", [10.0, 0.45, 9.0], cf(0, FLOOR_TOP + 0.23, 0), STEEL, "DiamondPlate"),
+        part("TopBeam", [9.6, 0.75, 0.75], cf(0, FLOOR_TOP + 9.7, -3.8), accent, "Metal"),
+    ])
+    bar = [cylinder("Bar", 9.4, 0.34, cf(0, FLOOR_TOP + 6.3, 0),
+                    CHROME, "Metal", CanCollide=False, CanTouch=False,
+                    CanQuery=False)]
+    for side in (-1, 1):
+        for offset in (3.4, 4.0):
+            bar.append(cylinder("Plate", 0.55, 2.0,
+                                cf(side * offset, FLOOR_TOP + 6.3, 0),
+                                RUBBER, "Pebble", CanCollide=False,
+                                CanTouch=False, CanQuery=False))
+    out.append(group("Spot", [
+        anchor_standing(cf(0, FLOOR_TOP, 0.4)),
+        group("HeldBoth", bar),
+    ]))
+    out.append(marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 6.1)))
+    return out
+
+
+def leg_press(pad_color, accent):
+    """Reclined sled press; the avatar extends against a broad fixed footplate."""
+    out = [floor_mat(12, 14)]
+    seat_frame = mul(cf(0, FLOOR_TOP + 2.1, 2.4), rot_x(28))
+    out.extend([
+        part("Base", [7.0, 0.6, 11.0], cf(0, FLOOR_TOP + 0.3, 0), STEEL, "DiamondPlate"),
+        part("Seat", [5.0, 0.7, 4.0], seat_frame, pad_color, "Fabric"),
+        part("BackPad", [5.0, 0.7, 6.0],
+             mul(cf(0, FLOOR_TOP + 3.8, 4.1), rot_x(58)), pad_color, "Fabric"),
+        part("FootPlate", [7.5, 0.65, 7.5],
+             mul(cf(0, FLOOR_TOP + 5.0, -3.7), rot_x(-38)), STEEL_LIGHT, "DiamondPlate"),
+        part("SledStripe", [7.7, 0.4, 1.0],
+             mul(cf(0, FLOOR_TOP + 5.4, -3.2), rot_x(-38)), accent, "Neon"),
+    ])
+    for side in (-1, 1):
+        out.append(part("Rail", [0.55, 0.55, 10.0],
+                        mul(cf(side * 3.4, FLOOR_TOP + 3.2, -0.4), rot_x(-25)),
+                        CHROME, "Metal"))
+    out.append(marker("TrainAnchor", [2, 2, 1],
+                      mul(seat_frame, mul(cf(0, 1.4, 1.0), rot_x(90)))))
+    out.append(marker("TrainExit", [2, 2, 1],
+                      mul(cf(5.0, FLOOR_TOP + ROOT_HEIGHT, 3.6), rot_y(-90))))
+    return out
+
+
 BUILDERS = {
     "BenchPress": bench_press,
+    "InclinePress": incline_press,
+    "PecDeck": pec_deck,
     "Dumbbells": dumbbell_rack,
+    "BarbellCurl": barbell_curl,
+    "TricepsPushdown": triceps_pushdown,
     "PullUpBar": pull_up_rig,
+    "SeatedRow": seated_row,
+    "LatPulldown": lat_pulldown,
     "SitUpBench": sit_up_bench,
+    "KneeRaise": knee_raise,
+    "TorsoTwist": torso_twist,
     "Treadmill": treadmill,
+    "SquatRack": squat_rack,
+    "LegPress": leg_press,
 }
 
 
@@ -1323,7 +1610,20 @@ def zone_volume(row):
 # variety survives a rebuild instead of becoming a moving target in source control.
 # --------------------------------------------------------------------------
 
-MACHINE_ORDER = ["BenchPress", "Dumbbells", "PullUpBar", "SitUpBench", "Treadmill"]
+FAMILY_ORDER = ["Chest", "Arms", "Back", "Core", "Legs"]
+STAT_VARIANTS = {
+    "Chest": ("BenchPress", "InclinePress", "PecDeck"),
+    "Arms": ("Dumbbells", "BarbellCurl", "TricepsPushdown"),
+    "Back": ("PullUpBar", "SeatedRow", "LatPulldown"),
+    "Core": ("SitUpBench", "KneeRaise", "TorsoTwist"),
+    "Legs": ("Treadmill", "SquatRack", "LegPress"),
+}
+MACHINE_ORDER = [STAT_VARIANTS[family][0] for family in FAMILY_ORDER]
+EQUIPMENT_FAMILY = {
+    equipment_id: family
+    for family, variants in STAT_VARIANTS.items()
+    for equipment_id in variants
+}
 MACHINE_COUNT = len(MACHINE_ORDER)
 
 
@@ -1412,18 +1712,24 @@ def machine_spots(row):
 # These are gameplay venues, not decorative copies of the machine itself: an
 # Arms cage, Chest bay, Back tower, Core court and Legs lane have different
 # silhouettes and use the stat colour as a restrained wayfinding stripe.
-STAT_COLORS = {
-    "BenchPress": [1.00, 0.65, 0.15],
-    "Dumbbells": [0.94, 0.33, 0.31],
-    "PullUpBar": [0.40, 0.73, 0.42],
-    "SitUpBench": [0.26, 0.65, 0.96],
-    "Treadmill": [0.67, 0.28, 0.74],
+FAMILY_COLORS = {
+    "Chest": [1.00, 0.65, 0.15],
+    "Arms": [0.94, 0.33, 0.31],
+    "Back": [0.40, 0.73, 0.42],
+    "Core": [0.26, 0.65, 0.96],
+    "Legs": [0.67, 0.28, 0.74],
 }
+STAT_COLORS = {
+    equipment_id: FAMILY_COLORS[family]
+    for equipment_id, family in EQUIPMENT_FAMILY.items()
+}
+STAT_COLORS.update(FAMILY_COLORS)
 
 
 def training_venue(equipment_id, district_accent):
     """Original part-built architecture wrapped around one training machine."""
-    color = STAT_COLORS[equipment_id]
+    family = EQUIPMENT_FAMILY[equipment_id]
+    color = FAMILY_COLORS[family]
     dark = [0.12, 0.13, 0.15]
     concrete = [0.31, 0.31, 0.32]
     out = [
@@ -1433,7 +1739,7 @@ def training_venue(equipment_id, district_accent):
              color, "Neon", CanCollide=False, CastShadow=False),
     ]
 
-    if equipment_id == "BenchPress":
+    if family == "Chest":
         # A heavy open-front press bay: concrete sides, lit lintel, no front wall.
         out.extend([
             part("ChestWall", [30, 12, 1.2], cf(0, FLOOR_TOP + 6, -14), dark, "Concrete"),
@@ -1441,7 +1747,7 @@ def training_venue(equipment_id, district_accent):
             part("ChestWing", [1.2, 9, 13], cf(14.4, FLOOR_TOP + 4.5, -7.5), dark, "Concrete"),
             part("ChestLintel", [28, 1.0, 1.5], cf(0, FLOOR_TOP + 11.5, -13.4), color, "Neon"),
         ])
-    elif equipment_id == "Dumbbells":
+    elif family == "Arms":
         # A steel street cage; open sides keep the three curl spots reachable.
         for x in (-14, 14):
             for z in (-13, 13):
@@ -1450,7 +1756,7 @@ def training_venue(equipment_id, district_accent):
             part("ArmsCanopy", [30, 0.8, 30], cf(0, FLOOR_TOP + 14.2, 0), dark, "Metal"),
             part("ArmsBeam", [30, 0.7, 0.8], cf(0, FLOOR_TOP + 12.6, 13.4), color, "Neon"),
         ])
-    elif equipment_id == "PullUpBar":
+    elif family == "Back":
         # A tall back-training tower visible over nearby props.
         out.extend([
             part("BackTower", [24, 18, 1.2], cf(0, FLOOR_TOP + 9, -14), dark, "Metal"),
@@ -1458,7 +1764,7 @@ def training_venue(equipment_id, district_accent):
                  [0.22, 0.24, 0.28], "DiamondPlate"),
             part("BackTop", [26, 1.2, 2.0], cf(0, FLOOR_TOP + 18.3, -14), color, "Neon"),
         ])
-    elif equipment_id == "SitUpBench":
+    elif family == "Core":
         # A low court keeps sightlines open while marking a dedicated Core area.
         for x, z, sx, sz in ((0, -14, 30, 1), (-14, 0, 1, 28), (14, 0, 1, 28)):
             out.append(part("CoreWall", [sx, 3.2, sz], cf(x, FLOOR_TOP + 1.6, z), dark, "Concrete"))
@@ -1928,17 +2234,53 @@ def build_world():
 # physically finding its doorway is the exploration layer.
 # --------------------------------------------------------------------------
 
-CITY_COLUMNS = 11
-CITY_ROWS = 5
-CITY_CELL_X = 230
-CITY_CELL_Z = 230
-CITY_BLOCK = 184
-CITY_HALF_X = CITY_COLUMNS * CITY_CELL_X / 2 + 70
-CITY_HALF_Z = CITY_ROWS * CITY_CELL_Z / 2 + 70
-HIDEOUT_STYLES = ["warehouse", "alley", "yard", "underpass", "bunker", "tower"]
 THIRD_FLOOR_Y = 24
 MAP_FEATURE_TAG = "MapFeature"
-CITY_THEME_ZONES = [row["zone"] for row in DISTRICTS if row["zone"] != "Garage"]
+GROUND_STYLES = ["warehouse", "alley", "yard", "underpass", "bunker"]
+
+# The connected world is an irregular coastal loop rather than a rectangular
+# grid. A region is a visual landmark, not a progression tier: the 50 non-starter
+# tier/family pairs are shuffled across all ten. Counts deliberately vary so the
+# player cannot infer "five machines live in every neighborhood" either.
+REGIONS = [
+    {"id": "OldTown", "theme": "Iron", "center": (-270, 100),
+     "size": (430, 340), "yaw": -12, "shape": "Rect", "count": 6},
+    {"id": "Harbor", "theme": "Powerhouse", "center": (-680, -100),
+     "size": (540, 300), "yaw": 16, "shape": "Rect", "count": 7},
+    {"id": "Beach", "theme": "Strongman", "center": (-570, -440),
+     "size": (430, 430), "yaw": 0, "shape": "Circle", "count": 3},
+    {"id": "Quarry", "theme": "Titan", "center": (-120, -590),
+     "size": (460, 460), "yaw": -18, "shape": "Circle", "count": 4},
+    {"id": "Highrise", "theme": "Skydeck", "center": (350, -470),
+     "size": (520, 380), "yaw": 21, "shape": "Rect", "count": 7},
+    {"id": "SolarWorks", "theme": "Solar", "center": (700, -160),
+     "size": (500, 340), "yaw": -14, "shape": "Rect", "count": 5},
+    {"id": "Stormworks", "theme": "Storm", "center": (660, 300),
+     "size": (430, 430), "yaw": 0, "shape": "Circle", "count": 4},
+    {"id": "NeonMarket", "theme": "Nebula", "center": (260, 560),
+     "size": (520, 360), "yaw": 27, "shape": "Rect", "count": 6},
+    {"id": "Observatory", "theme": "Ascendant", "center": (-180, 650),
+     "size": (430, 430), "yaw": 0, "shape": "Circle", "count": 3},
+    {"id": "VoidRail", "theme": "Void", "center": (-560, 430),
+     "size": (500, 360), "yaw": -24, "shape": "Rect", "count": 5},
+]
+REGION_BY_ID = {region["id"]: region for region in REGIONS}
+REGION_LINKS = [
+    ("OldTown", "Harbor"), ("Harbor", "Beach"), ("Beach", "Quarry"),
+    ("Quarry", "Highrise"), ("Highrise", "SolarWorks"),
+    ("SolarWorks", "Stormworks"), ("Stormworks", "NeonMarket"),
+    ("NeonMarket", "Observatory"), ("Observatory", "VoidRail"),
+    ("VoidRail", "OldTown"),
+]
+
+# Seven irregular local sites, consumed in different quantities by each region.
+# Rotating and scaling these per patch yields 50 non-axial, well-separated sites
+# while keeping their authored doors close enough to a road to be found on foot.
+REGION_SITE_PATTERN = [
+    (-0.31, -0.24), (0.29, -0.27), (-0.34, 0.23), (0.32, 0.25),
+    (-0.02, 0.01), (0.00, -0.42), (-0.04, 0.42),
+]
+NON_STARTER_VARIANT_SEQUENCE = (1, 2, 0, 1, 2, 0, 1, 2, 0, 1)
 
 
 def map_feature(node, kind, shape="Rect"):
@@ -1960,93 +2302,145 @@ def map_footprint(name, width, depth, frame, color, kind, shape="Rect"):
     )
 
 
-def city_neighborhood(block_x, block_z):
-    """One of ten flat visual neighborhoods, independent of training tier.
+def region_frame(region):
+    x, z = region["center"]
+    return mul(cf(x, 0, z), rot_y(region["yaw"]))
 
-    Five west-to-east bands on each side of the city reuse the ten old island
-    themes. Training tiers are shuffled through them, so scenery creates useful
-    landmarks without revealing the multiplier hidden in a building.
-    """
-    column = round(block_x / CITY_CELL_X + (CITY_COLUMNS - 1) / 2)
-    band = min(4, int(column * 5 / CITY_COLUMNS))
-    side = 0 if block_z < 0 else 1
-    return CITY_THEME_ZONES[side * 5 + band]
+
+def region_sites(region):
+    """World-space site CFrames for one irregular region."""
+    width, depth = region["size"]
+    frame = region_frame(region)
+    out = []
+    for index, (unit_x, unit_z) in enumerate(REGION_SITE_PATTERN[:region["count"]]):
+        local = cf(unit_x * width, 0, unit_z * depth)
+        yaw_jitter = (-8, -4, 0, 4, 8)[index % 5]
+        out.append(mul(mul(frame, local), rot_y(yaw_jitter)))
+    return out
+
+
+def _assignment_is_varied(assignments):
+    tier_regions = {}
+    family_regions = {family: set() for family in FAMILY_ORDER}
+    region_tiers = {}
+    region_families = {}
+    for record, region_id, _site_index, _site in assignments:
+        tier_regions.setdefault(record["zone"], set()).add(region_id)
+        family_regions[record["family"]].add(region_id)
+        key = (region_id, record["zone"])
+        region_tiers[key] = region_tiers.get(key, 0) + 1
+        key = (region_id, record["family"])
+        region_families[key] = region_families.get(key, 0) + 1
+    return (
+        all(len(regions) >= 4 for regions in tier_regions.values())
+        and all(len(regions) >= 7 for regions in family_regions.values())
+        and max(region_tiers.values()) <= 2
+        and max(region_families.values()) <= 2
+    )
 
 
 def connected_locations():
-    """All 55 stat/tier pairs: five starters together, fifty shuffled outside."""
+    """All 55 tier/family pairs, balanced across variants and environments."""
     starters = []
-    starter_radius = 66
-    for index, equipment_id in enumerate(MACHINE_ORDER):
-        angle = 360.0 * index / len(MACHINE_ORDER) + 18
-        origin = mul(mul(rot_y(angle), cf(0, 0, starter_radius)), rot_y(180))
+    starter_sites = [
+        (-62, -42, 32), (54, -56, -24), (-70, 35, 112),
+        (12, 68, 188), (70, 20, 254),
+    ]
+    for family, equipment_id, (x, z, yaw) in zip(
+            FAMILY_ORDER, MACHINE_ORDER, starter_sites):
+        origin = mul(cf(x, 0, z), rot_y(yaw))
         starters.append({
             "id": f"Garage-{equipment_id}",
             "zone": "Garage",
+            "family": family,
+            "slot": equipment_id,
             "equipment": equipment_id,
-            "block_x": 0.0,
-            "block_z": 0.0,
+            "site_x": x,
+            "site_z": z,
             "ground_origin": origin,
             "origin": origin,
             "style": "starter",
             "seed": f"Garage:{equipment_id}:starter",
             "starter": True,
             "landmark": False,
+            "region_id": "Hub",
+            "environment_id": "Hub",
             "neighborhood": "Garage",
+            "requires_flight": False,
         })
 
-    combinations = [
-        (row["zone"], equipment_id)
-        for row in DISTRICTS
-        if row["zone"] != "Garage"
-        for equipment_id in MACHINE_ORDER
-    ]
-    slots = [
-        ((column - (CITY_COLUMNS - 1) / 2) * CITY_CELL_X,
-         (row - (CITY_ROWS - 1) / 2) * CITY_CELL_Z)
-        for row in range(CITY_ROWS)
-        for column in range(CITY_COLUMNS)
-        if column != (CITY_COLUMNS - 1) / 2 or row != (CITY_ROWS - 1) / 2
-    ]
+    zone_ids = [row["zone"] for row in DISTRICTS if row["zone"] != "Garage"]
+    records = []
+    for zone_index, zone_id in enumerate(zone_ids):
+        for family_index, family in enumerate(FAMILY_ORDER):
+            variants = STAT_VARIANTS[family]
+            sequence_index = (zone_index + family_index * 2) % len(NON_STARTER_VARIANT_SEQUENCE)
+            equipment_id = variants[NON_STARTER_VARIANT_SEQUENCE[sequence_index]]
+            records.append({
+                "zone": zone_id,
+                "zone_index": zone_index + 1,
+                "family": family,
+                "family_index": family_index,
+                "slot": MACHINE_ORDER[family_index],
+                "equipment": equipment_id,
+            })
 
-    # Four of the 54 outer blocks remain scenery. Everything else is random-looking
-    # but committed and reproducible, with tiers deliberately interleaved.
-    rng = random.Random("connected-training-city-v2")
-    rng.shuffle(combinations)
-    rng.shuffle(slots)
-    slots = slots[:len(combinations)]
+    slots = [
+        (region["id"], index, site)
+        for region in REGIONS
+        for index, site in enumerate(region_sites(region))
+    ]
+    assignments = None
+    for attempt in range(2000):
+        shuffled = list(records)
+        random.Random(f"irregular-city-v3:{attempt}").shuffle(shuffled)
+        candidate = [
+            (record, region_id, site_index, site)
+            for record, (region_id, site_index, site) in zip(shuffled, slots)
+        ]
+        if _assignment_is_varied(candidate):
+            assignments = candidate
+            break
+    if assignments is None:
+        raise RuntimeError("could not distribute training sites across varied regions")
 
     out = list(starters)
-    landmark_neighborhoods = set()
-    for index, ((zone_id, equipment_id), (block_x, block_z)) in enumerate(zip(combinations, slots)):
-        local_rng = random.Random(f"{zone_id}:{equipment_id}:city")
-        offset_x = local_rng.uniform(-12, 12)
-        offset_z = local_rng.uniform(-24, 24)
-        yaw = local_rng.choice((0, 90, 180, 270))
-        style = HIDEOUT_STYLES[index % len(HIDEOUT_STYLES)]
-        neighborhood = city_neighborhood(block_x, block_z)
-        landmark = neighborhood not in landmark_neighborhoods
-        if landmark and style == "tower":
-            style = "warehouse"
-        ground_origin = mul(cf(block_x + offset_x, 0, block_z + offset_z), rot_y(yaw))
-        origin = mul(ground_origin, cf(0, THIRD_FLOOR_Y if style == "tower" else 0, 0))
-        landmark_neighborhoods.add(neighborhood)
+    ground_style_bag = (GROUND_STYLES * 10)[:50]
+    random.Random("irregular-city-v3:styles").shuffle(ground_style_bag)
+    for index, (record, region_id, site_index, site) in enumerate(assignments):
+        zone_rank = record["zone_index"]
+        family_index = record["family_index"]
+        requires_flight = zone_rank >= 3 and (zone_rank * 3 + family_index) % 4 == 0
+        third_floor = not requires_flight and (zone_rank + family_index * 2) % 7 == 0
+        style = "sky" if requires_flight else ("tower" if third_floor else ground_style_bag[index])
+        altitude = 0
+        if requires_flight:
+            altitude = 110 + ((zone_rank + family_index) % 4) * 42
+        origin = mul(site, cf(0, altitude if requires_flight else (
+            THIRD_FLOOR_Y if third_floor else 0), 0))
+        region = REGION_BY_ID[region_id]
+        equipment_id = record["equipment"]
+        travel_id = f"{record['zone']}-{record['slot']}"
+        site_x, _, site_z = site[0]
         out.append({
-            "id": f"{zone_id}-{equipment_id}",
-            "zone": zone_id,
+            "id": travel_id,
+            "zone": record["zone"],
+            "family": record["family"],
+            "slot": record["slot"],
             "equipment": equipment_id,
-            "block_x": block_x,
-            "block_z": block_z,
-            "ground_origin": ground_origin,
+            "site_x": site_x,
+            "site_z": site_z,
+            "ground_origin": site,
             "origin": origin,
             "style": style,
-            "seed": f"{zone_id}:{equipment_id}:block",
+            "seed": f"{record['zone']}:{record['family']}:{region_id}",
             "starter": False,
-            "landmark": landmark,
-            "neighborhood": neighborhood,
-            "offset_x": offset_x,
-            "offset_z": offset_z,
-            "yaw": yaw,
+            "landmark": site_index == 0,
+            "region_id": region_id,
+            "environment_id": f"Sky-{travel_id}" if requires_flight else region_id,
+            "neighborhood": region["theme"],
+            "requires_flight": requires_flight,
+            "altitude": altitude,
         })
     return out
 
@@ -2167,43 +2561,165 @@ def enterable_training_tower(travel_id, equipment_id, accent):
     }
 
 
-def connected_ground():
-    """One landmass and its complete road grid, all at the same playable Y."""
+def environment_model(environment_id, kind, children, atomic=False,
+                      requires_flight=False, travel_id=None):
+    attributes = {
+        "EnvironmentId": environment_id,
+        "EnvironmentKind": kind,
+        "RequiresFlight": requires_flight,
+    }
+    if travel_id is not None:
+        attributes["TravelId"] = travel_id
+    properties = {"Tags": ["TrainingEnvironment"]}
+    if atomic:
+        properties["ModelStreamingMode"] = "Atomic"
+    return {
+        "name": f"Environment_{environment_id}",
+        "className": "Model",
+        "attributes": attributes,
+        "properties": properties,
+        "children": children,
+    }
+
+
+def road_between(name, start, finish):
+    """A walkable causeway and road segment between two irregular patches."""
+    x1, z1 = start
+    x2, z2 = finish
+    dx, dz = x2 - x1, z2 - z1
+    length = math.hypot(dx, dz)
+    yaw = math.degrees(math.atan2(dx, dz))
+    frame = mul(cf((x1 + x2) / 2, 0, (z1 + z2) / 2), rot_y(yaw))
     out = [
-        map_feature(
-            part("CityGround", [CITY_HALF_X * 2, 5, CITY_HALF_Z * 2],
-                 cf(0, FLOOR_TOP - 2.5, 0), [0.20, 0.22, 0.20], "Ground"),
+        place(frame, map_feature(
+            part("LandCorridor", [78, 4, length + 44], cf(0, FLOOR_TOP - 2, 0),
+                 [0.22, 0.23, 0.23], "Ground"),
             "Land",
-        ),
-        part("CityFoundation", [CITY_HALF_X * 2 + 12, 4, CITY_HALF_Z * 2 + 12],
-             cf(0, FLOOR_TOP - 7, 0), [0.12, 0.13, 0.14], "Rock"),
+        )),
+        place(frame, map_feature(
+            part("Road", [40, 0.45, length + 18], cf(0, FLOOR_TOP + 0.03, 0),
+                 ROAD, "Asphalt", CanCollide=False),
+            "Road",
+        )),
     ]
+    for offset in range(-int(length / 2) + 18, int(length / 2) - 16, 42):
+        out.append(place(frame, part(
+            "RoadLine", [1.1, 0.1, 15], cf(0, FLOOR_TOP + 0.31, offset),
+            ROAD_LINE, "SmoothPlastic", CanCollide=False, CastShadow=False,
+        )))
+    return folder(name, out)
 
-    road_width = CITY_CELL_X - CITY_BLOCK
-    road_length_x = CITY_HALF_X * 2 - 18
-    road_length_z = CITY_HALF_Z * 2 - 18
-    for column in range(CITY_COLUMNS + 1):
-        x = (column - CITY_COLUMNS / 2) * CITY_CELL_X
-        pieces = street(road_length_z, road_width, cf(x, FLOOR_TOP - 0.2, 0), False)
-        map_feature(pieces[0], "Road")
-        out.extend(pieces)
-    for row_index in range(CITY_ROWS + 1):
-        z = (row_index - CITY_ROWS / 2) * CITY_CELL_Z
-        pieces = street(road_length_x, road_width,
-                        mul(cf(0, FLOOR_TOP - 0.2, z), rot_y(90)), False)
-        map_feature(pieces[0], "Road")
-        out.extend(pieces)
 
-    # A low continuous boundary makes the ground read as one coastal city plate,
-    # not a baseplate fading into the void.
-    for x, z, sx, sz in (
-        (0, -CITY_HALF_Z, CITY_HALF_X * 2, 4),
-        (0, CITY_HALF_Z, CITY_HALF_X * 2, 4),
-        (-CITY_HALF_X, 0, 4, CITY_HALF_Z * 2),
-        (CITY_HALF_X, 0, 4, CITY_HALF_Z * 2),
-    ):
-        out.append(part("SeaWall", [sx, 7, sz], cf(x, FLOOR_TOP + 3.5, z),
-                        [0.24, 0.25, 0.26], "Concrete"))
+def region_ground(region):
+    """A non-uniform coastal patch whose top remains the shared street Y=1."""
+    visual = next(row for row in DISTRICTS if row["zone"] == region["theme"])
+    width, depth = region["size"]
+    frame = region_frame(region)
+    out = []
+    if region["shape"] == "Circle":
+        diameter = min(width, depth)
+        out.append(place(frame, disc(
+            "DistrictGround", 4, diameter, FLOOR_TOP - 2,
+            visual["ground"], visual["ground_material"],
+        )))
+        out.append(place(frame, disc(
+            "DistrictFoundation", 5, diameter + 10, FLOOR_TOP - 6.5,
+            visual["rock"], visual["rock_material"],
+        )))
+        out.append(place(frame, map_footprint(
+            "DistrictLandMap", diameter, diameter, cf(0, FLOOR_TOP + 0.1, 0),
+            visual["ground"], "Land", "Circle",
+        )))
+    else:
+        out.extend([
+            place(frame, map_feature(part(
+                "DistrictGround", [width, 4, depth], cf(0, FLOOR_TOP - 2, 0),
+                visual["ground"], visual["ground_material"],
+            ), "Land")),
+            place(frame, part(
+                "DistrictFoundation", [width + 10, 5, depth + 10],
+                cf(0, FLOOR_TOP - 6.5, 0), visual["rock"], visual["rock_material"],
+            )),
+        ])
+
+        # Two rounded lobes break the silhouette of each rotated slab and make
+        # actual coves/peninsulas on both the world and its plan map.
+        lobe_diameter = min(depth * 0.48, 150)
+        for side in (-1, 1):
+            lobe_frame = mul(frame, cf(side * width * 0.43, 0, side * depth * 0.22))
+            out.append(place(lobe_frame, disc(
+                "DistrictLobe", 4, lobe_diameter, FLOOR_TOP - 2,
+                visual["ground"], visual["ground_material"],
+            )))
+            out.append(place(frame, map_footprint(
+                "DistrictLobeMap", lobe_diameter, lobe_diameter,
+                cf(side * width * 0.43, FLOOR_TOP + 0.1, side * depth * 0.22),
+                visual["ground"], "Land", "Circle",
+            )))
+    return out
+
+
+def _node_hits_sites(node, sites, clearance=48):
+    properties = node.get("properties", {})
+    frame = properties.get("CFrame")
+    size = properties.get("Size", [0, 0, 0])
+    if frame is not None:
+        radius = max(size[0], size[2]) / 2
+        if any(math.hypot(frame[0] - x, frame[2] - z) < clearance + radius
+               for x, z in sites):
+            return True
+    return any(_node_hits_sites(child, sites, clearance)
+               for child in node.get("children", []))
+
+
+def region_scenery(region, locations):
+    """One old-island landmark kit per neighborhood, filtered around gyms."""
+    visual = next(row for row in DISTRICTS if row["zone"] == region["theme"])
+    theme = visual.get("props")
+    if theme is None:
+        return []
+    row = dict(visual)
+    row["half"] = min(region["size"]) * 0.43
+    row["layout"] = "ring"
+    rng = random.Random(f"irregular-city-v3:scenery:{region['id']}")
+    site_positions = [(location["site_x"], location["site_z"])
+                      for location in locations]
+    out = []
+    for piece in PROPS[theme](row, rng):
+        placed = place(region_frame(region), piece)
+        if not _node_hits_sites(placed, site_positions):
+            out.append(placed)
+    return out
+
+
+def connected_ground():
+    """Water background plus the connected, non-rectangular causeway graph."""
+    out = [
+        map_feature(part(
+            "Ocean", [1900, 3, 1600], cf(0, FLOOR_TOP - 10, 10),
+            [0.08, 0.20, 0.27], "Glass", CanCollide=False, CanTouch=False,
+            CanQuery=False, Transparency=0.18,
+        ), "Water"),
+        environment_model("Hub", "Ground", [
+            disc("HubGround", 5, 470, FLOOR_TOP - 2.5,
+                 [0.22, 0.23, 0.23], "Ground"),
+            disc("HubFoundation", 5, 482, FLOOR_TOP - 7.5,
+                 [0.13, 0.14, 0.15], "Rock"),
+            map_footprint("HubLandMap", 470, 470, cf(0, FLOOR_TOP + 0.1, 0),
+                          [0.22, 0.23, 0.23], "Land", "Circle"),
+        ]),
+    ]
+    road_nodes = []
+    for index, (start_id, finish_id) in enumerate(REGION_LINKS):
+        road_nodes.append(road_between(
+            f"RingRoad{index + 1}", REGION_BY_ID[start_id]["center"],
+            REGION_BY_ID[finish_id]["center"],
+        ))
+    for region_id in ("OldTown", "Highrise", "NeonMarket"):
+        road_nodes.append(road_between(
+            f"HubRoad{region_id}", (0, 0), REGION_BY_ID[region_id]["center"],
+        ))
+    out.append(folder("RoadNetwork", road_nodes))
     return out
 
 
@@ -2244,7 +2760,7 @@ def connected_plaza():
                         barrier_color, "Neon", CanCollide=False, CastShadow=False))
     for index in range(12):
         angle = 360.0 * index / 12
-        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS - 6))
+        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS + 22))
         out.append(part("PlazaLamp", [1.4, 16, 1.4],
                         cf(spot[0][0], FLOOR_TOP + 8, spot[0][2]),
                         [0.16, 0.16, 0.18], "Metal"))
@@ -2256,7 +2772,7 @@ def connected_plaza():
 
 
 def starter_training_area(location, zone_row):
-    """One of all five x1 machines openly ringing the spawn safe zone."""
+    """One of all five x1 machines openly grouped around the spawn campus."""
     origin = location["origin"]
     out = [
         place(origin, piece)
@@ -2267,103 +2783,29 @@ def starter_training_area(location, zone_row):
     )))
     out.append(place(origin, map_footprint(
         "StarterVenueMap", 30, 30, cf(0, FLOOR_TOP + 0.1, 0),
-        STAT_COLORS[location["equipment"]], "Building"
+        FAMILY_COLORS[location["family"]], "Building"
     )))
     return out
 
 
-def adapted_city_landmark(location, visual_row):
-    """Reuses an old island theme without placing scenery through the gym.
-
-    The island prop functions already produce the authored cranes, palms, quarry
-    rigs, pylons, monoliths and observatory hardware. Their old centre/rim rules
-    do not know about a shuffled city doorway, so this pass removes any whole prop
-    whose footprint enters a generous keep-out circle around the hideout.
-    """
-    theme = visual_row.get("props")
-    if theme is None or not location["landmark"]:
-        return []
-    row = dict(visual_row)
-    row["half"] = 82
-    row["layout"] = "ring"
-    rng = random.Random(f"{location['neighborhood']}:city-landmark")
-    origin = cf(location["block_x"], 0, location["block_z"])
-    kept = []
-    for piece in PROPS[theme](row, rng):
-        properties = piece.get("properties", {})
-        frame = properties.get("CFrame")
-        size = properties.get("Size", [0, 0, 0])
-        if frame is not None:
-            dx = frame[0] - location["offset_x"]
-            dz = frame[2] - location["offset_z"]
-            footprint = max(size[0], size[2]) / 2
-            if math.hypot(dx, dz) < 45 + footprint:
-                continue
-        kept.append(place(origin, piece))
-    return kept
-
-
-def scenic_block(x, z, index):
-    """The four blocks not occupied by training become parks or parking lots."""
-    rng = random.Random(f"scenic:{x}:{z}")
-    color = [0.24, 0.31, 0.24] if index % 2 == 0 else [0.26, 0.27, 0.29]
-    material = "Grass" if index % 2 == 0 else "Asphalt"
-    out = [
-        map_feature(
-            part("ScenicBlock", [CITY_BLOCK, 1, CITY_BLOCK], cf(x, FLOOR_TOP - 0.5, z),
-                 color, material),
-            "Park" if index % 2 == 0 else "Block",
-        ),
-    ]
-    if index % 2 == 0:
-        for px, pz in ((-54, -48), (54, -48), (-54, 48), (54, 48), (0, 0)):
-            out.extend(palm(x + px, z + pz, rng))
-    else:
-        for offset in range(-68, 69, 34):
-            out.append(part("ParkingLine", [1, 0.1, 24],
-                            cf(x + offset, FLOOR_TOP + 1.05, z),
-                            [0.82, 0.76, 0.46], "SmoothPlastic", CanCollide=False))
-    return out
-
-
 def connected_block(location, zone_row, visual_row):
-    """Sidewalk, neighbouring buildings, hideout shell and its private zone."""
-    rng = random.Random(location["seed"])
-    x, z = location["block_x"], location["block_z"]
+    """One irregular ground site: pavement, secret shell and private zone."""
+    ground_origin = location["ground_origin"]
     out = [
-        map_feature(
-            part("Sidewalk", [CITY_BLOCK, 1, CITY_BLOCK], cf(x, FLOOR_TOP - 0.5, z),
-                 visual_row["ground"], visual_row["ground_material"]),
-            "Block",
-        ),
+        place(ground_origin, map_feature(part(
+            "SitePavement", [86, 1, 88], cf(0, FLOOR_TOP - 0.5, 0),
+            visual_row["ground"], visual_row["ground_material"],
+        ), "Block")),
     ]
-    # A kerb is a perimeter, not another full slab over the whole block. The old
-    # solid 188x188 part lifted every street gym 0.6 studs above the floor its
-    # machine was authored for and buried the low mats and bases inside it.
-    kerb_at = CITY_BLOCK / 2 + 1
-    for kx, kz, sx, sz in (
-        (x - kerb_at, z, 2, CITY_BLOCK + 4),
-        (x + kerb_at, z, 2, CITY_BLOCK + 4),
-        (x, z - kerb_at, CITY_BLOCK + 4, 2),
-        (x, z + kerb_at, CITY_BLOCK + 4, 2),
+    for x, z, sx, sz in (
+        (-44, 0, 2, 90), (44, 0, 2, 90),
+        (0, -45, 90, 2), (0, 45, 90, 2),
     ):
-        out.append(part("Kerb", [sx, 0.3, sz], cf(kx, FLOOR_TOP + 0.15, kz),
-                        KERB, "Concrete"))
-
-    # Two unrelated street buildings make the training door part of a city block
-    # instead of a freestanding labelled gym. Landmark and tower blocks provide
-    # their own skyline and stay clear of this generic pair.
-    if not location["landmark"] and location["style"] != "tower":
-        skin_a, skin_b = rng.choice(BUILDING_SKINS), rng.choice(BUILDING_SKINS)
-        out.extend(building(x - 64, z, 38, 144, rng.uniform(30, 82), skin_a, rng))
-        out.extend(building(x + 64, z, 38, 144, rng.uniform(26, 74), skin_b, rng))
-        out.append(map_footprint("BuildingMap", 38, 144,
-                                 cf(x - 64, FLOOR_TOP + 0.2, z), skin_a["wall"], "Building"))
-        out.append(map_footprint("BuildingMap", 38, 144,
-                                 cf(x + 64, FLOOR_TOP + 0.2, z), skin_b["wall"], "Building"))
+        out.append(place(ground_origin, part(
+            "Kerb", [sx, 0.3, sz], cf(x, FLOOR_TOP + 0.15, z), KERB, "Concrete",
+        )))
 
     origin = location["origin"]
-    ground_origin = location["ground_origin"]
     if location["style"] == "tower":
         out.append(place(ground_origin, enterable_training_tower(
             location["id"], location["equipment"], visual_row["accent"]
@@ -2383,10 +2825,76 @@ def connected_block(location, zone_row, visual_row):
     out.extend(place(origin, piece) for piece in training_venue(
         location["equipment"], visual_row["accent"]
     ))
-    out.extend(adapted_city_landmark(location, visual_row))
     out.append(place(origin, volume(
-        location["zone"], f"{location['id']}Volume", [76, 46, 82], cf(0, 22, 0)
+        location["zone"], f"{location['id']}Volume", [78, 54, 84], cf(0, 25, 0)
     )))
+    return out
+
+
+def sky_training_environment(location, zone_row, visual_row):
+    """An atomic, flight-only crane deck with rails and a recovery scaffold."""
+    accent = visual_row["accent"]
+    platform = [0.20, 0.22, 0.25]
+    out = [
+        part("LandingSurface", [96, 2, 88], cf(0, 0, 0), platform, "DiamondPlate"),
+        part("RecoveryDeck", [128, 2, 120], cf(0, -26, 0),
+             [0.16, 0.18, 0.21], "DiamondPlate"),
+        map_footprint("SkyPlatformMap", 96, 88, cf(0, 0.25, 0),
+                      platform, "SkyPlatform"),
+        marker("AccessEnd", [18, 10, 4], cf(0, 7, 45)),
+        part("CraneMast", [6, location["altitude"], 6],
+             cf(-39, -location["altitude"] / 2, -34),
+             [0.34, 0.30, 0.22], "DiamondPlate"),
+        part("CraneBeacon", [8, 3, 8], cf(-39, 5, -34), accent, "Neon",
+             CanCollide=False),
+    ]
+    tagged(out[3], tags=["VenueAccess"], attributes={
+        "TravelId": location["id"], "Role": "AccessEnd",
+    })
+    for x, z, sx, sz in (
+        (0, -43, 96, 2), (-47, 0, 2, 88), (47, 0, 2, 88),
+        (-35, 43, 26, 2), (35, 43, 26, 2),
+    ):
+        out.append(part("SkyRail", [sx, 5, sz], cf(x, 3.5, z),
+                        accent, "ForceField", Transparency=0.28))
+    for x, z, sx, sz in (
+        (0, -58, 128, 2), (-63, 0, 2, 120), (63, 0, 2, 120),
+        (0, 58, 128, 2),
+    ):
+        out.append(part("RecoveryRail", [sx, 4, sz], cf(x, -23, z),
+                        [0.34, 0.36, 0.40], "Metal"))
+    out.extend(training_venue(location["equipment"], visual_row["accent"]))
+    out.append(volume(
+        location["zone"], f"{location['id']}Volume", [112, 76, 104], cf(0, 30, 0)
+    ))
+    placed = [place(location["origin"], piece) for piece in out]
+    return environment_model(
+        location["environment_id"], "Sky", placed, atomic=True,
+        requires_flight=True, travel_id=location["id"],
+    )
+
+
+def sky_launch_site(location, visual_row):
+    """A visible ground tether and access marker below every aerial gym."""
+    origin = location["ground_origin"]
+    out = [
+        place(origin, map_feature(part(
+            "LaunchPad", [82, 1, 82], cf(0, FLOOR_TOP - 0.5, 0),
+            [0.22, 0.24, 0.27], "Concrete",
+        ), "Park")),
+        place(origin, disc("LaunchRing", 0.18, 48, FLOOR_TOP + 0.1,
+                           visual_row["accent"], "Neon", CanCollide=False)),
+        place(origin, marker("AccessStart", [18, 8, 18],
+                             cf(0, FLOOR_TOP + 4, 18))),
+    ]
+    tagged(out[2], tags=["VenueAccess"], attributes={
+        "TravelId": location["id"], "Role": "AccessStart",
+    })
+    for x, z in ((-28, -28), (28, -28), (-28, 28), (28, 28)):
+        out.append(place(origin, part(
+            "FlightBeacon", [2.2, 18, 2.2], cf(x, FLOOR_TOP + 9, z),
+            visual_row["accent"], "Neon", CanCollide=False,
+        )))
     return out
 
 
@@ -2394,38 +2902,59 @@ def build_connected_world():
     locations = connected_locations()
     zone_rows = {row["zone"]: row for row in DISTRICTS}
     structure = connected_ground()
-    structure.extend(connected_plaza())
     machines = []
-    used_blocks = {(0.0, 0.0)}
+    hub_children = connected_plaza()
+    region_children = {region["id"]: region_ground(region) for region in REGIONS}
+    sky_environments = []
 
     for location in locations:
         row = zone_rows[location["zone"]]
         visual_row = zone_rows[location["neighborhood"]]
         if location["starter"]:
-            pieces = starter_training_area(location, row)
+            hub_children.append(folder(location["id"], starter_training_area(location, row)))
+        elif location["style"] == "sky":
+            region_children[location["region_id"]].append(folder(
+                f"Launch_{location['id']}", sky_launch_site(location, visual_row)
+            ))
+            sky_environments.append(sky_training_environment(location, row, visual_row))
         else:
-            pieces = connected_block(location, row, visual_row)
-            used_blocks.add((location["block_x"], location["block_z"]))
-        structure.append(folder(location["id"], pieces))
+            region_children[location["region_id"]].append(folder(
+                location["id"], connected_block(location, row, visual_row)
+            ))
+
+        access_kind = "Sky" if location["style"] == "sky" else (
+            "ThirdFloor" if location["style"] == "tower" else "Street"
+        )
         machines.append(machine(
             location["id"], location["equipment"], location["origin"],
             BUILDERS[location["equipment"]](row["pad"], row["accent"]),
             travel_id=location["id"],
-            access_kind="ThirdFloor" if location["style"] == "tower" else "Street",
+            access_kind=access_kind,
             floor_index=3 if location["style"] == "tower" else 1,
+            exercise_family=location["family"],
+            environment_id=location["environment_id"],
+            requires_flight=location["requires_flight"],
         ))
 
-    all_blocks = [
-        ((column - (CITY_COLUMNS - 1) / 2) * CITY_CELL_X,
-         (row - (CITY_ROWS - 1) / 2) * CITY_CELL_Z)
-        for row in range(CITY_ROWS)
-        for column in range(CITY_COLUMNS)
-    ]
-    for index, (x, z) in enumerate(spot for spot in all_blocks if spot not in used_blocks):
-        structure.append(folder(f"ScenicBlock{index + 1}", scenic_block(x, z, index)))
+    # connected_ground creates Hub first so replace that minimal environment with
+    # its complete plaza/starter campus while preserving the road/water siblings.
+    for index, node in enumerate(structure):
+        if node.get("name") == "Environment_Hub":
+            node["children"].extend(hub_children)
+            structure[index] = node
+            break
+
+    for region in REGIONS:
+        region_locations = [location for location in locations
+                            if location.get("region_id") == region["id"]]
+        region_children[region["id"]].extend(region_scenery(region, region_locations))
+        structure.append(environment_model(
+            region["id"], "Ground", region_children[region["id"]]
+        ))
+    structure.extend(sky_environments)
 
     return (
-        {"className": "Folder", "children": [folder("ConnectedCity", structure)]},
+        {"className": "Folder", "children": [folder("IrregularCoastCity", structure)]},
         {"className": "Folder", "children": machines},
     )
 

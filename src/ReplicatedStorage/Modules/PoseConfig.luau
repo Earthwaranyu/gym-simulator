@@ -110,8 +110,8 @@ local poses: { Pose } = {
 				RestOffset = Vector3.new(0, -0.9, 0),
 				PeakOffset = Vector3.new(0, 0.9, 0),
 			},
-			{ Joint = "RightShoulder", Rest = deg(0, 0, 150), Peak = deg(0, 0, 136) },
-			{ Joint = "LeftShoulder", Rest = deg(0, 0, -150), Peak = deg(0, 0, -136) },
+			{ Joint = "RightShoulder", Rest = deg(0, 0, 145), Peak = deg(0, 0, 136) },
+			{ Joint = "LeftShoulder", Rest = deg(0, 0, -145), Peak = deg(0, 0, -136) },
 			{ Joint = "RightElbow", Rest = deg(10, 0, 0), Peak = deg(85, 0, 0) },
 			{ Joint = "LeftElbow", Rest = deg(10, 0, 0), Peak = deg(85, 0, 0) },
 			{ Joint = "RightHip", Rest = deg(12, 0, 6), Peak = deg(12, 0, 6) },
@@ -159,6 +159,196 @@ local poses: { Pose } = {
 				RestOffset = Vector3.new(0, -0.18, 0),
 				PeakOffset = Vector3.new(0, 0.18, 0),
 			},
+		},
+	},
+	{
+		-- Synchronous barbell curl. The small shoulder sweep keeps the motion
+		-- readable on simplified rigs while the elbows perform most of the lift.
+		Id = "BarbellCurl",
+		Cycles = 1,
+		Joints = {
+			{ Joint = "RightShoulder", Rest = deg(2, 0, 9), Peak = deg(-12, 0, 12) },
+			{ Joint = "LeftShoulder", Rest = deg(2, 0, -9), Peak = deg(-12, 0, -12) },
+			{ Joint = "RightElbow", Rest = deg(8, 0, 0), Peak = deg(120, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(8, 0, 0), Peak = deg(120, 0, 0) },
+			{ Joint = "Waist", Rest = deg(0, 0, 0), Peak = deg(-4, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(0, 0, 5), Peak = deg(0, 0, 5) },
+			{ Joint = "LeftHip", Rest = deg(0, 0, -5), Peak = deg(0, 0, -5) },
+		},
+	},
+	{
+		-- Cable pushdown: elbows extend beside the ribs and the shoulders settle
+		-- slightly as the bar reaches the thighs.
+		Id = "TricepsPushdown",
+		Cycles = 1,
+		Joints = {
+			{ Joint = "RightShoulder", Rest = deg(18, 0, 10), Peak = deg(3, 0, 8) },
+			{ Joint = "LeftShoulder", Rest = deg(18, 0, -10), Peak = deg(3, 0, -8) },
+			{ Joint = "RightElbow", Rest = deg(105, 0, 0), Peak = deg(5, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(105, 0, 0), Peak = deg(5, 0, 0) },
+			{ Joint = "Waist", Rest = deg(-8, 0, 0), Peak = deg(-5, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(-3, 0, 5), Peak = deg(0, 0, 5) },
+			{ Joint = "LeftHip", Rest = deg(-3, 0, -5), Peak = deg(0, 0, -5) },
+		},
+	},
+	{
+		-- Incline dumbbell press. The anchor supplies the bench angle; these joint
+		-- transforms lower the weights wide and press them above the upper chest.
+		Id = "InclinePress",
+		Cycles = 1,
+		Joints = {
+			{ Joint = "RightShoulder", Rest = deg(55, 0, 24), Peak = deg(82, 0, 8) },
+			{ Joint = "LeftShoulder", Rest = deg(55, 0, -24), Peak = deg(82, 0, -8) },
+			{ Joint = "RightElbow", Rest = deg(75, 0, 0), Peak = deg(8, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(75, 0, 0), Peak = deg(8, 0, 0) },
+			{ Joint = "Waist", Rest = deg(-5, 0, 0), Peak = deg(-2, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(-45, 0, 8), Peak = deg(-42, 0, 8) },
+			{ Joint = "LeftHip", Rest = deg(-45, 0, -8), Peak = deg(-42, 0, -8) },
+			{ Joint = "RightKnee", Rest = deg(-60, 0, 0), Peak = deg(-60, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-60, 0, 0), Peak = deg(-60, 0, 0) },
+		},
+	},
+	{
+		-- Pec-deck fly: bent arms sweep from a wide position to meet in front of
+		-- the chest while the torso stays against the back pad.
+		Id = "PecDeck",
+		Cycles = 1,
+		Joints = {
+			{ Joint = "RightShoulder", Rest = deg(20, 0, 78), Peak = deg(70, 0, 12) },
+			{ Joint = "LeftShoulder", Rest = deg(20, 0, -78), Peak = deg(70, 0, -12) },
+			{ Joint = "RightElbow", Rest = deg(85, 0, 0), Peak = deg(78, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(85, 0, 0), Peak = deg(78, 0, 0) },
+			{ Joint = "Waist", Rest = deg(-4, 0, 0), Peak = deg(2, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(72, 0, 7), Peak = deg(70, 0, 7) },
+			{ Joint = "LeftHip", Rest = deg(72, 0, -7), Peak = deg(70, 0, -7) },
+			{ Joint = "RightKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
+		},
+	},
+	{
+		-- Seated cable row. Arms reach toward the stack, then the shoulders and
+		-- elbows pull the close-grip handle to the abdomen without a large body swing.
+		Id = "SeatedRow",
+		Cycles = 1,
+		Joints = {
+			{ Joint = "RightShoulder", Rest = deg(45, 0, 10), Peak = deg(-15, 0, 18) },
+			{ Joint = "LeftShoulder", Rest = deg(45, 0, -10), Peak = deg(-15, 0, -18) },
+			{ Joint = "RightElbow", Rest = deg(8, 0, 0), Peak = deg(95, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(8, 0, 0), Peak = deg(95, 0, 0) },
+			{ Joint = "Waist", Rest = deg(8, 0, 0), Peak = deg(-4, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(68, 0, 7), Peak = deg(64, 0, 7) },
+			{ Joint = "LeftHip", Rest = deg(68, 0, -7), Peak = deg(64, 0, -7) },
+			{ Joint = "RightKnee", Rest = deg(-70, 0, 0), Peak = deg(-70, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-70, 0, 0), Peak = deg(-70, 0, 0) },
+		},
+	},
+	{
+		-- Lat pulldown from full overhead reach to a bar near the upper chest.
+		-- Shoulders remain below the rig's measured reversal threshold.
+		Id = "LatPulldown",
+		Cycles = 1,
+		Joints = {
+			{ Joint = "RightShoulder", Rest = deg(0, 0, 145), Peak = deg(10, 0, 90) },
+			{ Joint = "LeftShoulder", Rest = deg(0, 0, -145), Peak = deg(10, 0, -90) },
+			{ Joint = "RightElbow", Rest = deg(8, 0, 0), Peak = deg(95, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(8, 0, 0), Peak = deg(95, 0, 0) },
+			{ Joint = "Waist", Rest = deg(-8, 0, 0), Peak = deg(-12, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(72, 0, 7), Peak = deg(68, 0, 7) },
+			{ Joint = "LeftHip", Rest = deg(72, 0, -7), Peak = deg(68, 0, -7) },
+			{ Joint = "RightKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
+		},
+	},
+	{
+		-- Captain's-chair knee raise. The upper body presses into the pads while
+		-- the pelvis rises and both knees fold toward the torso.
+		Id = "KneeRaise",
+		Cycles = 1,
+		Joints = {
+			{
+				Joint = "Root",
+				Rest = deg(0, 0, 0),
+				Peak = deg(-6, 0, 0),
+				RestOffset = Vector3.new(0, -0.08, 0),
+				PeakOffset = Vector3.new(0, 0.25, 0),
+			},
+			{ Joint = "RightShoulder", Rest = deg(0, 0, 132), Peak = deg(-8, 0, 125) },
+			{ Joint = "LeftShoulder", Rest = deg(0, 0, -132), Peak = deg(-8, 0, -125) },
+			{ Joint = "RightElbow", Rest = deg(20, 0, 0), Peak = deg(24, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(20, 0, 0), Peak = deg(24, 0, 0) },
+			{ Joint = "Waist", Rest = deg(0, 0, 0), Peak = deg(20, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(0, 0, 6), Peak = deg(75, 0, 8) },
+			{ Joint = "LeftHip", Rest = deg(0, 0, -6), Peak = deg(75, 0, -8) },
+			{ Joint = "RightKnee", Rest = deg(-10, 0, 0), Peak = deg(-105, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-10, 0, 0), Peak = deg(-105, 0, 0) },
+		},
+	},
+	{
+		-- Seated transverse rotation. Root and waist share the turn so the exercise
+		-- stays visible on rigs that do not expose a separate waist joint.
+		Id = "TorsoTwist",
+		Cycles = 1,
+		Joints = {
+			{ Joint = "Root", Rest = deg(0, -12, 0), Peak = deg(0, 12, 0) },
+			{ Joint = "Waist", Rest = deg(0, -35, 0), Peak = deg(0, 35, 0) },
+			{ Joint = "RightShoulder", Rest = deg(62, -8, 12), Peak = deg(68, 8, 10) },
+			{ Joint = "LeftShoulder", Rest = deg(62, -8, -12), Peak = deg(68, 8, -10) },
+			{ Joint = "RightElbow", Rest = deg(20, 0, 0), Peak = deg(20, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(20, 0, 0), Peak = deg(20, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(70, 8, 7), Peak = deg(70, -8, 7) },
+			{ Joint = "LeftHip", Rest = deg(70, 8, -7), Peak = deg(70, -8, -7) },
+			{ Joint = "RightKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
+		},
+	},
+	{
+		-- Barbell squat. Root translation lowers the whole rig while simultaneous
+		-- hip and knee flexion keeps the movement compact inside the rack.
+		Id = "SquatRack",
+		Cycles = 1,
+		Joints = {
+			{
+				Joint = "Root",
+				Rest = deg(0, 0, 0),
+				Peak = deg(8, 0, 0),
+				RestOffset = Vector3.new(0, 0, 0),
+				PeakOffset = Vector3.new(0, -1.4, 0),
+			},
+			{ Joint = "RightShoulder", Rest = deg(-8, 0, 58), Peak = deg(-2, 0, 54) },
+			{ Joint = "LeftShoulder", Rest = deg(-8, 0, -58), Peak = deg(-2, 0, -54) },
+			{ Joint = "RightElbow", Rest = deg(95, 0, 0), Peak = deg(100, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(95, 0, 0), Peak = deg(100, 0, 0) },
+			{ Joint = "Waist", Rest = deg(0, 0, 0), Peak = deg(18, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(0, 0, 6), Peak = deg(65, 0, 8) },
+			{ Joint = "LeftHip", Rest = deg(0, 0, -6), Peak = deg(65, 0, -8) },
+			{ Joint = "RightKnee", Rest = deg(-5, 0, 0), Peak = deg(-90, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-5, 0, 0), Peak = deg(-90, 0, 0) },
+		},
+	},
+	{
+		-- Reclined leg press. The machine anchor supplies the seat angle; the legs
+		-- drive from a controlled ninety-degree fold toward relaxed extension.
+		Id = "LegPress",
+		Cycles = 1,
+		Joints = {
+			{
+				Joint = "Root",
+				Rest = deg(0, 0, 0),
+				Peak = deg(-3, 0, 0),
+				RestOffset = Vector3.new(0, 0, 0),
+				PeakOffset = Vector3.new(0, 0.12, -0.08),
+			},
+			{ Joint = "RightShoulder", Rest = deg(-5, 0, 18), Peak = deg(2, 0, 14) },
+			{ Joint = "LeftShoulder", Rest = deg(-5, 0, -18), Peak = deg(2, 0, -14) },
+			{ Joint = "RightElbow", Rest = deg(75, 0, 0), Peak = deg(72, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(75, 0, 0), Peak = deg(72, 0, 0) },
+			{ Joint = "Waist", Rest = deg(-8, 0, 0), Peak = deg(-3, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(65, 0, 7), Peak = deg(10, 0, 5) },
+			{ Joint = "LeftHip", Rest = deg(65, 0, -7), Peak = deg(10, 0, -5) },
+			{ Joint = "RightKnee", Rest = deg(-100, 0, 0), Peak = deg(-8, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-100, 0, 0), Peak = deg(-8, 0, 0) },
+			{ Joint = "RightAnkle", Rest = deg(15, 0, 0), Peak = deg(0, 0, 0) },
+			{ Joint = "LeftAnkle", Rest = deg(15, 0, 0), Peak = deg(0, 0, 0) },
 		},
 	},
 }

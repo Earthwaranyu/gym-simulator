@@ -58,6 +58,10 @@ type Destination = {
 	Position: Vector3,
 	AccessKind: string,
 	FloorIndex: number,
+	EnvironmentId: string,
+	VariantId: string,
+	ExerciseFamily: string,
+	RequiresFlight: boolean,
 }
 
 type MapFeature = {
@@ -246,6 +250,12 @@ function MenuController:_fetchDestinations()
 			Position = Vector3.new(entry.X, entry.Y, entry.Z),
 			AccessKind = if type(entry.AccessKind) == "string" then entry.AccessKind else "Street",
 			FloorIndex = if type(entry.FloorIndex) == "number" then entry.FloorIndex else 1,
+			EnvironmentId = if type(entry.EnvironmentId) == "string" then entry.EnvironmentId else "Unknown",
+			VariantId = if type(entry.VariantId) == "string" then entry.VariantId else entry.EquipmentId,
+			ExerciseFamily = if type(entry.ExerciseFamily) == "string"
+				then entry.ExerciseFamily
+				else entry.StatId,
+			RequiresFlight = entry.RequiresFlight == true,
 		}
 		table.insert(destinations, destination)
 		destinationsById[destination.Id] = destination
@@ -353,12 +363,12 @@ function MenuController:_renderMap(parent: Frame)
 			includeFeature(feature)
 		end
 	end
-	if minX == math.huge then
-		for _, destination in destinations do
-			local at = destination.Position
-			minX, maxX = math.min(minX, at.X), math.max(maxX, at.X)
-			minZ, maxZ = math.min(minZ, at.Z), math.max(maxZ, at.Z)
-		end
+	-- Aerial locations normally sit over a district, but destinations still take
+	-- part in the bounds so a later offshore roof can never produce a clipped pin.
+	for _, destination in destinations do
+		local at = destination.Position
+		minX, maxX = math.min(minX, at.X - 12), math.max(maxX, at.X + 12)
+		minZ, maxZ = math.min(minZ, at.Z - 12), math.max(maxZ, at.Z + 12)
 	end
 
 	local worldWidth = math.max(maxX - minX, 1)
@@ -424,13 +434,15 @@ function MenuController:_renderMap(parent: Frame)
 	pinLayer.Parent = canvas
 
 	local featureLayers: { [string]: number } = {
-		Land = 1,
-		Block = 2,
-		Park = 3,
-		Road = 4,
-		Building = 5,
-		Plaza = 6,
-		SafeZone = 7,
+		Water = 1,
+		Land = 2,
+		Block = 3,
+		Park = 4,
+		Road = 5,
+		Building = 6,
+		SkyPlatform = 7,
+		Plaza = 8,
+		SafeZone = 9,
 	}
 	for index, feature in mapFeatures do
 		local shape = Instance.new("Frame")
@@ -440,7 +452,11 @@ function MenuController:_renderMap(parent: Frame)
 		shape.Size = UDim2.fromScale(feature.Width / worldWidth, feature.Depth / worldDepth)
 		shape.Rotation = feature.Rotation
 		shape.BackgroundColor3 = feature.Color
-		shape.BackgroundTransparency = if feature.Kind == "SafeZone" then 0.5 else 0
+		shape.BackgroundTransparency = if feature.Kind == "SafeZone"
+			then 0.5
+			elseif feature.Kind == "Water" then 0.22
+			elseif feature.Kind == "SkyPlatform" then 0.12
+			else 0
 		shape.BorderSizePixel = 0
 		shape.ZIndex = featureLayers[feature.Kind] or 3
 		shape.Parent = featureLayer
@@ -458,6 +474,11 @@ function MenuController:_renderMap(parent: Frame)
 			local stroke = Instance.new("UIStroke")
 			stroke.Color = Color3.fromRGB(78, 220, 255)
 			stroke.Thickness = 2
+			stroke.Parent = shape
+		elseif feature.Kind == "SkyPlatform" then
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = Color3.fromRGB(215, 238, 255)
+			stroke.Thickness = 1.5
 			stroke.Parent = shape
 		end
 	end
@@ -500,6 +521,11 @@ function MenuController:_renderMap(parent: Frame)
 		pin.TextColor3 = UI.Palette.Backdrop
 		pin.Text = string.sub(stat.DisplayName, 1, 1)
 		pin.ZIndex = if isSelected then 24 else 22
+		pin:SetAttribute("EnvironmentId", destination.EnvironmentId)
+		pin:SetAttribute("ExerciseFamily", destination.ExerciseFamily)
+		pin:SetAttribute("VariantId", destination.VariantId)
+		pin:SetAttribute("AccessKind", destination.AccessKind)
+		pin:SetAttribute("RequiresFlight", destination.RequiresFlight)
 		pin.Parent = pinLayer
 
 		local pinCorner = Instance.new("UICorner")
@@ -790,8 +816,9 @@ function MenuController:_renderDestination(parent: Frame, power: number)
 	tagline.LayoutOrder = 4
 	tagline.TextSize = 13
 	tagline.TextColor3 = UI.Palette.TextMuted
-	local access = if destination.FloorIndex > 1
-		then `floor {destination.FloorIndex} interior`
+	local access = if destination.AccessKind == "Sky"
+		then `sky deck at {math.round(destination.Position.Y)} studs · flight required`
+		elseif destination.FloorIndex > 1 then `floor {destination.FloorIndex} interior`
 		else "street level"
 	tagline.Text = `{zone.DisplayName} location  ·  {access}  ·  {zone.Tagline}`
 

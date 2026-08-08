@@ -577,6 +577,44 @@ were also far enough apart to feel like five unrelated destinations.
       pins render, zoom expands the 616×300 canvas to 770×375 at 1.25x, every station has
       floor support and its matching private zone, all seven interiors pathfind, and
       Garage Dumbbells travel lands exactly on its `TrainExit`.
+
+## Phase 18 — A world that does not reveal its formula
+
+The city map finally showed every destination, but fifty of them still occupied an
+11×5 square grid and every tier repeated the same five exercises. Once a player saw one
+block, both the next location and the machine waiting there were easy to predict.
+
+- [x] 94. **Irregular districts, reachable sky gyms, and three exercises per muscle.**
+      The single rectangular city plate is replaced by ten differently sized and rotated
+      coastal neighborhoods around the starter campus. Thirty-six overlapping land
+      footprints and thirteen angled road/causeway links keep the whole ground map
+      walkable while giving it bays, peninsulas, a harbor, beach, quarry, high-rise core,
+      foundry, storm works, neon market, observatory, and void-rail silhouette. The old
+      themed props live in those environments, filtered around every training footprint.
+      Fifty non-starter tier/stat pairs are reproducibly shuffled into neighborhoods with
+      unequal site counts; every tier spans at least four neighborhoods, every stat spans
+      at least seven, adjacent sites remain 119+ studs apart, and progression cannot be
+      read from the scenery. This is generated randomness rather than per-server churn, so
+      players can still learn the locations shown on the map.
+      Ten Strongman-or-higher destinations now sit on original primitive-built crane decks
+      110–194 studs above their streets. Flight already unlocks below Strongman's power
+      gate, and each atomic sky environment includes a wide landing surface, open approach,
+      rails, tether mast, and lower recovery scaffold. Five other secrets remain inside
+      pathfindable third-floor buildings; the remaining forty are street-level.
+      Chest, Arms, Back, Core, and Legs each rotate through three real exercise families:
+      flat/incline/fly presses; dumbbell/barbell/pushdown arm work; pull-up/row/pulldown back
+      work; sit-up/knee-raise/twist core work; and treadmill/squat/leg-press leg work. All
+      fifteen machines are original part geometry, all fifteen poses are procedural joint
+      motion capped at 145 degrees, and gain-per-second stays within 10.90–11.44 so a random
+      variant never changes progression. The server publishes environment, family, variant,
+      sky-access, and flight metadata; the vector map draws water and sky platforms and
+      labels sky pins as flight-required.
+      `validate_gym.py` now guards determinism, committed JSON freshness, the 55-location /
+      15-variant balance, machine contracts, sky gating, irregularity, geometry, and instance
+      budgets on every `check.sh` run. Verified in Studio: all 55 stations bind one prompt,
+      all five interior routes succeed, every exit has support exactly three studs below,
+      the client receives 157 faithful map features, locked sky travel is refused, starter
+      travel lands at zero error, and every one of the fifteen poses visibly changes a joint.
 ---
 
 ## Milestone 1 — Vertical Slice

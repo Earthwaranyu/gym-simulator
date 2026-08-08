@@ -56,6 +56,12 @@ fi
 echo "==> self-tests"
 luau scripts/selftest.luau || status=1
 
+# The world generator is code too. This catches stale model JSON, duplicated map
+# destinations, broken machine contracts, unbalanced variants, and a regression
+# back to the old rectangular grid before Rojo ever opens the place.
+echo "==> generated gym"
+python3 scripts/validate_gym.py || status=1
+
 if [[ $status -eq 0 ]]; then
 	echo
 	echo "All checks passed."

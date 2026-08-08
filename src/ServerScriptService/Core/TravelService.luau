@@ -147,6 +147,10 @@ function TravelService:GetDestinations(): { any }
 		end
 		local accessKind = station:GetAttribute("AccessKind")
 		local floorIndex = station:GetAttribute("FloorIndex")
+		local environmentId = station:GetAttribute("EnvironmentId")
+		local variantId = station:GetAttribute("VariantId")
+		local exerciseFamily = station:GetAttribute("ExerciseFamily")
+		local requiresFlight = station:GetAttribute("RequiresFlight")
 		table.insert(out, {
 			Id = travelId,
 			ZoneId = zone.Id,
@@ -159,6 +163,10 @@ function TravelService:GetDestinations(): { any }
 			Z = landing.Position.Z,
 			AccessKind = if type(accessKind) == "string" then accessKind else "Street",
 			FloorIndex = if type(floorIndex) == "number" then floorIndex else 1,
+			EnvironmentId = if type(environmentId) == "string" then environmentId else "Unknown",
+			VariantId = if type(variantId) == "string" then variantId else definition.Id,
+			ExerciseFamily = if type(exerciseFamily) == "string" then exerciseFamily else definition.StatId,
+			RequiresFlight = requiresFlight == true,
 		})
 	end
 	table.sort(out, function(a, b)
