@@ -62,6 +62,12 @@ luau scripts/selftest.luau || status=1
 echo "==> generated gym"
 python3 scripts/validate_gym.py || status=1
 
+# The economy simulator reads the real configs through a generated module. If a
+# balance number moved and nobody regenerated it, every projection in the model is
+# stale — which is worse than having no model, because it still looks authoritative.
+echo "==> balance inputs"
+python3 scripts/extract_balance.py --check || status=1
+
 if [[ $status -eq 0 ]]; then
 	echo
 	echo "All checks passed."

@@ -745,11 +745,20 @@ Execution rules:
       wrong type, and logs exposure on first *read* rather than on assignment.
       `FlagController` holds outcomes only. `ShopEnabled` is a real kill switch on both
       purchase paths that never blocks fulfillment of an existing receipt.*
-- [ ] 100. **Progression and economy simulator.** Build a headless deterministic model
+- [x] 100. **Progression and economy simulator.** Build a headless deterministic model
       from fresh spawn through every district and beyond Ascendant for active, casual,
       social, boosted, frequently-killed, and returning play styles. Gate balance changes
       on documented time-to-first-upgrade/rank/zone, sources/sinks, stall points, inflation,
       and sensitivity ranges instead of intuition.
+      *Done: `scripts/simulate.luau` runs six play styles to a 24h horizon using the
+      game's real `Formulas` plus `scripts/_balance_inputs.luau`, generated from the
+      configs by `extract_balance.py` and staleness-checked by `check.sh`. Findings in
+      `docs/BALANCE_MODEL.md`: first upgrade at 2.5m for every style including the
+      constantly-killed one; 11 districts inside a day; the only hard stall is after
+      Ascendant, which is a content gap (#152). Two results change how balance should
+      be tuned — `BaseGain` moves number size but not pacing at all, and being killed
+      every 2 minutes costs 72% of 24h power, which is far more than "time and combo
+      only" implies. That fairness question goes to Phase 26.*
 - [ ] 101. **Finite-number and hostile-input safety.** Define behavior above the current
       suffix range; cap or safely display every stat, multiplier, damage, and datastore
       value; fuzz formulas and runtime remote schemas with NaN/Inf/oversized/malformed
