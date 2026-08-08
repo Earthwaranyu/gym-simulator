@@ -25,6 +25,7 @@ from typing import Any, Iterable, Iterator
 ROOT = Path(__file__).resolve().parent.parent
 BUILDER_PATH = ROOT / "scripts" / "build_gym.py"
 EQUIPMENT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "EquipmentConfig.luau"
+ZONE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "ZoneConfig.luau"
 STRUCTURE_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure.model.json"
 MACHINES_PATH = ROOT / "src" / "Workspace" / "Gym" / "Machines.model.json"
 
@@ -44,9 +45,10 @@ REQUIRED_STATION_ATTRIBUTES = {
     "LocationTagline",
 }
 
-EXPECTED_STATIONS = 5
+EXPECTED_STATIONS = 35
+EXPECTED_ACTIVE_TIERS = 7
 EXPECTED_BUILDERS = 15
-EXPECTED_SKY_STATIONS = 1
+EXPECTED_SKY_STATIONS = 5
 MIN_SKY_PIN_SEPARATION = 32.0
 MAX_MAP_FEATURES = 400
 MAX_BASE_PARTS = 7_000
@@ -165,6 +167,30 @@ def parse_equipment_config() -> dict[str, dict[str, str]]:
     return rows
 
 
+def parse_zone_progression() -> list[tuple[str, float, float]]:
+    """Read zone id, power gate and multiplier from the simple config rows."""
+    text = ZONE_CONFIG_PATH.read_text(encoding="utf-8")
+    start = text.find("local zones")
+    end = text.find("\nlocal ZoneConfig", start)
+    if start < 0 or end < 0:
+        raise RuntimeError("could not locate ZoneConfig zones table")
+    section = text[start:end]
+    pattern = re.compile(
+        r'\{\s*Id\s*=\s*"(?P<id>[^"]+)"(?P<body>.*?)\n\s*\},',
+        re.DOTALL,
+    )
+    number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?"
+    out: list[tuple[str, float, float]] = []
+    for match in pattern.finditer(section):
+        body = match.group("body")
+        power = re.search(rf"\bRequiredPower\s*=\s*(?P<value>{number})", body, re.IGNORECASE)
+        gain = re.search(rf"\bGainMultiplier\s*=\s*(?P<value>{number})", body, re.IGNORECASE)
+        if power is None or gain is None:
+            raise RuntimeError(f'zone "{match.group("id")}" is missing numeric progression fields')
+        out.append((match.group("id"), float(power.group("value")), float(gain.group("value"))))
+    return out
+
+
 def validate_finite_geometry(validator: Validator, payloads: Iterable[Any]) -> None:
     for payload in payloads:
         for node in walk(payload):
@@ -248,11 +274,11 @@ def validate_locations(
     locations = list(builder.connected_locations())
     validator.check(
         len(locations) == EXPECTED_STATIONS,
-        f"expected five generated locations, found {len(locations)}",
+        f"expected 35 generated locations, found {len(locations)}",
     )
     validator.check(
         len(stations) == EXPECTED_STATIONS,
-        f"expected five TrainingStation models, found {len(stations)}",
+        f"expected 35 TrainingStation models, found {len(stations)}",
     )
 
     location_by_id: dict[str, dict[str, Any]] = {}
@@ -269,6 +295,9 @@ def validate_locations(
     family_counts: Counter[str] = Counter()
     equipment_counts: Counter[str] = Counter()
     access_counts: Counter[str] = Counter()
+    zone_counts: Counter[str] = Counter()
+    pair_counts: Counter[tuple[str, str]] = Counter()
+    family_access_counts: Counter[tuple[str, str]] = Counter()
     sky_ids: list[str] = []
 
     for station in stations:
@@ -334,7 +363,6 @@ def validate_locations(
             location_tagline == location.get("location_tagline"),
             f"{travel_id}: LocationTagline differs from layout",
         )
-        validator.check(zone_id == "Garage", f"{travel_id}: five-location build must be open from spawn")
 
         expected_access = "Sky" if location.get("style") == "sky" else (
             "ThirdFloor" if location.get("style") == "tower" else "Street"
@@ -355,6 +383,9 @@ def validate_locations(
         family_counts[family] += 1
         equipment_counts[equipment_id] += 1
         access_counts[access_kind] += 1
+        zone_counts[zone_id] += 1
+        pair_counts[(zone_id, family)] += 1
+        family_access_counts[(family, access_kind)] += 1
 
         base_parts = named_parts(station, "Base")
         anchors = named_parts(station, "TrainAnchor")
@@ -376,20 +407,50 @@ def validate_locations(
     validator.check(set(station_by_id) == set(location_by_id), "station and location TravelId sets differ")
     primary_equipment = set(getattr(builder, "MACHINE_ORDER", ()))
     for family in FAMILIES:
-        validator.check(family_counts[family] == 1, f"{family}: expected one station, found {family_counts[family]}")
+        validator.check(family_counts[family] == 7, f"{family}: expected seven stations, found {family_counts[family]}")
+        validator.check(family_access_counts[(family, "Sky")] == 1, f"{family}: expected one Sky destination")
+        validator.check(
+            family_access_counts[(family, "ThirdFloor")] == 1,
+            f"{family}: expected one ThirdFloor destination",
+        )
 
     zone_order = [row.get("zone") for row in getattr(builder, "DISTRICTS", [])]
     validator.check(len(zone_order) == 11, f"expected 11 DISTRICTS, found {len(zone_order)}")
+    active_zone_order = zone_order[:EXPECTED_ACTIVE_TIERS]
+    for zone_id in active_zone_order:
+        validator.check(zone_counts[zone_id] == 5, f"{zone_id}: expected five stations, found {zone_counts[zone_id]}")
     validator.check(
-        set(equipment_counts) == primary_equipment and all(count == 1 for count in equipment_counts.values()),
-        "the playable world must spawn each primary exercise exactly once",
+        set(zone_counts) == set(active_zone_order),
+        f"only the first seven tiers may be active, found {sorted(zone_counts)}",
     )
+    validator.check(
+        len(pair_counts) == EXPECTED_STATIONS and all(count == 1 for count in pair_counts.values()),
+        "every active (zone, ExerciseFamily) pair must occur exactly once",
+    )
+    validator.check(
+        set(equipment_counts) == primary_equipment and all(count == 7 for count in equipment_counts.values()),
+        "the playable world must spawn each primary exercise exactly seven times",
+    )
+
+    zone_progression = parse_zone_progression()
+    validator.check(len(zone_progression) == 11, f"expected 11 ZoneConfig rows, found {len(zone_progression)}")
+    active_progression = zone_progression[:EXPECTED_ACTIVE_TIERS]
+    validator.check(
+        [zone_id for zone_id, _, _ in active_progression] == active_zone_order,
+        "ZoneConfig and generator active tier order differ",
+    )
+    validator.check(
+        [gain for _, _, gain in active_progression] == [1, 2, 4, 8, 16, 32, 64],
+        "active GainMultiplier sequence must be exactly x1, x2, x4, x8, x16, x32, x64",
+    )
+    powers = [power for _, power, _ in active_progression]
+    validator.check(powers[0] == 0 and all(a < b for a, b in zip(powers, powers[1:])), "active power gates must rise from zero")
     validator.check(
         len(sky_ids) == EXPECTED_SKY_STATIONS,
         f"expected one Sky station, found {len(sky_ids)}",
     )
-    validator.check(access_counts["ThirdFloor"] == 1, "expected one third-floor training location")
-    validator.check(access_counts["Street"] == 3, "expected three street/interior training locations")
+    validator.check(access_counts["ThirdFloor"] == 5, "expected five third-floor training locations")
+    validator.check(access_counts["Street"] == 25, "expected 25 street/interior training locations")
 
     return station_by_id
 
@@ -424,6 +485,8 @@ def validate_irregular_map(
         global_max_z = max(bounds[3] for bounds in land_bounds)
         global_width = max(global_max_x - global_min_x, 1)
         global_depth = max(global_max_z - global_min_z, 1)
+        validator.check(global_width >= 2800, f"world is only {global_width:.0f} studs wide")
+        validator.check(global_depth >= 2500, f"world is only {global_depth:.0f} studs deep")
         for node, bounds in zip(land, land_bounds):
             shape = node.get("attributes", {}).get("MapShape", "Rect")
             if shape != "Rect":
@@ -446,8 +509,16 @@ def validate_irregular_map(
             station_positions[travel_id] = at
     x_levels = {round(at[0], 1) for at in station_positions.values()}
     z_levels = {round(at[2], 1) for at in station_positions.values()}
-    validator.check(len(x_levels) == EXPECTED_STATIONS, f"station layout has only {len(x_levels)} distinct X levels")
-    validator.check(len(z_levels) == EXPECTED_STATIONS, f"station layout has only {len(z_levels)} distinct Z levels")
+    validator.check(len(x_levels) >= 25, f"station layout has only {len(x_levels)} distinct X levels")
+    validator.check(len(z_levels) >= 25, f"station layout has only {len(z_levels)} distinct Z levels")
+    position_rows = list(station_positions.items())
+    for index, (travel_id, at) in enumerate(position_rows):
+        for other_id, other_at in position_rows[index + 1:]:
+            separation = math.hypot(at[0] - other_at[0], at[2] - other_at[2])
+            validator.check(
+                separation >= 48,
+                f"{travel_id} and {other_id} are only {separation:.1f} studs apart",
+            )
 
     sky_ids = [
         travel_id
@@ -545,7 +616,7 @@ def run() -> int:
 
     print(
         "Gym validation passed: "
-        f"5 stations, 5 playable exercises / 15 configured, {instance_count} instances, "
+        f"35 stations, 7 tiers x 5 muscles / 15 configured exercises, {instance_count} instances, "
         f"{base_part_count} BaseParts, build {short_hash(first_canonical)}"
     )
     return 0

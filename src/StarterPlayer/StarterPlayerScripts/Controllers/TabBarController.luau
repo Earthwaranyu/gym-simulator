@@ -82,6 +82,10 @@ function TabBarController:_render(roster: { any })
 	UI.VerticalList(list, 1)
 
 	title.Text = `PLAYERS  ({#roster})`
+	if panel ~= nil then
+		local shown = math.min(#roster, MAX_ROWS)
+		panel.Size = UDim2.fromOffset(300, ROW_HEIGHT * (shown + 1) + 20)
+	end
 
 	for index, entry in roster do
 		if index > MAX_ROWS then

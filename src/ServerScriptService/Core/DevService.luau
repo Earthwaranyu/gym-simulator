@@ -2,7 +2,7 @@
 --[[
 	DevService — Studio-only commands for reaching content you have not earned.
 
-	Fifty-five stations across eleven districts cannot be tested by grinding to them.
+	Thirty-five stations across a massive city cannot be tested by grinding to them.
 	Playtesting the Ascendant machines legitimately means 20 hours of continuous play
 	(see `docs/BALANCE_MODEL.md`), which is why the pose on most machines in this game
 	has still never been looked at by a human. This file is how you look at them.

@@ -38,12 +38,12 @@ BalanceInputs.Equipment = {
 
 BalanceInputs.Zones = {
 	{ Id = "Garage", RequiredPower = 0, GainMultiplier = 1 },
-	{ Id = "Iron", RequiredPower = 25000, GainMultiplier = 6 },
-	{ Id = "Powerhouse", RequiredPower = 500000, GainMultiplier = 40 },
-	{ Id = "Strongman", RequiredPower = 10000000, GainMultiplier = 250 },
-	{ Id = "Titan", RequiredPower = 200000000, GainMultiplier = 1600 },
-	{ Id = "Skydeck", RequiredPower = 4000000000, GainMultiplier = 10000 },
-	{ Id = "Storm", RequiredPower = 80000000000, GainMultiplier = 65000 },
+	{ Id = "Iron", RequiredPower = 500, GainMultiplier = 2 },
+	{ Id = "Powerhouse", RequiredPower = 5000, GainMultiplier = 4 },
+	{ Id = "Strongman", RequiredPower = 50000, GainMultiplier = 8 },
+	{ Id = "Titan", RequiredPower = 500000, GainMultiplier = 16 },
+	{ Id = "Skydeck", RequiredPower = 5000000, GainMultiplier = 32 },
+	{ Id = "Storm", RequiredPower = 50000000, GainMultiplier = 64 },
 	{ Id = "Void", RequiredPower = 1500000000000, GainMultiplier = 400000 },
 	{ Id = "Solar", RequiredPower = 30000000000000, GainMultiplier = 2500000 },
 	{ Id = "Nebula", RequiredPower = 600000000000000, GainMultiplier = 16000000 },

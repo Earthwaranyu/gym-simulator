@@ -43,9 +43,9 @@ local SPAWN_TAG = "ZoneSpawn"
 -- Attribute naming which zone a tagged part belongs to.
 local ZONE_ATTRIBUTE = "ZoneId"
 
--- Eleven multiplier tiers. Power roughly x20 and gain roughly x6 per step. Each tier
--- appears once for every stat, shuffled across the connected city rather than gathered
--- into one level-shaped district.
+-- The seven active training tiers double exactly: x1 through x64. The remaining rows
+-- stay in the catalog as dormant future expansion themes, but the generated world does
+-- not place their GymZones.
 local zones: { Zone } = {
 	{
 		Id = "Garage",
@@ -59,48 +59,48 @@ local zones: { Zone } = {
 		Id = "Iron",
 		DisplayName = "Iron Hall",
 		Tagline = "Warehouse iron, two streets off the plaza.",
-		RequiredPower = 25e3,
-		GainMultiplier = 6,
+		RequiredPower = 500,
+		GainMultiplier = 2,
 		Color = Color3.fromRGB(66, 165, 245),
 	},
 	{
 		Id = "Powerhouse",
 		DisplayName = "The Powerhouse",
 		Tagline = "The docks work all night.",
-		RequiredPower = 500e3,
-		GainMultiplier = 40,
+		RequiredPower = 5e3,
+		GainMultiplier = 4,
 		Color = Color3.fromRGB(239, 108, 61),
 	},
 	{
 		Id = "Strongman",
 		DisplayName = "Strongman Yard",
 		Tagline = "Sand, salt and heavy stone.",
-		RequiredPower = 10e6,
-		GainMultiplier = 250,
+		RequiredPower = 50e3,
+		GainMultiplier = 8,
 		Color = Color3.fromRGB(190, 120, 70),
 	},
 	{
 		Id = "Titan",
 		DisplayName = "Titan Forge",
 		Tagline = "The pit that ate a mountain.",
-		RequiredPower = 200e6,
-		GainMultiplier = 1600,
+		RequiredPower = 500e3,
+		GainMultiplier = 16,
 		Color = Color3.fromRGB(255, 196, 61),
 	},
 	{
 		Id = "Skydeck",
 		DisplayName = "Sky Deck",
 		Tagline = "Above the smog line.",
-		RequiredPower = 4e9,
-		GainMultiplier = 10e3,
+		RequiredPower = 5e6,
+		GainMultiplier = 32,
 		Color = Color3.fromRGB(120, 210, 255),
 	},
 	{
 		Id = "Storm",
 		DisplayName = "Storm Peak",
 		Tagline = "Thin air and live cable.",
-		RequiredPower = 80e9,
-		GainMultiplier = 65e3,
+		RequiredPower = 50e6,
+		GainMultiplier = 64,
 		Color = Color3.fromRGB(150, 160, 255),
 	},
 	{

@@ -8,7 +8,7 @@ mid-training-set, interrupting reps to annoy them.
 (training anti-exploit) were withdrawn by design, not skipped: reps are server-driven
 with no client remote to exploit.
 
-**Current roadmap: 7 / 14 items complete (#96–#109).** The checked foundation proves a
+**Current roadmap: 8 / 15 items complete (#96–#110).** The checked foundation proves a
 large playable prototype; it does **not** mean the product is ready for a public launch.
 
 **Current public-launch blockers:** `DataService` still uses the Studio mock store, four
@@ -653,8 +653,8 @@ The product loop this roadmap optimizes is:
 
 | Area | What is genuinely present | Largest gap before growth |
 |---|---|---|
-| Core fantasy | 5 locations, one exercise per stat, muscle growth, flight, PvP, reputation; 15 exercise definitions remain available for future drops | A new player is not taught or directed through the fantasy |
-| World | Irregular connected city, warehouse, third-floor, underpass and sky training, vector map, streaming-aware travel | The five-location slice still needs human route/readability evidence |
+| Core fantasy | 35 locations, seven exact x1–x64 tiers per muscle, muscle growth, flight, PvP, reputation; 15 exercise definitions remain available for future drops | A new player is not taught or directed through the fantasy |
+| World | Massive irregular connected city, interiors, third floors and skyline training, vector map, streaming-aware travel | The 35-pin map and long routes still need human readability evidence |
 | Progression | ranks, tokens, multipliers, two daily quests, one one-shot quest | no balanced first-hour path, mastery, weekly goals, comeback loop, or post-endgame purpose |
 | Combat | authoritative Punch, damage, kills, bounties, safe zones; interruption settled as kill-only (#96) | only one ability — Slam/Dash deferred to #122; paid-peace fairness still open (Phase 26) |
 | Social | roster, kill feed, global Power/Kills boards | no parties, friend co-training, invites, rivals, crews, co-op events, or shareable moments |
@@ -814,7 +814,7 @@ Execution rules:
 - [ ] 107. **Hermetic CI and Studio contracts.** Pin/checksum tool definitions and make a
       clean clone install dependencies, lint/typecheck, run self-tests, validate generated
       JSON/config/migrations, and `rojo build` reproducibly. Add automated Studio contracts
-      for all 5 playable / 15 configured world entries, every remote failure path, profile load/save, receipts,
+      for all 35 playable / 15 configured world entries, every remote failure path, profile load/save, receipts,
       training/travel, and a two-client PvP scenario; no launch claim depends only on a
       manual memory.
 - [ ] 108. **Scale the existing runtime before adding systems.** Cache immutable map and
@@ -824,7 +824,7 @@ Execution rules:
       3× allowance. At target capacity, meet script/network/memory budgets with no per-frame
       descendant scans, stale rig leaks, or repeated static Workspace scans.
 
-## Phase 20 — Five memorable training locations
+## Phase 20 — Training-world direction
 
 - [x] 109. **Ship the five-location vertical slice.** Replace the repeated 55-station
       tier matrix with exactly one playable exercise per stat while retaining all 15
@@ -845,3 +845,27 @@ Execution rules:
       with 31 path waypoints; the destination remote and rendered map both return five
       named pins plus 61 map features; clicking Legs in the HUD opens TRAIN with exactly
       one open `Highrise Running Deck` treadmill entry.
+
+- [x] 110. **Supersede the vertical slice with a massive seven-tier city.** Expand the
+      connected world to roughly 3,000 × 2,700 studs and spawn exactly 35 stations: one
+      recognizable primary exercise for every `(muscle, tier)` pair. Location multipliers
+      double exactly x1, x2, x4, x8, x16, x32 and x64; power gates rise with them. Keep all
+      five x1 stations around the central safe spawn, then deterministically shuffle the
+      other 30 across ten visually distinct neighborhoods so neither muscle nor tier forms
+      a visible row. Give every muscle one third-floor secret and one x64 flight-only sky
+      platform, with the remaining 25 stations at varied street-level warehouses, yards,
+      alleys, bunkers and underpasses. Keep the compact five-stat HUD and single MENU entry;
+      every muscle button opens its seven-location ladder, and every map pin prints both
+      muscle and multiplier. Preserve original primitive geometry and procedural poses—copy
+      the reference's progression clarity and world scale, not its artwork or assets.
+
+      **Verified 2026-08-08:** `./scripts/check.sh` passes formatting, lint, strict types,
+      self-tests, generated-world validation and balance freshness. The deterministic build
+      reports 35 stations, 7 tiers × 5 muscles, 2,384 instances / 2,184 BaseParts and hash
+      `4c572a6de1e6`; `rojo build` also succeeds. In connected Studio Edit mode there are
+      exactly 35 TrainingStations/GymZones, seven per muscle, five each at x1–x64, with
+      Street/ThirdFloor/Sky = 25/5/5; every landing ray has support and all five third-floor
+      entrance routes succeed (22–27 waypoints). A clean Play session creates exactly 35
+      prompts and returns 35 destinations / 117 map features. The client renders five muscle
+      shortcuts, one MENU entry and the training-first `Gym Rat` main goal; only documented
+      mock-DataStore and zero-product-id warnings appear.

@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
+local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
@@ -46,6 +47,10 @@ local tokenLabel: TextLabel
 local healthBar: UI.Bar
 local comboLabel: TextLabel
 local abilityLabel: TextLabel
+local goalPanel: Frame
+local goalName: TextLabel
+local goalDetail: TextLabel
+local goalBar: UI.Bar
 local feedLabels: { TextLabel } = {}
 local feedLines: { string } = {}
 
@@ -214,6 +219,61 @@ function HudController:_build()
 		line.TextColor3 = UI.Palette.TextMuted
 		feedLabels[index] = line
 	end
+
+	-- Right-side objective card: the reference game's best UX idea is that the next
+	-- useful action never requires opening a menu. This uses the real quest stream and
+	-- keeps its own original dark gym styling.
+	goalPanel = UI.Panel("MainGoal", screen)
+	goalPanel.AnchorPoint = Vector2.new(1, 0)
+	goalPanel.Position = UDim2.new(1, -16, 0, 102)
+	goalPanel.Size = UDim2.fromOffset(260, 116)
+	goalPanel.Visible = false
+
+	local goalHeading = UI.Label("Heading", goalPanel)
+	goalHeading.Size = UDim2.new(1, -76, 0, 18)
+	goalHeading.Font = UI.Font.Heading
+	goalHeading.TextSize = 13
+	goalHeading.TextColor3 = UI.Palette.Token
+	goalHeading.Text = "MAIN GOAL"
+
+	local questButton = Instance.new("TextButton")
+	questButton.Name = "OpenQuests"
+	questButton.AnchorPoint = Vector2.new(1, 0)
+	questButton.Position = UDim2.fromScale(1, 0)
+	questButton.Size = UDim2.fromOffset(70, 24)
+	questButton.BackgroundColor3 = UI.Palette.Token
+	questButton.BorderSizePixel = 0
+	questButton.AutoButtonColor = false
+	questButton.Font = UI.Font.Heading
+	questButton.TextSize = 11
+	questButton.TextColor3 = UI.Palette.Backdrop
+	questButton.Text = "QUESTS"
+	questButton.Parent = goalPanel
+	UI.Pressable(questButton)
+	questButton.Activated:Connect(function()
+		MenuController:Open("Quests")
+	end)
+
+	local questCorner = Instance.new("UICorner")
+	questCorner.CornerRadius = UDim.new(0, 6)
+	questCorner.Parent = questButton
+
+	goalName = UI.Label("GoalName", goalPanel)
+	goalName.Position = UDim2.fromOffset(0, 26)
+	goalName.Size = UDim2.new(1, 0, 0, 22)
+	goalName.Font = UI.Font.Heading
+	goalName.TextSize = 15
+	goalName.TextColor3 = UI.Palette.Text
+
+	goalDetail = UI.Label("GoalDetail", goalPanel)
+	goalDetail.Position = UDim2.fromOffset(0, 49)
+	goalDetail.Size = UDim2.new(1, 0, 0, 20)
+	goalDetail.TextSize = 12
+	goalDetail.TextColor3 = UI.Palette.TextMuted
+	goalDetail.TextTruncate = Enum.TextTruncate.AtEnd
+
+	goalBar = UI.Bar("GoalProgress", UI.Palette.Token, goalPanel)
+	goalBar.Root.Position = UDim2.fromOffset(0, 78)
 end
 
 function HudController:_pushFeed(text: string)
@@ -225,6 +285,41 @@ function HudController:_pushFeed(text: string)
 	for index, label in feedLabels do
 		label.Text = feedLines[index] or ""
 	end
+end
+
+function HudController:_refreshGoal(view: { any })
+	-- Training is always the clearest first objective. The quest service may discover
+	-- module files in any order, so choose deliberately instead of accidentally putting
+	-- a three-player PvP goal in front of someone who has just spawned alone.
+	local priority = { DailyReps = 1, FirstMillion = 2, DailyKnockouts = 3 }
+	local selected = nil
+	local selectedPriority = math.huge
+	for _, quest in view do
+		if type(quest) == "table" and quest.Complete ~= true then
+			local questPriority = priority[tostring(quest.Id)] or 100
+			if questPriority < selectedPriority then
+				selected = quest
+				selectedPriority = questPriority
+			end
+		end
+	end
+	selected = selected or view[1]
+	if type(selected) ~= "table" then
+		goalPanel.Visible = false
+		return
+	end
+
+	local progress = if type(selected.Progress) == "number" then math.max(0, selected.Progress) else 0
+	local target = if type(selected.Goal) == "number" then math.max(1, selected.Goal) else 1
+	goalPanel.Visible = true
+	goalName.Text = tostring(selected.DisplayName or "Training Goal")
+	goalDetail.Text = tostring(selected.Description or "Keep training")
+	goalBar.Set(
+		math.clamp(progress / target, 0, 1),
+		`{NumberFormat.Format(progress)} / {NumberFormat.Format(target)}  ·  +{NumberFormat.Format(
+			selected.TokenReward or 0
+		)} tokens`
+	)
 end
 
 function HudController:_refreshProfile()
@@ -304,6 +399,12 @@ function HudController:Start()
 
 	ProfileController.Changed:Connect(function()
 		self:_refreshProfile()
+	end)
+
+	Net.Event("QuestsChanged").OnClientEvent:Connect(function(view: any)
+		if type(view) == "table" then
+			self:_refreshGoal(view)
+		end
 	end)
 
 	CombatController.Feedback:Connect(function(payload: any)

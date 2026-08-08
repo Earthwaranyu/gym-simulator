@@ -2251,26 +2251,26 @@ GROUND_STYLES = ["warehouse", "alley", "yard", "underpass", "bunker"]
 # tier/family pairs are shuffled across all ten. Counts deliberately vary so the
 # player cannot infer "five machines live in every neighborhood" either.
 REGIONS = [
-    {"id": "OldTown", "theme": "Iron", "center": (-270, 100),
-     "size": (430, 340), "yaw": -12, "shape": "Rect", "count": 6},
-    {"id": "Harbor", "theme": "Powerhouse", "center": (-680, -100),
-     "size": (540, 300), "yaw": 16, "shape": "Rect", "count": 7},
-    {"id": "Beach", "theme": "Strongman", "center": (-570, -440),
-     "size": (430, 430), "yaw": 0, "shape": "Circle", "count": 3},
-    {"id": "Quarry", "theme": "Titan", "center": (-120, -590),
-     "size": (460, 460), "yaw": -18, "shape": "Circle", "count": 4},
-    {"id": "Highrise", "theme": "Skydeck", "center": (350, -470),
-     "size": (520, 380), "yaw": 21, "shape": "Rect", "count": 7},
-    {"id": "SolarWorks", "theme": "Solar", "center": (700, -160),
-     "size": (500, 340), "yaw": -14, "shape": "Rect", "count": 5},
-    {"id": "Stormworks", "theme": "Storm", "center": (660, 300),
-     "size": (430, 430), "yaw": 0, "shape": "Circle", "count": 4},
-    {"id": "NeonMarket", "theme": "Nebula", "center": (260, 560),
-     "size": (520, 360), "yaw": 27, "shape": "Rect", "count": 6},
-    {"id": "Observatory", "theme": "Ascendant", "center": (-180, 650),
-     "size": (430, 430), "yaw": 0, "shape": "Circle", "count": 3},
-    {"id": "VoidRail", "theme": "Void", "center": (-560, 430),
-     "size": (500, 360), "yaw": -24, "shape": "Rect", "count": 5},
+    {"id": "OldTown", "theme": "Iron", "center": (-480, 180),
+     "size": (600, 470), "yaw": -12, "shape": "Rect", "count": 6},
+    {"id": "Harbor", "theme": "Powerhouse", "center": (-1180, -160),
+     "size": (720, 460), "yaw": 16, "shape": "Rect", "count": 7},
+    {"id": "Beach", "theme": "Strongman", "center": (-1020, -760),
+     "size": (600, 600), "yaw": 0, "shape": "Circle", "count": 3},
+    {"id": "Quarry", "theme": "Titan", "center": (-220, -1080),
+     "size": (640, 640), "yaw": -18, "shape": "Circle", "count": 4},
+    {"id": "Highrise", "theme": "Skydeck", "center": (620, -850),
+     "size": (720, 520), "yaw": 21, "shape": "Rect", "count": 7},
+    {"id": "SolarWorks", "theme": "Solar", "center": (1240, -280),
+     "size": (680, 480), "yaw": -14, "shape": "Rect", "count": 5},
+    {"id": "Stormworks", "theme": "Storm", "center": (1180, 540),
+     "size": (600, 600), "yaw": 0, "shape": "Circle", "count": 4},
+    {"id": "NeonMarket", "theme": "Nebula", "center": (470, 1000),
+     "size": (720, 500), "yaw": 27, "shape": "Rect", "count": 6},
+    {"id": "Observatory", "theme": "Ascendant", "center": (-330, 1160),
+     "size": (600, 600), "yaw": 0, "shape": "Circle", "count": 3},
+    {"id": "VoidRail", "theme": "Void", "center": (-1000, 770),
+     "size": (680, 500), "yaw": -24, "shape": "Rect", "count": 5},
 ]
 REGION_BY_ID = {region["id"]: region for region in REGIONS}
 REGION_LINKS = [
@@ -2341,119 +2341,127 @@ def _assignment_is_varied(assignments):
         region_families[key] = region_families.get(key, 0) + 1
     return (
         all(len(regions) >= 4 for regions in tier_regions.values())
-        and all(len(regions) >= 7 for regions in family_regions.values())
+        and all(len(regions) >= 5 for regions in family_regions.values())
         and max(region_tiers.values()) <= 2
         and max(region_families.values()) <= 2
     )
 
 
 def connected_locations():
-    """Five authored destinations: one memorable exercise for each muscle.
+    """Thirty-five destinations: seven doubling locations for every muscle.
 
-    The 15 machine builders remain available for future seasons, but the shipping
-    world deliberately exposes one exercise per family.  Environment replaces tier
-    repetition as the discovery layer: street, warehouse, underpass, upper floor and
-    sky all ask the player to read the city differently.
+    The first five form a readable x1 ring around spawn. The other thirty are
+    deterministically shuffled over ten far-apart neighborhoods so multiplier,
+    muscle and scenery never collapse into rows. Each family keeps one recognizable
+    exercise while the environment supplies the discovery fantasy.
     """
-    authored = [
-        {
-            "id": "Training-Arms",
-            "family": "Arms",
-            "equipment": "Dumbbells",
-            "style": "starter",
-            "region_id": "Hub",
-            "site": mul(cf(-54, 0, -34), rot_y(28)),
-            "starter": True,
-            "neighborhood": "Garage",
-            "location_name": "Starter Iron Yard",
-            "location_tagline": "Open-air dumbbells inside the protected plaza.",
-        },
-        {
-            "id": "Training-Chest",
-            "family": "Chest",
-            "equipment": "BenchPress",
-            "style": "warehouse",
-            "region_id": "Harbor",
-            "site": region_sites(REGION_BY_ID["Harbor"])[1],
-            "starter": False,
-            "neighborhood": "Powerhouse",
-            "location_name": "Dockside Warehouse",
-            "location_tagline": "A bench press hidden behind the freight sheds.",
-        },
-        {
-            "id": "Training-Back",
-            "family": "Back",
-            "equipment": "PullUpBar",
-            "style": "tower",
-            "region_id": "OldTown",
-            "site": region_sites(REGION_BY_ID["OldTown"])[2],
-            "starter": False,
-            "neighborhood": "Iron",
-            "location_name": "Old Town Walk-Up",
-            "location_tagline": "Climb to the third-floor pull-up room.",
-        },
-        {
-            "id": "Training-Core",
-            "family": "Core",
-            "equipment": "SitUpBench",
-            "style": "underpass",
-            "region_id": "VoidRail",
-            "site": region_sites(REGION_BY_ID["VoidRail"])[3],
-            "starter": False,
-            "neighborhood": "Void",
-            "location_name": "Railway Fight Gym",
-            "location_tagline": "A sit-up bench beneath the old elevated line.",
-        },
-        {
-            "id": "Training-Legs",
-            "family": "Legs",
-            "equipment": "Treadmill",
-            "style": "sky",
-            "region_id": "Highrise",
-            "site": region_sites(REGION_BY_ID["Highrise"])[4],
-            "starter": False,
-            "neighborhood": "Skydeck",
-            "location_name": "Highrise Running Deck",
-            "location_tagline": "Fly above downtown to reach the rooftop treadmill.",
-            "altitude": 152,
-        },
+    tier_rows = DISTRICTS[:7]
+    starters = []
+    starter_sites = [
+        (-62, -42, 32), (54, -56, -24), (-70, 35, 112),
+        (12, 68, 188), (70, 20, 254),
     ]
-
-    out = []
-    for row in authored:
-        ground_origin = row["site"]
-        requires_flight = row["style"] == "sky"
-        elevated = row["altitude"] if requires_flight else (
-            THIRD_FLOOR_Y if row["style"] == "tower" else 0
-        )
-        origin = mul(ground_origin, cf(0, elevated, 0))
-        site_x, _, site_z = ground_origin[0]
-        out.append({
-            "id": row["id"],
-            # Five destinations are available immediately. Progression remains in
-            # permanent per-stat multipliers; the dormant zone catalog is future
-            # expansion data rather than five copies of the same machine.
+    for family, equipment_id, (x, z, yaw) in zip(
+            FAMILY_ORDER, MACHINE_ORDER, starter_sites):
+        origin = mul(cf(x, 0, z), rot_y(yaw))
+        starters.append({
+            "id": f"Garage-{family}",
             "zone": "Garage",
-            "family": row["family"],
-            "slot": row["equipment"],
-            "equipment": row["equipment"],
+            "family": family,
+            "slot": equipment_id,
+            "equipment": equipment_id,
+            "site_x": x,
+            "site_z": z,
+            "ground_origin": origin,
+            "origin": origin,
+            "style": "starter",
+            "seed": f"massive-city-v1:Garage:{family}",
+            "starter": True,
+            "landmark": False,
+            "region_id": "Hub",
+            "environment_id": "Hub",
+            "neighborhood": "Garage",
+            "requires_flight": False,
+            "altitude": 0,
+            "location_name": f"Starter {family} Yard",
+            "location_tagline": "The x1 training spot beside the central safe zone.",
+        })
+
+    records = []
+    for zone_index, zone_row in enumerate(tier_rows[1:], 1):
+        for family_index, (family, equipment_id) in enumerate(
+                zip(FAMILY_ORDER, MACHINE_ORDER)):
+            records.append({
+                "zone": zone_row["zone"],
+                "zone_index": zone_index,
+                "family": family,
+                "family_index": family_index,
+                "equipment": equipment_id,
+            })
+
+    # Three active sites in every neighborhood makes the whole 2,500-stud city
+    # meaningful while avoiding the old tell of exactly five machines per district.
+    slots = [
+        (region["id"], site_index, site)
+        for region in REGIONS
+        for site_index, site in enumerate(region_sites(region)[:3])
+    ]
+    assignments = None
+    for attempt in range(2000):
+        shuffled = list(records)
+        random.Random(f"massive-city-v1:assignment:{attempt}").shuffle(shuffled)
+        candidate = [
+            (record, region_id, site_index, site)
+            for record, (region_id, site_index, site) in zip(shuffled, slots)
+        ]
+        if _assignment_is_varied(candidate):
+            assignments = candidate
+            break
+    if assignments is None:
+        raise RuntimeError("could not distribute the 30 outer training sites")
+
+    out = list(starters)
+    for index, (record, region_id, site_index, site) in enumerate(assignments):
+        zone_index = record["zone_index"]
+        family_index = record["family_index"]
+        requires_flight = zone_index == 6
+        # Each muscle has one intermediate third-floor secret, but its multiplier
+        # differs by muscle so a player cannot infer the whole progression from one.
+        third_floor = not requires_flight and zone_index == 1 + family_index
+        style = "sky" if requires_flight else (
+            "tower" if third_floor else GROUND_STYLES[(index + zone_index + family_index) % len(GROUND_STYLES)]
+        )
+        altitude = 0 if not requires_flight else 180 + family_index * 24
+        origin = mul(site, cf(0, altitude if requires_flight else (
+            THIRD_FLOOR_Y if third_floor else 0), 0))
+        region = REGION_BY_ID[region_id]
+        site_x, _, site_z = site[0]
+        travel_id = f"{record['zone']}-{record['family']}"
+        access_text = "Fly to the skyline platform." if requires_flight else (
+            "Find the entrance and climb to floor three." if third_floor
+            else "Search the street-level gym landmark."
+        )
+        out.append({
+            "id": travel_id,
+            "zone": record["zone"],
+            "family": record["family"],
+            "slot": record["equipment"],
+            "equipment": record["equipment"],
             "site_x": site_x,
             "site_z": site_z,
-            "ground_origin": ground_origin,
+            "ground_origin": site,
             "origin": origin,
-            "style": row["style"],
-            "seed": f"five-locations-v1:{row['id']}",
-            "starter": row["starter"],
-            "landmark": True,
-            "region_id": row["region_id"],
-            "environment_id": (
-                f"Sky-{row['id']}" if requires_flight else row["region_id"]
-            ),
-            "neighborhood": row["neighborhood"],
+            "style": style,
+            "seed": f"massive-city-v1:{travel_id}:{region_id}",
+            "starter": False,
+            "landmark": site_index == 0,
+            "region_id": region_id,
+            "environment_id": f"Sky-{travel_id}" if requires_flight else region_id,
+            "neighborhood": region["theme"],
             "requires_flight": requires_flight,
-            "altitude": row.get("altitude", 0),
-            "location_name": row["location_name"],
-            "location_tagline": row["location_tagline"],
+            "altitude": altitude,
+            "location_name": f"{region_id} {record['family']} Gym",
+            "location_tagline": access_text,
         })
     return out
 
@@ -2737,7 +2745,7 @@ def connected_ground():
     """Water background plus the connected, non-rectangular causeway graph."""
     out = [
         map_feature(part(
-            "Ocean", [1900, 3, 1600], cf(0, FLOOR_TOP - 10, 10),
+            "Ocean", [3400, 3, 3100], cf(0, FLOOR_TOP - 10, 20),
             [0.08, 0.20, 0.27], "Glass", CanCollide=False, CanTouch=False,
             CanQuery=False, Transparency=0.18,
         ), "Water"),

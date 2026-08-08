@@ -555,7 +555,7 @@ function MenuController:_renderMap(parent: Frame)
 			unlockedCount += 1
 		end
 		local isSelected = selectedDestination == destination.Id
-		local size = if isSelected then 22 else 15
+		local size = if isSelected then 34 else 27
 		local at = destination.Position
 
 		local pin = Instance.new("TextButton")
@@ -572,7 +572,8 @@ function MenuController:_renderMap(parent: Frame)
 		pin.Font = UI.Font.Numeric
 		pin.TextSize = 9
 		pin.TextColor3 = if unlocked then MAP_PAPER else MAP_INK
-		pin.Text = string.sub(stat.DisplayName, 1, 1)
+		pin.TextWrapped = true
+		pin.Text = `{string.sub(stat.DisplayName, 1, 1)}\n×{NumberFormat.Format(destination.GainMultiplier)}`
 		pin.ZIndex = if isSelected then 24 else 22
 		pin:SetAttribute("EnvironmentId", destination.EnvironmentId)
 		pin:SetAttribute("ExerciseFamily", destination.ExerciseFamily)
@@ -580,6 +581,7 @@ function MenuController:_renderMap(parent: Frame)
 		pin:SetAttribute("AccessKind", destination.AccessKind)
 		pin:SetAttribute("RequiresFlight", destination.RequiresFlight)
 		pin:SetAttribute("LocationName", destination.LocationName)
+		pin:SetAttribute("GainMultiplier", destination.GainMultiplier)
 		pin.Parent = pinLayer
 
 		local pinCorner = Instance.new("UICorner")
@@ -1144,7 +1146,8 @@ function MenuController:_renderTrain(parent: Frame)
 		title.Position = UDim2.fromOffset(0, 5)
 		title.TextColor3 = if spot.Unlocked then stat.Color else UI.Palette.TextMuted
 		local zoneName = destination.LocationName
-		title.Text = `{spot.Equipment.DisplayName}  <font color="#8A93A8">{zoneName}</font>`
+		title.Text = `×{NumberFormat.Format(destination.GainMultiplier)}  {spot.Equipment.DisplayName}`
+			.. `  <font color="#8A93A8">{zoneName}</font>`
 			.. (if here then `  <font color="#7EE7FF">· YOU ARE HERE</font>` else "")
 
 		-- Free/busy is the "current" half of the question. Absent status means the
