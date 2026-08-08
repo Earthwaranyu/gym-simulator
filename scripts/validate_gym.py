@@ -229,6 +229,11 @@ def validate_finite_geometry(validator: Validator, payloads: Iterable[Any]) -> N
                         ),
                         f"{label}: Size contains a non-positive, non-finite, or non-numeric value",
                     )
+                    if is_base_part(node) and len(size) == 3:
+                        validator.check(
+                            all(value <= 2048 for value in size if isinstance(value, (int, float))),
+                            f"{label}: Size exceeds Roblox's 2,048-stud BasePart limit",
+                        )
 
 
 def validate_equipment_tables(validator: Validator, builder: ModuleType) -> dict[str, str]:
@@ -456,7 +461,7 @@ def validate_locations(
     validator.check(powers[0] == 0 and all(a < b for a, b in zip(powers, powers[1:])), "active power gates must rise from zero")
     validator.check(
         len(sky_ids) == EXPECTED_SKY_STATIONS,
-        f"expected one Sky station, found {len(sky_ids)}",
+        f"expected {EXPECTED_SKY_STATIONS} Sky stations, found {len(sky_ids)}",
     )
     validator.check(access_counts["ThirdFloor"] == 5, "expected five third-floor training locations")
     validator.check(access_counts["Street"] == 25, "expected 25 street/interior training locations")
@@ -494,8 +499,8 @@ def validate_irregular_map(
         global_max_z = max(bounds[3] for bounds in land_bounds)
         global_width = max(global_max_x - global_min_x, 1)
         global_depth = max(global_max_z - global_min_z, 1)
-        validator.check(global_width >= 2800, f"world is only {global_width:.0f} studs wide")
-        validator.check(global_depth >= 2500, f"world is only {global_depth:.0f} studs deep")
+        validator.check(global_width >= 4700, f"world is only {global_width:.0f} studs wide")
+        validator.check(global_depth >= 4300, f"world is only {global_depth:.0f} studs deep")
         for node, bounds in zip(land, land_bounds):
             shape = node.get("attributes", {}).get("MapShape", "Rect")
             if shape != "Rect":
@@ -550,6 +555,94 @@ def validate_irregular_map(
             nearest >= MIN_SKY_PIN_SEPARATION,
             f"{sky_id}: map pin is only {nearest:.1f} studs from {nearest_id}; minimum is {MIN_SKY_PIN_SEPARATION:.0f}",
         )
+
+
+def validate_world_foundation(
+    validator: Validator,
+    structure: Any,
+    machines: Any,
+) -> None:
+    foundations = [
+        node
+        for node in walk(structure)
+        if node.get("attributes", {}).get("PlayableFoundation") is True
+    ]
+    validator.check(
+        len(foundations) == 1,
+        f"expected exactly one playable world foundation, found {len(foundations)}",
+    )
+    if len(foundations) != 1:
+        return
+
+    foundation = foundations[0]
+    attributes = foundation.get("attributes", {})
+    width = attributes.get("FoundationWidth")
+    depth = attributes.get("FoundationDepth")
+    center_x = attributes.get("FoundationCenterX")
+    center_z = attributes.get("FoundationCenterZ")
+    validator.check(
+        foundation.get("name") == "WorldFoundation",
+        "playable foundation must keep the stable WorldFoundation name",
+    )
+    validator.check(
+        foundation.get("className") == "Folder",
+        "WorldFoundation must be a tiled Folder, not an oversized BasePart",
+    )
+    validator.check(
+        isinstance(width, (int, float))
+        and isinstance(depth, (int, float))
+        and width >= 6000
+        and depth >= 5400,
+        "WorldFoundation must be at least 6,000 x 5,400 studs",
+    )
+    validator.check(
+        isinstance(center_x, (int, float)) and isinstance(center_z, (int, float)),
+        "WorldFoundation needs numeric center attributes",
+    )
+    if not all(isinstance(value, (int, float)) for value in (width, depth, center_x, center_z)):
+        return
+
+    min_x = center_x - width / 2
+    max_x = center_x + width / 2
+    min_z = center_z - depth / 2
+    max_z = center_z + depth / 2
+    tiles = [node for node in descendants(foundation) if is_base_part(node)]
+    columns = attributes.get("TileColumns")
+    rows = attributes.get("TileRows")
+    validator.check(
+        columns == 4 and rows == 4 and len(tiles) == 16,
+        f"WorldFoundation must contain a 4 x 4 tile grid, found {len(tiles)} tiles",
+    )
+    tile_bounds = [bounds for tile in tiles if (bounds := rotated_aabb(tile)) is not None]
+    validator.check(len(tile_bounds) == len(tiles), "every foundation tile needs valid geometry")
+    if tile_bounds:
+        validator.check(
+            abs(min(bounds[0] for bounds in tile_bounds) - min_x) <= 0.1
+            and abs(max(bounds[1] for bounds in tile_bounds) - max_x) <= 0.1
+            and abs(min(bounds[2] for bounds in tile_bounds) - min_z) <= 0.1
+            and abs(max(bounds[3] for bounds in tile_bounds) - max_z) <= 0.1,
+            "foundation tiles do not cover the declared world boundary",
+        )
+        tile_area = sum((bounds[1] - bounds[0]) * (bounds[3] - bounds[2]) for bounds in tile_bounds)
+        validator.check(
+            abs(tile_area - width * depth) <= 1,
+            "foundation tiles contain gaps or overlap in their declared footprint",
+        )
+
+    for payload in (structure, machines):
+        for node in walk(payload):
+            if not is_base_part(node):
+                continue
+            bounds = rotated_aabb(node)
+            if bounds is None:
+                continue
+            validator.check(
+                bounds[0] >= min_x - 0.05
+                and bounds[1] <= max_x + 0.05
+                and bounds[2] >= min_z - 0.05
+                and bounds[3] <= max_z + 0.05,
+                f"{node.get('name', '<part>')}: geometry extends outside WorldFoundation",
+            )
 
 
 def validate_instance_budgets(validator: Validator, payloads: Iterable[Any]) -> tuple[int, int]:
@@ -607,6 +700,7 @@ def run() -> int:
         stations = [node for node in walk(first_machines) if "TrainingStation" in tags(node)]
         station_by_id = validate_locations(validator, builder, stations, family_by_equipment)
         validate_irregular_map(validator, first_structure, station_by_id)
+        validate_world_foundation(validator, first_structure, first_machines)
         instance_count, base_part_count = validate_instance_budgets(
             validator,
             (first_structure, first_machines),

@@ -2635,30 +2635,32 @@ MAP_FEATURE_TAG = "MapFeature"
 GROUND_STYLES = ["warehouse", "alley", "yard", "underpass", "bunker"]
 
 # The connected world is an irregular coastal loop rather than a rectangular
-# grid. A region is a visual landmark, not a progression tier: the 50 non-starter
-# tier/family pairs are shuffled across all ten. Counts deliberately vary so the
-# player cannot infer "five machines live in every neighborhood" either.
+# grid. A region is a visual landmark, not a progression tier: the 30 non-starter
+# tier/family pairs are shuffled across all ten. The large hidden foundation is
+# only a fall catcher; visible land remains an irregular chain of districts.
+WORLD_FOUNDATION_SIZE = (6200, 5600)
+WORLD_WATER_SIZE = (6000, 5400)
 REGIONS = [
-    {"id": "OldTown", "theme": "Iron", "center": (-480, 180),
-     "size": (600, 470), "yaw": -12, "shape": "Rect", "count": 6},
-    {"id": "Harbor", "theme": "Powerhouse", "center": (-1180, -160),
-     "size": (720, 460), "yaw": 16, "shape": "Rect", "count": 7},
-    {"id": "Beach", "theme": "Strongman", "center": (-1020, -760),
-     "size": (600, 600), "yaw": 0, "shape": "Circle", "count": 3},
-    {"id": "Quarry", "theme": "Titan", "center": (-220, -1080),
-     "size": (640, 640), "yaw": -18, "shape": "Circle", "count": 4},
-    {"id": "Highrise", "theme": "Skydeck", "center": (620, -850),
-     "size": (720, 520), "yaw": 21, "shape": "Rect", "count": 7},
-    {"id": "SolarWorks", "theme": "Solar", "center": (1240, -280),
-     "size": (680, 480), "yaw": -14, "shape": "Rect", "count": 5},
-    {"id": "Stormworks", "theme": "Storm", "center": (1180, 540),
-     "size": (600, 600), "yaw": 0, "shape": "Circle", "count": 4},
-    {"id": "NeonMarket", "theme": "Nebula", "center": (470, 1000),
-     "size": (720, 500), "yaw": 27, "shape": "Rect", "count": 6},
-    {"id": "Observatory", "theme": "Ascendant", "center": (-330, 1160),
-     "size": (600, 600), "yaw": 0, "shape": "Circle", "count": 3},
-    {"id": "VoidRail", "theme": "Void", "center": (-1000, 770),
-     "size": (680, 500), "yaw": -24, "shape": "Rect", "count": 5},
+    {"id": "OldTown", "theme": "Iron", "center": (-790, 300),
+     "size": (660, 520), "yaw": -12, "shape": "Rect", "count": 6},
+    {"id": "Harbor", "theme": "Powerhouse", "center": (-1950, -260),
+     "size": (790, 510), "yaw": 16, "shape": "Rect", "count": 7},
+    {"id": "Beach", "theme": "Strongman", "center": (-1690, -1260),
+     "size": (660, 660), "yaw": 0, "shape": "Circle", "count": 3},
+    {"id": "Quarry", "theme": "Titan", "center": (-360, -1780),
+     "size": (700, 700), "yaw": -18, "shape": "Circle", "count": 4},
+    {"id": "Highrise", "theme": "Skydeck", "center": (1020, -1410),
+     "size": (790, 570), "yaw": 21, "shape": "Rect", "count": 7},
+    {"id": "SolarWorks", "theme": "Solar", "center": (2040, -470),
+     "size": (750, 530), "yaw": -14, "shape": "Rect", "count": 5},
+    {"id": "Stormworks", "theme": "Storm", "center": (1950, 890),
+     "size": (660, 660), "yaw": 0, "shape": "Circle", "count": 4},
+    {"id": "NeonMarket", "theme": "Nebula", "center": (780, 1650),
+     "size": (790, 550), "yaw": 27, "shape": "Rect", "count": 6},
+    {"id": "Observatory", "theme": "Ascendant", "center": (-550, 1920),
+     "size": (660, 660), "yaw": 0, "shape": "Circle", "count": 3},
+    {"id": "VoidRail", "theme": "Void", "center": (-1650, 1270),
+     "size": (750, 550), "yaw": -24, "shape": "Rect", "count": 5},
 ]
 REGION_BY_ID = {region["id"]: region for region in REGIONS}
 REGION_LINKS = [
@@ -2696,6 +2698,25 @@ def map_footprint(name, width, depth, frame, color, kind, shape="Rect"):
         kind,
         shape,
     )
+
+
+def tiled_surface(name, width, depth, height, y, color, material,
+                  columns=4, rows=4, map_kind=None, **props):
+    """Build a seamless surface without exceeding Roblox's 2,048-stud Part cap."""
+    tile_width = width / columns
+    tile_depth = depth / rows
+    out = []
+    for column in range(columns):
+        x = -width / 2 + tile_width * (column + 0.5)
+        for row in range(rows):
+            z = -depth / 2 + tile_depth * (row + 0.5)
+            node = part(
+                f"{name}_{column + 1}_{row + 1}",
+                [tile_width, height, tile_depth], cf(x, y, z),
+                color, material, **props,
+            )
+            out.append(map_feature(node, map_kind) if map_kind else node)
+    return out
 
 
 def region_frame(region):
@@ -2786,7 +2807,7 @@ def connected_locations():
                 "equipment": STAT_VARIANTS[family][zone_index],
             })
 
-    # Three active sites in every neighborhood makes the whole 2,500-stud city
+    # Three active sites in every neighborhood makes the whole 5,000-stud city
     # meaningful while avoiding the old tell of exactly five machines per district.
     slots = [
         (region["id"], site_index, site)
@@ -3129,13 +3150,33 @@ def region_scenery(region, locations):
 
 
 def connected_ground():
-    """Water background plus the connected, non-rectangular causeway graph."""
+    """Large foundation, water background, and irregular causeway graph."""
     out = [
-        map_feature(part(
-            "Ocean", [3400, 3, 3100], cf(0, FLOOR_TOP - 10, 20),
-            [0.08, 0.20, 0.27], "Glass", CanCollide=False, CanTouch=False,
+        {
+            "name": "WorldFoundation",
+            "className": "Folder",
+            "attributes": {
+                "PlayableFoundation": True,
+                "Purpose": "WorldBoundsAndFallCatcher",
+                "FoundationCenterX": 0,
+                "FoundationCenterZ": 0,
+                "FoundationWidth": WORLD_FOUNDATION_SIZE[0],
+                "FoundationDepth": WORLD_FOUNDATION_SIZE[1],
+                "TileColumns": 4,
+                "TileRows": 4,
+            },
+            "children": tiled_surface(
+                "FoundationTile", WORLD_FOUNDATION_SIZE[0], WORLD_FOUNDATION_SIZE[1],
+                6, FLOOR_TOP - 12.5, [0.055, 0.06, 0.07], "Rock",
+                CanTouch=False, CanQuery=False,
+            ),
+        },
+        folder("WorldWater", tiled_surface(
+            "OceanTile", WORLD_WATER_SIZE[0], WORLD_WATER_SIZE[1],
+            3, FLOOR_TOP - 10, [0.08, 0.20, 0.27], "Glass",
+            map_kind="Water", CanCollide=False, CanTouch=False,
             CanQuery=False, Transparency=0.18,
-        ), "Water"),
+        )),
         environment_model("Hub", "Ground", [
             disc("HubGround", 5, 470, FLOOR_TOP - 2.5,
                  [0.22, 0.23, 0.23], "Ground"),

@@ -8,7 +8,7 @@ mid-training-set, interrupting reps to annoy them.
 (training anti-exploit) were withdrawn by design, not skipped: reps are server-driven
 with no client remote to exploit.
 
-**Current roadmap: 9 / 16 items complete (#96–#111).** The checked foundation proves a
+**Current roadmap: 10 / 17 items complete (#96–#112).** The checked foundation proves a
 large playable prototype; it does **not** mean the product is ready for a public launch.
 
 **Current public-launch blockers:** `DataService` still uses the Studio mock store, four
@@ -895,3 +895,24 @@ Execution rules:
       Deadlift, Ab Wheel and Stair Climber all move current R15 `AnimationConstraint` joints.
       At the 2.2 physique cap, measured upper torso is ≈3.27×1.79×1.45 and upper arm
       ≈1.34×1.36×1.34, preserving a visible taper rather than the previous inflated shape.
+
+- [x] 112. **Expand the city beyond the original baseplate footprint.** Spread the ten
+      connected neighborhoods across ≈4,868 × 4,471 studs of visible land while preserving
+      their irregular coastal silhouettes, causeway connections, shuffled exercises, five
+      enterable third-floor gyms, and five intentional skyline gyms. Add one 6,200 × 5,600
+      `WorldFoundation` beneath the water as a seamless 4×4 tile grid—Roblox clamps a single
+      BasePart axis to 2,048 studs—forming a physical world boundary and fall catcher;
+      do not expose it as a rectangular map feature or flatten the visible city into a plain
+      square. Expand the water/map background with the world, keep all structure and machine
+      X/Z bounds inside the foundation, and make the generated-world validator reject a
+      smaller footprint or any escaped geometry.
+
+      **Verified 2026-08-08:** deterministic generation and `python3
+      scripts/validate_gym.py` pass with 35 stations / 35 unique exercises, 2,230 instances,
+      2,051 BaseParts and build `a343c75bb4ba`. The validator measures at least 4,700 ×
+      4,300 studs of irregular visible land, requires exactly one tiled foundation at least
+      6,000 × 5,400, rejects any part over Roblox's 2,048-stud axis limit, and checks every
+      generated BasePart against the foundation's horizontal boundary. Connected Studio
+      independently measures 4,868 × 4,471 visible studs, 16 foundation tiles, 16 water
+      tiles, 132 map features, 35 stations/zones, zero escaped or oversized parts, floor
+      support beneath all 35 exits, and five successful third-floor routes.

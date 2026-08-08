@@ -113,6 +113,10 @@ The rule under test: **a hit does not dismount; only death does.**
       than the old 140-stud launch; even maximum Legs never exceeds 120.
 - [ ] Fly between distant districts with StreamingEnabled on — machines must not pop in
       late. If they do, raise `StreamingMinRadius` in `default.project.json`.
+- [ ] Traverse the expanded world edge to edge. The connected visible land should span
+      roughly 4,868 × 4,471 studs, with every road, district, machine and sky platform
+      horizontally contained by the 6,200 × 5,600 `WorldFoundation`. Falling into the
+      surrounding water lands on the hidden rock catcher instead of the void.
 - [ ] Open the map. It is a **light** board, not a dark one, and every district, road
       and building is legible against it. All **35** locations are present and
       selectable; zoom, pan, and selection survive a refresh.
