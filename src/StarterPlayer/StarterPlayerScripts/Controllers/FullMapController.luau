@@ -52,7 +52,6 @@ local MAX_ZOOM = 4
 local ZOOM_STEP = 1.25
 local PIN_SIZE = 30
 local SELECTED_PIN_SIZE = 32
-local RECOMMENDED_PIN_SIZE = 36
 
 local MAP_PAPER = MapRender.Paper
 local MAP_INK = MapRender.Ink
@@ -71,7 +70,7 @@ local mapFeatures: { MapRender.Feature } = {}
 local mapZoom = 1
 local mapCenter = Vector2.new(0.5, 0.5)
 local renderedPower = 0
-local recommendedDestination: string? = nil
+local currentTrainingMultiplier: number? = nil
 
 local function toast(message: string?)
 	if ToastController ~= nil and type(message) == "string" and message ~= "" then
@@ -188,31 +187,13 @@ function FullMapController:_teleport(destination: Destination)
 	toast(message)
 end
 
-function FullMapController:_recommend(power: number, stats: { [string]: number }): Destination?
-	-- A single recommendation is more useful than making all currently unlocked pins
-	-- shout at once. Train the weakest muscle at the best multiplier the player's total
-	-- Power can enter; ties follow the stable five-stat display order.
-	local weakest = StatConfig.List[1]
-	local weakestValue = math.huge
-	for _, definition in StatConfig.List do
-		local value = Formulas.SanitizeStat(stats[definition.Id] or 0)
-		if value < weakestValue then
-			weakest = definition
-			weakestValue = value
-		end
-	end
-	if weakest == nil then
-		return nil
-	end
-
-	local best: Destination? = nil
+function FullMapController:_currentMultiplier(power: number): number?
+	-- The map guides progression by Power tier, not by picking a favourite muscle.
+	-- Every muscle in the strongest accessible tier receives the same quiet emphasis.
+	local best: number? = nil
 	for _, destination in destinations do
-		if
-			destination.StatId == weakest.Id
-			and power >= destination.RequiredPower
-			and (best == nil or destination.GainMultiplier > best.GainMultiplier)
-		then
-			best = destination
+		if power >= destination.RequiredPower and (best == nil or destination.GainMultiplier > best) then
+			best = destination.GainMultiplier
 		end
 	end
 	return best
@@ -262,8 +243,8 @@ function FullMapController:_renderSidebar(parent: Frame, power: number)
 	heading.Font = UI.Font.Heading
 	heading.TextSize = 12
 	heading.TextColor3 = UI.Palette.TextMuted
-	heading.Text = if destination ~= nil and destination.Id == recommendedDestination
-		then "RECOMMENDED FOR YOUR BUILD"
+	heading.Text = if destination ~= nil and destination.GainMultiplier == currentTrainingMultiplier
+		then "CURRENT POWER TIER"
 		else "SELECTED LOCATION"
 
 	if destination == nil then
@@ -417,13 +398,11 @@ function FullMapController:_render()
 
 	self:_fetchMap()
 	local data = ProfileController:Get()
-	local stats = if data ~= nil then data.Stats else {}
-	local power = Formulas.TotalPower(stats)
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
 	renderedPower = power
-	local recommendation = self:_recommend(power, stats)
-	recommendedDestination = if recommendation ~= nil then recommendation.Id else nil
-	if selectedDestination == nil or MapRender.GetDestination(selectedDestination) == nil then
-		selectedDestination = recommendedDestination
+	currentTrainingMultiplier = self:_currentMultiplier(power)
+	if selectedDestination ~= nil and MapRender.GetDestination(selectedDestination) == nil then
+		selectedDestination = nil
 	end
 
 	content:ClearAllChildren()
@@ -486,7 +465,7 @@ function FullMapController:_render()
 
 	-- The full map is deliberately moodier than the minimap. This quiet overlay keeps
 	-- the complete street/building context visible without letting it compete with the
-	-- one recommended training pin drawn above it.
+	-- the current Power tier drawn above it.
 	local mapShade = Instance.new("Frame")
 	mapShade.Name = "MapShade"
 	mapShade.Size = UDim2.fromScale(1, 1)
@@ -515,7 +494,7 @@ function FullMapController:_render()
 	hub.ZIndex = 24
 
 	local unlockedCount = 0
-	local pinRecords: { [string]: { Button: TextButton, Stroke: UIStroke, Recommended: boolean } } = {}
+	local pinRecords: { [string]: { Button: TextButton, Stroke: UIStroke } } = {}
 	local clusterMembers: { [string]: { Destination } } = {}
 	for _, destination in destinations do
 		local key = destinationCluster(destination)
@@ -570,16 +549,16 @@ function FullMapController:_render()
 			unlockedCount += 1
 		end
 		local selected = selectedDestination == destination.Id
-		local recommended = recommendedDestination == destination.Id
+		local currentTier = destination.GainMultiplier == currentTrainingMultiplier
 		local pin = Instance.new("TextButton")
 		pin.Name = destination.Id
 		pin.AnchorPoint = Vector2.new(0.5, 0.5)
 		pin.Position = pinPositions[destination.Id]
 		pin.Size = UDim2.fromOffset(
-			if recommended then RECOMMENDED_PIN_SIZE elseif selected then SELECTED_PIN_SIZE else PIN_SIZE,
-			if recommended then RECOMMENDED_PIN_SIZE elseif selected then SELECTED_PIN_SIZE else PIN_SIZE
+			if selected then SELECTED_PIN_SIZE else PIN_SIZE,
+			if selected then SELECTED_PIN_SIZE else PIN_SIZE
 		)
-		pin.BackgroundColor3 = if recommended
+		pin.BackgroundColor3 = if currentTier
 			then stat.Color
 			elseif unlocked then stat.Color:Lerp(UI.Palette.Glass, 0.48)
 			else stat.Color:Lerp(UI.Palette.Glass, 0.72)
@@ -589,45 +568,32 @@ function FullMapController:_render()
 		pin.TextScaled = true
 		pin.TextWrapped = true
 		pin.LineHeight = 0.82
-		pin.TextColor3 = if recommended or unlocked then MAP_PAPER else UI.Palette.TextMuted
+		pin.TextColor3 = if currentTier then MAP_PAPER else UI.Palette.TextMuted
 		pin.Text = `{string.sub(string.upper(stat.DisplayName), 1, 2)}\n×{NumberFormat.Format(
 			destination.GainMultiplier
 		)}`
-		pin.ZIndex = if recommended then 27 elseif selected then 25 else 22
+		pin.ZIndex = if selected then 25 else 22
 		pin.Parent = pins
 		addCorner(pin, 20)
 		local textLimit = Instance.new("UITextSizeConstraint")
 		textLimit.MinTextSize = 6
 		textLimit.MaxTextSize = 10
 		textLimit.Parent = pin
-		local pinStroke = addBorder(
-			pin,
-			if recommended then UI.Palette.Accent elseif selected then MAP_PAPER else MAP_INK,
-			0,
-			if recommended then 4 elseif selected then 2 else 1
-		)
-		pinRecords[destination.Id] = { Button = pin, Stroke = pinStroke, Recommended = recommended }
+		local pinStroke =
+			addBorder(pin, if selected then MAP_PAPER else MAP_INK, 0, if selected then 2 else 1)
+		pinRecords[destination.Id] = { Button = pin, Stroke = pinStroke }
 		UI.Pressable(pin, { PressScale = 0.9, HoverScale = 1.12 })
 		pin.Activated:Connect(function()
 			selectedDestination = destination.Id
 			for id, record in pinRecords do
 				local nowSelected = id == selectedDestination
 				record.Button.Size = UDim2.fromOffset(
-					if record.Recommended
-						then RECOMMENDED_PIN_SIZE
-						elseif nowSelected then SELECTED_PIN_SIZE
-						else PIN_SIZE,
-					if record.Recommended
-						then RECOMMENDED_PIN_SIZE
-						elseif nowSelected then SELECTED_PIN_SIZE
-						else PIN_SIZE
+					if nowSelected then SELECTED_PIN_SIZE else PIN_SIZE,
+					if nowSelected then SELECTED_PIN_SIZE else PIN_SIZE
 				)
-				record.Button.ZIndex = if record.Recommended then 27 elseif nowSelected then 25 else 22
-				record.Stroke.Color = if record.Recommended
-					then UI.Palette.Accent
-					elseif nowSelected then MAP_PAPER
-					else MAP_INK
-				record.Stroke.Thickness = if record.Recommended then 4 elseif nowSelected then 2 else 1
+				record.Button.ZIndex = if nowSelected then 25 else 22
+				record.Stroke.Color = if nowSelected then MAP_PAPER else MAP_INK
+				record.Stroke.Thickness = if nowSelected then 2 else 1
 			end
 			-- Redraw only the small detail card. Recreating thousands of map-feature
 			-- Frames for every pin click made destination selection needlessly heavy.
@@ -834,13 +800,9 @@ function FullMapController:_render()
 	status.TextSize = 10
 	status.TextColor3 = UI.Palette.Text
 	status.TextXAlignment = Enum.TextXAlignment.Center
-	if recommendation ~= nil then
-		local recommendedStat = StatConfig.Get(recommendation.StatId)
-		local statName = if recommendedStat ~= nil
-			then string.upper(recommendedStat.DisplayName)
-			else "MUSCLE"
+	if currentTrainingMultiplier ~= nil then
 		status.Text =
-			`★ TRAIN {statName} AT ×{NumberFormat.Format(recommendation.GainMultiplier)}  ·  {unlockedCount}/{#destinations} OPEN`
+			`CURRENT TRAINING TIER ×{NumberFormat.Format(currentTrainingMultiplier)}  ·  {unlockedCount}/{#destinations} OPEN`
 	else
 		status.Text = `{unlockedCount}/{#destinations} OPEN  ·  DRAG TO PAN  ·  WHEEL OR +/− TO ZOOM`
 	end
@@ -997,12 +959,14 @@ function FullMapController:Start()
 			return
 		end
 		local data = ProfileController:Get()
-		local stats = if data ~= nil then data.Stats else {}
-		local power = Formulas.TotalPower(stats)
-		local nextRecommendation = self:_recommend(power, stats)
-		if (if nextRecommendation ~= nil then nextRecommendation.Id else nil) ~= recommendedDestination then
-			if selectedDestination == recommendedDestination then
-				selectedDestination = if nextRecommendation ~= nil then nextRecommendation.Id else nil
+		local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+		local nextMultiplier = self:_currentMultiplier(power)
+		if nextMultiplier ~= currentTrainingMultiplier then
+			local selected = if selectedDestination ~= nil
+				then MapRender.GetDestination(selectedDestination)
+				else nil
+			if selected ~= nil and selected.GainMultiplier == currentTrainingMultiplier then
+				selectedDestination = nil
 			end
 			self:_render()
 			return

@@ -139,12 +139,13 @@ The rule under test: **a hit does not dismount; only death does.**
       mouse drag, touch drag, and touch-friendly zoom buttons as well.
 - [ ] Drag the map repeatedly, including releasing the mouse over the panel edge and
       dimmed background. The map must stay open. Only **X**, **Escape**, or **M** closes it.
-- [ ] On open, exactly one pin has the large gold recommendation outline. It belongs
-      to the player's lowest raw muscle stat and uses that muscle's highest multiplier
-      unlocked by total Power. Ties resolve in dock order: Arms, Chest, Back, Core, Legs.
-- [ ] Pan and zoom, then select several circles. A non-recommended selection receives
-      only a thin light outline; the gold recommendation remains the sole strong
-      highlight, and the sidebar updates without resetting the current map view.
+- [ ] On open, no single muscle is preselected or enlarged. All five locations in the
+      player's highest Power-unlocked multiplier tier are equally bright: ×1 at 0
+      Power, then ×2, ×4, ×8, ×16, ×32 and ×64 at their configured thresholds. Earlier
+      unlocked tiers and future locked tiers stay readable but subdued.
+- [ ] Pan and zoom, then select several circles. Only the manually selected circle
+      receives a thin light outline, and the sidebar updates without resetting the
+      current map view. Selection must not change which five multiplier-tier pins are bright.
 - [ ] The selected-location sidebar shows machine, muscle, gain rate, access type,
       required Power, and two distinct actions: **TRACK** and **TELEPORT**.
 - [ ] Run and fly through scenery — containers, palms, bollards, kerbs. None of it

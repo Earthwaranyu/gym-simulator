@@ -1240,6 +1240,23 @@ punches for a whole phase, so the game had two answers to one question.
       generated-gym and balance validation, `git diff --check`, and a clean Rojo place
       build. Studio remains the required visual hierarchy and live-recommendation check.
 
+- [x] 119. **The map highlights a training tier, not a favourite muscle.** The first
+      recommendation pass overreached: a large gold Arms circle at equal starter stats
+      looked like the game wanted players to train only Arms. The weakest-stat
+      recommendation and oversized gold marker are removed. The map now derives one
+      current multiplier from total Power and keeps all five muscles in that tier at
+      their full colours—×1 at spawn, then ×2 through ×64 as each threshold unlocks.
+      Earlier unlocked tiers and future locked tiers remain labelled and clickable but
+      subdued. Opening the map no longer preselects an arbitrary Arms destination;
+      clicking any circle adds only a thin selection outline and does not alter the
+      five bright tier pins. The sidebar and map footer call this the **current Power
+      tier**, and live profile updates repaint only when the accessible multiplier
+      changes. Product truth and playtests replace the one-muscle recommendation
+      contract with equal five-muscle tier emphasis. Verified with StyLua, Selene (zero
+      warnings), strict Luau LSP analysis, every pure self-test, generated-gym and
+      balance validation, `git diff --check`, and a clean Rojo place build. Studio
+      remains the required brightness and tier-transition check.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
