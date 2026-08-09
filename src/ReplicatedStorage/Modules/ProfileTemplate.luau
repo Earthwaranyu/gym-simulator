@@ -19,7 +19,7 @@
 local Types = require(script.Parent.Types)
 
 -- Bump alongside a new entry in Core/_Migrations.luau.
-local SCHEMA_VERSION = 1
+local SCHEMA_VERSION = 2
 
 local ProfileTemplate: Types.ProfileData = {
 	SchemaVersion = SCHEMA_VERSION,

@@ -1099,6 +1099,26 @@ punches for a whole phase, so the game had two answers to one question.
       5.3 MB Rojo place build. A human Studio screenshot pass remains the final optical
       check because Studio is not available in this workspace.
 
+- [x] 111. **Quests become a standalone, honest and readable surface.** Opening Quests,
+      Map or Ranks now hides the unrelated Info/Shop/Settings strip and gives the page
+      that vertical space. The old three cramped text lines are replaced by full-width
+      quest cards with a pictogram, clear title and description, reward badge, and
+      labelled progress bar. Gym Rat no longer counts the four quarter-second
+      `StatChanged` payments from manual training as four whole reps: it measures the
+      actual Power awarded, so its visible progress rises with the visible Power total.
+      Schema v2 resets only the old inflated Gym Rat progress/completion when an
+      existing save loads.
+      The shared Heading, Body and Numeric faces now all use the same Gotham Bold seen
+      on the readable QUESTS button. Text-button strokes explicitly use border mode,
+      preventing their outlines from turning small tab, purchase and upgrade copy into
+      dark blobs. Shop presentation sorts VIP before Fast Travel while leaving the
+      server-owned catalogue and purchasing rules intact. Product-truth and playtest
+      documents record the new behavior.
+      Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure
+      self-test, generated-gym and balance validation, `git diff --check`, and a clean
+      5.3 MB Rojo place build. Studio remains the required final visual and interaction
+      check.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

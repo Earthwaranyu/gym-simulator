@@ -47,8 +47,10 @@ UI.Palette = {
 
 UI.Font = {
 	Heading = Enum.Font.GothamBold,
-	Body = Enum.Font.GothamMedium,
-	Numeric = Enum.Font.GothamBlack,
+	-- One clear face everywhere. The HUD's QUESTS button proved more legible than the
+	-- mixed Medium/Black treatment, especially after viewport scaling.
+	Body = Enum.Font.GothamBold,
+	Numeric = Enum.Font.GothamBold,
 }
 
 local CORNER_RADIUS = UDim.new(0, 10)

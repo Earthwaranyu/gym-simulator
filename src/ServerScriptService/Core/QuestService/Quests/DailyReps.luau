@@ -1,9 +1,11 @@
 --!strict
 --[[
-	Daily: train a lot of reps.
+	Daily: gain Power through training.
 
-	Reference implementation of Types.Quest. Track() runs once at startup and wires
-	whatever listener this objective needs; the engine never learns what a "rep" is.
+	Manual training pays four small slices per second while machines pay once per
+	exercise cycle. Counting StatChanged events therefore made the same +1 Power read
+	as four "reps" in the quest HUD. Progress uses the amount that actually reached the
+	profile instead, so the quest and the player's Power rise by the same number.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,16 +16,16 @@ local Types = require(ReplicatedStorage.Modules.Types)
 local Quest: Types.Quest = {
 	Id = "DailyReps",
 	DisplayName = "Gym Rat",
-	Description = "Complete 500 reps today.",
+	Description = "Gain 500 Power today.",
 	Goal = 500,
 	TokenReward = 5,
 	Repeat = "Daily",
 
 	Track = function(report: (Player, number) -> ())
-		-- StatChanged fires once per awarded rep, which is exactly one unit of progress.
-		Loader.Get("StatService").StatChanged:Connect(function(player: Player)
-			report(player, 1)
-		end)
+		Loader.Get("StatService").StatChanged
+			:Connect(function(player: Player, _statId: string, _newValue: number, gained: number)
+				report(player, gained)
+			end)
 	end,
 }
 

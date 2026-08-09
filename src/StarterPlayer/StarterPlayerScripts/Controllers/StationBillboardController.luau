@@ -116,7 +116,7 @@ function StationBillboardController:_bind(station: Instance)
 	local warningText = UI.Label("ExclamationMark", warningFrame)
 	warningText.Size = UDim2.fromScale(1, 1)
 	warningText.Text = "!"
-	warningText.Font = Enum.Font.GothamBlack
+	warningText.Font = UI.Font.Heading
 	warningText.TextSize = 24
 	warningText.TextColor3 = Color3.fromRGB(255, 255, 255)
 	warningText.TextXAlignment = Enum.TextXAlignment.Center

@@ -95,6 +95,7 @@ function TabBarController:_build()
 	local rankStroke = Instance.new("UIStroke")
 	rankStroke.Color = UI.Palette.CartoonInk
 	rankStroke.Thickness = 3
+	rankStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	rankStroke.Parent = newRankButton
 
 	local rankIcon = Instance.new("Frame")

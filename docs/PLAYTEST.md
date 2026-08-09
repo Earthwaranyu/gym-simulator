@@ -196,8 +196,10 @@ The rule under test: **a hit does not dismount; only death does.**
 - [ ] Stand in a safe zone or stay dead — tokens do **not** accrue.
 - [ ] Press **M** → Upgrades. Buy a multiplier. The value **doubles** (1x → 2x → 4x) and
       is shown through `NumberFormat`, not as `2.00x`. The stat's rate visibly increases.
-- [ ] Quests tab shows progress for the three shipped quests (`DailyReps`,
+- [ ] Quests page shows progress for the three shipped quests (`DailyReps`,
       `DailyBounties`, `FirstMillion`); completing one awards tokens with a toast.
+- [ ] Hold manual training for ten displayed Power. Gym Rat also rises by ten, not by
+      roughly forty quarter-second server ticks; machine and multiplier gains match too.
 - [ ] Shop tab: buy a Protein Shake with cash and confirm the boost applies and expires.
 - [ ] Reputation drops toward Criminal after killing a peaceful player, and rises after
       killing someone already marked Criminal.

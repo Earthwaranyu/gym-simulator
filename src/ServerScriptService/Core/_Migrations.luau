@@ -24,15 +24,18 @@ local Migrations = {}
 -- Each entry takes the profile data table and mutates it in place.
 -- Steps[1] upgrades a version-1 profile to version 2, and so on.
 local Steps: { (data: any) -> () } = {
-	-- Example of what a real step looks like, kept as documentation:
-	--
-	-- [1] = function(data)
-	--     -- v2 split the single "Power" number into per-stat values.
-	--     if data.Power ~= nil then
-	--         data.Stats = { Arms = data.Power / 5, Chest = data.Power / 5 }
-	--         data.Power = nil
-	--     end
-	-- end,
+	-- v2 changes Gym Rat from counting StatChanged events to counting the amount of
+	-- Power actually awarded. Old progress can be up to four times too high because
+	-- manual training pays in quarter-second slices, so it cannot be converted
+	-- reliably; reset only this daily and leave every other quest untouched.
+	[1] = function(data)
+		if type(data.QuestProgress) == "table" then
+			data.QuestProgress.DailyReps = nil
+		end
+		if type(data.QuestCompletions) == "table" then
+			data.QuestCompletions.DailyReps = nil
+		end
+	end,
 }
 
 -- A profile that has run every step sits at this version.

@@ -80,6 +80,7 @@ function MenuBarController:_build()
 	buttonStroke.Color = UI.Palette.GlassStroke
 	buttonStroke.Thickness = 2
 	buttonStroke.Transparency = 0.45
+	buttonStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	buttonStroke.Parent = menuButton
 
 	iconTile = Instance.new("Frame")

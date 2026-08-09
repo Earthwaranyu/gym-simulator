@@ -42,7 +42,7 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Flight steering | follows the camera's full look direction, pitch included; the rig is held upright and facing its heading by an `AlignOrientation` | `FlightController:_step` |
 | Flight availability | available from spawn | commit `895d0e3` |
 | Leaderboards | 2 global boards — Power and Kills | `LeaderboardService.luau` |
-| Menu tabs | 7 — Map, **Train**, Upgrades, Quests, Shop, Top, Settings | `MenuController.luau` |
+| Menu tabs | 3 — Info, Shop, Settings. Map, Quests and Ranks are direct HUD pages and do not show that strip | `MenuController.luau` |
 | Persistent navigation | one right-side **MENU** button, a bottom five-stat training dock, and a persistent training-first **MAIN GOAL** card; pressing a stat opens its Train view | `MenuBarController.luau`, `HudController.luau`, `MenuController:OpenTrain` |
 | Finding a machine | the **Train** tab lists seven locations for the chosen muscle, usable first and weakest→strongest, with authored place names and live free/busy counts | `MenuController:_renderTrain`, `TrainingService:GetSpotStatus` |
 | Teleporting | **Fast Travel gamepass only.** The plaza rule is gone. Without the pass a destination becomes a tracked waypoint — beacon plus off-screen arrow — and the player walks or flies | `TravelService:CanTravelFrom`, `WaypointController` |
@@ -53,7 +53,7 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Muscle growth | per stat, not per total: Arms→upper/lower arms, Chest→UpperTorso, Back→UpperTorso (0.6), Core→LowerTorso, Legs→upper/lower legs. Shared parts take the largest contribution, never the product | `StatConfig.BodyScales`, `MuscleService:ComputeScales` |
 | Machine visibility | the nearest 14 of 35 stations within 260 studs carry muscle-coloured outlines and floor rings | `StationHighlightController` |
 | Dev commands | `/power`, `/stat`, `/tokens`, `/unlockall`, `/reset`, `/where`, `/help` — **Studio only**, gated on `RunService:IsStudio()` | `DevService.luau` |
-| Quests | 3 — `DailyReps`, `DailyBounties` (daily), `FirstMillion` (one-shot) | `QuestService/Quests/` |
+| Quests | 3 — Gym Rat (`DailyReps`) counts actual Power gained, `DailyBounties` counts unique KOs (daily), and `FirstMillion` is one-shot | `QuestService/Quests/` |
 | Multiplier curve | `2^level`, capped at level 128 so the value stays finite | `Formulas.MultiplierValue` |
 | Monetization | 4 product definitions — ImmortalPotion1Hour, ImmortalPotion1Day, VipGamepass, FastTravelGamepass. **Every `AssetId` is still `0`; nothing is purchasable** | `PurchaseService/Products/` |
 | Persistence | ProfileStore, mock store in Studio by default (`USE_MOCK_IN_STUDIO`) | `DataService.luau` |

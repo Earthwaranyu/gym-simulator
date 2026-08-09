@@ -382,6 +382,7 @@ function MenuController:_renderMap(parent: Frame)
 		local pinStroke = Instance.new("UIStroke")
 		pinStroke.Color = if isSelected then MAP_INK else wash(MAP_INK, 0.45)
 		pinStroke.Thickness = if isSelected then 2 else 1
+		pinStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		pinStroke.Parent = pin
 
 		pin.Activated:Connect(function()
@@ -542,6 +543,7 @@ function MenuController:_renderMap(parent: Frame)
 		local stroke = Instance.new("UIStroke")
 		stroke.Color = UI.Palette.GlassStroke
 		stroke.Transparency = 0.55
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		stroke.Parent = control
 		control.Activated:Connect(onClick)
 	end
@@ -1074,7 +1076,7 @@ function MenuController:_renderInfo(parent: Frame)
 	local rankLabel = UI.Label("Rank", header)
 	rankLabel.Size = UDim2.new(0.5, -74, 0, 18)
 	rankLabel.Position = UDim2.fromOffset(68, 27)
-	rankLabel.Font = Enum.Font.GothamMedium
+	rankLabel.Font = UI.Font.Heading
 	rankLabel.TextSize = 12
 	rankLabel.TextColor3 = Color3.new(1, 1, 1)
 	rankLabel.Text = `{rank.DisplayName}  ·  {reputation.DisplayName}`
@@ -1082,7 +1084,7 @@ function MenuController:_renderInfo(parent: Frame)
 	local record = UI.Label("Record", header)
 	record.Size = UDim2.new(0.5, -74, 0, 16)
 	record.Position = UDim2.fromOffset(68, 44)
-	record.Font = Enum.Font.GothamMedium
+	record.Font = UI.Font.Heading
 	record.TextSize = 11
 	record.TextColor3 = UI.Palette.CartoonCream
 	record.Text =
@@ -1175,7 +1177,7 @@ function MenuController:_renderInfo(parent: Frame)
 		effect.AnchorPoint = Vector2.new(0, 0.5)
 		effect.Position = UDim2.new(0, 210, 0.5, 0)
 		effect.Size = UDim2.new(1, -416, 0, 30)
-		effect.Font = Enum.Font.GothamMedium
+		effect.Font = UI.Font.Heading
 		effect.TextSize = 13
 		effect.TextColor3 = Color3.new(1, 1, 1)
 		effect.TextTruncate = Enum.TextTruncate.AtEnd
@@ -1202,6 +1204,7 @@ function MenuController:_renderInfo(parent: Frame)
 		local upgradeStroke = Instance.new("UIStroke")
 		upgradeStroke.Color = UI.Palette.CartoonInk
 		upgradeStroke.Thickness = 3
+		upgradeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		upgradeStroke.Parent = upgrade
 
 		local upgradeGradient = Instance.new("UIGradient")
@@ -1247,18 +1250,82 @@ function MenuController:_renderQuests(parent: Frame)
 	end
 
 	for index, quest in quests do
-		local line = row(parent, 48, index)
+		local progress = if type(quest.Progress) == "number" then math.max(0, quest.Progress) else 0
+		local goal = if type(quest.Goal) == "number" then math.max(1, quest.Goal) else 1
+		local complete = quest.Complete == true
+		local accent = if complete
+			then UI.Palette.Vital
+			elseif quest.Id == "DailyKnockouts" then UI.Palette.Danger
+			elseif quest.Id == "FirstMillion" then UI.Palette.Power
+			else UI.Palette.Token
 
-		local label = UI.Label("Text", line)
-		label.Size = UDim2.fromScale(1, 1)
+		local card = UI.CartoonCard(tostring(quest.Id), accent, parent)
+		card.LayoutOrder = index
+		card.Size = UDim2.new(1, 0, 0, 104)
 
-		local status = if quest.Complete
-			then `<font color="#66BB6A">complete</font>`
-			else `{NumberFormat.Format(quest.Progress)} / {NumberFormat.Format(quest.Goal)}`
+		local iconBubble = Instance.new("Frame")
+		iconBubble.Name = "Icon"
+		iconBubble.Position = UDim2.fromOffset(10, 10)
+		iconBubble.Size = UDim2.fromOffset(54, 54)
+		iconBubble.BackgroundColor3 = UI.Palette.CartoonInk
+		iconBubble.BackgroundTransparency = 0.12
+		iconBubble.BorderSizePixel = 0
+		iconBubble.Parent = card
 
-		label.Text = `{quest.DisplayName}  <font color="#8A93A8">{quest.Description}</font>\n`
-			.. `{status}  <font color="#7EE7FF">+{quest.TokenReward} tokens</font>`
-		label.TextSize = 13
+		local iconCorner = Instance.new("UICorner")
+		iconCorner.CornerRadius = UDim.new(1, 0)
+		iconCorner.Parent = iconBubble
+
+		local iconPadding = Instance.new("UIPadding")
+		iconPadding.PaddingTop = UDim.new(0, 10)
+		iconPadding.PaddingBottom = UDim.new(0, 10)
+		iconPadding.PaddingLeft = UDim.new(0, 10)
+		iconPadding.PaddingRight = UDim.new(0, 10)
+		iconPadding.Parent = iconBubble
+		Icons.Draw("Quest", iconBubble, UI.Palette.CartoonCream, UI.Palette.CartoonInk)
+
+		local name = UI.Label("Name", card)
+		name.Position = UDim2.fromOffset(76, 8)
+		name.Size = UDim2.new(1, -238, 0, 24)
+		name.Font = UI.Font.Heading
+		name.TextSize = 16
+		name.TextColor3 = UI.Palette.CartoonCream
+		name.Text = string.upper(tostring(quest.DisplayName))
+
+		local detail = UI.Label("Description", card)
+		detail.Position = UDim2.fromOffset(76, 31)
+		detail.Size = UDim2.new(1, -88, 0, 32)
+		detail.TextSize = 13
+		detail.TextColor3 = Color3.new(1, 1, 1)
+		detail.TextWrapped = true
+		detail.Text = tostring(quest.Description)
+
+		local reward = UI.Label("Reward", card)
+		reward.AnchorPoint = Vector2.new(1, 0)
+		reward.Position = UDim2.new(1, -10, 0, 9)
+		reward.Size = UDim2.fromOffset(146, 24)
+		reward.BackgroundColor3 = if complete then UI.Palette.Vital else UI.Palette.CartoonCream
+		reward.BackgroundTransparency = 0
+		reward.Font = UI.Font.Heading
+		reward.TextSize = 12
+		reward.TextColor3 = UI.Palette.CartoonInk
+		reward.TextXAlignment = Enum.TextXAlignment.Center
+		reward.Text = if complete then "COMPLETED" else `+{quest.TokenReward} TOKENS`
+
+		local rewardCorner = Instance.new("UICorner")
+		rewardCorner.CornerRadius = UDim.new(0, 7)
+		rewardCorner.Parent = reward
+
+		local progressBar = UI.Bar("Progress", accent, card)
+		progressBar.Root.Position = UDim2.fromOffset(10, 72)
+		progressBar.Root.Size = UDim2.new(1, -20, 0, 22)
+		local unit = if quest.Id == "DailyKnockouts" then "KOs" else "POWER"
+		progressBar.Set(
+			math.clamp(progress / goal, 0, 1),
+			if complete
+				then `COMPLETE  ·  {NumberFormat.Format(goal)} {unit}`
+				else `{NumberFormat.Format(progress)} / {NumberFormat.Format(goal)} {unit}`
+		)
 	end
 end
 
@@ -1290,6 +1357,18 @@ function MenuController:_renderShop(parent: Frame)
 			table.insert(sections[group], product)
 		end
 	end
+
+	-- VIP is the game's flagship pass and should be read first. Catalogue prices are
+	-- sorted server-side, which otherwise puts the cheaper Fast Travel card before it.
+	local gamepassOrder: { [string]: number } = { Vip = 1, FastTravel = 2 }
+	table.sort(sections.Gamepass, function(left, right): boolean
+		local leftOrder = gamepassOrder[tostring(left.Id)] or 100
+		local rightOrder = gamepassOrder[tostring(right.Id)] or 100
+		if leftOrder ~= rightOrder then
+			return leftOrder < rightOrder
+		end
+		return tostring(left.Id) < tostring(right.Id)
+	end)
 
 	local order = 0
 
@@ -1372,6 +1451,7 @@ function MenuController:_renderShop(parent: Frame)
 		local actionStroke = Instance.new("UIStroke")
 		actionStroke.Color = UI.Palette.CartoonInk
 		actionStroke.Thickness = 2
+		actionStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		actionStroke.Parent = action
 
 		if enabled then
@@ -1632,6 +1712,14 @@ function MenuController:_refresh()
 		end
 	end
 
+	-- Info, Shop and Settings form the menu. Map, Quests and Ranks are standalone HUD
+	-- destinations, so showing the menu strip above them falsely implies a hierarchy
+	-- they do not belong to and wastes a full row of usable space.
+	local hasMenuTabs = activeTab == "Info" or activeTab == "Shop" or activeTab == "Settings"
+	tabStrip.Visible = hasMenuTabs
+	bodyScroll.Position = if hasMenuTabs then UDim2.fromOffset(0, 82) else UDim2.fromOffset(0, 28)
+	bodyScroll.Size = if hasMenuTabs then UDim2.new(1, 0, 1, -82) else UDim2.new(1, 0, 1, -28)
+
 	local fixedInfo = activeTab == "Info"
 	bodyScroll.ScrollingEnabled = not fixedInfo
 	bodyScroll.ScrollBarThickness = if fixedInfo then 0 else 4
@@ -1804,9 +1892,8 @@ function MenuController:_build()
 		self:Toggle()
 	end)
 
-	-- The user's three top-level pages live together here. Map, Quests, and Ranks are
-	-- still direct HUD routes; opening one leaves this strip visible as a quick way
-	-- back to the main menu without inventing another back button.
+	-- The user's three top-level menu pages live together here. Direct HUD routes such
+	-- as Quests hide this strip in _refresh, so they read as their own surfaces.
 	tabStrip = Instance.new("Frame")
 	tabStrip.Name = "Tabs"
 	tabStrip.BackgroundTransparency = 1
@@ -1843,6 +1930,7 @@ function MenuController:_build()
 		local tabStroke = Instance.new("UIStroke")
 		tabStroke.Color = UI.Palette.GlassStroke
 		tabStroke.Transparency = 0.75
+		tabStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		tabStroke.Parent = tabButton
 
 		UI.Pressable(tabButton, { PressScale = 0.97, HoverScale = 1.01 })
