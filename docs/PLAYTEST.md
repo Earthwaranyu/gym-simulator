@@ -126,8 +126,8 @@ The rule under test: **a hit does not dismount; only death does.**
       ocean or fall into the void.
 - [ ] Click the minimap. The full map opens as its own wide modal with **no**
       Info/Shop/Settings tabs, Train list, or vertically scrolling page around it.
-- [ ] The map is a **light** board, not a dark one, and every district, road and
-      building is legible. All **35** coloured location circles are present and
+- [ ] The map uses a subdued dark-slate wash while every district, road and building
+      remains legible. All **35** coloured location circles are present and
       selectable; locked locations remain visible rather than disappearing. Every
       circle shows an unambiguous muscle code and its exact multiplier (`AR ×1`,
       `CH ×8`, `CO ×16`, etc.).
@@ -139,8 +139,12 @@ The rule under test: **a hit does not dismount; only death does.**
       mouse drag, touch drag, and touch-friendly zoom buttons as well.
 - [ ] Drag the map repeatedly, including releasing the mouse over the panel edge and
       dimmed background. The map must stay open. Only **X**, **Escape**, or **M** closes it.
-- [ ] Pan and zoom, then select several circles. The chosen pin receives the heavy
-      outline and the fixed sidebar updates without resetting the current map view.
+- [ ] On open, exactly one pin has the large gold recommendation outline. It belongs
+      to the player's lowest raw muscle stat and uses that muscle's highest multiplier
+      unlocked by total Power. Ties resolve in dock order: Arms, Chest, Back, Core, Legs.
+- [ ] Pan and zoom, then select several circles. A non-recommended selection receives
+      only a thin light outline; the gold recommendation remains the sole strong
+      highlight, and the sidebar updates without resetting the current map view.
 - [ ] The selected-location sidebar shows machine, muscle, gain rate, access type,
       required Power, and two distinct actions: **TRACK** and **TELEPORT**.
 - [ ] Run and fly through scenery — containers, palms, bollards, kerbs. None of it

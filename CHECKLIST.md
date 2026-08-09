@@ -1223,6 +1223,23 @@ punches for a whole phase, so the game had two answers to one question.
       Rojo place build. Studio remains the required mouse, touch, scaling, and 35-pin
       optical check.
 
+- [x] 118. **The map quiets down and points to one useful next workout.** The complete
+      city drawing now sits beneath a dark-slate wash, and all non-recommended pins use
+      restrained versions of their muscle colours. One gold-ringed circle remains the
+      clear focal point: `FullMapController:_recommend` finds the player's lowest raw
+      muscle value, resolves ties in the five-stat dock order, and chooses that muscle's
+      highest multiplier currently unlocked by total Power. The recommendation opens
+      selected, identifies itself in the sidebar and bottom map status, updates when
+      training changes the weakest muscle or Power unlocks a better tier, and never
+      changes the server's travel authority. Manual selections keep a deliberately thin
+      light outline so they remain locatable without competing with the recommendation.
+      Cluster spacing grew with the focal pin, preserving the no-overlap contract.
+      Product truth and playtests now define the darkness, single-highlight rule,
+      weakest-stat calculation, tier selection, and deterministic ties. Verified with
+      StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure self-test,
+      generated-gym and balance validation, `git diff --check`, and a clean Rojo place
+      build. Studio remains the required visual hierarchy and live-recommendation check.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
