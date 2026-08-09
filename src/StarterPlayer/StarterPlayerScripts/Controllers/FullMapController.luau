@@ -32,6 +32,7 @@ local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local MapViewportMath = require(ReplicatedStorage.Modules.MapViewportMath)
 
 type Destination = MapRender.Destination
 type MapItemLayout = {
@@ -478,6 +479,9 @@ function FullMapController:_render()
 			Position = object.Position,
 			Size = object.Size,
 		}
+		-- Do not allow a one-frame flash outside the board while AbsoluteSize is still
+		-- zero. The deferred first layout decides visibility from tested geometry.
+		object.Visible = false
 	end
 	local function setMapItemSize(object: GuiObject, size: UDim2)
 		local layout = mapItems[object]
@@ -656,19 +660,31 @@ function FullMapController:_render()
 
 	local function layoutMapItems()
 		local canvasSize = theoreticalCanvasSize()
+		local viewportSize = viewport.AbsoluteSize
 		local offset = Vector2.new(canvas.Position.X.Offset, canvas.Position.Y.Offset)
 		for object, layout in mapItems do
 			if object.Parent == nil then
 				mapItems[object] = nil
 				continue
 			end
-			object.Position = UDim2.fromOffset(
-				offset.X + layout.Position.X.Scale * canvasSize.X + layout.Position.X.Offset,
-				offset.Y + layout.Position.Y.Scale * canvasSize.Y + layout.Position.Y.Offset
-			)
-			object.Size = UDim2.fromOffset(
-				layout.Size.X.Scale * canvasSize.X + layout.Size.X.Offset,
-				layout.Size.Y.Scale * canvasSize.Y + layout.Size.Y.Offset
+			local centerX = offset.X + layout.Position.X.Scale * canvasSize.X + layout.Position.X.Offset
+			local centerY = offset.Y + layout.Position.Y.Scale * canvasSize.Y + layout.Position.Y.Offset
+			local width = layout.Size.X.Scale * canvasSize.X + layout.Size.X.Offset
+			local height = layout.Size.Y.Scale * canvasSize.Y + layout.Size.Y.Offset
+			object.Position = UDim2.fromOffset(centerX, centerY)
+			object.Size = UDim2.fromOffset(width, height)
+			-- This software containment is deliberately stricter than clipping: a rotated
+			-- feature disappears before any part can cross an edge. It is deterministic on
+			-- every renderer and removes the legacy rotated-ClipsDescendants dependency.
+			object.Visible = MapViewportMath.Fits(
+				centerX,
+				centerY,
+				width,
+				height,
+				object.Rotation,
+				viewportSize.X,
+				viewportSize.Y,
+				1
 			)
 		end
 	end

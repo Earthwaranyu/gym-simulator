@@ -1344,6 +1344,20 @@ punches for a whole phase, so the game had two answers to one question.
       and balance validation, `git diff --check`, a clean Rojo build, and inspection of
       the built rbxlx property.
 
+- [x] 125. **Full-map containment becomes renderer-independent.** A third maximum-zoom
+      Studio screenshot proved the rollout opt-in still did not contain rotated map
+      Frames in this place. `MapViewportMath` now calculates each item's complete
+      rotated axis-aligned bounds in viewport pixels, and `FullMapController` keeps the
+      item hidden whenever that bound touches any of the four edges. Items also start
+      hidden until the first non-zero viewport layout, eliminating the opening-frame
+      flash. This is intentionally stricter than partial clipping: no Roblox renderer
+      path can draw a feature that the controller has made invisible. The pure self-test
+      reproduces the important case—a 45-degree square whose unrotated box fits but
+      whose rotated corners cross the edge—and verifies it is rejected. Product truth
+      and the edge playtest now describe the software containment rule. Verified with
+      StyLua, Selene, strict Luau analysis, all pure self-tests, generated-gym and
+      balance validation, `git diff --check`, and a clean Rojo build.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
