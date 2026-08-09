@@ -8,8 +8,10 @@ numbers from `scripts/_balance_inputs.luau`, generated from the actual configs b
 `scripts/extract_balance.py`. `check.sh` fails if that generated file is stale, so a
 balance change cannot silently invalidate these results.
 
-> **Normalized-rate note (#120):** every exercise now pays exactly once per second and
-> grants one base stat before its x1–x64 location rate, combo, and permanent multiplier.
+> **Additive-rate note (#121):** every exercise pays exactly once per second. Manual
+> training grants the universal +1 base; a machine adds its x1–x64 equipment bonus, so
+> a starter station pays +2/s before owned multipliers. Combo is a discrete x2 only
+> after a complete 50-tick set—there is no longer hidden fractional gain each second.
 > Animation cycles still vary from 0.5–1.2 seconds but no longer drive payout timing.
 > The tables below were regenerated from all 35 live definitions. Void, Solar, Nebula
 > and Ascendant remain dormant future themes and are not reachable in this build.
@@ -27,57 +29,57 @@ Results below are from the 24-hour horizon at the commit that added this file.
 
 | Style | 1st upgrade | 1st rank | 2nd district | power @ 1h |
 |---|---|---|---|---|
-| Active | 2.5m | 13.5m | 5.6m | 100.9K |
-| Casual | 2.5m | 22.4m | 10.3m | 31.9K |
-| Social | 2.5m | 19.3m | 8.5m | 41.7K |
-| Boosted (VIP 2x) | 2.5m | 7.9m | 2.9m | 263.9K |
-| Killed every 2m | 2.8m | 15.7m | 6.6m | 54.7K |
-| Killed every 30s | 4.5m | 30.5m | 12.6m | 11.3K |
+| Active | 2.5m | 12.1m | 4.0m | 84.3K |
+| Casual | 2.5m | 19.2m | 7.2m | 32.9K |
+| Social | 2.5m | 17.1m | 6.2m | 40.4K |
+| Boosted (VIP 2x) | 2.5m | 6.9m | 2.1m | 215.3K |
+| Killed every 2m | 2.8m | 13.8m | 4.5m | 50.0K |
+| Killed every 30s | 4.5m | 23.5m | 7.5m | 15.4K |
 
 **First upgrade lands at 2.5 minutes for every style**, because tokens accrue on a timer
 rather than from reps — even a player being killed constantly gets their first permanent
 choice inside three minutes. That comfortably meets the "first permanent choice in five
 minutes" target in #111, and it does so without a Robux prompt.
 
-The second location tier now arrives at 5.6 minutes for an active player, while the first
-rank arrives at 13.5 minutes. That makes the x2 discovery the first-session payoff without
-pretending normalized +1/s training reaches the first rank immediately.
+The second location tier now arrives at 4.0 minutes for an active player, while the first
+rank arrives at 12.1 minutes. The additive starter machine makes its advantage immediately
+visible without pretending its printed +1 equipment bonus replaced the player's base.
 
 ## Being killed costs far more than the docs claim
 
 | Style | deaths / 24h | combo ticks lost | power vs uninterrupted |
 |---|---|---|---|
-| Killed every 2m | 719 | 5,033 | **−39.0%** |
-| Killed every 30s | 2,879 | 36,012 | **−91.5%** |
+| Killed every 2m | 719 | 5,033 | **−37.1%** |
+| Killed every 30s | 2,879 | 36,012 | **−89.4%** |
 
 This is the most important finding, and it contradicts how the design has been describing
 itself. `CHECKLIST.md` #33 says death costs "no stat, cash, or token loss" and the pitch
 has been that dying costs "time and combo only". Formally true — but a player killed
-every two minutes ends the day with **a quarter of the power** of one who was left alone,
-because the combo multiplier never gets to climb and the token clock stops while dead.
+every two minutes ends the day with only **about 63% of the power** of one who was left alone,
+because repeated deaths prevent full 50-tick sets and the token clock stops while dead.
 
 That is a fairness decision, not a bug, and it belongs to Phase 26. Stated plainly:
 under the current numbers, a determined griefer can still erase much of a victim's
 progression rate without taking a saved currency. The kill-only interruption rule (#96)
-softens this; the open question is whether −39.0% at a two-minute death rate is acceptable.
+softens this; the open question is whether −37.1% at a two-minute death rate is acceptable.
 
 ## Progression pacing to the endgame
 
 | District | needs power | reached (Active) |
 |---|---|---|
 | Garage | 0 | 0s |
-| Iron | 500 | 5.6m |
-| Powerhouse | 5.00K | 20.4m |
-| Strongman | 50.0K | 50.6m |
-| Titan | 500K | 1.7h |
-| Skydeck | 5.00M | 3.1h |
-| Storm | 50.0M | 5.5h |
+| Iron | 500 | 4.0m |
+| Powerhouse | 5.00K | 18.8m |
+| Strongman | 50.0K | 52.2m |
+| Titan | 500K | 1.8h |
+| Skydeck | 5.00M | 3.4h |
+| Storm | 50.0M | 6.0h |
 | Void | 1.50T | never (dormant) |
 | Solar | 30.0T | never (dormant) |
 | Nebula | 600T | never (dormant) |
 | Ascendant | 12.0Qa | never (dormant) |
 
-All seven active tiers arrive inside about 5.5 hours of continuous active play. The next
+All seven active tiers arrive inside about 6 hours of continuous active play. The next
 configured zone is intentionally dormant, so endgame must come from future horizontal
 goals rather than an accidentally reachable placeholder multiplier.
 
@@ -85,13 +87,13 @@ goals rather than an accidentally reachable placeholder multiplier.
 
 | Change | 1st upgrade | 24h power | upgrades bought |
 |---|---|---|---|
-| baseline | 2.5m | 11.40B | 61 |
-| gains −25% | 2.5m | 8.54B | 61 |
-| gains +25% | 2.5m | 14.27B | 61 |
-| gains ×2 | 2.5m | 22.87B | 61 |
-| upgrade cost −25% | 2.0m | 21.78B | 66 |
-| upgrade cost +25% | 3.2m | 6.90B | 58 |
-| upgrade cost ×2 | 5.0m | 2.46B | 50 |
+| baseline | 2.5m | 8.27B | 61 |
+| gains −25% | 2.5m | 6.19B | 61 |
+| gains +25% | 2.5m | 10.35B | 61 |
+| gains ×2 | 2.5m | 16.60B | 61 |
+| upgrade cost −25% | 2.0m | 15.80B | 66 |
+| upgrade cost +25% | 3.2m | 5.00B | 58 |
+| upgrade cost ×2 | 5.0m | 1.77B | 50 |
 
 Two things fall out of this:
 

@@ -19,8 +19,9 @@ local DAMAGE_MULTIPLIER = 1
 
 -- Throwing a punch is arm training, so a landed hit pays Arms.
 --
--- Deliberately worth less than standing at a machine. A machine pays one base stat
--- per second; at the 0.6s cooldown this is 0.25 per hit, about 0.42/s, and only when
+-- Deliberately worth less than standing at a machine. A starter machine pays two stats
+-- per second before owned multipliers; at the 0.6s cooldown this is 0.25 per hit,
+-- about 0.42/s, and only when
 -- a hit actually connects on a living victim. Fighting therefore adds to a session
 -- without ever being the efficient way to train — which matters because the victim
 -- is losing training time while it happens.

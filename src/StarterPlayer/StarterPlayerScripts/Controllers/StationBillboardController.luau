@@ -208,6 +208,10 @@ function StationBillboardController:_refresh()
 			* zoneRate
 			* Formulas.MultiplierValue(level)
 			/ definition.RepInterval
+		local totalPerSecond = Formulas.MachineTrainingRate(
+			definition.BaseGain / definition.RepInterval,
+			zoneRate
+		) * Formulas.MultiplierValue(level)
 
 		local reqLine = if requiredPower > 0
 			then `<font color="#FF7B7B">Require : {NumberFormat.Format(requiredPower)}+ Power</font>\n`
@@ -216,7 +220,8 @@ function StationBillboardController:_refresh()
 		if unlocked then
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
 				.. reqLine
-				.. `<font color="#{color:ToHex()}">+{NumberFormat.Format(perSecond)} {statDisplayName}</font>/s\n`
+				.. `<font color="#{color:ToHex()}">+{NumberFormat.Format(perSecond)} EQUIP · `
+				.. `+{NumberFormat.Format(totalPerSecond)} {statDisplayName}/s TRAINING</font>\n`
 				.. statusLine(entry)
 		else
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`

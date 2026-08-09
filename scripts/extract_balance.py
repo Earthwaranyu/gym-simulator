@@ -111,7 +111,7 @@ def _collect(path: Path, table_name: str, fields: dict[str, type]) -> list[dict]
 
 
 def _equipment_rows(path: Path) -> list[dict]:
-    """Parse the compact equipment(...) calls used to enforce +1 base stat/second."""
+    """Parse compact equipment(...) calls normalized to +1 equipment stat/second."""
     source = path.read_text()
     pattern = re.compile(
         r'equipment\("(?P<id>[^"]+)",\s*"[^"]+",\s*"(?P<family>[^"]+)",\s*'
@@ -150,7 +150,7 @@ def render() -> str:
     ranks = _collect(MODULES / "RankConfig.luau", "ranks", RANK_FIELDS)
 
     training = ROOT / "src" / "ServerScriptService" / "Core" / "TrainingService.luau"
-    combo_step = _constant(training, "COMBO_STEP")
+    combo_goal = _constant(training, "COMBO_GOAL")
     max_combo = _constant(training, "MAX_COMBO_MULTIPLIER")
     stat_tick = _constant(training, "STAT_TICK_SECONDS")
 
@@ -172,7 +172,7 @@ def render() -> str:
         "",
         "local BalanceInputs = {}",
         "",
-        f"BalanceInputs.COMBO_STEP = {_number(combo_step)}",
+        f"BalanceInputs.COMBO_GOAL = {_number(combo_goal)}",
         f"BalanceInputs.MAX_COMBO_MULTIPLIER = {_number(max_combo)}",
         f"BalanceInputs.STAT_TICK_SECONDS = {_number(stat_tick)}",
         "",

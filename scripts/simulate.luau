@@ -322,16 +322,16 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 
 			if best ~= nil and time >= nextRepAt then
 				nextRepAt = time + Inputs.STAT_TICK_SECONDS
-				local comboMultiplier = math.min(Inputs.MAX_COMBO_MULTIPLIER, 1 + combo * Inputs.COMBO_STEP)
+				combo += 1
+				local comboMultiplier = if combo >= Inputs.COMBO_GOAL then Inputs.MAX_COMBO_MULTIPLIER else 1
 				local multiplier = Formulas.MultiplierValue(levels[targetStat])
 					* comboMultiplier
-					* zoneMultiplier
 					* style.GainBoost
 					* gainScale
 
-				local basePerSecond = best.BaseGain / best.RepInterval
-				stats[targetStat] += Formulas.GainPerRep(basePerSecond * Inputs.STAT_TICK_SECONDS, multiplier)
-				combo += 1
+				local equipmentPerSecond = best.BaseGain / best.RepInterval
+				local rawRate = Formulas.MachineTrainingRate(equipmentPerSecond, zoneMultiplier)
+				stats[targetStat] += Formulas.GainPerRep(rawRate * Inputs.STAT_TICK_SECONDS, multiplier)
 			end
 		else
 			-- Dismounting to walk around resets the combo, same as in game.

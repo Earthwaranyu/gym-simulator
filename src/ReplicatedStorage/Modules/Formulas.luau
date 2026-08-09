@@ -82,6 +82,33 @@ end
 
 -- === Training ===============================================================
 
+-- Training always includes the player's own effort. A station adds its advertised
+-- equipment rate on top: an x1 starter machine is therefore 1 base + 1 equipment =
+-- 2 stats per second before the player's upgrade/boost multiplier stack.
+Formulas.BASE_TRAINING_PER_SECOND = 1
+
+--[[
+	The raw per-second rate while mounted, before player-owned multipliers.
+
+	`equipmentPerSecond` is the machine's normalized rate and `zoneMultiplier` is the
+	map tier printed on its pin. They are additive with the universal base rate, so a
+	map pin remains an honest description of the *equipment bonus* instead of silently
+	replacing the training every player can already do without a machine.
+]]
+function Formulas.MachineTrainingRate(equipmentPerSecond: number, zoneMultiplier: number): number
+	if not Formulas.IsFinite(equipmentPerSecond) or not Formulas.IsFinite(zoneMultiplier) then
+		return 0
+	end
+	if equipmentPerSecond < 0 or zoneMultiplier < 0 then
+		return 0
+	end
+	return math.clamp(
+		Formulas.BASE_TRAINING_PER_SECOND + equipmentPerSecond * zoneMultiplier,
+		0,
+		Formulas.MAX_STAT
+	)
+end
+
 --[[
 	Stat awarded for one automatic rep. The equipment supplies the base; the multiplier
 	is the product of the player's whole modifier stack. Kept deliberately trivial — all
@@ -375,6 +402,7 @@ function Formulas.RunSelfTest(): { string }
 	fuzz("FlightSpeed", Formulas.FlightSpeed, 1)
 	fuzz("MuscleScale", Formulas.MuscleScale, 2)
 	fuzz("GainPerRep", Formulas.GainPerRep, 2)
+	fuzz("MachineTrainingRate", Formulas.MachineTrainingRate, 2)
 	fuzz("DamageResistance", Formulas.DamageResistance, 2)
 	fuzz("RetaliationRate", Formulas.RetaliationRate, 1)
 	fuzz("Retaliation", Formulas.Retaliation, 2)
@@ -388,6 +416,9 @@ function Formulas.RunSelfTest(): { string }
 	check("sanitize rejects non-numbers", Formulas.SanitizeStat("1e9") == 0)
 	check("sanitize passes ordinary values", Formulas.SanitizeStat(1234.5) == 1234.5)
 	check("gain never exceeds the cap", Formulas.GainPerRep(1e60, 1e60) <= Formulas.MAX_STAT)
+	check("manual training starts at one per second", Formulas.BASE_TRAINING_PER_SECOND == 1)
+	check("x1 machine adds to base", Formulas.MachineTrainingRate(1, 1) == 2)
+	check("x4 machine adds to base", Formulas.MachineTrainingRate(1, 4) == 5)
 	check("five capped stats stay finite", Formulas.TotalPower({
 		a = Formulas.MAX_STAT,
 		b = Formulas.MAX_STAT,

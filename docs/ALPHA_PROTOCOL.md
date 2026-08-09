@@ -15,12 +15,12 @@ Freeze these before the first session. Every later comparison is against this ro
 
 | What | Value |
 |---|---|
-| Commit | checklist #120 build (record the final commit in each filled sheet) |
-| World build hash | `580b192a698f` (35 stations, 35 unique exercises, 2012 instances) |
+| Commit | checklist #121 build (record the final commit in each filled sheet) |
+| World build hash | `ffc81d90b4ee` (35 stations, 35 unique exercises, 3,927 instances) |
 | Interruption rule | kill-only |
 | Abilities | Punch only |
 | Products | all four `AssetId` still `0` — nothing purchasable |
-| Model prediction, active player | first upgrade 2.5m, first rank 13.5m, second tier 5.6m |
+| Model prediction, active player | first upgrade 2.5m, first rank 12.1m, second tier 4.0m |
 
 If any of these changed, note it in the filled sheet. A session run against a different
 world is a different baseline.
@@ -97,7 +97,7 @@ State these before running, so a confirmed expectation is not mistaken for a dis
 | Join → first rep | — | | | |
 | Join → first upgrade | 2.5m | | | |
 | Join → first flight | — | | | |
-| Reached second tier | 5.6m | | | |
+| Reached second tier | 4.0m | | | |
 | Session length before disengaging | — | | | |
 | Distinct activities | — | | | |
 | p50 FPS | — | | | |

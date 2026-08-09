@@ -273,7 +273,7 @@ def validate_equipment_tables(validator: Validator, builder: ModuleType) -> dict
             validator.check(bool(row.get("PoseId")), f"{equipment_id}: EquipmentConfig is missing PoseId")
             validator.check(
                 row.get("BaseGain") == row.get("RepInterval"),
-                f"{equipment_id}: BaseGain must equal RepInterval for exactly +1/s base rate",
+                f"{equipment_id}: BaseGain must equal RepInterval for exactly +1/s equipment rate",
             )
 
     return family_by_equipment

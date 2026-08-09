@@ -872,7 +872,7 @@ end
 	Tells the server the click is happening.
 
 	Deliberately a "still going" ping rather than "grant me a rep": the server owns
-	the clock and pays by elapsed time, so spamming the button as fast as possible
+	the one-second clock, so spamming the button as fast as possible
 	earns exactly the same as holding it. That is the whole reason the client sends
 	no amount and the server trusts no number from here.
 ]]
@@ -1005,6 +1005,7 @@ function HudController:Start()
 	UserInputService.InputEnded:Connect(function(input: InputObject)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			clicking = false
+			Net.Event("ManualTrain"):FireServer("Stop")
 		end
 	end)
 

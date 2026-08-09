@@ -112,8 +112,9 @@ local function equipment(
 		DisplayName = displayName,
 		ExerciseFamily = family,
 		StatId = family,
-		-- One full second always pays exactly one base stat. The location multiplier
-		-- is therefore the honest advertised rate: x1 = +1/s through x64 = +64/s.
+		-- Normalized to one equipment stat per second. The location multiplier is the
+		-- honest advertised bonus: x1 = +1/s through x64 = +64/s, added to the
+		-- universal +1/s training base by Formulas.MachineTrainingRate.
 		BaseGain = repInterval,
 		RepInterval = repInterval,
 		UnlockPower = 0,

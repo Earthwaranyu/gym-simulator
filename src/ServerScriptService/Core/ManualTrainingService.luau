@@ -12,11 +12,11 @@
 	owns the clock:
 
 	  * **Spamming earns nothing extra.** The client sends "still holding", never
-	    "give me a rep". Gain is rate x elapsed-time, so a hundred clicks a second
-	    and one click a second pay identically. There is no number in the message to
+	    "give me a rep". One uninterrupted second earns one tick, so a hundred clicks
+	    a second and one held button pay identically. There is no number in the message to
 	    inflate and no per-click grant to farm, which is what makes an auto-clicker
 	    pointless rather than merely against the rules.
-	  * **The rate is the stat's own multiplier.** BASE_RATE is one per second and
+	  * **The rate is the stat's own multiplier.** The universal base is one per second and
 	    goes through StatService, which applies the modifier stack — so a Core on
 	    x4 earns +4/s exactly as the Info screen advertises, and token upgrades and
 	    boosts compose without this file knowing they exist.
@@ -33,21 +33,20 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local Types = require(ReplicatedStorage.Modules.Types)
-
--- One base stat per second before multipliers, matching a machine's base rate. The
--- machine's advantage is its zone multiplier, not its base.
-local BASE_RATE = 1
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 -- How long a ping keeps the player "training" for. Longer than the client's 0.4s
 -- re-ping so an ordinary frame hitch does not drop the hold, short enough that
 -- letting go stops the gain before the player notices they are still earning.
 local ACTIVE_WINDOW = 0.9
 
--- The same visible one-second cadence used by mounted machine training.
-local TICK = 1
+-- Check holds more often than they pay so starting shortly after a global scheduler
+-- boundary never delays the first reward. Each individual hold still owns a strict
+-- one-second NextGainAt clock.
+local CHECK_INTERVAL = 0.1
 
--- Client pings are rate limited here as well as paid by time. The time-based payout
--- already makes flooding pointless; this stops it being *free* in bandwidth.
+-- Client pings are rate limited here as well as paid by the server clock. Flooding
+-- cannot move NextGainAt; this also stops it being *free* in bandwidth.
 local PING_BUDGET_PER_SECOND = 8
 
 local ManualTrainingService = {
@@ -58,9 +57,7 @@ local ManualTrainingService = {
 type Hold = {
 	StatId: Types.StatId,
 	Until: number,
-	-- When this player was last paid, so a tick pays for real elapsed time rather
-	-- than for TICK. A hitching server then pays the same total as a smooth one.
-	LastPaidAt: number,
+	NextGainAt: number,
 }
 
 local holds: { [Player]: Hold } = {}
@@ -85,6 +82,11 @@ end
 
 function ManualTrainingService:Start()
 	Net.BindEvent("ManualTrain", PING_BUDGET_PER_SECOND, function(player: Player, statId: any)
+		if statId == "Stop" then
+			holds[player] = nil
+			return
+		end
+
 		-- The one thing the client is trusted for is *which* muscle, and even that is
 		-- checked against the config rather than taken on faith.
 		if type(statId) ~= "string" or not StatConfig.IsValid(statId) then
@@ -104,7 +106,7 @@ function ManualTrainingService:Start()
 		holds[player] = {
 			StatId = statId,
 			Until = now + ACTIVE_WINDOW,
-			LastPaidAt = now,
+			NextGainAt = now + 1,
 		}
 	end)
 
@@ -115,7 +117,7 @@ function ManualTrainingService:Start()
 	local accumulated = 0
 	RunService.Heartbeat:Connect(function(delta: number)
 		accumulated += delta
-		if accumulated < TICK then
+		if accumulated < CHECK_INTERVAL then
 			return
 		end
 		accumulated = 0
@@ -127,34 +129,55 @@ function ManualTrainingService:Start()
 				continue
 			end
 
-			-- Pay for the part of the window that has actually elapsed, and never for
-			-- time after the hold expired — otherwise letting go a moment before a
-			-- tick would still be paid for the whole tick.
-			local paidTo = math.min(now, hold.Until)
-			local elapsed = paidTo - hold.LastPaidAt
-			if elapsed <= 0 then
+			if now < hold.NextGainAt then
 				if now > hold.Until then
 					holds[player] = nil
 				end
 				continue
 			end
-			hold.LastPaidAt = paidTo
+
+			-- A scheduled second that was still inside the client's hold window is valid
+			-- even if this 0.1s check arrived just after the window. Never catch up with
+			-- multiple rewards in one frame: a visible tick is always exactly one second.
+			if hold.NextGainAt > hold.Until then
+				holds[player] = nil
+				continue
+			end
+			hold.NextGainAt = now + 1
 
 			-- A dead player earns nothing, the same rule TokenService applies. Being
 			-- knocked off a machine should cost the attacker's victim something.
 			local character = player.Character
 			local humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
 			if humanoid == nil or humanoid.Health <= 0 then
+				if now > hold.Until then
+					holds[player] = nil
+				end
 				continue
 			end
 
 			if not self:_allowed(player, hold.StatId) then
+				if now > hold.Until then
+					holds[player] = nil
+				end
 				continue
 			end
 
-			-- Through AddStat, so the modifier stack turns the base rate into the
-			-- multiplier the player was shown.
-			StatService:AddStat(player, hold.StatId, BASE_RATE * elapsed)
+			-- Through AddStat, so the modifier stack turns the universal +1 base rate
+			-- into the multiplier the player was shown. Manual rewards use the same
+			-- single replacement popup as equipment rewards.
+			local gained = StatService:AddStat(player, hold.StatId, Formulas.BASE_TRAINING_PER_SECOND)
+			if gained > 0 then
+				local payload: Types.TrainingGain = {
+					StatId = hold.StatId,
+					Amount = gained,
+					PerSecond = gained,
+					Combo = 0,
+					ComboGoal = 0,
+					ComboMultiplier = 1,
+				}
+				Net.Event("TrainingGain"):FireClient(player, payload)
+			end
 
 			if now > hold.Until then
 				holds[player] = nil

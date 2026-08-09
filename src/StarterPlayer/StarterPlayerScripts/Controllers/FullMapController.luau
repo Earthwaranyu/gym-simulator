@@ -313,9 +313,10 @@ function FullMapController:_renderSidebar(parent: Frame, power: number)
 	rate.Position = UDim2.fromOffset(12, 158)
 	rate.Size = UDim2.new(1, -24, 0, 42)
 	rate.Font = UI.Font.Numeric
-	rate.TextSize = 25
+	rate.TextSize = 18
+	rate.TextWrapped = true
 	rate.TextColor3 = stat.Color
-	rate.Text = `+{NumberFormat.Format(perSecond)}/SEC`
+	rate.Text = `+{NumberFormat.Format(perSecond)}/SEC  EQUIPMENT BONUS`
 
 	local access = if destination.AccessKind == "Sky"
 		then `SKY DECK · {math.round(destination.Position.Y)} STUDS`
@@ -436,9 +437,10 @@ function FullMapController:_render()
 	local bounds = MapRender.Bounds(mapFeatures, destinations, MAP_ASPECT)
 	local project = MapRender.Project(bounds)
 
-	-- CanvasGroup is the clipping boundary. Unlike a plain Frame it also clips rotated
-	-- road/building features reliably, so zoomed geometry cannot paint over the sidebar.
-	local viewport = Instance.new("CanvasGroup")
+	-- A dedicated Frame owns the hard viewport rectangle. CanvasGroup clipping leaked
+	-- an enlarged canvas across the modal on some clients; a plain clipping frame keeps
+	-- every zoomed pin, road, and background behind the sidebar and window chrome.
+	local viewport = Instance.new("Frame")
 	viewport.Name = "Viewport"
 	viewport.Active = true
 	viewport.Size = UDim2.fromScale(1, 1)
@@ -771,7 +773,9 @@ function FullMapController:_render()
 	legend.BackgroundTransparency = 0.03
 	legend.BorderSizePixel = 0
 	legend.ZIndex = 60
-	legend.Parent = board
+	-- The legend describes the map sheet, so it belongs to that sheet. It now follows
+	-- the canvas when zoomed or panned instead of floating at an unrelated screen point.
+	legend.Parent = canvas
 	addCorner(legend, 7)
 	addBorder(legend, UI.Palette.GlassStroke, 0.5, 1)
 	local legendLayout = Instance.new("UIListLayout")

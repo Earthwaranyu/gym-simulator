@@ -37,12 +37,14 @@ local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local PoseConfig = require(ReplicatedStorage.Modules.PoseConfig)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 -- How long being hit keeps a player off the machines.
 local STAGGER_SECONDS = 3
--- Combo grows this much per one-second stat tick...
-local COMBO_STEP = 0.02
--- ...up to this multiplier.
+-- A full uninterrupted set earns one clear, whole-number boost. The former 2%-per-tick
+-- curve stored fractional stats, so a visible stat could jump +1 and then +2 even
+-- though the machine label had not changed.
+local COMBO_GOAL = 50
 local MAX_COMBO_MULTIPLIER = 2
 -- Stats land on one shared clock for every exercise. Pose cycles remain free to use
 -- their natural 0.5–1.2 second timing without making one muscle update more often.
@@ -169,7 +171,7 @@ function TrainingService:GetComboMultiplier(player: Player): number
 	if session == nil then
 		return 1
 	end
-	return math.min(MAX_COMBO_MULTIPLIER, 1 + session.combo * COMBO_STEP)
+	return if session.combo >= COMBO_GOAL then MAX_COMBO_MULTIPLIER else 1
 end
 
 function TrainingService:GetSession(player: Player): Session?
@@ -583,7 +585,7 @@ function TrainingService:_bindStation(station: Instance)
 	if zone == nil then
 		warn(
 			`[TrainingService] {station:GetFullName()} stands outside every "{ZoneConfig.ZONE_TAG}" `
-				.. `volume, so it pays base rate. Put it inside one to tier it.`
+				.. `volume, so it uses the x1 equipment bonus. Put it inside one to tier it.`
 		)
 	end
 
@@ -644,26 +646,29 @@ function TrainingService:_step(player: Player, session: Session, now: number)
 	end
 
 	session.lastGainAt = now
+	session.combo += 1
 
 	-- Cheap insurance that nothing has nudged the player off their spot. Writing an
 	-- identical CFrame is a no-op, so this costs no replication in the normal case.
 	session.root.CFrame = session.anchorCFrame
 
-	local basePerSecond = session.definition.BaseGain / session.definition.RepInterval
-	local gain = basePerSecond
+	local equipmentPerSecond = session.definition.BaseGain / session.definition.RepInterval
+	local comboMultiplier = self:GetComboMultiplier(player)
+	local gain = Formulas.MachineTrainingRate(equipmentPerSecond, session.record.zoneMultiplier)
 		* STAT_TICK_SECONDS
-		* self:GetComboMultiplier(player)
-		* session.record.zoneMultiplier
+		* comboMultiplier
 	local gained = StatService:AddStat(player, session.definition.StatId, gain)
 	if gained > 0 then
 		local payload: Types.TrainingGain = {
 			StatId = session.definition.StatId,
 			Amount = gained,
 			PerSecond = gained / STAT_TICK_SECONDS,
+			Combo = math.min(session.combo, COMBO_GOAL),
+			ComboGoal = COMBO_GOAL,
+			ComboMultiplier = comboMultiplier,
 		}
 		Net.Event("TrainingGain"):FireClient(player, payload)
 	end
-	session.combo += 1
 
 	if now - (lastPushAt[player] or 0) >= PUSH_INTERVAL then
 		self:_push(player)

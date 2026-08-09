@@ -4,13 +4,14 @@ A Roblox gym-training game in the vein of **Gym League**, with one differentiati
 from **Super Power Training Simulator**: PvP is live inside the gym. Players can attack each
 other mid-training-set, breaking rep combos to annoy them.
 
-Build progress is tracked in [`CHECKLIST.md`](CHECKLIST.md) — 120 numbered items across 21
+Build progress is tracked in [`CHECKLIST.md`](CHECKLIST.md) — 121 numbered items across 21
 phases. Architecture rules live in [`CLAUDE.md`](CLAUDE.md) (mirrored in `AGENTS.md`).
 
 What the build *actually* contains, with the command behind every number, lives in
 [`docs/PRODUCT_TRUTH.md`](docs/PRODUCT_TRUTH.md). That file is the tiebreaker: if any doc
 disagrees with it, the doc is wrong. Highlights: **35 training locations—seven unique
-exercises per muscle—with exact +1/s through +64/s base location rates**, 35 original exercise definitions,
+exercises per muscle—with exact +1/s through +64/s equipment bonuses on top of the
+universal +1/s training base**, 35 original exercise definitions,
 5 stats, **one** combat ability (Punch), keyboard-only flight, and no purchasable product
 yet — every `AssetId` is still `0`.
 

@@ -42,7 +42,7 @@ local ToastController: any = nil
 local lastRepSoundAt = 0
 local lastRankId: string? = nil
 local damageLayer: Frame? = nil
-local activeTrainingGains = 0
+local activeTrainingGain: BillboardGui? = nil
 
 --[[
 	Plays a configured sound, or does nothing if it has no asset id yet.
@@ -133,17 +133,25 @@ function EffectsController:_showTrainingGain(payload: Types.TrainingGain)
 	local color = if definition ~= nil then definition.Color else UI.Palette.Accent
 	local iconName = if definition ~= nil then definition.Icon else "Train"
 
+	-- Stat ticks are a status readout, not a combat-number pile. Replace the previous
+	-- card before drawing the next one so Heartbeat jitter can never leave two muscle
+	-- gains occupying the same space.
+	local previous = activeTrainingGain
+	activeTrainingGain = nil
+	if previous ~= nil then
+		previous:Destroy()
+	end
+
 	local billboard = Instance.new("BillboardGui")
-	activeTrainingGains += 1
 	billboard.Name = "TrainingGain"
 	billboard.Adornee = head
 	billboard.Size = UDim2.fromOffset(310, 66)
-	billboard.StudsOffsetWorldSpace =
-		Vector3.new((math.random() - 0.5) * 0.5, 3.25 + math.min(activeTrainingGains - 1, 2) * 0.45, 0)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.25, 0)
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 110
 	billboard.LightInfluence = 0
 	billboard.Parent = head
+	activeTrainingGain = billboard
 
 	local card = Instance.new("CanvasGroup")
 	card.Name = "Card"
@@ -202,17 +210,34 @@ function EffectsController:_showTrainingGain(payload: Types.TrainingGain)
 	rate.Font = UI.Font.Heading
 	rate.TextSize = 11
 	rate.TextColor3 = UI.Palette.TextMuted
-	rate.Text = `{NumberFormat.Format(payload.PerSecond)} / SEC  ·  ACTUAL GAIN`
+	if payload.ComboGoal > 0 then
+		if payload.ComboMultiplier > 1 then
+			rate.Text = `{NumberFormat.Format(payload.PerSecond)} / SEC  ·  FULL SET ×{NumberFormat.Format(
+				payload.ComboMultiplier
+			)}`
+		else
+			rate.Text =
+				`{NumberFormat.Format(payload.PerSecond)} / SEC  ·  SET {payload.Combo}/{payload.ComboGoal}`
+		end
+	else
+		rate.Text = `{NumberFormat.Format(payload.PerSecond)} / SEC  ·  BASE TRAINING`
+	end
 
-	local info = TweenInfo.new(1.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	-- Finish comfortably before the next one-second server tick. Replacement above is
+	-- still the hard guarantee when network packets arrive unusually close together.
+	local info = TweenInfo.new(0.78, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local rise = TweenService:Create(card, info, {
 		Position = UDim2.fromScale(0.5, 0.18),
 		GroupTransparency = 1,
 	})
 
 	rise.Completed:Connect(function()
-		activeTrainingGains = math.max(0, activeTrainingGains - 1)
-		billboard:Destroy()
+		if activeTrainingGain == billboard then
+			activeTrainingGain = nil
+		end
+		if billboard.Parent ~= nil then
+			billboard:Destroy()
+		end
 	end)
 	rise:Play()
 end
@@ -252,6 +277,9 @@ function EffectsController:Start()
 			or type(payload.StatId) ~= "string"
 			or type(payload.Amount) ~= "number"
 			or type(payload.PerSecond) ~= "number"
+			or type(payload.Combo) ~= "number"
+			or type(payload.ComboGoal) ~= "number"
+			or type(payload.ComboMultiplier) ~= "number"
 			or payload.Amount <= 0
 		then
 			return

@@ -90,13 +90,18 @@ export type TrainingState = {
 	StaggerSeconds: number,
 }
 
--- One machine stat tick after every server-side modifier and stat cap has been applied.
+-- One training stat tick after every server-side modifier and stat cap has been applied.
 -- Ticks are one second apart; PerSecond stays explicit so feedback never reconstructs
 -- the multiplier stack locally.
 export type TrainingGain = {
 	StatId: StatId,
 	Amount: number,
 	PerSecond: number,
+	-- Zero/zero for manual training. Machine training fills these so the popup can
+	-- explain exactly when the uninterrupted-set bonus turns on.
+	Combo: number,
+	ComboGoal: number,
+	ComboMultiplier: number,
 }
 
 --[[

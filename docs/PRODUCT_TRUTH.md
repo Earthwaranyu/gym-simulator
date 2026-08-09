@@ -1,4 +1,4 @@
-# Product Truth — v10 (2026-08-08)
+# Product Truth — v11 (2026-08-09)
 
 The single versioned inventory of what this build actually is. `CLAUDE.md`, `AGENTS.md`,
 `README.md`, `CHECKLIST.md`, and `docs/PLAYTEST.md` are all reconciled against this file.
@@ -22,7 +22,7 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 
 | Claim | Truth in this build | Evidence |
 |---|---|---|
-| World size | **35 stations—7 tiers × 5 muscles** across ten scattered islands plus the spawn island; visible land spans ≈8,037 × 6,547 studs inside a tiled 10,000 × 9,000 foundation; 1,933 instances / 1,767 BaseParts, build `a1917590d228` | `scripts/validate_gym.py` |
+| World size | **35 stations—7 tiers × 5 muscles** across ten scattered islands plus the spawn island; visible land spans ≈8,037 × 6,547 studs inside a tiled 10,000 × 9,000 foundation; 3,927 instances / 3,759 BaseParts, build `ffc81d90b4ee` | `scripts/validate_gym.py` |
 | World topology | no bridges, roads, causeways, ring, or grid; seeded rejection sampling keeps island centers ≥1,750 studs apart and produces a non-ring radial spread | `scripts/build_gym.py` `scattered_regions`, `scripts/validate_gym.py` |
 | Water traversal | the 9,600 × 8,600 ocean is 25 persistent collidable tiles; walk and Legs sprint work on its Glass surface, and every island has ten shore steps | `scripts/build_gym.py` `connected_ground`, `shore_access` |
 | World-edge safety | 20 persistent invisible collision walls enclose the ocean; client flight and server correction keep roots above Y=-4.5 and within X±4,790 / Z±4,290 | `MovementConfig`, `FlightController`, `FlightService` |
@@ -33,8 +33,9 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Character | **uniform for everyone** — `LoadCharacterAppearance` off, clothing/accessories stripped, one skin tone, shorts painted onto the R15 UpperLegs | `AppearanceService.luau`, `default.project.json` |
 | Stats | 5 — Arms (damage), Chest (max HP), Back (durability), Core (retaliation knockback), Legs (Shift sprint + flight speed) | `StatConfig.luau`, Phase 14 |
 | Abilities | **1 — Punch only.** Slam and Dash are *deferred*, not shipped | `CombatService/Abilities/` |
-| Training start | hold **E** at a station prompt; server mounts, locks, and poses the player. Every machine awards once per second even though exercise animations retain varied natural cycle lengths | `TrainingService.luau`, `EquipmentConfig.luau` |
-| Manual training | hold left mouse while unmounted to award the selected dock stat once per second. It is disabled while mounted, so manual and machine payouts cannot stack | `ManualTrainingService.luau`, `HudController.luau` |
+| Training start | hold **E** at a station prompt; server mounts, locks, and poses the player. Every machine awards once per second even though exercise animations retain varied natural cycle lengths. Rate = universal +1 base + the printed x1–x64 equipment bonus, then owned multipliers | `TrainingService.luau`, `Formulas.MachineTrainingRate` |
+| Manual training | hold left mouse while unmounted to award the selected dock stat an exact +1 base tick once per second before owned multipliers. Release sends an explicit stop; it is disabled while mounted | `ManualTrainingService.luau`, `HudController.luau` |
+| Training feedback | all five muscles use one server-authored `+amount Muscle` card. A new tick replaces the old card and each card fades in 0.78s, so gains never overlap. Manual cards identify base training; machine cards show the 50-tick set progress/full-set x2 | `EffectsController:_showTrainingGain`, `TrainingGain` |
 | Training stop | hold **E** again, or press **Space** / jump | `TrainingService.luau`, `Net` `StopTraining` |
 | Training interruption | **kill-only.** A hit deals damage and grounds the victim but does *not* dismount them; only death ends the set | `CombatService/init.luau` |
 | Death cost | respawn timer, combo reset, in-flight token tick forfeited. No stat, cash, or token loss | `CHECKLIST.md` #33 |
@@ -45,12 +46,12 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Leaderboards | 2 global boards — Power and Kills | `LeaderboardService.luau` |
 | Menu tabs | 3 — Info, Shop, Settings. Quests and Ranks are direct HUD pages; the full map is a separate modal with no menu tabs or page scroll | `MenuController.luau`, `FullMapController.luau` |
 | Persistent navigation | one right-side **MENU** button, a bottom five-stat training dock, a persistent training-first **MAIN GOAL** card, and a clickable minimap that opens the dedicated full map | `MenuBarController.luau`, `HudController.luau`, `FullMapController.luau` |
-| Finding a machine | the dedicated map shows all 35 labelled training circles in readable neighbourhood clusters. All five muscles in the player's highest Power-unlocked multiplier tier stay equally bright; earlier and future tiers are subdued but selectable. No muscle is preselected, and manual selection preserves pan/zoom while opening full details in the sidebar | `FullMapController:_currentMultiplier`, `FullMapController:_render`, `MapRender` |
+| Finding a machine | the dedicated map shows all 35 labelled training circles in readable neighbourhood clusters. All five muscles in the player's highest Power-unlocked multiplier tier stay equally bright; earlier and future tiers are subdued but selectable. The muscle legend belongs to the map sheet and follows zoom/pan | `FullMapController:_currentMultiplier`, `FullMapController:_render`, `MapRender` |
 | Teleporting | Selecting a map circle always shows two separate actions. **Track is free** and creates the beacon/off-screen arrow; **Teleport requires the Fast Travel gamepass** and enough Power, with both conditions rechecked server-side | `FullMapController`, `TravelService:Travel`, `WaypointController` |
 | Physique shape | athletic 2.2 cap with restrained height: full chest ≈3.30 wide vs ≈2.41 waist; upper arm ≈1.35 girth × 1.36 long, with tapered forearms/calves | `PhysiqueConfig`, `MuscleController` |
 | Vascularity | 9 subtle vein cylinders on arms and chest, fading in late from scale 1.60 to 2.15, client-side only | `PhysiqueConfig.VEINS`, `VeinController` |
 | Scenery | decorative props are non-colliding and cleared 72 studs from any machine; kerbs no longer block | `scripts/build_gym.py` `_decorate`, `PROP_CLEARANCE` |
-| Full map | dedicated 980×620 modal: dark-slate city layer beneath undimmed current-tier pins, fixed destination sidebar, wheel/button zoom, mouse/touch drag, no nested page scrolling, and explicit X/Escape/M closing | `FullMapController`, `MapRender` |
+| Full map | dedicated 980×620 modal: hard-clipped dark-slate city viewport beneath undimmed current-tier pins, fixed destination sidebar, map-attached muscle legend, wheel/button zoom, mouse/touch drag, no nested page scrolling, and explicit X/Escape/M closing | `FullMapController`, `MapRender` |
 | Live Power displays | top-left HUD, Info page and the local player's top-right roster row all repaint from the same private profile snapshot; other players remain on the one-second public roster broadcast | `HudController`, `MenuController`, `TabBarController`, `ProfileController` |
 | Muscle growth | per stat, not per total: Arms→upper/lower arms, Chest→UpperTorso, Back→UpperTorso (0.6), Core→LowerTorso, Legs→upper/lower legs. Shared parts take the largest contribution, never the product | `StatConfig.BodyScales`, `MuscleService:ComputeScales` |
 | Machine visibility | the nearest 14 of 35 stations within 260 studs carry muscle-coloured outlines and floor rings | `StationHighlightController` |

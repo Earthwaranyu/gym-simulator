@@ -1279,6 +1279,25 @@ punches for a whole phase, so the game had two answers to one question.
       24-hour simulation, `git diff --check`, and a clean Rojo place build. Studio remains
       the required real-time cadence, display synchronization, and map-contrast check.
 
+- [x] 121. **Training rates are additive and exact, feedback replaces instead of stacks,
+      and the map legend belongs to the map.** The universal unmounted rate is now one
+      stat per second. A mounted station adds its printed location/equipment bonus rather
+      than replacing that base, so an x1 starter pays +2/s and an x4 station pays +5/s
+      before owned multipliers. Station labels show both EQUIP and TRAINING. The old hidden
+      2%-per-tick combo produced fractional stored stats and made whole-number displays
+      alternate +1/+2; it is now one explicit x2 milestone at 50 uninterrupted ticks,
+      reported in the gain card. Manual training uses a per-hold one-second clock and an
+      explicit mouse-release stop, and both manual and machine paths send the same typed
+      server-authored popup for all five muscles. `EffectsController` permits only one
+      live training card and finishes it in 0.78s, guaranteeing the next tick never
+      overlaps it. The full map replaces leaky CanvasGroup clipping with a hard clipping
+      Frame and parents the muscle legend to the zoom/pan canvas, so an enlarged sheet
+      cannot cover the sidebar and its legend no longer floats at the old screen point.
+      The shared formula, balance extractor/model, product truth and manual playtests are
+      updated. Verified with StyLua, Selene, strict Luau analysis, pure self-tests,
+      generated-gym/balance validation, deterministic simulation, `git diff --check`,
+      and a clean Rojo build; Studio remains required for visual timing and clipping QA.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

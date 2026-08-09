@@ -4,7 +4,7 @@ Everything static is already enforced by `./scripts/check.sh` — build, lints, 
 `--!strict` types, plus `python3 scripts/validate_gym.py` for the generated world. This
 file covers what only a running game can answer.
 
-Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v10. If a
+Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v11. If a
 step below contradicts that file, the step is stale — fix it.
 
 Run a **two-client Studio playtest** (Test → Clients and Servers → 2 players) unless a
@@ -64,9 +64,20 @@ and whether any balance number feels right.
 - [ ] Time the floating stat awards on the fastest animation (Treadmill, 0.5s), a
       middle animation, and the slowest (Deadlift, 1.2s). All three award exactly once
       per second; animation speed changes motion only. Repeat across all five muscles.
-- [ ] Hold left mouse while unmounted. The selected dock stat updates once per second.
-      Mount a machine without releasing the mouse: only the machine award continues,
-      with no second manual payout stacked on it.
+- [ ] Hold left mouse while unmounted. The selected dock stat updates by exactly +1
+      once per second before owned multipliers. Release before the next second: no
+      delayed reward appears. Mount a machine without releasing the mouse: only the
+      machine award continues, with no second manual payout stacked on it.
+- [ ] Mount any x1 starter machine with no owned multiplier. Its sign distinguishes
+      `+1 EQUIP` from `+2 Muscle/s TRAINING`, and every tick adds exactly +2: +1 universal
+      training base plus +1 equipment bonus. Check an x4 district too: raw total is +5.
+- [ ] Watch one uninterrupted set. Ticks 1–49 stay at the same whole rate; tick 50
+      activates the clearly labelled full-set x2. There are no fractional 2% steps and
+      no unexplained alternating +1/+2 changes in the visible stat.
+- [ ] Repeat machine and manual training across Arms, Chest, Back, Core and Legs. Every
+      muscle gets the same icon-coloured `+amount Muscle` card. Each card is gone before
+      the next one-second tick; force closely timed packets and verify the new card
+      replaces the old instead of stacking above it.
 - [ ] Keep Info open during several training ticks. After every tick, top-left Power,
       Info Power and the local top-right roster Power show the same number—never N,
       N and N−1. Other players may still refresh on the public one-second roster clock.
@@ -143,6 +154,10 @@ The rule under test: **a hit does not dismount; only death does.**
 - [ ] At the default zoom, pins sharing a neighbourhood form a tidy ring rather than
       covering one another. The five starter pins around the Hub are all individually
       readable and clickable before zooming in.
+- [ ] Zoom at the centre and edges, then pan. The map sheet remains hard-clipped inside
+      its left viewport and never covers the destination sidebar or modal chrome. The
+      Arms/Back/Chest/Core/Legs legend moves with the map sheet instead of floating at
+      its old screen coordinate.
 - [ ] Scroll up over the board to zoom in and scroll down to zoom out. The page must
       never move because there is no page scroll. Verify the +, − and reset controls,
       mouse drag, touch drag, and touch-friendly zoom buttons as well.
