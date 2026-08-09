@@ -33,6 +33,7 @@ local EffectsController = {
 local ProfileController: any = nil
 local TrainingController: any = nil
 local CombatController: any = nil
+local ToastController: any = nil
 
 local lastRepSoundAt = 0
 local lastRankId: string? = nil
@@ -71,18 +72,22 @@ end
 	Floating damage number at the centre of the screen. Cheap stand-in for world-space
 	numbers, and readable regardless of where the target is.
 ]]
-function EffectsController:_showDamage(amount: number, color: Color3)
+function EffectsController:_showDamage(amount: number, color: Color3, dealt: boolean?)
 	local layer = damageLayer
 	if layer == nil then
 		return
 	end
 
+	-- Damage you dealt rises on one side of the crosshair, damage you took on the
+	-- other. They used to share the middle, which in a two-way fight produced one
+	-- unreadable pile of numbers with no way to tell whose was whose.
+	local side = if dealt then 0.62 else 0.38
 	local label = UI.Label("Damage", layer)
 	label.AnchorPoint = Vector2.new(0.5, 0.5)
-	label.Position = UDim2.fromScale(0.5 + (math.random() - 0.5) * 0.14, 0.44)
+	label.Position = UDim2.fromScale(side + (math.random() - 0.5) * 0.06, 0.44)
 	label.Size = UDim2.fromOffset(160, 34)
 	label.Font = UI.Font.Numeric
-	label.TextSize = 26
+	label.TextSize = if dealt then 22 else 26
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextColor3 = color
 	label.TextStrokeTransparency = 0.4
@@ -106,6 +111,7 @@ function EffectsController:Init()
 	ProfileController = Loader.Get("ProfileController")
 	TrainingController = Loader.Get("TrainingController")
 	CombatController = Loader.Get("CombatController")
+	ToastController = Loader.Get("ToastController")
 end
 
 function EffectsController:_build()
@@ -135,11 +141,22 @@ function EffectsController:Start()
 			return
 		end
 
+		-- Both directions get a number now. The HUD used to write "You hit X for N" into
+		-- a text log in the top-left corner, which is the one place a player in a fight
+		-- is not looking; the corner is the minimap's, and the number belongs where the
+		-- fight is.
 		if payload.Kind == "Hit" then
 			self:Play("Hit")
+			self:_showDamage(payload.Damage or 0, EffectsConfig.HitColor, true)
 		elseif payload.Kind == "Hurt" then
 			self:Play("Hurt")
-			self:_showDamage(payload.Damage or 0, EffectsConfig.HurtColor)
+			self:_showDamage(payload.Damage or 0, EffectsConfig.HurtColor, false)
+		elseif payload.Kind == "Blocked" or payload.Kind == "Rejected" then
+			-- A refusal is a sentence, not a number: "they are in a safe zone" has to
+			-- be read, so it goes to the toast strip rather than over the crosshair.
+			if ToastController ~= nil and type(payload.Reason) == "string" then
+				ToastController:Show(payload.Reason)
+			end
 		end
 	end)
 

@@ -75,12 +75,38 @@ local function shape(
 end
 
 --[[
+	The same rectangle, but drawn in the tile's own colour so it reads as a gap punched
+	through the glyph rather than as part of it.
+
+	Marked with an attribute rather than by name. Recolour used to spot knockouts by
+	checking for the names "Hole" and "Fold", which quietly missed every knockout called
+	something else — the fist's knuckles, the sheet's ruled lines, the crown's notches —
+	so a selected tile filled those gaps in with the glyph colour and the shape closed
+	up. An attribute cannot be missed by an icon that names its parts honestly.
+]]
+local function knockout(
+	parent: GuiObject,
+	name: string,
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	hole: Color3,
+	rotation: number?,
+	corner: number?
+): Frame
+	local frame = shape(parent, name, x, y, width, height, hole, rotation, corner)
+	frame:SetAttribute("Knockout", true)
+	return frame
+end
+
+--[[
 	Map — a marker diamond with the pin hole knocked out of it.
 ]]
 local function drawMap(parent: GuiObject, color: Color3, hole: Color3)
 	local body = shape(parent, "Diamond", 0.5, 0.46, 0.6, 0.6, color, 45, 0.16)
 	-- Child of the diamond, so it turns with it and stays centred in the shape.
-	shape(body, "Hole", 0.5, 0.5, 0.34, 0.34, hole, 0, 1)
+	knockout(body, "Hole", 0.5, 0.5, 0.34, 0.34, hole, 0, 1)
 	-- The point below the head, which is what makes it a map pin and not a rhombus.
 	shape(parent, "Tip", 0.5, 0.84, 0.16, 0.22, color, 0, 0.4)
 end
@@ -104,7 +130,7 @@ end
 ]]
 local function drawShop(parent: GuiObject, color: Color3, hole: Color3)
 	local body = shape(parent, "Bag", 0.5, 0.64, 0.76, 0.56, color, 0, 0.16)
-	shape(body, "Fold", 0.5, 0.14, 1.0, 0.1, hole, 0, 0)
+	knockout(body, "Fold", 0.5, 0.14, 1.0, 0.1, hole, 0, 0)
 
 	-- A handle drawn as three straight pieces, because a GUI cannot draw an arc
 	-- and a squared handle reads as a bag where half a circle reads as noise.
@@ -170,7 +196,7 @@ local function drawInfo(parent: GuiObject, color: Color3, hole: Color3)
 	-- as a heading rather than as a fourth line of body text.
 	for index, spec in { { 0.3, 0.26 }, { 0.5, 0.42 }, { 0.66, 0.42 } } do
 		local y, width = spec[1], spec[2]
-		shape(parent, `Line{index}`, 0.5 - (0.42 - width) / 2, y, width, 0.07, hole, 0, 1)
+		knockout(parent, `Line{index}`, 0.5 - (0.42 - width) / 2, y, width, 0.07, hole, 0, 1)
 	end
 end
 
@@ -183,8 +209,66 @@ local function drawFist(parent: GuiObject, color: Color3, hole: Color3)
 	shape(parent, "Wrist", 0.5, 0.82, 0.5, 0.24, color, 0, 0.18)
 	-- Knuckle gaps, knocked out rather than drawn, so the shape stays one silhouette.
 	for index = 1, 3 do
-		shape(parent, `Knuckle{index}`, 0.26 + (index - 1) * 0.24, 0.3, 0.05, 0.2, hole, 0, 1)
+		knockout(parent, `Knuckle{index}`, 0.26 + (index - 1) * 0.24, 0.3, 0.05, 0.2, hole, 0, 1)
 	end
+end
+
+--[[
+	The four muscle glyphs below stand for the training slots along the bottom of the
+	screen, one per stat. Arms is not among them: it borrows the fist, because slot 1 is
+	also the punch, and a player who sees a fist there has been told both things at once.
+
+	Body parts are hard at this size — an anatomical drawing of a back is a grey smudge
+	28 pixels tall. Each of these is instead the one silhouette that muscle has in a gym
+	poster: pecs are two slabs, lats are a V, abs are a grid, legs are two columns. None
+	of the four shares an outline with another, or with the dumbbell that means Train.
+]]
+
+--[[
+	Chest — two pec slabs over a narrow ribcage. Landscape and top-heavy, the opposite
+	of Legs, which is portrait and bottom-heavy.
+]]
+local function drawChest(parent: GuiObject, color: Color3, _hole: Color3)
+	-- Tilted outward a few degrees so the pair reads as a chest rather than as two
+	-- buttons. The sternum is the gap left between them, not a knockout: at tile size a
+	-- 0.06-wide punched line disappears while a 0.06-wide gap survives.
+	shape(parent, "PecLeft", 0.29, 0.4, 0.36, 0.34, color, -8, 0.3)
+	shape(parent, "PecRight", 0.71, 0.4, 0.36, 0.34, color, 8, 0.3)
+	shape(parent, "Ribs", 0.5, 0.72, 0.56, 0.14, color, 0, 0.4)
+end
+
+--[[
+	Back — the lat spread: two wings tapering into a spine.
+]]
+local function drawBack(parent: GuiObject, color: Color3, _hole: Color3)
+	-- Wide at the shoulders, converging at the waist. Positive rotation is clockwise,
+	-- so the left wing leans anticlockwise to put its top on the outside.
+	shape(parent, "WingLeft", 0.28, 0.5, 0.26, 0.78, color, -22, 0.34)
+	shape(parent, "WingRight", 0.72, 0.5, 0.26, 0.78, color, 22, 0.34)
+	shape(parent, "Spine", 0.5, 0.5, 0.13, 0.86, color, 0, 0.4)
+end
+
+--[[
+	Core — a six-pack: one slab with the grid punched out of it.
+]]
+local function drawCore(parent: GuiObject, color: Color3, hole: Color3)
+	local slab = shape(parent, "Abs", 0.5, 0.5, 0.62, 0.84, color, 0, 0.22)
+	-- Punched rather than drawn as six separate blocks, so the glyph stays a single
+	-- silhouette when the tile behind it changes colour.
+	knockout(slab, "HoleSpine", 0.5, 0.5, 0.09, 1, hole, 0, 0)
+	for index, y in { 0.36, 0.64 } do
+		knockout(slab, `HoleRow{index}`, 0.5, y, 1, 0.09, hole, 0, 0)
+	end
+end
+
+--[[
+	Legs — two thighs under a hip. Portrait, and the only glyph with its mass at the
+	bottom, which is what tells it from Chest across the dock.
+]]
+local function drawLegs(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "Hips", 0.5, 0.22, 0.68, 0.22, color, 0, 0.3)
+	shape(parent, "ThighLeft", 0.33, 0.63, 0.26, 0.66, color, -5, 0.3)
+	shape(parent, "ThighRight", 0.67, 0.63, 0.26, 0.66, color, 5, 0.3)
 end
 
 --[[
@@ -205,7 +289,7 @@ local function drawVip(parent: GuiObject, color: Color3, hole: Color3)
 	shape(parent, "Band", 0.5, 0.74, 0.86, 0.2, color, 0, 0.16)
 	shape(parent, "Peaks", 0.5, 0.44, 0.86, 0.42, color, 0, 0.1)
 	for _, x in { 0.32, 0.68 } do
-		shape(parent, `Notch{x}`, x, 0.34, 0.14, 0.3, hole, 0, 0.3)
+		knockout(parent, `Notch{x}`, x, 0.34, 0.14, 0.3, hole, 0, 0.3)
 	end
 end
 
@@ -215,8 +299,8 @@ end
 ]]
 local function drawQuest(parent: GuiObject, color: Color3, hole: Color3)
 	shape(parent, "Board", 0.5, 0.52, 0.78, 0.84, color, 0, 0.14)
-	shape(parent, "TickShort", 0.38, 0.58, 0.1, 0.26, hole, 45, 1)
-	shape(parent, "TickLong", 0.56, 0.48, 0.1, 0.46, hole, -40, 1)
+	knockout(parent, "TickShort", 0.38, 0.58, 0.1, 0.26, hole, 45, 1)
+	knockout(parent, "TickLong", 0.56, 0.48, 0.1, 0.46, hole, -40, 1)
 end
 
 local ICONS: { [string]: Builder } = {
@@ -228,6 +312,10 @@ local ICONS: { [string]: Builder } = {
 	Settings = drawSettings,
 	Info = drawInfo,
 	Fist = drawFist,
+	Chest = drawChest,
+	Back = drawBack,
+	Core = drawCore,
+	Legs = drawLegs,
 	Potion = drawPotion,
 	Vip = drawVip,
 	Quest = drawQuest,
@@ -287,10 +375,9 @@ function Icons.Recolour(holder: Frame, color: Color3, hole: Color3)
 			continue
 		end
 		-- Knockouts are the parts drawn in the tile's own colour; everything else
-		-- is the glyph. Distinguishing them by name keeps this from having to know
-		-- how any individual icon is put together.
-		local isHole = child.Name == "Hole" or child.Name == "Fold"
-		child.BackgroundColor3 = if isHole then hole else color
+		-- is the glyph. They say so themselves, so this never has to know how any
+		-- individual icon is put together.
+		child.BackgroundColor3 = if child:GetAttribute("Knockout") == true then hole else color
 	end
 end
 

@@ -112,12 +112,24 @@ function CombatController:Init()
 end
 
 function CombatController:Start()
+	-- No F.
+	--
+	-- The keyboard punch is the left mouse button, and it always was: HudController
+	-- has thrown one on click since the training dock arrived, whenever slot 1 — the
+	-- fist — is the selected muscle. F was a second way to do the same thing, which
+	-- meant the HUD had to advertise a key nobody needed and new players had to be
+	-- told about two controls to explain one action.
+	--
+	-- The bind stays for the two inputs that have no left mouse button: the touch
+	-- button this creates, and a gamepad's X. Neither is gated on the selected slot,
+	-- because a Punch button that silently does nothing while slot 3 is up is worse on
+	-- a phone than an ungated one.
 	ContextActionService:BindAction(ATTACK_ACTION, function(_, inputState: Enum.UserInputState)
 		if inputState == Enum.UserInputState.Begin then
 			self:Attack()
 		end
 		return Enum.ContextActionResult.Pass
-	end, true, Enum.KeyCode.F, Enum.KeyCode.ButtonX)
+	end, true, Enum.KeyCode.ButtonX)
 
 	ContextActionService:SetTitle(ATTACK_ACTION, "Punch")
 end

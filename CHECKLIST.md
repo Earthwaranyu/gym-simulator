@@ -743,6 +743,51 @@ the largest element in the HUD and did nothing but open a list of locations.
       Spam-immunity measured directly: 40 clicks in one second paid 1.55 while a single
       ping then idling paid 0.90, the exact activity window.
 
+## Phase 22 — A map in the corner, a muscle on every slot
+
+#98 left the top-left of the screen holding the combat feed: four lines of text that
+stayed blank until somebody hit you, so the most valuable corner of the display spent
+almost all of its life as an empty grey box. The dock below it was five numbered
+squares that named nothing — 3 was Back only to a player who had already read the Info
+screen. And punching was still bound to F while the left mouse button had been throwing
+punches for a whole phase, so the game had two answers to one question.
+
+- [x] 99. **A minimap where the log was, muscles on the dock, and no more F.**
+      **`MapRender`** is new and holds everything the Map screen and the HUD both need:
+      the memoised `GetDestinations` round-trip, the bounds maths, the projection, and
+      the feature Frames. `MenuController:_renderMap` lost 130 lines to it and keeps only
+      what is menu-specific — the paper board, the pins, zoom and pan — and its `Bounds`
+      takes the aspect as an optional argument, because the map letterboxes the world
+      into a board while the minimap wants the world's own shape.
+      **The minimap** replaces the feed at the same 16,68 footprint. It draws the real
+      city at 2.6 studs a pixel, pins every station as a dot in its muscle's colour, and
+      pans an oversized canvas under a fixed centre dot so a move costs one Position
+      write rather than a redraw. The whole panel is the Map button, so the rail drops
+      from five tiles to four. The hits the feed used to report are damage numbers over
+      the crosshair — dealt on one side, taken on the other — and refusals are toasts.
+      **The dock** carries a glyph per stat, named by `StatConfig`'s new `Icon` field so
+      a sixth stat brings its own picture. Chest is two pec slabs, Back is a lat V, Core
+      is a punched six-pack, Legs is two thighs under a hip, and Arms borrows the fist
+      because slot 1 is also the punch. Knockouts are now marked with an attribute
+      instead of guessed from a name, which fixed the fist filling in its own knuckles
+      whenever it was selected. Selecting a slot pops its glyph and the glyph of the
+      muscle actually being worked breathes for the length of the set — `UI.Pop` and
+      `UI.Pulse`, which drive the icon rather than the button so they never fight
+      `UI.Pressable` over one UIScale.
+      **F is gone.** The bind survives only for the touch button and a gamepad's X,
+      which have no left mouse button; the hint now says what the click does for the
+      slot that is up — "Click to punch — ready" on Arms, "Click to train Back" in
+      Back's own green on slot 3.
+      Verified in a Studio play session: the feed is gone, the rail draws
+      Info/Shop/Settings/Rank, the minimap builds 126 world features and 35 station pins
+      and its canvas offset tracks a 200-stud move, all five slots draw their glyph, the
+      hint reads correctly for both Arms and Back, and the full Map still renders its
+      board with 37 markers. Not measurable in that session: the pop and pulse tweens.
+      Studio's renderer was stalled — RenderStepped fired 0 times against Heartbeat's 74
+      a second, and a control tween created alongside them stayed at scale 1.000 while
+      reporting `PlaybackState.Playing` — so the animation needs a human eye on a real
+      client before it is called done.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

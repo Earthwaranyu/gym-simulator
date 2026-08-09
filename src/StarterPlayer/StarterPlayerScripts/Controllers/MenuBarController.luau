@@ -148,11 +148,15 @@ function MenuBarController:_build()
 	-- Five is the ceiling here. _plan already shrinks or reflows the column when it
 	-- will not fit, but a sixth tile would start crowding the touch controls on a
 	-- phone, so a new screen should replace one of these rather than join them.
+	--
+	-- Map is not one of them. The HUD's minimap is already a picture of where the
+	-- player is, drawn in the corner they are looking at anyway, and it opens the same
+	-- screen when clicked — so a button here saying "Map" was a second door into a room
+	-- whose window was already on screen.
 	local tabs = {
 		{ Id = "Info", DisplayName = "Info", Icon = "Info", Tab = "Info" },
 		{ Id = "Shop", DisplayName = "Shop", Icon = "Shop", Tab = "Shop" },
 		{ Id = "Settings", DisplayName = "Settings", Icon = "Settings", Tab = "Settings" },
-		{ Id = "Map", DisplayName = "Map", Icon = "Map", Tab = "Map" },
 		{ Id = "Rank", DisplayName = "Rank", Icon = "Rank", Tab = "Ranks" },
 	}
 

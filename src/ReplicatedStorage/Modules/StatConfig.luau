@@ -19,6 +19,10 @@ export type StatDefinition = {
 	DisplayName: string,
 	-- Drives the stat's HUD row and its muscle-growth tint.
 	Color: Color3,
+	-- Which glyph in Icons.luau stands for this muscle. Named here rather than
+	-- switched on downstream, so the HUD's training dock draws a sixth stat's picture
+	-- the moment the entry exists and never learns any stat's name.
+	Icon: string,
 	-- Short blurb for the training station tooltip.
 	Description: string,
 	-- What this stat is currently worth to this player, as a short line: "38 damage
@@ -43,6 +47,7 @@ local definitions: { StatDefinition } = {
 	{
 		Id = "Arms",
 		DisplayName = "Arms",
+		Icon = "Fist",
 		Color = Color3.fromRGB(239, 83, 80),
 		Description = "Raw punching power. Every point of damage you deal starts here.",
 		Effect = function(stats)
@@ -58,6 +63,7 @@ local definitions: { StatDefinition } = {
 	{
 		Id = "Chest",
 		DisplayName = "Chest",
+		Icon = "Chest",
 		Color = Color3.fromRGB(255, 167, 38),
 		Description = "How much punishment you can take before you drop.",
 		Effect = function(stats)
@@ -70,6 +76,7 @@ local definitions: { StatDefinition } = {
 	{
 		Id = "Back",
 		DisplayName = "Back",
+		Icon = "Back",
 		Color = Color3.fromRGB(102, 187, 106),
 		Description = "Braced against heavier hitters. Blunts damage from anyone whose Arms trail your Back.",
 		Effect = function(stats)
@@ -89,6 +96,7 @@ local definitions: { StatDefinition } = {
 	{
 		Id = "Core",
 		DisplayName = "Core",
+		Icon = "Core",
 		Description = "Hitting you costs the attacker. A share of every blow goes straight back.",
 		Effect = function(stats)
 			return `{string.format("%.0f", Formulas.Retaliation(get(stats, "Core"), 100))}% of hits sent back`
@@ -101,6 +109,7 @@ local definitions: { StatDefinition } = {
 	{
 		Id = "Legs",
 		DisplayName = "Legs",
+		Icon = "Legs",
 		Color = Color3.fromRGB(171, 71, 188),
 		Description = "Ground speed and air speed. The stat that makes the map smaller.",
 		Effect = function(stats)

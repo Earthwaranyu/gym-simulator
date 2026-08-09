@@ -24,15 +24,30 @@ local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local Types = require(ReplicatedStorage.Modules.Types)
 local Icons = require(ReplicatedStorage.Modules.Icons)
+local MapRender = require(ReplicatedStorage.Modules.MapRender)
 
 -- Punch's cooldown, mirrored for the cooldown sweep. The server remains the
 -- authority; this only decides when the pip looks ready.
 local PUNCH_COOLDOWN = 0.6
-local FEED_LINES = 4
 -- A slot is a square big enough to hit with a thumb and small enough that five of
--- them plus their gaps stay narrower than the vitals panel above.
-local SLOT_SIZE = 44
+-- them plus their gaps stay narrower than the vitals panel above. Four pixels wider
+-- than it was, because a slot now carries a picture of a muscle as well as a number.
+local SLOT_SIZE = 48
 local SLOT_GAP = 6
+-- How much of the slot the muscle glyph takes. The rest is breathing room and the
+-- corner where the keybind number sits.
+local SLOT_ICON_SCALE = 0.62
+
+-- The minimap, in the corner the eye already goes to for Power and Tokens.
+local MINIMAP_WIDTH = 260
+local MINIMAP_HEIGHT = 150
+-- How many world studs one pixel of the minimap covers. Chosen so the window shows
+-- roughly the district around the player: close enough that the streets are streets,
+-- wide enough that the next island is on screen before you swim to it.
+local MINIMAP_STUDS_PER_PIXEL = 2.6
+-- The minimap redraws its offset on a timer rather than every frame. Ten a second is
+-- past the point the eye reads it as stepping, and it is a tenth of the work.
+local MINIMAP_INTERVAL = 0.1
 -- How often a held mouse button re-tells the server it is still held. Comfortably
 -- inside the server's activity window so holding never flickers off, and slow
 -- enough that it costs nothing.
@@ -52,9 +67,13 @@ local TrainingController: any = nil
 local CombatController: any = nil
 local MenuController: any = nil
 
-type Slot = { Button: TextButton, Stroke: UIStroke, Number: TextLabel }
+type Slot = { Button: TextButton, Stroke: UIStroke, Number: TextLabel, Icon: Frame }
 
 local slotButtons: { [Types.StatId]: Slot } = {}
+-- Which slot is breathing, and how to stop it. Only one stat can be trained at a time,
+-- so this is one value rather than one per slot.
+local pulsingStat: Types.StatId? = nil
+local stopPulse: (() -> ())? = nil
 -- Which muscle the left mouse button trains. Never nil once Start has run: the
 -- click has to do something, so there is always a slot selected.
 local selectedStat: Types.StatId = StatConfig.List[1].Id
@@ -68,8 +87,10 @@ local goalPanel: Frame
 local goalName: TextLabel
 local goalDetail: TextLabel
 local goalBar: UI.Bar
-local feedLabels: { TextLabel } = {}
-local feedLines: { string } = {}
+local minimapCanvas: Frame? = nil
+local minimapProject: ((number, number) -> UDim2)? = nil
+local minimapPixels = Vector2.zero
+local minimapAt = 0
 
 local lastPunchAt = -math.huge
 
@@ -191,14 +212,38 @@ function HudController:_build()
 		stroke.Transparency = 1
 		stroke.Parent = button
 
+		-- The picture of the muscle, not its name.
+		--
+		-- Five numbered squares said which slot was selected and nothing about what any
+		-- of them trained: a player who had not read the Info screen had no way to know
+		-- 3 was Back other than by pressing it and watching a number move. The glyph is
+		-- named by the stat's own definition, so a sixth stat brings its own picture and
+		-- this loop never learns any stat's name.
+		--
+		-- Its own holder rather than drawn straight into the button, because the icon is
+		-- what pops on selection and breathes while that muscle is being trained, and
+		-- UI.Pressable already owns the button's UIScale.
+		local iconHolder = Instance.new("Frame")
+		iconHolder.Name = "Glyph"
+		iconHolder.AnchorPoint = Vector2.new(0.5, 0.5)
+		iconHolder.Position = UDim2.fromScale(0.5, 0.46)
+		iconHolder.Size = UDim2.fromScale(SLOT_ICON_SCALE, SLOT_ICON_SCALE)
+		iconHolder.BackgroundTransparency = 1
+		iconHolder.Parent = button
+		Icons.Draw(definition.Icon, iconHolder, UI.Palette.TextMuted, UI.Palette.Backdrop)
+
+		-- The keybind, demoted to a corner badge. It is how you press the slot, not
+		-- what the slot is, so it no longer gets the whole tile.
 		local number = UI.Label("Slot", button)
-		number.Size = UDim2.fromScale(1, 1)
+		number.AnchorPoint = Vector2.new(1, 1)
+		number.Position = UDim2.new(1, -4, 1, -1)
+		number.Size = UDim2.fromOffset(10, 12)
 		number.Font = UI.Font.Numeric
-		number.TextSize = 18
-		number.TextXAlignment = Enum.TextXAlignment.Center
+		number.TextSize = 11
+		number.TextXAlignment = Enum.TextXAlignment.Right
 		number.Text = tostring(index)
 
-		slotButtons[definition.Id] = { Button = button, Stroke = stroke, Number = number }
+		slotButtons[definition.Id] = { Button = button, Stroke = stroke, Number = number, Icon = iconHolder }
 
 		-- Tapping a slot picks it, the same as pressing its number. It no longer
 		-- opens anything: the station list moved to the Map button, because "where
@@ -231,23 +276,17 @@ function HudController:_build()
 	abilityLabel.TextColor3 = UI.Palette.TextMuted
 	abilityLabel.LayoutOrder = 3
 
-	-- Under the compact summary: combat feed. The right side belongs to the roster
-	-- and Menu button, while the bottom belongs to the training dock and controls.
-	local feed = UI.Panel("Feed", screen)
-	feed.Position = UDim2.fromOffset(16, 68)
-	feed.Size = UDim2.fromOffset(260, 20 * FEED_LINES + 20)
-	feed.BackgroundTransparency = 0.45
-
-	UI.VerticalList(feed, 2)
-
-	for index = 1, FEED_LINES do
-		local line = UI.Label(`Line{index}`, feed)
-		line.Size = UDim2.new(1, 0, 0, 18)
-		line.TextSize = 14
-		line.LayoutOrder = index
-		line.TextColor3 = UI.Palette.TextMuted
-		feedLabels[index] = line
-	end
+	-- Under the compact summary: the minimap.
+	--
+	-- This corner used to be the combat feed — four lines of text that were blank
+	-- until somebody hit you, so the most valuable space on the screen spent almost
+	-- all of its life as an empty grey box. The hits it reported are better said by
+	-- the damage numbers EffectsController already throws up over the crosshair, and
+	-- what the corner is actually good for is the question a player in an open world
+	-- asks constantly: where am I, and what is near me.
+	--
+	-- It is also the whole Map button: pressing the picture of the map opens the map.
+	self:_buildMinimap(screen)
 
 	-- Right-side objective card: the reference game's best UX idea is that the next
 	-- useful action never requires opening a menu. This uses the real quest stream and
@@ -306,6 +345,182 @@ function HudController:_build()
 end
 
 --[[
+	The corner map, and the way into the full one.
+
+	Drawn from MapRender, the same module the Map screen uses, so the city has one look
+	and the server is asked for its shape once no matter which of the two opens first.
+
+	The framing is the part that differs. The Map screen fits the whole world into a
+	board and lets you pan it; this keeps the player nailed to the centre of the window
+	and slides an oversized canvas underneath them. That is why nothing here rebuilds
+	when the player moves — a move is one Position write on a canvas that was drawn once.
+]]
+function HudController:_buildMinimap(screen: ScreenGui)
+	local panel = Instance.new("TextButton")
+	panel.Name = "Minimap"
+	panel.Position = UDim2.fromOffset(16, 68)
+	panel.Size = UDim2.fromOffset(MINIMAP_WIDTH, MINIMAP_HEIGHT)
+	panel.BackgroundColor3 = UI.Palette.Glass
+	panel.BackgroundTransparency = 0.25
+	panel.BorderSizePixel = 0
+	panel.AutoButtonColor = false
+	panel.Text = ""
+	panel.ClipsDescendants = true
+	panel.Parent = screen
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = panel
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = UI.Palette.GlassStroke
+	stroke.Transparency = 0.7
+	stroke.Parent = panel
+
+	-- Brighten on hover, so a panel that otherwise looks like a readout admits it is
+	-- also a button.
+	panel.MouseEnter:Connect(function()
+		stroke.Transparency = 0.25
+	end)
+	panel.MouseLeave:Connect(function()
+		stroke.Transparency = 0.7
+	end)
+
+	UI.Pressable(panel, { PressScale = 0.985, HoverScale = 1 })
+	panel.Activated:Connect(function()
+		MenuController:Toggle("Map")
+	end)
+
+	local window = Instance.new("Frame")
+	window.Name = "Window"
+	window.Size = UDim2.fromScale(1, 1)
+	window.BackgroundColor3 = MapRender.Paper
+	window.BackgroundTransparency = 0.08
+	window.BorderSizePixel = 0
+	window.ClipsDescendants = true
+	window.Parent = panel
+
+	local loading = UI.Label("Loading", window)
+	loading.Size = UDim2.fromScale(1, 1)
+	loading.TextXAlignment = Enum.TextXAlignment.Center
+	loading.TextColor3 = MapRender.Ink
+	loading.TextTransparency = 0.4
+	loading.Text = "mapping…"
+
+	-- The corner caption, so the panel says what it is and what pressing it does.
+	local badge = Instance.new("Frame")
+	badge.Name = "Badge"
+	badge.Position = UDim2.fromOffset(6, 6)
+	badge.Size = UDim2.fromOffset(60, 20)
+	badge.BackgroundColor3 = UI.Palette.Backdrop
+	badge.BackgroundTransparency = 0.25
+	badge.BorderSizePixel = 0
+	badge.ZIndex = 40
+	badge.Parent = panel
+
+	local badgeCorner = Instance.new("UICorner")
+	badgeCorner.CornerRadius = UDim.new(0, 6)
+	badgeCorner.Parent = badge
+
+	local glyph = Instance.new("Frame")
+	glyph.Name = "Glyph"
+	glyph.AnchorPoint = Vector2.new(0, 0.5)
+	glyph.Position = UDim2.new(0, 4, 0.5, 0)
+	glyph.Size = UDim2.fromOffset(13, 13)
+	glyph.BackgroundTransparency = 1
+	glyph.ZIndex = 41
+	glyph.Parent = badge
+	Icons.Draw("Map", glyph, UI.Palette.Accent, UI.Palette.Backdrop)
+
+	local caption = UI.Label("Caption", badge)
+	caption.Position = UDim2.fromOffset(22, 0)
+	caption.Size = UDim2.new(1, -24, 1, 0)
+	caption.Font = UI.Font.Heading
+	caption.TextSize = 11
+	caption.TextColor3 = UI.Palette.Accent
+	caption.ZIndex = 41
+	caption.Text = "MAP"
+
+	-- The player, fixed dead centre: the canvas moves, the dot does not.
+	local here = MapRender.Dot(window, "You", 9, UI.Palette.Accent, 30)
+	here.Position = UDim2.fromScale(0.5, 0.5)
+	here.Visible = false
+
+	-- The fetch is a server round-trip, so it happens off to one side. The panel is a
+	-- working button the whole time it is loading.
+	task.spawn(function()
+		local dests, feats = MapRender.Fetch()
+		if #feats == 0 and #dests == 0 then
+			loading.Text = "no map data"
+			return
+		end
+
+		local bounds = MapRender.Bounds(feats, dests)
+		local pixels = Vector2.new(
+			math.max(bounds.Width / MINIMAP_STUDS_PER_PIXEL, MINIMAP_WIDTH),
+			math.max(bounds.Depth / MINIMAP_STUDS_PER_PIXEL, MINIMAP_HEIGHT)
+		)
+
+		local canvas = Instance.new("Frame")
+		canvas.Name = "Canvas"
+		canvas.Size = UDim2.fromOffset(pixels.X, pixels.Y)
+		canvas.BackgroundTransparency = 1
+		canvas.BorderSizePixel = 0
+		canvas.Parent = window
+
+		-- No strokes and no rounded corners down here: both are invisible on a
+		-- building three pixels wide, and both cost an instance on a canvas that
+		-- holds every building in the city.
+		MapRender.DrawFeatures(canvas, feats, bounds, false)
+
+		local project = MapRender.Project(bounds)
+		for _, destination in dests do
+			local stat = StatConfig.Get(destination.StatId)
+			if stat == nil then
+				continue
+			end
+			-- A dot in the muscle's colour and nothing else. The names, the
+			-- multipliers and the locks are on the full map, and none of them can be
+			-- read at this size anyway.
+			local pin = MapRender.Dot(canvas, destination.Id, 6, stat.Color, 20)
+			pin.Position = project(destination.Position.X, destination.Position.Z)
+		end
+
+		loading:Destroy()
+		here.Visible = true
+		minimapCanvas = canvas
+		minimapProject = project
+		minimapPixels = pixels
+	end)
+end
+
+--[[
+	Slides the canvas so the player's projected position sits under the centre dot.
+]]
+function HudController:_refreshMinimap()
+	local canvas = minimapCanvas
+	local project = minimapProject
+	if canvas == nil or project == nil then
+		return
+	end
+
+	local character = Players.LocalPlayer.Character
+	local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	if root == nil or not root:IsA("BasePart") then
+		return
+	end
+
+	-- The projection is in canvas scale, so it is multiplied out by the canvas's own
+	-- pixel size rather than by AbsoluteSize: the HUD carries a viewport UIScale, and
+	-- reading back a scaled size here would shrink the pan along with it.
+	local at = project(root.Position.X, root.Position.Z)
+	canvas.Position = UDim2.fromOffset(
+		MINIMAP_WIDTH / 2 - at.X.Scale * minimapPixels.X,
+		MINIMAP_HEIGHT / 2 - at.Y.Scale * minimapPixels.Y
+	)
+end
+
+--[[
 	Picks the muscle the left mouse button trains, and paints the strip to say so.
 
 	The selected slot is drawn in its own stat colour rather than in the shared
@@ -317,17 +532,61 @@ function HudController:_select(statId: Types.StatId)
 	if StatConfig.Get(statId) == nil then
 		return
 	end
+	local changed = selectedStat ~= statId
 	selectedStat = statId
 
 	for id, slot in slotButtons do
 		local definition = StatConfig.Get(id)
 		local chosen = id == statId
-		slot.Button.BackgroundColor3 = if chosen
+		local fill = if chosen
 			then (if definition ~= nil then definition.Color else UI.Palette.Accent)
 			else UI.Palette.Backdrop
+		slot.Button.BackgroundColor3 = fill
 		slot.Button.BackgroundTransparency = if chosen then 0.05 else 0.08
 		slot.Stroke.Transparency = if chosen then 0 else 1
 		slot.Number.TextColor3 = if chosen then UI.Palette.Backdrop else UI.Palette.TextMuted
+		-- The glyph inverts on the selected tile: dark on the stat's colour, rather
+		-- than a muted grey drawing sitting on a bright red square. `fill` is passed as
+		-- the knockout colour for the same reason — a gap punched in the icon has to be
+		-- whatever is behind it, and behind it just changed.
+		Icons.Recolour(slot.Icon, if chosen then UI.Palette.Backdrop else UI.Palette.TextMuted, fill)
+	end
+
+	-- Only on an actual change: Start calls this once to paint the initial state, and a
+	-- HUD that pops itself the instant it appears looks like a glitch rather than an
+	-- acknowledgement.
+	local slot = slotButtons[statId]
+	if changed and slot ~= nil then
+		UI.Pop(slot.Icon)
+	end
+end
+
+--[[
+	Breathes the slot of the muscle currently being worked.
+
+	The dock says which slot the click trains; this says which one is actually earning
+	right now, which during a set is not the same question — a player locked into a
+	bench can still switch the click to Legs. Starting and stopping only on a change,
+	because the caller runs every frame and a tween restarted 60 times a second is a
+	still image.
+]]
+function HudController:_setPulsing(statId: Types.StatId?)
+	if pulsingStat == statId then
+		return
+	end
+
+	if stopPulse ~= nil then
+		stopPulse()
+		stopPulse = nil
+	end
+	pulsingStat = statId
+
+	if statId == nil then
+		return
+	end
+	local slot = slotButtons[statId]
+	if slot ~= nil then
+		stopPulse = UI.Pulse(slot.Icon)
 	end
 end
 
@@ -341,17 +600,6 @@ end
 ]]
 function HudController:_trainPing()
 	Net.Event("ManualTrain"):FireServer(selectedStat)
-end
-
-function HudController:_pushFeed(text: string)
-	table.insert(feedLines, 1, text)
-	while #feedLines > FEED_LINES do
-		table.remove(feedLines)
-	end
-
-	for index, label in feedLabels do
-		label.Text = feedLines[index] or ""
-	end
 end
 
 function HudController:_refreshGoal(view: { any })
@@ -430,20 +678,42 @@ function HudController:_refreshVitals()
 		healthBar.Set(0, "HEALTH  —")
 	end
 
-	local remaining = PUNCH_COOLDOWN - (os.clock() - lastPunchAt)
-	if remaining > 0 then
-		abilityLabel.Text = `[F] Punch  —  {string.format("%.1f", remaining)}s`
-		abilityLabel.TextColor3 = UI.Palette.TextMuted
+	-- What the left mouse button does right now, which depends on the slot.
+	--
+	-- There is no [F] any more. Punching was on its own key while the click already
+	-- threw a punch whenever Arms was selected, so the game had two answers to "how do
+	-- I hit someone" and the prompt only admitted to one of them. Slot 1 is the fist:
+	-- select it and the click is a punch, select anything else and the click is reps.
+	if selectedStat ~= ARMS_STAT then
+		local definition = StatConfig.Get(selectedStat)
+		abilityLabel.Text =
+			`Click to train {if definition ~= nil then definition.DisplayName else selectedStat}`
+		abilityLabel.TextColor3 = if definition ~= nil then definition.Color else UI.Palette.TextMuted
 	else
-		local target = CombatController:FindTarget()
-		if target ~= nil then
-			abilityLabel.Text = `[F] Punch  —  {target.Name}`
-			abilityLabel.TextColor3 = UI.Palette.Danger
+		local remaining = PUNCH_COOLDOWN - (os.clock() - lastPunchAt)
+		if remaining > 0 then
+			abilityLabel.Text = `Click to punch  —  {string.format("%.1f", remaining)}s`
+			abilityLabel.TextColor3 = UI.Palette.TextMuted
 		else
-			abilityLabel.Text = "[F] Punch  —  ready"
-			abilityLabel.TextColor3 = UI.Palette.Accent
+			local target = CombatController:FindTarget()
+			if target ~= nil then
+				abilityLabel.Text = `Click to punch  —  {target.Name}`
+				abilityLabel.TextColor3 = UI.Palette.Danger
+			else
+				abilityLabel.Text = "Click to punch  —  ready"
+				abilityLabel.TextColor3 = UI.Palette.Accent
+			end
 		end
 	end
+
+	-- The slot of whatever muscle the machine is working, which is not necessarily the
+	-- slot the click is pointed at.
+	local trained: Types.StatId? = nil
+	if state.StationId ~= nil then
+		local definition = EquipmentConfig.Get(state.StationId)
+		trained = if definition ~= nil then definition.StatId else nil
+	end
+	self:_setPulsing(trained)
 end
 
 function HudController:Start()
@@ -465,13 +735,11 @@ function HudController:Start()
 			return
 		end
 
+		-- Only the cooldown clock lives here now. What the hit was and what it did for
+		-- is EffectsController's damage numbers and ToastController's line, which are
+		-- both nearer the middle of the screen than a log in the corner ever was.
 		if payload.Kind == "Hit" then
 			lastPunchAt = os.clock()
-			self:_pushFeed(`You hit {payload.Victim} for {NumberFormat.Format(payload.Damage)}`)
-		elseif payload.Kind == "Hurt" then
-			self:_pushFeed(`{payload.Attacker} hit you for {NumberFormat.Format(payload.Damage)}`)
-		elseif payload.Kind == "Blocked" or payload.Kind == "Rejected" then
-			self:_pushFeed(tostring(payload.Reason))
 		end
 	end)
 
@@ -532,6 +800,15 @@ function HudController:Start()
 
 	RunService.RenderStepped:Connect(function()
 		self:_refreshVitals()
+
+		-- The map pans on its own clock. Nothing on it changes between frames except
+		-- where the player is standing, and ten updates a second is already smoother
+		-- than the eye reads a 260-pixel picture.
+		local now = os.clock()
+		if now - minimapAt >= MINIMAP_INTERVAL then
+			minimapAt = now
+			self:_refreshMinimap()
+		end
 	end)
 end
 

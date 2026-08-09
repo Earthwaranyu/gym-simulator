@@ -257,6 +257,67 @@ function UI.Pressable(button: GuiButton, options: PressableOptions?): UIScale
 	return scale
 end
 
+local POP_UP = TweenInfo.new(0.09, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local POP_DOWN = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local PULSE = TweenInfo.new(0.62, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+
+--[[
+	The one `UIScale` an object is animated by.
+
+	Reused rather than added, because a second UIScale on the same instance is silently
+	ignored — two animations that each make their own would look like one of them had
+	simply stopped working.
+]]
+local function scaleOf(object: GuiObject): UIScale
+	local existing = object:FindFirstChildOfClass("UIScale")
+	if existing ~= nil then
+		return existing
+	end
+
+	local scale = Instance.new("UIScale")
+	scale.Parent = object
+	return scale
+end
+
+--[[
+	A one-shot punch: overshoot, then settle back to normal size.
+
+	Note that this drives the same UIScale as UI.Pressable, so do not point the two at
+	one instance — Pressable's settle would cut the pop short. On a button, pop the
+	contents (its icon, its label) and let Pressable own the button itself.
+]]
+function UI.Pop(object: GuiObject, strength: number?)
+	local scale = scaleOf(object)
+	local up = TweenService:Create(scale, POP_UP, { Scale = 1 + (strength or 0.22) })
+	up.Completed:Connect(function()
+		if object.Parent ~= nil then
+			TweenService:Create(scale, POP_DOWN, { Scale = 1 }):Play()
+		end
+	end)
+	up:Play()
+end
+
+--[[
+	A slow breathe that runs until it is told to stop, for the one thing on screen that
+	is currently happening. Returns the stopper; calling it restores the normal size.
+
+	Deliberately gentle and deliberately slow: this sits under the player's eyeline for
+	minutes at a time while they train, and anything faster becomes something to look
+	away from.
+]]
+function UI.Pulse(object: GuiObject, strength: number?): () -> ()
+	local scale = scaleOf(object)
+	local tween = TweenService:Create(scale, PULSE, { Scale = 1 + (strength or 0.1) })
+	tween:Play()
+
+	return function()
+		tween:Cancel()
+		if object.Parent ~= nil then
+			TweenService:Create(scale, POP_DOWN, { Scale = 1 }):Play()
+		end
+	end
+end
+
 -- The screen height every fixed offset in this game was chosen against.
 local REFERENCE_HEIGHT = 720
 -- Below this the interface would shrink past the point a finger can hit it; above
