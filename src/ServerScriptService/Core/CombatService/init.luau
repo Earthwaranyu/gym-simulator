@@ -319,11 +319,21 @@ end
 	Fires an ability for a player. Every check the client could lie about — cooldown,
 	stamina, range, target liveness — is recomputed here.
 ]]
+--[[
+	Runs an ability, or says why not.
+
+	The third return is whether the refusal is worth telling the player about. Some are:
+	a safe zone or a barrier is a rule they can act on. Most are not — "not ready yet"
+	and "no target" are the ordinary texture of holding a mouse button down, and since
+	the punch moved onto left-click the client sends one of those on most clicks. Toasted,
+	they buried the screen in a stack of "Not ready yet." saying nothing the cooldown had
+	not already said by refusing.
+]]
 function CombatService:Activate(
 	attacker: Player,
 	abilityId: Types.AbilityId,
 	target: Player?
-): (boolean, string?)
+): (boolean, string?, boolean?)
 	local ability = abilities[abilityId]
 	if ability == nil then
 		return false, "Unknown ability."
@@ -343,7 +353,7 @@ function CombatService:Activate(
 	local now = os.clock()
 	local readyAt = playerCooldowns[abilityId]
 	if readyAt ~= nil and now < readyAt then
-		return false, "Not ready yet."
+		return false, "Not ready yet.", true
 	end
 
 	local targetCharacter: Model? = nil
@@ -355,10 +365,10 @@ function CombatService:Activate(
 
 	if ability.RequiresTarget then
 		if target == nil or targetRoot == nil then
-			return false, "No target."
+			return false, "No target.", true
 		end
 		if (attackerRoot.Position - targetRoot.Position).Magnitude > ability.Range * RANGE_TOLERANCE then
-			return false, "Too far away."
+			return false, "Too far away.", true
 		end
 	end
 
@@ -439,8 +449,8 @@ function CombatService:Start()
 			return
 		end
 
-		local ok, reason = self:Activate(player, abilityId, target)
-		if not ok and reason ~= nil then
+		local ok, reason, quiet = self:Activate(player, abilityId, target)
+		if not ok and reason ~= nil and not quiet then
 			Net.Event("CombatFeedback"):FireClient(player, { Kind = "Rejected", Reason = reason })
 		end
 	end)

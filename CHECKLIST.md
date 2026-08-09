@@ -985,6 +985,24 @@ punches for a whole phase, so the game had two answers to one question.
       health is green for what is left and red for what has been taken — at 79/100, 79%
       green and 21% red, and the split tells you the number before the caption does.
 
+- [x] 106. **A refusal only speaks when it has something to say.** The screen filled with
+      "Not ready yet." Since the punch moved onto left-click, every click of a held mouse
+      button asked the server for a hit, and every one inside the 0.6s cooldown got a
+      rejection back — which #99 had helpfully routed to the toast strip. The player was
+      being told, several times a second, a thing the cooldown had already said by
+      refusing.
+      `CombatService:Activate` now returns a third value: whether the refusal is worth
+      hearing. A safe zone or a barrier is — it is a rule you can act on. "Not ready
+      yet", "No target" and "Too far away" are not; they are the ordinary texture of
+      holding a button down, and the server no longer sends them at all. The decision
+      sits with the code that knows why it refused rather than with a string match at
+      the other end.
+      `CombatController:Attack` also stops asking when it already knows the answer,
+      keeping a local copy of the cooldown. The server still re-checks — the worst a
+      client that strips this achieves is asking for hits it will not get — but it means
+      a held button sends one request per cooldown instead of one per click, which also
+      keeps the remote clear of its own eight-a-second limit.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

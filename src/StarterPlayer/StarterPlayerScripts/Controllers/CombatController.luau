@@ -22,6 +22,9 @@ local Net = require(ReplicatedStorage.Modules.Net)
 local ATTACK_ACTION = "GymSimulatorAttack"
 local DEFAULT_ABILITY = "Punch"
 local TARGET_RANGE = 12
+-- Punch's cooldown, mirrored so the client can decline to ask. The server is still the
+-- authority and re-checks it; this only stops the doomed requests being sent.
+local PUNCH_COOLDOWN = 0.6
 -- Only consider players within this cone of where the camera points.
 local MIN_AIM_DOT = 0.35
 
@@ -32,6 +35,9 @@ local CombatController = {
 
 -- (feedback) — Hit, Hurt, Blocked, or Rejected payloads from the server.
 CombatController.Feedback = Signal.new()
+
+-- When the local copy of the cooldown expires.
+local readyAt = 0
 
 local function getRoot(character: Model?): BasePart?
 	if character == nil then
@@ -97,11 +103,24 @@ function CombatController:FindTarget(): Player?
 	return best
 end
 
+--[[
+	Asks the server for a punch, unless it already knows the answer is no.
+
+	The left mouse button both trains and punches, so this runs on every click of a held
+	button — several a second. Sending each one produced a rejection back for every click
+	inside the cooldown, and at eight events a second it also crowded the remote's own
+	rate limit. Declining locally costs nothing and the server still re-checks: the worst
+	a client that removes this achieves is asking for hits it will not get.
+]]
 function CombatController:Attack()
+	if os.clock() < readyAt then
+		return
+	end
 	local target = self:FindTarget()
 	if target == nil then
 		return
 	end
+	readyAt = os.clock() + PUNCH_COOLDOWN
 	Net.Event("AbilityActivate"):FireServer(DEFAULT_ABILITY, target)
 end
 
