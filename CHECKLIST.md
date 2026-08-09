@@ -931,6 +931,38 @@ punches for a whole phase, so the game had two answers to one question.
       it once in the place a player goes to ask. The sign is three lines now — name,
       stat and rate, how to get on — and shrank from 90 to 70 pixels to match.
 
+- [x] 104. **The floor was two floors.** "The map looks overlap, look at the floor" was
+      never about the minimap. The hub's plaza is a 180-stud pavement disc lying on a
+      470-stud ground disc and **both top faces were at exactly y=1.0000**, so the
+      renderer had no way to choose between them and tore the whole plaza into a
+      flickering checkerboard. A screen capture of the ground shows it plainly; nothing
+      in the generator looked wrong, because every walkable surface is *meant* to top out
+      at `FLOOR_TOP` so a machine placed there stands flush.
+      The rule now has a direction. `GROUND_SINK` (0.05) drops the base layers — the hub
+      ground, the island decks, the district grounds and lobes — a twentieth of a stud
+      below `FLOOR_TOP`, far too little to step on and far more than the depth buffer
+      needs. `SURFACE_LIFT` (0.04) is its mirror, for a paved surface laid on another:
+      the interiors' `Floor1` sits on `SitePavement` and now clears it.
+      **`validate_no_coplanar_floors`** stops it coming back. It projects every flat
+      visible part onto the ground as a real rotated rectangle — not a bounding box,
+      which reports two neighbouring slabs in a rotated building as overlapping and a
+      disc as having no width at all — buckets them by height, and fails the build on any
+      pair sharing a top face within a hundredth of a stud over more than a few square
+      studs. It caught `SitePavement` against `Floor1` immediately after the hub was
+      fixed, which is the whole argument for having it.
+      **The vitals box is gone.** It sat in the middle of the screen carrying the health
+      bar and two permanent sentences — how to mount a machine, and what the left mouse
+      button would do — which said the same thing whether or not a machine or an enemy
+      was anywhere near, so they stopped being read in the first minute and kept the
+      centre of the screen for the rest of the session. The dock already names the muscle
+      the click trains and the machines say "Hold E" on their own signs at the moment it
+      is true. Health is a bar in the bottom-left corner, and `_refreshVitals` is nine
+      lines instead of sixty.
+      Verified by looking at it: screen captures of the plaza before and after, from a
+      standing angle and from overhead. Before, the ring around the plaza is ripped into
+      striped fragments; after, it is one clean paved disc. `validate_gym.py` passes with
+      3927 instances and the new rule armed.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

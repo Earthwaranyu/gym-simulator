@@ -480,6 +480,101 @@ def rotated_aabb(node: Node) -> tuple[float, float, float, float] | None:
     return frame[0] - half_x, frame[0] + half_x, frame[2] - half_z, frame[2] + half_z
 
 
+def floor_footprint(node: Node) -> tuple[float, float, list[tuple[float, float]], float] | None:
+    """A flat visible part as a plan-view rectangle plus the height of its top face.
+
+    Returns (centre_x, centre_z, [edge_a, edge_b], top_y) where the edges are half-extent
+    vectors in the XZ plane. Built from the part's own axes rather than an axis-aligned
+    box, because two neighbouring slabs inside a rotated building have overlapping
+    bounding boxes while their actual footprints only touch.
+    """
+    properties = node.get("properties", {})
+    frame = properties.get("CFrame")
+    size = properties.get("Size")
+    if not isinstance(frame, list) or len(frame) != 12 or not isinstance(size, list) or len(size) != 3:
+        return None
+    if float(properties.get("Transparency", 0) or 0) >= 0.95:
+        return None
+
+    # Columns of the rotation matrix are the part's own axes in world space.
+    axes = [
+        ((frame[3], frame[6], frame[9]), size[0] / 2),
+        ((frame[4], frame[7], frame[10]), size[1] / 2),
+        ((frame[5], frame[8], frame[11]), size[2] / 2),
+    ]
+    # The axis most nearly vertical is the thickness; the other two spread on the floor.
+    axes.sort(key=lambda entry: abs(entry[0][1]), reverse=True)
+    thickness_axis, half_thickness = axes[0]
+    half_y = abs(thickness_axis[1]) * half_thickness
+    if half_y > 3:
+        return None
+
+    spread = [((axis[0] * half, axis[2] * half)) for axis, half in axes[1:]]
+    if min(math.hypot(*edge) for edge in spread) < 6:
+        return None
+
+    return frame[0], frame[2], spread, frame[1] + half_y
+
+
+def footprints_overlap(a: Any, b: Any, slack: float) -> bool:
+    """Separating-axis test between two plan-view rectangles."""
+    ax, az, a_edges, _ = a
+    bx, bz, b_edges, _ = b
+    delta = (bx - ax, bz - az)
+    for edges in (a_edges, b_edges):
+        for edge in edges:
+            length = math.hypot(*edge)
+            if length < 1e-6:
+                continue
+            axis = (edge[0] / length, edge[1] / length)
+            centre_gap = abs(delta[0] * axis[0] + delta[1] * axis[1])
+            reach = 0.0
+            for other in (a_edges, b_edges):
+                for candidate in other:
+                    reach += abs(candidate[0] * axis[0] + candidate[1] * axis[1])
+            reach /= 2
+            if centre_gap >= reach - slack:
+                return False
+    return True
+
+
+def validate_no_coplanar_floors(validator: Validator, payloads: Iterable[Any]) -> None:
+    """Two floors at exactly the same height tear into a flickering checkerboard.
+
+    The hub shipped like this: a 180-stud plaza lying on a 470-stud ground disc with both
+    top faces at exactly FLOOR_TOP. Nothing in the generator looked wrong — every
+    walkable surface is *meant* to top out at FLOOR_TOP so a machine placed there stands
+    flush — which is why it survived review and had to be found by looking at the floor
+    in a screenshot. A rule is cheaper than another pair of eyes.
+    """
+    surfaces: list[tuple[str, Any]] = []
+    for payload in payloads:
+        for node in walk(payload):
+            if not is_base_part(node):
+                continue
+            found = floor_footprint(node)
+            if found is not None:
+                surfaces.append((str(node.get("name", "?")), found))
+
+    # Only pairs sharing a top face can tear, so group by height first: comparing every
+    # flat part with every other is thousands of times more work for the same answer.
+    by_height: dict[int, list[tuple[str, Any]]] = {}
+    for entry in surfaces:
+        by_height.setdefault(round(entry[1][3] * 100), []).append(entry)
+
+    clashes: set[str] = set()
+    for group in by_height.values():
+        for index, (name_a, a) in enumerate(group):
+            for name_b, b in group[index + 1 :]:
+                if footprints_overlap(a, b, slack=4.0):
+                    clashes.add(f"{name_a} and {name_b} share a top face at y={a[3]:.3f}")
+
+    validator.check(
+        not clashes,
+        "coplanar floor surfaces will z-fight: " + "; ".join(sorted(clashes)[:8]),
+    )
+
+
 def validate_irregular_map(
     validator: Validator,
     builder: ModuleType,
@@ -770,6 +865,7 @@ def run() -> int:
         station_by_id = validate_locations(validator, builder, stations, family_by_equipment)
         validate_irregular_map(validator, builder, first_structure, station_by_id)
         validate_world_foundation(validator, first_structure, first_machines)
+        validate_no_coplanar_floors(validator, (first_structure, first_machines))
         instance_count, base_part_count = validate_instance_budgets(
             validator,
             (first_structure, first_machines),

@@ -35,6 +35,21 @@ import random
 
 # Floor slabs are 1 stud thick centred at y=0.5, so everything stands on y=1.
 FLOOR_TOP = 1.0
+# How far the base ground sits below FLOOR_TOP.
+#
+# Every walkable surface in this world is built to top out at exactly FLOOR_TOP, so a
+# machine placed at FLOOR_TOP stands flush wherever it is put. That is right for the
+# surfaces you walk on and wrong for the ground *underneath* them: the plaza is a
+# 180-stud disc lying on a 470-stud one, and two coplanar faces do not take turns — the
+# renderer tears them into a flickering checkerboard, which is what the hub floor had
+# been doing. Sinking the base by a twentieth of a stud settles the argument. It is far
+# too small to step on and far larger than the depth buffer's precision here.
+GROUND_SINK = 0.05
+# The mirror of GROUND_SINK, for a paved surface laid on top of another paved one — an
+# interior floor sitting on the site's own pavement, say. Lifting rather than sinking
+# keeps the surface a player walks on at FLOOR_TOP, which is the contract every machine
+# builder is written against.
+SURFACE_LIFT = 0.04
 # A standing R15 HumanoidRootPart sits this far above the ground it stands on
 # (HipHeight 2 + half of the 2-stud root part).
 ROOT_HEIGHT = 3.0
@@ -1396,7 +1411,7 @@ def island_slab(row, rng):
     """A rectangular deck with a kerb — quays, rooftops, stations."""
     half = row["half"]
     size = half * 2
-    out = [part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2, 0),
+    out = [part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2 - GROUND_SINK, 0),
                 row["ground"], row["ground_material"])]
     out.append(part("DeckTrim", [size + 5, 1.4, size + 5], cf(0, FLOOR_TOP - 4.5, 0),
                     [c * 0.5 for c in row["accent"]], "Metal"))
@@ -1422,7 +1437,8 @@ def island_slab(row, rng):
 def island_round(row, rng):
     """A disc island with a stone rim — beaches and peaks."""
     half = row["half"]
-    out = [disc("Deck", 4, half * 2, FLOOR_TOP - 2, row["ground"], row["ground_material"])]
+    out = [disc("Deck", 4, half * 2, FLOOR_TOP - 2 - GROUND_SINK,
+           row["ground"], row["ground_material"])]
     out.append(disc("DeckTrim", 1.6, half * 2 + 8, FLOOR_TOP - 4.6,
                     [c * 0.5 for c in row["accent"]], "Metal"))
 
@@ -1449,7 +1465,7 @@ def island_mesa(row, rng):
     """A flat top on stepped stone shoulders — quarries and plateaus."""
     half = row["half"]
     size = half * 2
-    out = [part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2, 0),
+    out = [part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2 - GROUND_SINK, 0),
                 row["ground"], row["ground_material"])]
 
     # Shoulders step outward and down, so the top plate overhangs slightly.
@@ -1479,7 +1495,8 @@ def island_mesa(row, rng):
 def island_crag(row, rng):
     """A deck ringed by jagged spurs — storm peaks and volcanic rock."""
     half = row["half"]
-    out = [disc("Deck", 4, half * 2, FLOOR_TOP - 2, row["ground"], row["ground_material"])]
+    out = [disc("Deck", 4, half * 2, FLOOR_TOP - 2 - GROUND_SINK,
+           row["ground"], row["ground_material"])]
 
     for index in range(9):
         angle = 360.0 * index / 9 + rng.uniform(-10, 10)
@@ -2628,7 +2645,7 @@ def downtown():
         "rock_material": "Rock",
     }
 
-    out.append(part("Ground", [size, 4, size], cf(0, FLOOR_TOP - 2, 0),
+    out.append(part("Ground", [size, 4, size], cf(0, FLOOR_TOP - 2 - GROUND_SINK, 0),
                     [0.21, 0.21, 0.22], "Asphalt"))
     out.append(part("GroundTrim", [size + 8, 2, size + 8], cf(0, FLOOR_TOP - 5, 0),
                     [0.26, 0.27, 0.30], "Concrete"))
@@ -3245,7 +3262,7 @@ def enterable_training_tower(travel_id, equipment_id, accent):
     out = [
         # All surfaces line up with the builders' local FLOOR_TOP=1 contract.
         # Upper slabs stop at x=16, leaving a 14-stud stairwell at the right wall.
-        part("Floor1", [60, 1, 66], cf(0, FLOOR_TOP - 0.5, 0),
+        part("Floor1", [60, 1, 66], cf(0, FLOOR_TOP - 0.5 + SURFACE_LIFT, 0),
              [0.34, 0.34, 0.35], "Concrete"),
         part("Floor2", [46, 1, 62], cf(-7, FLOOR_TOP + 11.5, 0),
              [0.30, 0.30, 0.32], "Concrete"),
@@ -3335,7 +3352,7 @@ def region_ground(region):
     if region["shape"] == "Circle":
         diameter = min(width, depth)
         out.append(place(frame, disc(
-            "DistrictGround", 4, diameter, FLOOR_TOP - 2,
+            "DistrictGround", 4, diameter, FLOOR_TOP - 2 - GROUND_SINK,
             visual["ground"], visual["ground_material"],
         )))
         out.append(place(frame, disc(
@@ -3349,7 +3366,8 @@ def region_ground(region):
     else:
         out.extend([
             place(frame, map_feature(part(
-                "DistrictGround", [width, 4, depth], cf(0, FLOOR_TOP - 2, 0),
+                "DistrictGround", [width, 4, depth],
+                cf(0, FLOOR_TOP - 2 - GROUND_SINK, 0),
                 visual["ground"], visual["ground_material"],
             ), "Land")),
             place(frame, part(
@@ -3364,7 +3382,7 @@ def region_ground(region):
         for side in (-1, 1):
             lobe_frame = mul(frame, cf(side * width * 0.43, 0, side * depth * 0.22))
             out.append(place(lobe_frame, disc(
-                "DistrictLobe", 4, lobe_diameter, FLOOR_TOP - 2,
+                "DistrictLobe", 4, lobe_diameter, FLOOR_TOP - 2 - GROUND_SINK,
                 visual["ground"], visual["ground_material"],
             )))
             out.append(place(frame, map_footprint(
@@ -3531,7 +3549,7 @@ def connected_ground():
         "TileRows": 5,
     })
     hub_children = [
-        disc("HubGround", 5, 470, FLOOR_TOP - 2.5,
+        disc("HubGround", 5, 470, FLOOR_TOP - 2.5 - GROUND_SINK,
              [0.22, 0.23, 0.23], "Ground"),
         disc("HubFoundation", 5, 482, FLOOR_TOP - 7.5,
              [0.13, 0.14, 0.15], "Rock"),

@@ -27,12 +27,9 @@ local Icons = require(ReplicatedStorage.Modules.Icons)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
 local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
 
--- Punch's cooldown, mirrored for the cooldown sweep. The server remains the
--- authority; this only decides when the pip looks ready.
-local PUNCH_COOLDOWN = 0.6
 -- A slot is big enough to hit with a thumb and small enough that five of them plus
--- their gaps stay narrower than the vitals panel above (380). It stopped being square
--- when the muscle's name went under its picture: 5*56 + 4*6 + 24 = 328.
+-- their gaps stay narrow under the middle of the screen. It stopped being square when
+-- the muscle's name went under its picture: 5*56 + 4*6 + 24 = 328.
 local SLOT_WIDTH = 56
 local SLOT_HEIGHT = 62
 local SLOT_GAP = 6
@@ -79,9 +76,8 @@ local MINIMAP_INTERVAL = 1 / 30
 -- inside the server's activity window so holding never flickers off, and slow
 -- enough that it costs nothing.
 local PING_INTERVAL = 0.4
--- Which stat the fist belongs to. Named rather than inlined because two places
--- below branch on it, and "Arms" appearing twice as a literal is how those two
--- quietly disagree later.
+-- Which stat the fist belongs to. Named rather than inlined so the click handler and
+-- anything else that cares cannot quietly disagree about the spelling.
 local ARMS_STAT = "Arms"
 
 local HudController = {
@@ -120,8 +116,6 @@ local clicking = false
 local powerLabel: TextLabel
 local tokenLabel: TextLabel
 local healthBar: UI.Bar
-local comboLabel: TextLabel
-local abilityLabel: TextLabel
 local goalPanel: Frame
 local goalName: TextLabel
 local goalDetail: TextLabel
@@ -136,8 +130,6 @@ local minimapCentre: Vector3? = nil
 local minimapReady = false
 local minimapDrawing = false
 local minimapAt = 0
-
-local lastPunchAt = -math.huge
 
 function HudController:Init()
 	ProfileController = Loader.Get("ProfileController")
@@ -341,26 +333,23 @@ function HudController:_build()
 		})
 	end
 
-	-- Bottom-centre: the vitals the player watches while training and fighting.
-	local vitals = UI.Panel("Vitals", screen)
-	vitals.AnchorPoint = Vector2.new(0.5, 1)
-	vitals.Position = UDim2.new(0.5, 0, 1, -84)
-	vitals.Size = UDim2.fromOffset(380, 94)
-
-	UI.VerticalList(vitals, 6)
-
-	healthBar = UI.Bar("Health", UI.Palette.Health, vitals)
-	healthBar.Root.LayoutOrder = 1
-
-	comboLabel = UI.Label("Combo", vitals)
-	comboLabel.Size = UDim2.new(1, 0, 0, 20)
-	comboLabel.TextColor3 = UI.Palette.Combo
-	comboLabel.LayoutOrder = 2
-
-	abilityLabel = UI.Label("Ability", vitals)
-	abilityLabel.Size = UDim2.new(1, 0, 0, 20)
-	abilityLabel.TextColor3 = UI.Palette.TextMuted
-	abilityLabel.LayoutOrder = 3
+	-- Bottom-left: health, and nothing else.
+	--
+	-- This was a panel in the middle of the screen carrying the health bar and two lines
+	-- of prose — how to mount a machine, and what the left mouse button would do. Both
+	-- sentences were permanent: they said the same thing whether or not there was a
+	-- machine or an enemy anywhere near, so they stopped being read within a minute of
+	-- play and went on occupying the centre of the screen for the rest of the session.
+	-- The dock already names the muscle the click trains, and the machines say "Hold E"
+	-- on their own signs at the moment it is true.
+	--
+	-- What is left is the one number that changes while you are being hit, and it goes
+	-- in the corner where a health bar belongs.
+	healthBar = UI.Bar("Health", UI.Palette.Health, screen)
+	healthBar.Root.AnchorPoint = Vector2.new(0, 1)
+	healthBar.Root.Position = UDim2.new(0, 16, 1, -16)
+	healthBar.Root.Size = UDim2.fromOffset(240, 26)
+	healthBar.Root.BackgroundTransparency = 0.2
 
 	-- Under the compact summary: the minimap.
 	--
@@ -930,22 +919,6 @@ end
 
 function HudController:_refreshVitals()
 	local state = TrainingController:GetState()
-	local stagger = TrainingController:GetStaggerRemaining()
-
-	if stagger > 0 then
-		comboLabel.Text = `Knocked off the machine — {string.format("%.1f", stagger)}s`
-		comboLabel.TextColor3 = UI.Palette.Danger
-	elseif state.StationId ~= nil then
-		local definition = EquipmentConfig.Get(state.StationId)
-		local name = if definition ~= nil then definition.DisplayName else state.StationId
-		local combo = math.min(2, 1 + state.Combo * 0.02)
-		comboLabel.Text =
-			`{name}  —  combo x{string.format("%.2f", combo)} ({state.Combo} reps)  —  Space or hold E to stop`
-		comboLabel.TextColor3 = UI.Palette.Combo
-	else
-		comboLabel.Text = "Hold E at a machine to start training"
-		comboLabel.TextColor3 = UI.Palette.TextMuted
-	end
 
 	local character = Players.LocalPlayer.Character
 	local humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
@@ -957,34 +930,6 @@ function HudController:_refreshVitals()
 		)
 	else
 		healthBar.Set(0, "HEALTH  —")
-	end
-
-	-- What the left mouse button does right now, which depends on the slot.
-	--
-	-- There is no [F] any more. Punching was on its own key while the click already
-	-- threw a punch whenever Arms was selected, so the game had two answers to "how do
-	-- I hit someone" and the prompt only admitted to one of them. Slot 1 is the fist:
-	-- select it and the click is a punch, select anything else and the click is reps.
-	if selectedStat ~= ARMS_STAT then
-		local definition = StatConfig.Get(selectedStat)
-		abilityLabel.Text =
-			`Click to train {if definition ~= nil then definition.DisplayName else selectedStat}`
-		abilityLabel.TextColor3 = if definition ~= nil then definition.Color else UI.Palette.TextMuted
-	else
-		local remaining = PUNCH_COOLDOWN - (os.clock() - lastPunchAt)
-		if remaining > 0 then
-			abilityLabel.Text = `Click to punch  —  {string.format("%.1f", remaining)}s`
-			abilityLabel.TextColor3 = UI.Palette.TextMuted
-		else
-			local target = CombatController:FindTarget()
-			if target ~= nil then
-				abilityLabel.Text = `Click to punch  —  {target.Name}`
-				abilityLabel.TextColor3 = UI.Palette.Danger
-			else
-				abilityLabel.Text = "Click to punch  —  ready"
-				abilityLabel.TextColor3 = UI.Palette.Accent
-			end
-		end
 	end
 
 	-- The slot of whatever muscle the machine is working, which is not necessarily the
@@ -1008,19 +953,6 @@ function HudController:Start()
 	Net.Event("QuestsChanged").OnClientEvent:Connect(function(view: any)
 		if type(view) == "table" then
 			self:_refreshGoal(view)
-		end
-	end)
-
-	CombatController.Feedback:Connect(function(payload: any)
-		if type(payload) ~= "table" then
-			return
-		end
-
-		-- Only the cooldown clock lives here now. What the hit was and what it did for
-		-- is EffectsController's damage numbers and ToastController's line, which are
-		-- both nearer the middle of the screen than a log in the corner ever was.
-		if payload.Kind == "Hit" then
-			lastPunchAt = os.clock()
 		end
 	end)
 
