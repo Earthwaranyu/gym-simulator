@@ -1,6 +1,6 @@
 --!strict
 --[[
-	MenuController — the tabbed menu: map, upgrades, quests, shop, leaderboard, settings.
+	MenuController — the Info, Shop and Settings menu plus standalone text panels.
 
 	Tabs are declared in one table with a render function each, so adding a screen is
 	an entry rather than a new controller and a new toggle.
@@ -169,13 +169,9 @@ function MenuController:Init()
 	-- The seven-tab strip put Map, Train, Upgrades, Quests, Shop, Top and Settings
 	-- behind one button, which meant the two screens a player opens constantly — the
 	-- map and their own stats — were the same number of clicks away as the ones they
-	-- open twice a session. Map, Ranks and Quests are now their own HUD surfaces
-	-- (see MenuBarController and HudController's goal card), and Train's picker lives
-	-- with the map it belongs to. What is left is genuinely a menu: who you are, what
-	-- you can buy, and what you can switch off.
-	--
-	-- The render functions for the promoted screens are unchanged and still live
-	-- here; only their route in changed.
+	-- open twice a session. The interactive map now belongs to FullMapController;
+	-- Ranks and Quests remain direct HUD routes. What is left here is genuinely a
+	-- menu: who you are, what you can buy, and what you can switch off.
 	tabs = {
 		{
 			Id = "Info",
@@ -196,15 +192,6 @@ function MenuController:Init()
 			DisplayName = "Settings",
 			Render = function(parent)
 				self:_renderSettings(parent)
-			end,
-		},
-		-- Reachable by Open() from the HUD buttons rather than from the tab strip.
-		{
-			Id = "Map",
-			DisplayName = "Map",
-			OnBar = false,
-			Render = function(parent)
-				self:_renderMap(parent)
 			end,
 		},
 		{
@@ -999,16 +986,15 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 	end
 end
 
--- Opens the one destination for a muscle from the persistent five-stat hotbar.
--- The same method remains valid if a later season adds more locations: Train still
--- owns the list and selection, while the HUD only names the stat it wants to inspect.
+-- Opens the dedicated map on a useful destination for one muscle. The route stays
+-- here for callers written before the map became its own controller.
 function MenuController:OpenTrain(statId: string)
 	if StatConfig.Get(statId) == nil then
 		warn(`[MenuController] No stat named "{statId}"`)
 		return
 	end
 	selectedMuscle = statId
-	self:Open("Map")
+	Loader.Get("FullMapController"):OpenForStat(statId)
 end
 
 --[[
@@ -1712,7 +1698,7 @@ function MenuController:_refresh()
 		end
 	end
 
-	-- Info, Shop and Settings form the menu. Map, Quests and Ranks are standalone HUD
+	-- Info, Shop and Settings form the menu. Quests and Ranks are standalone HUD
 	-- destinations, so showing the menu strip above them falsely implies a hierarchy
 	-- they do not belong to and wastes a full row of usable space.
 	local hasMenuTabs = activeTab == "Info" or activeTab == "Shop" or activeTab == "Settings"
@@ -1720,10 +1706,10 @@ function MenuController:_refresh()
 	bodyScroll.Position = if hasMenuTabs then UDim2.fromOffset(0, 82) else UDim2.fromOffset(0, 28)
 	bodyScroll.Size = if hasMenuTabs then UDim2.new(1, 0, 1, -82) else UDim2.new(1, 0, 1, -28)
 
-	local fixedInfo = activeTab == "Info"
-	bodyScroll.ScrollingEnabled = not fixedInfo
-	bodyScroll.ScrollBarThickness = if fixedInfo then 0 else 4
-	bodyScroll.AutomaticCanvasSize = if fixedInfo then Enum.AutomaticSize.None else Enum.AutomaticSize.Y
+	local fixedPage = activeTab == "Info"
+	bodyScroll.ScrollingEnabled = not fixedPage
+	bodyScroll.ScrollBarThickness = if fixedPage then 0 else 4
+	bodyScroll.AutomaticCanvasSize = if fixedPage then Enum.AutomaticSize.None else Enum.AutomaticSize.Y
 	bodyScroll.CanvasPosition = Vector2.zero
 
 	body:ClearAllChildren()
@@ -1745,6 +1731,11 @@ end
 	because pressing it twice should put you back where you were.
 ]]
 function MenuController:Toggle(tabId: string?)
+	local FullMapController = Loader.Get("FullMapController")
+	if FullMapController:IsOpen() then
+		FullMapController:Close()
+	end
+
 	if tabId ~= nil and isOpen and activeTab ~= tabId then
 		self:Open(tabId)
 		return
@@ -1810,6 +1801,11 @@ end
 	config table should be visible to whoever wrote it.
 ]]
 function MenuController:Open(tabId: string)
+	local FullMapController = Loader.Get("FullMapController")
+	if FullMapController:IsOpen() then
+		FullMapController:Close()
+	end
+
 	local known = false
 	for _, tab in tabs do
 		if tab.Id == tabId then
@@ -1839,14 +1835,7 @@ end
 	player actually reads.
 ]]
 function MenuController:_enterTab()
-	self:_fetchTravelAccess()
-
-	if activeTab == "Map" then
-		self:_fetchSpotStatus()
-		self:_pollTrainPanel()
-	else
-		trainPollToken += 1
-	end
+	trainPollToken += 1
 end
 
 function MenuController:_build()
@@ -1968,10 +1957,7 @@ function MenuController:Start()
 	end)
 
 	ProfileController.Changed:Connect(function()
-		if
-			isOpen
-			and (activeTab == "Info" or activeTab == "Shop" or activeTab == "Settings" or activeTab == "Map")
-		then
+		if isOpen and (activeTab == "Info" or activeTab == "Shop" or activeTab == "Settings") then
 			self:_refresh()
 		end
 	end)

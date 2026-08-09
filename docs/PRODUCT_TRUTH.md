@@ -42,14 +42,14 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Flight steering | follows the camera's full look direction, pitch included; the rig is held upright and facing its heading by an `AlignOrientation` | `FlightController:_step` |
 | Flight availability | available from spawn | commit `895d0e3` |
 | Leaderboards | 2 global boards — Power and Kills | `LeaderboardService.luau` |
-| Menu tabs | 3 — Info, Shop, Settings. Map, Quests and Ranks are direct HUD pages and do not show that strip | `MenuController.luau` |
-| Persistent navigation | one right-side **MENU** button, a bottom five-stat training dock, and a persistent training-first **MAIN GOAL** card; pressing a stat opens its Train view | `MenuBarController.luau`, `HudController.luau`, `MenuController:OpenTrain` |
-| Finding a machine | the **Train** tab lists seven locations for the chosen muscle, usable first and weakest→strongest, with authored place names and live free/busy counts | `MenuController:_renderTrain`, `TrainingService:GetSpotStatus` |
-| Teleporting | **Fast Travel gamepass only.** The plaza rule is gone. Without the pass a destination becomes a tracked waypoint — beacon plus off-screen arrow — and the player walks or flies | `TravelService:CanTravelFrom`, `WaypointController` |
+| Menu tabs | 3 — Info, Shop, Settings. Quests and Ranks are direct HUD pages; the full map is a separate modal with no menu tabs or page scroll | `MenuController.luau`, `FullMapController.luau` |
+| Persistent navigation | one right-side **MENU** button, a bottom five-stat training dock, a persistent training-first **MAIN GOAL** card, and a clickable minimap that opens the dedicated full map | `MenuBarController.luau`, `HudController.luau`, `FullMapController.luau` |
+| Finding a machine | the dedicated map shows all 35 training circles. Selecting one preserves map pan/zoom and opens its muscle, rate, access and Power details in a fixed sidebar | `FullMapController:_render`, `MapRender` |
+| Teleporting | Selecting a map circle always shows two separate actions. **Track is free** and creates the beacon/off-screen arrow; **Teleport requires the Fast Travel gamepass** and enough Power, with both conditions rechecked server-side | `FullMapController`, `TravelService:Travel`, `WaypointController` |
 | Physique shape | athletic 2.2 cap with restrained height: full chest ≈3.30 wide vs ≈2.41 waist; upper arm ≈1.35 girth × 1.36 long, with tapered forearms/calves | `PhysiqueConfig`, `MuscleController` |
 | Vascularity | 9 subtle vein cylinders on arms and chest, fading in late from scale 1.60 to 2.15, client-side only | `PhysiqueConfig.VEINS`, `VeinController` |
 | Scenery | decorative props are non-colliding and cleared 72 studs from any machine; kerbs no longer block | `scripts/build_gym.py` `_decorate`, `PROP_CLEARANCE` |
-| Menu map | light "paper" board (232,234,238) with washed features and inked pins — the one panel that is not dark | `MenuController` `MAP_PAPER` |
+| Full map | dedicated 980×620 modal: light paper board, fixed destination sidebar, wheel/button zoom, mouse/touch drag, and no nested page scrolling | `FullMapController`, `MapRender` |
 | Muscle growth | per stat, not per total: Arms→upper/lower arms, Chest→UpperTorso, Back→UpperTorso (0.6), Core→LowerTorso, Legs→upper/lower legs. Shared parts take the largest contribution, never the product | `StatConfig.BodyScales`, `MuscleService:ComputeScales` |
 | Machine visibility | the nearest 14 of 35 stations within 260 studs carry muscle-coloured outlines and floor rings | `StationHighlightController` |
 | Dev commands | `/power`, `/stat`, `/tokens`, `/unlockall`, `/reset`, `/where`, `/help` — **Studio only**, gated on `RunService:IsStudio()` | `DevService.luau` |

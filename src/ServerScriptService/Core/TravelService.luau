@@ -115,8 +115,8 @@ function TravelService:Init()
 		return self:GetDestinations(), self:GetMapFeatures()
 	end)
 
-	-- The client needs to know whether a destination button says "Go" or "Track"
-	-- before it is pressed. Ownership itself is still only ever decided here.
+	-- The client needs to know whether its separate Teleport action should look locked.
+	-- Ownership itself is still only ever decided here.
 	Net.BindFunction("GetTravelAccess", 2, function(player: Player)
 		return { HasFastTravel = self:CanTravelFrom(player) }
 	end)
@@ -158,9 +158,9 @@ end
 	made the pass worth very little, since the free path did the same job with one extra
 	step.
 
-	A non-owner is not blocked from the destination, only from skipping the trip: the
-	client turns a refused Travel into a tracked waypoint. Flight is available from
-	spawn, so every location is reachable on foot or in the air.
+	A non-owner is not blocked from the destination, only from skipping the trip: Track
+	is a separate free action on the map. Flight is available from spawn, so every
+	location remains reachable on foot or in the air.
 ]]
 function TravelService:CanTravelFrom(player: Player): boolean
 	if studioOverride[player] then
@@ -307,8 +307,8 @@ function TravelService:Travel(player: Player, travelId: string): (boolean, strin
 	end
 
 	if not self:CanTravelFrom(player) then
-		-- The client turns this exact refusal into a tracked waypoint, so the message
-		-- explains the offer rather than just denying it.
+		-- The client uses this exact refusal to repaint Teleport as locked if ownership
+		-- changed after the map opened.
 		return false, "NO_FAST_TRAVEL"
 	end
 

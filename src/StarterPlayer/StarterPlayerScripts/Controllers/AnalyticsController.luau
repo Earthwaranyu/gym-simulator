@@ -95,16 +95,21 @@ function AnalyticsController:Start()
 		reportOnce("Locale", { LocaleId = localeId })
 	end
 
-	-- Which panel the player opened. MenuController.Changed already publishes this
-	-- for the button bar's highlight, so nothing new has to be wired.
+	-- Which panel the player opened. The full map is now its own non-scrolling surface;
+	-- the menu signal continues to cover the actual menu and standalone text panels.
 	local MenuController = Loader.Get("MenuController")
 	MenuController.Changed:Connect(function(tabId: string?)
-		if tabId == "Map" then
-			report("MapOpened")
-		elseif tabId == "Shop" then
+		if tabId == "Shop" then
 			-- Opening the shop is the closest thing to an impression the catalogue has
 			-- until per-item views exist (#171).
 			report("ItemViewed", { ItemId = "ShopPanel" })
+		end
+	end)
+
+	local FullMapController = Loader.Get("FullMapController")
+	FullMapController.Changed:Connect(function(open: boolean)
+		if open then
+			report("MapOpened")
 		end
 	end)
 

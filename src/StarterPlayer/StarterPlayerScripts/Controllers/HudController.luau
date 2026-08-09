@@ -85,6 +85,7 @@ local ProfileController: any = nil
 local TrainingController: any = nil
 local CombatController: any = nil
 local MenuController: any = nil
+local FullMapController: any = nil
 
 type Slot = {
 	Button: TextButton,
@@ -132,6 +133,7 @@ function HudController:Init()
 	TrainingController = Loader.Get("TrainingController")
 	CombatController = Loader.Get("CombatController")
 	MenuController = Loader.Get("MenuController")
+	FullMapController = Loader.Get("FullMapController")
 end
 
 function HudController:_build()
@@ -511,7 +513,7 @@ function HudController:_buildMinimap(screen: ScreenGui)
 
 	UI.Pressable(panel, { PressScale = 0.985, HoverScale = 1 })
 	panel.Activated:Connect(function()
-		MenuController:Toggle("Map")
+		FullMapController:Toggle()
 	end)
 
 	-- A CanvasGroup, and it has to be one.

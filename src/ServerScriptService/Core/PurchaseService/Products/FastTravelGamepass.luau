@@ -2,9 +2,8 @@
 --[[
 	Fast Travel — 149 Robux gamepass.
 
-	Travel between districts is free to anywhere you have the power for, but only
-	from inside the spawn plaza. This lifts that: travel from wherever you are
-	standing, without the walk or the flight back.
+	The map lets everyone track any training location. This pass unlocks the separate
+	Teleport action for every destination the player has enough Power to enter.
 
 	It sells convenience, not progress. The power requirement on every district
 	still applies to owners exactly as it does to everyone else, which is the line
@@ -27,8 +26,7 @@ local Product: Types.Product = {
 	Kind = "Gamepass",
 	AssetId = 0,
 	DisplayName = "Fast Travel",
-	Description = "Travel to any district you have unlocked from anywhere on the map, "
-		.. "instead of only from the spawn plaza.",
+	Description = "Unlock the Teleport button for every map destination you have enough Power to enter.",
 	RobuxPrice = 149,
 
 	Grant = function(_player: Player): boolean

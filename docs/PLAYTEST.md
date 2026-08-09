@@ -124,42 +124,50 @@ The rule under test: **a hit does not dismount; only death does.**
 - [ ] Fly into every outer edge at maximum Legs speed. The persistent wall and safety
       envelope must keep X within ±4,790 and Z within ±4,290; the player cannot leave the
       ocean or fall into the void.
-- [ ] Open the map. It is a **light** board, not a dark one, and every district, road
-      and building is legible against it. All **35** locations are present and
-      selectable; zoom, pan, and selection survive a refresh.
-- [ ] Every pin shows both its muscle letter and location multiplier. x1 pins are open;
-      locked x2–x64 pins remain readable rather than disappearing into the paper.
+- [ ] Click the minimap. The full map opens as its own wide modal with **no**
+      Info/Shop/Settings tabs, Train list, or vertically scrolling page around it.
+- [ ] The map is a **light** board, not a dark one, and every district, road and
+      building is legible. All **35** coloured location circles are present and
+      selectable; locked locations remain visible rather than disappearing.
+- [ ] Scroll up over the board to zoom in and scroll down to zoom out. The page must
+      never move because there is no page scroll. Verify the +, − and reset controls,
+      mouse drag, touch drag, and touch-friendly zoom buttons as well.
+- [ ] Pan and zoom, then select several circles. The chosen pin receives the heavy
+      outline and the fixed sidebar updates without resetting the current map view.
+- [ ] The selected-location sidebar shows machine, muscle, gain rate, access type,
+      required Power, and two distinct actions: **TRACK** and **TELEPORT**.
 - [ ] Run and fly through scenery — containers, palms, bollards, kerbs. None of it
       blocks you. Buildings, ground and platforms still do.
-- [ ] **Without the Fast Travel pass**, pick any destination. You are NOT moved: a
-      beacon appears over it with a live distance, an arrow points to it whenever it is
-      off-screen, and the menu closes. Walk/fly there and confirm it clears itself
-      within ~26 studs with an "Arrived" toast.
+- [ ] **Without the Fast Travel pass**, Teleport visibly reads
+      **LOCKED · GET FAST TRAVEL**. Clicking it opens the purchase flow (or the
+      configured-AssetId warning in development) and never moves the character.
+- [ ] Click **TRACK** on that same destination. A beacon appears with a live distance,
+      an arrow points to it whenever it is off-screen, and the map closes. Walk/fly
+      there and confirm it clears within ~26 studs with an "Arrived" toast.
 - [ ] Turn around — the arrow must point behind you, not at the mirrored side of the
       screen.
 - [ ] Die while tracking. The beacon survives the respawn (it is rebuilt on the new
       camera).
-- [ ] **With the pass** (`/fasttravel` in Studio), the same button teleports instead,
-      including across the map, and you land intact and mounted to nothing.
+- [ ] **With the pass** (`/fasttravel` in Studio), Track remains present and Teleport
+      becomes a separate active button. Teleport across the map and confirm you land
+      intact and mounted to nothing.
+- [ ] With the pass, select a location above your Power. Track remains available but
+      Teleport reads **LOCKED · NEED MORE POWER**; a forged Travel request is refused
+      by the server too.
 - [ ] Die mid-flight and mid-travel. You respawn cleanly with no stuck camera, no residual
       velocity, and no half-applied travel.
 
-## 4b. Finding a machine (Train tab)
+## 4b. Finding a machine (full map)
 
-- [ ] Open the menu → **Train**. It opens on the muscle you are furthest behind on.
-- [ ] Click each of the five bottom muscle buttons. Exactly seven named locations appear
-      for each muscle, and the matching Train chip is selected.
-- [ ] Each muscle list reads x1, x2, x4, x8, x16, x32, x64; usable locations appear first
-      and locked entries show the correct power shortfall.
+- [ ] Use the stat-coloured circles and legend to find exactly seven destinations for
+      each muscle. Across each muscle they represent x1, x2, x4, x8, x16, x32 and x64.
+- [ ] Select one location from every muscle. The sidebar icon, colour, machine name,
+      gain rate and access description must all change to the selected destination.
+- [ ] Unlocked circles use their muscle colour. Locked circles remain selectable and
+      the sidebar shows the correct Power shortfall rather than an active Teleport.
 - [ ] The right-side **MAIN GOAL** card defaults to the training objective (`Gym Rat`), shows
       live progress/reward, and its **QUESTS** button opens the complete quest list. It must
       not choose the multiplayer knockout objective for a fresh solo player.
-- [ ] Free/busy counts are live: have a second player mount a machine and confirm the
-      count drops within ~2 seconds without reopening the panel.
-- [ ] While you are training, that station reads **YOU ARE HERE** and its button says
-      "Here".
-- [ ] Close the panel and confirm the polling stops (no further `GetSpotStatus` traffic).
-- [ ] Locked entries show the shortfall in power, not a Go button.
 
 ## 4d. Body and growth
 

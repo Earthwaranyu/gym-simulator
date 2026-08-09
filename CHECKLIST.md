@@ -1184,6 +1184,28 @@ punches for a whole phase, so the game had two answers to one question.
       every pure self-test, generated-gym and balance validation, `git diff --check`, and
       a clean Rojo place build. Studio remains the final optical and combat-feel check.
 
+- [x] 116. **The full map becomes a dedicated navigation surface.** Clicking the
+      minimap now opens `FullMapController`'s wide modal rather than a map-sized
+      `ScrollingFrame` nested inside MenuController's vertically scrolling page. The
+      canvas owns wheel zoom, +/−/reset controls, mouse drag and touch drag directly;
+      scrolling up zooms in, scrolling down zooms out, and there is no parent page that
+      can steal either gesture. The complete paper map and all 35 colour-coded circles
+      remain visible, while the menu tabs and old Train list stay off this surface.
+      Selecting a circle preserves the current pan/zoom, highlights only the new pin,
+      and refreshes a fixed sidebar with the machine, muscle, rate, access and Power
+      requirement. **Track** is permanently separate and free. **Teleport** is visibly
+      locked behind Fast Travel, opens its purchase prompt for non-owners, changes to a
+      Power lock when appropriate, and updates in place after a successful gamepass
+      purchase. `TravelService` still validates ownership, Power, combat state and the
+      destination on every request, so none of the client presentation grants travel.
+      Menu/full-map mutual exclusion prevents stacked modals, and map-open analytics
+      follows the new controller signal. Product-truth and playtest contracts now
+      describe the two-action flow and the wheel-direction regression.
+      Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure
+      self-test, generated-gym and balance validation, `git diff --check`, and a clean
+      Rojo place build. Studio remains the required mouse-wheel, touch, purchase-prompt
+      and 35-pin optical check.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

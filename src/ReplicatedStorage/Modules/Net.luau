@@ -82,9 +82,9 @@ local FUNCTION_NAMES: { string } = {
 	"GetLeaderboard",
 	-- Client -> server: travel to a district by id. Returns ok, message.
 	"Travel",
-	-- Client -> server: whether this player may teleport. Decides whether a
-	-- destination button offers "Go" or "Track"; the answer is still re-checked
-	-- server-side on every actual Travel call.
+	-- Client -> server: whether this player may teleport. The dedicated map always
+	-- shows Track separately and uses this answer only to paint Teleport locked or
+	-- available; ownership is still re-checked on every actual Travel call.
 	"GetTravelAccess",
 	-- Client -> server: live occupancy for every station, plus which one the caller is
 	-- on. Streaming means most stations are absent from a client's Workspace, so this

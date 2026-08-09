@@ -2,7 +2,7 @@
 --[[
 	MapRender — the shared parts of drawing the world as a picture.
 
-	Two surfaces draw the same city: the full Map screen in MenuController, and the
+	Two surfaces draw the same city: FullMapController's dedicated map, and the
 	minimap in the corner of the HUD. Before this module the full map owned all of it —
 	the server round-trip, the bounds maths, the feature Frames — and a minimap could
 	only have been a copy of six hundred lines that would drift the first time a new
