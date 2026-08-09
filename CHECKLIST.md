@@ -1206,6 +1206,23 @@ punches for a whole phase, so the game had two answers to one question.
       Rojo place build. Studio remains the required mouse-wheel, touch, purchase-prompt
       and 35-pin optical check.
 
+- [x] 117. **The full map stops closing on drag and its circles identify themselves.**
+      The dark full-screen scrim is now a visual `Frame`, not a giant invisible
+      `TextButton`, so releasing a mouse/touch pan at the edge cannot be interpreted as
+      an outside click. The dedicated **X**, **Escape**, and **M** controls remain the
+      only close paths. The 35 destination circles no longer sit directly on top of
+      near-identical venue coordinates at overview zoom: destinations sharing a real
+      neighbourhood are sorted deterministically and spaced around its geographic
+      centre, while tracking and teleporting retain each machine's exact world
+      position. Every circle now carries both an unambiguous two-letter muscle code and its
+      abbreviated gain multiplier, including locked pins, so colour is reinforcement
+      rather than the only explanation. Product-truth and playtest contracts cover the
+      drag-release regression, default-zoom separation, labels, and five-pin Hub case.
+      Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure
+      self-test, generated-gym and balance validation, `git diff --check`, and a clean
+      Rojo place build. Studio remains the required mouse, touch, scaling, and 35-pin
+      optical check.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

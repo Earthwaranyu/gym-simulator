@@ -128,10 +128,17 @@ The rule under test: **a hit does not dismount; only death does.**
       Info/Shop/Settings tabs, Train list, or vertically scrolling page around it.
 - [ ] The map is a **light** board, not a dark one, and every district, road and
       building is legible. All **35** coloured location circles are present and
-      selectable; locked locations remain visible rather than disappearing.
+      selectable; locked locations remain visible rather than disappearing. Every
+      circle shows an unambiguous muscle code and its exact multiplier (`AR ×1`,
+      `CH ×8`, `CO ×16`, etc.).
+- [ ] At the default zoom, pins sharing a neighbourhood form a tidy ring rather than
+      covering one another. The five starter pins around the Hub are all individually
+      readable and clickable before zooming in.
 - [ ] Scroll up over the board to zoom in and scroll down to zoom out. The page must
       never move because there is no page scroll. Verify the +, − and reset controls,
       mouse drag, touch drag, and touch-friendly zoom buttons as well.
+- [ ] Drag the map repeatedly, including releasing the mouse over the panel edge and
+      dimmed background. The map must stay open. Only **X**, **Escape**, or **M** closes it.
 - [ ] Pan and zoom, then select several circles. The chosen pin receives the heavy
       outline and the fixed sidebar updates without resetting the current map view.
 - [ ] The selected-location sidebar shows machine, muscle, gain rate, access type,
@@ -160,7 +167,9 @@ The rule under test: **a hit does not dismount; only death does.**
 ## 4b. Finding a machine (full map)
 
 - [ ] Use the stat-coloured circles and legend to find exactly seven destinations for
-      each muscle. Across each muscle they represent x1, x2, x4, x8, x16, x32 and x64.
+      each muscle. The code identifies Arms/Chest/Back/Core/Legs and the second line
+      prints the multiplier. Across each muscle they represent x1, x2, x4, x8, x16,
+      x32 and x64.
 - [ ] Select one location from every muscle. The sidebar icon, colour, machine name,
       gain rate and access description must all change to the selected destination.
 - [ ] Unlocked circles use their muscle colour. Locked circles remain selectable and

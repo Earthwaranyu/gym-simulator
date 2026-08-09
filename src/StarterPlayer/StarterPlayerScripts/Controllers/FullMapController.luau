@@ -50,6 +50,8 @@ local MAP_ASPECT = 1.19
 local MIN_ZOOM = 1
 local MAX_ZOOM = 4
 local ZOOM_STEP = 1.25
+local PIN_SIZE = 30
+local SELECTED_PIN_SIZE = 36
 
 local MAP_PAPER = MapRender.Paper
 local MAP_INK = MapRender.Ink
@@ -104,6 +106,31 @@ local function destinationLabel(destination: Destination): (string, Color3)
 	local zoneName = if zone ~= nil then zone.DisplayName else destination.LocationName
 	local color = if stat ~= nil then stat.Color else UI.Palette.Accent
 	return `{equipmentName} · {zoneName}`, color
+end
+
+-- Ground venues use their environment id, while skyline venues deliberately have a
+-- unique environment id so their barriers can be controlled independently. Their
+-- human-facing location name still starts with the neighbourhood, so removing the
+-- trailing "<Muscle> Gym" reunites street and skyline pins into one map cluster.
+local function destinationCluster(destination: Destination): string
+	if destination.ZoneId == "Garage" then
+		return "Hub"
+	end
+
+	local suffix = ` {destination.StatId} Gym`
+	if string.sub(destination.LocationName, -#suffix) == suffix then
+		return string.sub(destination.LocationName, 1, #destination.LocationName - #suffix)
+	end
+	return destination.EnvironmentId
+end
+
+local function statOrder(statId: string): number
+	for index, definition in StatConfig.List do
+		if definition.Id == statId then
+			return index
+		end
+	end
+	return #StatConfig.List + 1
 end
 
 function FullMapController:Init()
@@ -456,6 +483,50 @@ function FullMapController:_render()
 
 	local unlockedCount = 0
 	local pinRecords: { [string]: { Button: TextButton, Stroke: UIStroke } } = {}
+	local clusterMembers: { [string]: { Destination } } = {}
+	for _, destination in destinations do
+		local key = destinationCluster(destination)
+		local members = clusterMembers[key]
+		if members == nil then
+			members = {}
+			clusterMembers[key] = members
+		end
+		table.insert(members, destination)
+	end
+
+	local pinPositions: { [string]: UDim2 } = {}
+	for _, members in clusterMembers do
+		table.sort(members, function(a, b)
+			local aOrder = statOrder(a.StatId)
+			local bOrder = statOrder(b.StatId)
+			if aOrder ~= bOrder then
+				return aOrder < bOrder
+			end
+			if a.GainMultiplier ~= b.GainMultiplier then
+				return a.GainMultiplier < b.GainMultiplier
+			end
+			return a.Id < b.Id
+		end)
+
+		local sum = Vector3.zero
+		for _, destination in members do
+			sum += destination.Position
+		end
+		local centre = sum / #members
+		local projectedCentre = project(centre.X, centre.Z)
+		local radius = if #members == 1 then 0 else 15 + #members * 2.2
+		for index, destination in members do
+			local angle = math.rad(-90 + (index - 1) * 360 / #members)
+			local offset = Vector2.new(math.cos(angle), math.sin(angle)) * radius
+			pinPositions[destination.Id] = UDim2.new(
+				projectedCentre.X.Scale,
+				projectedCentre.X.Offset + offset.X,
+				projectedCentre.Y.Scale,
+				projectedCentre.Y.Offset + offset.Y
+			)
+		end
+	end
+
 	for _, destination in destinations do
 		local stat = StatConfig.Get(destination.StatId)
 		if stat == nil then
@@ -469,18 +540,29 @@ function FullMapController:_render()
 		local pin = Instance.new("TextButton")
 		pin.Name = destination.Id
 		pin.AnchorPoint = Vector2.new(0.5, 0.5)
-		pin.Position = project(destination.Position.X, destination.Position.Z)
-		pin.Size = UDim2.fromOffset(if selected then 34 else 27, if selected then 34 else 27)
+		pin.Position = pinPositions[destination.Id]
+		pin.Size = UDim2.fromOffset(
+			if selected then SELECTED_PIN_SIZE else PIN_SIZE,
+			if selected then SELECTED_PIN_SIZE else PIN_SIZE
+		)
 		pin.BackgroundColor3 = if unlocked then stat.Color else MapRender.Tint(stat.Color, 0.58)
 		pin.BorderSizePixel = 0
 		pin.AutoButtonColor = false
-		pin.Font = UI.Font.Numeric
-		pin.TextSize = 9
+		pin.Font = UI.Font.Heading
+		pin.TextScaled = true
+		pin.TextWrapped = true
+		pin.LineHeight = 0.82
 		pin.TextColor3 = if unlocked then MAP_PAPER else MAP_INK
-		pin.Text = if unlocked then string.sub(stat.DisplayName, 1, 1) else "×"
+		pin.Text = `{string.sub(string.upper(stat.DisplayName), 1, 2)}\n×{NumberFormat.Format(
+			destination.GainMultiplier
+		)}`
 		pin.ZIndex = if selected then 25 else 22
 		pin.Parent = pins
 		addCorner(pin, 20)
+		local textLimit = Instance.new("UITextSizeConstraint")
+		textLimit.MinTextSize = 6
+		textLimit.MaxTextSize = 10
+		textLimit.Parent = pin
 		local pinStroke = addBorder(
 			pin,
 			if selected then MAP_INK else MapRender.Tint(MAP_INK, 0.4),
@@ -493,8 +575,10 @@ function FullMapController:_render()
 			selectedDestination = destination.Id
 			for id, record in pinRecords do
 				local nowSelected = id == selectedDestination
-				record.Button.Size =
-					UDim2.fromOffset(if nowSelected then 34 else 27, if nowSelected then 34 else 27)
+				record.Button.Size = UDim2.fromOffset(
+					if nowSelected then SELECTED_PIN_SIZE else PIN_SIZE,
+					if nowSelected then SELECTED_PIN_SIZE else PIN_SIZE
+				)
 				record.Button.ZIndex = if nowSelected then 25 else 22
 				record.Stroke.Color = if nowSelected then MAP_INK else MapRender.Tint(MAP_INK, 0.4)
 				record.Stroke.Thickness = if nowSelected then 3 else 1
@@ -728,26 +812,24 @@ function FullMapController:_build()
 	screen.Parent = playerGui
 	UI.ScaleWithViewport(screen)
 
-	local scrim = Instance.new("TextButton")
+	-- The scrim is deliberately visual-only. A full-screen TextButton used to treat
+	-- the mouse-up at the end of some map drags as an activation and close the page.
+	-- Closing is now explicit: the X button, Escape, or M.
+	local scrim = Instance.new("Frame")
 	scrim.Name = "Scrim"
 	scrim.Size = UDim2.fromScale(1, 1)
 	scrim.BackgroundColor3 = Color3.new(0, 0, 0)
 	scrim.BackgroundTransparency = 0.42
 	scrim.BorderSizePixel = 0
-	scrim.AutoButtonColor = false
-	scrim.Text = ""
+	scrim.Active = true
 	scrim.Parent = screen
-	scrim.Activated:Connect(function()
-		self:Close()
-	end)
 
 	local panel = UI.Panel("FullMap", screen)
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Size = UDim2.fromOffset(PANEL_SIZE.X, PANEL_SIZE.Y)
 	panel.BackgroundTransparency = 0.01
-	-- Sink clicks inside the panel so only an intentional click on the outside scrim
-	-- closes the map. Frames are not input sinks unless Active is set.
+	-- Sink clicks inside the panel so they cannot reach the 3D world behind the map.
 	panel.Active = true
 	local aspect = Instance.new("UIAspectRatioConstraint")
 	aspect.AspectRatio = PANEL_SIZE.X / PANEL_SIZE.Y
