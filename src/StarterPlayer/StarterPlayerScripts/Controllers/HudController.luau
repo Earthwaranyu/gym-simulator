@@ -25,7 +25,6 @@ local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local Types = require(ReplicatedStorage.Modules.Types)
 local Icons = require(ReplicatedStorage.Modules.Icons)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
-local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
 
 -- A slot is big enough to hit with a thumb and small enough that five of them plus
 -- their gaps stay narrow under the middle of the screen. The wider cartoon cards still
@@ -45,11 +44,6 @@ local SLOT_IDLE_STRENGTH = 0.45
 -- Staggered per slot so the five do not breathe in unison, which reads as the whole bar
 -- throbbing rather than as five separate muscles.
 local SLOT_IDLE_STAGGER = 0.17
--- Radians a second for the figures' rep cycle. About one contraction every three
--- seconds — a working pace, not an anxious one, for something that sits under the
--- player's eyeline all session.
-local SLOT_MOTION_SPEED = 2.1
-
 -- The minimap, in the corner the eye already goes to for Power and Tokens.
 local MINIMAP_WIDTH = 260
 local MINIMAP_HEIGHT = 150
@@ -101,14 +95,11 @@ type Slot = {
 	Name: TextLabel,
 	NameBand: Frame,
 	Icon: Frame,
-	-- The 3D figure, when this muscle has one. Nil falls back to the flat glyph and its
-	-- tweened animation.
-	Figure: MuscleIcons.Figure?,
-	-- The glyph's name, so the fallback motion can start without asking StatConfig again.
+	-- The same glyph Info uses, and its name so motion can start without asking
+	-- StatConfig again.
 	Glyph: string,
 	Order: number,
-	-- How hard this slot is currently moving, and — for the flat fallback only — how to
-	-- stop it. A figure needs no stopper: it is posed from one number every frame.
+	-- How hard this slot is currently moving, and how to stop its tween.
 	Strength: number?,
 	Stop: (() -> ())?,
 }
@@ -305,16 +296,9 @@ function HudController:_build()
 		iconHolder.BackgroundTransparency = 1
 		iconHolder.Parent = button
 
-		-- A 3D figure if the muscle has one, the flat glyph if it does not. Flat art of
-		-- a muscle failed twice: a chest and a back are the same rounded blob in
-		-- silhouette however boldly they are drawn, and a lit volume seen from the front
-		-- left is recognised where a silhouette has to be deciphered. A sixth stat with
-		-- no figure still gets its glyph and its motion, so nothing here has to know
-		-- which muscles have been modelled.
-		local figure = MuscleIcons.Build(iconHolder, definition.Icon, definition.Color)
-		if figure == nil then
-			Icons.Draw(definition.Icon, iconHolder, definition.Color, UI.Palette.Backdrop)
-		end
+		-- Match Info exactly. A separate set of 3D figures made the same five stats look
+		-- like different concepts in the two places a player sees them most often.
+		Icons.Draw(definition.Icon, iconHolder, definition.Color, UI.Palette.Backdrop)
 
 		-- And the word, under the picture.
 		--
@@ -380,7 +364,6 @@ function HudController:_build()
 			Name = name,
 			NameBand = nameBand,
 			Icon = iconHolder,
-			Figure = figure,
 			Glyph = definition.Icon,
 			Order = index,
 		}
@@ -835,13 +818,9 @@ function HudController:_select(statId: Types.StatId)
 		-- The picture inverts on the selected tile: dark on the stat's colour, because a
 		-- coloured drawing on a tile of its own colour is invisible.
 		local ink = if chosen then UI.Palette.Backdrop else statColor
-		if slot.Figure ~= nil then
-			slot.Figure.SetColor(ink)
-		else
-			-- `fill` is the knockout colour for the flat glyph: a gap punched in an icon
-			-- has to be whatever is behind it, and behind it just changed.
-			Icons.Recolour(slot.Icon, ink, fill)
-		end
+		-- `fill` is the knockout colour for the flat glyph: a gap punched in an icon
+		-- has to be whatever is behind it, and behind it just changed.
+		Icons.Recolour(slot.Icon, ink, fill)
 	end
 
 	-- Only on an actual change: Start calls this once to paint the initial state, and a
@@ -854,12 +833,8 @@ function HudController:_select(statId: Types.StatId)
 end
 
 --[[
-	Sets how hard one slot's muscle is moving. Zero stops it.
-
-	A figure needs nothing started: it is posed from a number every frame, so this only
-	records the amplitude. The flat fallback is tween-driven, and there the guard on an
-	unchanged strength matters — the caller runs every frame and a tween restarted sixty
-	times a second is a still image.
+	Sets how hard one slot glyph is moving. Zero stops it. The unchanged-strength guard
+	matters because a tween restarted every frame is a still image.
 ]]
 function HudController:_setSlotMotion(statId: Types.StatId, strength: number)
 	local slot = slotButtons[statId]
@@ -867,13 +842,6 @@ function HudController:_setSlotMotion(statId: Types.StatId, strength: number)
 		return
 	end
 	slot.Strength = strength
-
-	if slot.Figure ~= nil then
-		if strength <= 0 then
-			slot.Figure.SetFlex(0)
-		end
-		return
-	end
 
 	if slot.Stop ~= nil then
 		slot.Stop()
@@ -887,43 +855,14 @@ function HudController:_setSlotMotion(statId: Types.StatId, strength: number)
 end
 
 --[[
-	Decides which of the five are moving and how hard, from what the player is doing.
-
-	Two levels, because the dock answers two questions at once. Standing free, every
-	muscle idles: the arm curls, the pecs press, the lats spread, the abs crunch, the legs
-	squat — which is both a sign of life on a bar that was completely static and the
-	clearest statement of what each picture means, since a muscle that moves the way that
-	muscle moves needs no caption. Locked into a machine, only that machine's muscle
-	moves, and it moves properly: the row stops being decoration and starts naming what
-	is earning.
-
-	`trained` is the muscle the machine works, or nil when the player is not on one.
+	Decides which of the five symbols are moving and how hard. Standing free, all five
+	idle subtly. On a machine, only the stat being earned moves. `trained` is that stat,
+	or nil when the player is not mounted.
 ]]
 function HudController:_refreshSlotMotion(trained: Types.StatId?)
 	for id in slotButtons do
 		local strength = if trained == nil then SLOT_IDLE_STRENGTH elseif id == trained then 1 else 0
 		self:_setSlotMotion(id, strength)
-	end
-end
-
---[[
-	Poses every 3D figure for this frame.
-
-	One sine, five figures, no tweens to own or leak: `alpha` runs 0 to 1 and back, the
-	phase is offset per slot so the row does not pump in unison, and the amplitude is
-	whatever `_refreshSlotMotion` last decided. A figure at strength zero is left where it
-	was put — resting — rather than being driven at zero amplitude every frame.
-]]
-function HudController:_poseFigures(clock: number)
-	for _, slot in slotButtons do
-		local figure = slot.Figure
-		local strength = slot.Strength
-		if figure == nil or strength == nil or strength <= 0 then
-			continue
-		end
-		local phase = (slot.Order - 1) * SLOT_IDLE_STAGGER * math.pi
-		local wave = 0.5 - 0.5 * math.cos(clock * SLOT_MOTION_SPEED + phase)
-		figure.SetFlex(wave * strength)
 	end
 end
 
@@ -1080,7 +1019,6 @@ function HudController:Start()
 
 	RunService.RenderStepped:Connect(function()
 		self:_refreshVitals()
-		self:_poseFigures(os.clock())
 
 		-- The map pans on its own clock. Nothing on it changes between frames except
 		-- where the player is standing, and ten updates a second is already smoother

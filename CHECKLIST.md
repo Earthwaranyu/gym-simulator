@@ -1133,6 +1133,19 @@ punches for a whole phase, so the game had two answers to one question.
       Rojo place build. Studio remains the final optical check at desktop and mobile
       sizes.
 
+- [x] 113. **The five-stat dock and Info speak one icon language.** The Legs shoe still
+      produced an ambiguous silhouette, so it is replaced by a direct speed arrow with
+      three motion rails. The bottom dock no longer swaps the five flat stat symbols for
+      a separate collection of miniature 3D figures: Arms, Chest, Back, Core and Legs
+      now use exactly the same glove, heart, shield, target and speed-arrow drawings in
+      Info, the persistent dock and gain feedback. Selection still inverts the shared
+      glyph against the stat-coloured tile, and each glyph's lightweight idle/training
+      tween now targets its current named parts rather than the retired anatomical art.
+      Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure
+      self-test, generated-gym and balance validation, `git diff --check`, and a clean
+      Rojo place build. Studio remains the final optical check at desktop and mobile
+      sizes.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

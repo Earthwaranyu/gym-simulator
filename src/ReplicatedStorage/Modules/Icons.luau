@@ -204,7 +204,7 @@ end
 	The five stat glyphs communicate what a stat DOES, not an abstract anatomical
 	shape. At 32–48 pixels the old pec slabs, lat V, abs grid and trouser-like legs
 	needed their labels to be understood. These use familiar objects with five clearly
-	different outer silhouettes: glove, heart, shield, target and running shoe.
+	different outer silhouettes: glove, heart, shield, target and speed arrow.
 ]]
 
 -- Arms — a forward punching glove with four visible knuckles and a thumb.
@@ -242,15 +242,14 @@ local function drawCore(parent: GuiObject, color: Color3, hole: Color3)
 	shape(parent, "Centre", 0.5, 0.5, 0.28, 0.28, color, 0, 1)
 end
 
--- Legs — movement speed. A shoe and two motion rails read instantly as running.
-local function drawLegs(parent: GuiObject, color: Color3, hole: Color3)
-	shape(parent, "SpeedTop", 0.18, 0.37, 0.28, 0.09, color, 0, 1)
-	shape(parent, "SpeedBottom", 0.14, 0.53, 0.2, 0.09, color, 0, 1)
-	shape(parent, "Heel", 0.35, 0.52, 0.25, 0.48, color, -6, 0.28)
-	shape(parent, "Shoe", 0.57, 0.62, 0.66, 0.34, color, 7, 0.28)
-	shape(parent, "Sole", 0.58, 0.81, 0.78, 0.12, color, 0, 0.45)
-	knockout(parent, "Opening", 0.36, 0.42, 0.25, 0.16, hole, -6, 1)
-	knockout(parent, "Lace", 0.58, 0.57, 0.22, 0.08, hole, 7, 1)
+-- Legs — movement speed. A forward arrow with motion rails stays clear at any size.
+local function drawLegs(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "TrailTop", 0.18, 0.32, 0.27, 0.09, color, 0, 1)
+	shape(parent, "TrailMiddle", 0.14, 0.5, 0.2, 0.09, color, 0, 1)
+	shape(parent, "TrailBottom", 0.18, 0.68, 0.27, 0.09, color, 0, 1)
+	shape(parent, "ArrowShaft", 0.55, 0.5, 0.62, 0.17, color, 0, 1)
+	shape(parent, "ArrowTop", 0.76, 0.37, 0.4, 0.17, color, 45, 1)
+	shape(parent, "ArrowBottom", 0.76, 0.63, 0.4, 0.17, color, -45, 1)
 end
 
 --[[
@@ -383,13 +382,11 @@ end
 --[[
 	Motion.
 
-	A glyph that stands for a muscle should move the way that muscle moves. Pecs press,
-	lats spread, abs crunch, thighs squat, a fist jabs — five motions a player recognises
-	without being told, which is the same argument that put a picture on the slot in the
-	first place.
+	The shared Info/dock symbols move according to their meaning: the glove jabs, health
+	and defence pulse, the target tightens, and the speed arrow drives forward.
 
 	The animation lives here rather than in the HUD for the reason the drawing does: only
-	this file knows that Chest is made of parts called PecLeft and PecRight. A new glyph
+	this file knows that Chest is made of heart parts or Legs is made of an arrow. A new glyph
 	brings its own motion in the same edit, and nothing downstream branches on a stat id.
 
 	Each animator is written against a small rig — Move, Grow, Turn — which records the
@@ -415,44 +412,40 @@ export type Animator = (rig: Rig) -> ()
 	Fist — a jab. Drives up and forward, which on a flat glyph is up and slightly out.
 ]]
 local function animateFist(rig: Rig)
-	rig.Move("Hand", 0.03, -0.09)
+	for index = 1, 4 do
+		rig.Move(`Knuckle{index}`, 0.03, -0.07)
+	end
+	rig.Move("Palm", 0.03, -0.07)
+	rig.Move("Thumb", 0.03, -0.07)
 	rig.Move("Wrist", 0.02, -0.05)
 end
 
---[[
-	Chest — a press: the pecs push apart at the top of the rep and close again.
-]]
+-- Chest — the health heart beats.
 local function animateChest(rig: Rig)
-	rig.Move("PecLeft", -0.05, -0.02)
-	rig.Move("PecRight", 0.05, -0.02)
-	rig.Turn("PecLeft", -6)
-	rig.Turn("PecRight", 6)
+	rig.Grow("HeartLeft", 0.04, 0.04)
+	rig.Grow("HeartRight", 0.04, 0.04)
+	rig.Grow("HeartPoint", 0.04, 0.04)
 end
 
---[[
-	Back — a lat spread: the wings open out and come back in.
-]]
+-- Back — the durability shield braces outward.
 local function animateBack(rig: Rig)
-	rig.Turn("WingLeft", -12)
-	rig.Turn("WingRight", 12)
-	rig.Grow("WingLeft", 0.04, 0)
-	rig.Grow("WingRight", 0.04, 0)
+	rig.Grow("ShieldHead", 0.04, 0.04)
+	rig.Grow("ShieldPoint", 0.03, 0.03)
+	rig.Grow("ShieldInset", 0.02, 0.02)
 end
 
---[[
-	Core — a crunch: the slab shortens and thickens, the way a torso does folding over.
-]]
+-- Core — the target tightens around its centre.
 local function animateCore(rig: Rig)
-	rig.Grow("Abs", 0.05, -0.14)
+	rig.Grow("OuterRing", 0.06, 0.06)
+	rig.Grow("RingGap", 0.04, 0.04)
+	rig.Grow("Centre", 0.02, 0.02)
 end
 
---[[
-	Legs — a squat: the thighs compress and the hips drop onto them.
-]]
+-- Legs — the speed arrow surges forward while its trails stay planted.
 local function animateLegs(rig: Rig)
-	rig.Grow("ThighLeft", 0.03, -0.14)
-	rig.Grow("ThighRight", 0.03, -0.14)
-	rig.Move("Hips", 0, 0.07)
+	rig.Move("ArrowShaft", 0.05, 0)
+	rig.Move("ArrowTop", 0.05, 0)
+	rig.Move("ArrowBottom", 0.05, 0)
 end
 
 local MOTIONS: { [string]: Animator } = {
