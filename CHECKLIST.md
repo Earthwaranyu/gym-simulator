@@ -1119,6 +1119,20 @@ punches for a whole phase, so the game had two answers to one question.
       5.3 MB Rojo place build. Studio remains the required final visual and interaction
       check.
 
+- [x] 112. **Info stat icons explain effects instead of resembling body-part blobs.**
+      The five small glyphs were reviewed against current interface-icon guidance:
+      one familiar concept, a streamlined silhouette, consistent optical weight, and
+      no detail that disappears at the 32-pixel effective drawing size. Arms is now a
+      four-knuckle punching glove; Chest is a health heart; Back is a durability shield;
+      Core is a bullseye; and Legs is a running shoe with motion rails. All five remain
+      original, scale-based Frame drawings with no uploaded or third-party assets. The
+      same keys continue to drive the existing 3D muscle figures in the bottom dock,
+      while gain popups inherit the clearer flat symbols.
+      Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure
+      self-test, generated-gym and balance validation, `git diff --check`, and a clean
+      Rojo place build. Studio remains the final optical check at desktop and mobile
+      sizes.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

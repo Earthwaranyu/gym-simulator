@@ -201,77 +201,56 @@ local function drawInfo(parent: GuiObject, color: Color3, hole: Color3)
 end
 
 --[[
-	Fist — the attack, and the Arms slot. A blocky knuckle line over a wrist, which
-	is the part of a fist that still reads when it is 28 pixels tall; fingers do not.
+	The five stat glyphs communicate what a stat DOES, not an abstract anatomical
+	shape. At 32–48 pixels the old pec slabs, lat V, abs grid and trouser-like legs
+	needed their labels to be understood. These use familiar objects with five clearly
+	different outer silhouettes: glove, heart, shield, target and running shoe.
 ]]
-local function drawFist(parent: GuiObject, color: Color3, hole: Color3)
-	shape(parent, "Hand", 0.5, 0.44, 0.74, 0.56, color, 0, 0.26)
-	shape(parent, "Wrist", 0.5, 0.82, 0.5, 0.24, color, 0, 0.18)
-	-- Knuckle gaps, knocked out rather than drawn, so the shape stays one silhouette.
-	for index = 1, 3 do
-		knockout(parent, `Knuckle{index}`, 0.26 + (index - 1) * 0.24, 0.3, 0.05, 0.2, hole, 0, 1)
+
+-- Arms — a forward punching glove with four visible knuckles and a thumb.
+local function drawFist(parent: GuiObject, color: Color3, _hole: Color3)
+	for index, x in { 0.23, 0.41, 0.59, 0.77 } do
+		shape(parent, `Knuckle{index}`, x, 0.29, 0.21, 0.27, color, 0, 1)
 	end
+	shape(parent, "Palm", 0.5, 0.52, 0.72, 0.44, color, 0, 0.32)
+	shape(parent, "Thumb", 0.22, 0.58, 0.22, 0.34, color, -34, 0.5)
+	shape(parent, "Wrist", 0.53, 0.82, 0.44, 0.22, color, 0, 0.24)
 end
 
---[[
-	The four muscle glyphs below stand for the training slots along the bottom of the
-	screen, one per stat. Arms is not among them: it borrows the fist, because slot 1 is
-	also the punch, and a player who sees a fist there has been told both things at once.
-
-	Body parts are hard at this size — an anatomical drawing of a back is a grey smudge
-	28 pixels tall. Each of these is instead the one silhouette that muscle has in a gym
-	poster: pecs are two slabs, lats are a V, abs are a grid, legs are two columns. None
-	of the four shares an outline with another, or with the dumbbell that means Train.
-]]
-
---[[
-	Chest — two pec slabs over a narrow ribcage. Landscape and top-heavy, the opposite
-	of Legs, which is portrait and bottom-heavy.
-]]
-local function drawChest(parent: GuiObject, color: Color3, _hole: Color3)
-	-- Tilted outward a few degrees so the pair reads as a chest rather than as two
-	-- buttons. The sternum is the gap left between them, not a knockout: at tile size a
-	-- 0.06-wide punched line disappears while a 0.06-wide gap survives.
-	shape(parent, "PecLeft", 0.29, 0.4, 0.36, 0.34, color, -8, 0.3)
-	shape(parent, "PecRight", 0.71, 0.4, 0.36, 0.34, color, 8, 0.3)
-	shape(parent, "Ribs", 0.5, 0.72, 0.56, 0.14, color, 0, 0.4)
+-- Chest — health. A heart with a medical cutout is clearer than two floating pecs.
+local function drawChest(parent: GuiObject, color: Color3, hole: Color3)
+	shape(parent, "HeartLeft", 0.34, 0.34, 0.43, 0.43, color, 0, 1)
+	shape(parent, "HeartRight", 0.66, 0.34, 0.43, 0.43, color, 0, 1)
+	shape(parent, "HeartPoint", 0.5, 0.58, 0.58, 0.58, color, 45, 0.12)
+	knockout(parent, "HealthVertical", 0.5, 0.47, 0.1, 0.3, hole, 0, 0.25)
+	knockout(parent, "HealthHorizontal", 0.5, 0.47, 0.3, 0.1, hole, 0, 0.25)
 end
 
---[[
-	Back — the lat spread: two wings tapering into a spine.
-]]
-local function drawBack(parent: GuiObject, color: Color3, _hole: Color3)
-	-- Wide at the shoulders, converging at the waist. Positive rotation is clockwise,
-	-- so the left wing leans anticlockwise to put its top on the outside.
-	shape(parent, "WingLeft", 0.27, 0.5, 0.3, 0.8, color, -22, 0.34)
-	shape(parent, "WingRight", 0.73, 0.5, 0.3, 0.8, color, 22, 0.34)
-	-- Fat enough to still be a spine at thirty pixels. At 0.13 it was a hairline that
-	-- vanished into the gap between the wings and left the glyph reading as two blobs.
-	shape(parent, "Spine", 0.5, 0.5, 0.2, 0.88, color, 0, 0.4)
+-- Back — durability. A broad shield survives scaling without anatomical detail.
+local function drawBack(parent: GuiObject, color: Color3, hole: Color3)
+	shape(parent, "ShieldHead", 0.5, 0.4, 0.76, 0.62, color, 0, 0.28)
+	shape(parent, "ShieldPoint", 0.5, 0.66, 0.54, 0.54, color, 45, 0.12)
+	-- A single inset brace keeps the shield from becoming a featureless blob.
+	knockout(parent, "ShieldInset", 0.5, 0.45, 0.34, 0.38, hole, 0, 0.3)
+	shape(parent, "ShieldCore", 0.5, 0.47, 0.17, 0.31, color, 0, 0.3)
 end
 
---[[
-	Core — a six-pack: one slab with the grid punched out of it.
-]]
+-- Core — the centre of the body and the source of reflected force: a bullseye.
 local function drawCore(parent: GuiObject, color: Color3, hole: Color3)
-	local slab = shape(parent, "Abs", 0.5, 0.5, 0.66, 0.86, color, 0, 0.22)
-	-- Punched rather than drawn as six separate blocks, so the glyph stays a single
-	-- silhouette when the tile behind it changes colour. The gaps are wide — a six-pack
-	-- read at thirty pixels is mostly the gaps, and thin ones close up into a plain slab.
-	knockout(slab, "HoleSpine", 0.5, 0.5, 0.13, 1, hole, 0, 0)
-	for index, y in { 0.36, 0.64 } do
-		knockout(slab, `HoleRow{index}`, 0.5, y, 1, 0.13, hole, 0, 0)
-	end
+	shape(parent, "OuterRing", 0.5, 0.5, 0.86, 0.86, color, 0, 1)
+	knockout(parent, "RingGap", 0.5, 0.5, 0.56, 0.56, hole, 0, 1)
+	shape(parent, "Centre", 0.5, 0.5, 0.28, 0.28, color, 0, 1)
 end
 
---[[
-	Legs — two thighs under a hip. Portrait, and the only glyph with its mass at the
-	bottom, which is what tells it from Chest across the dock.
-]]
-local function drawLegs(parent: GuiObject, color: Color3, _hole: Color3)
-	shape(parent, "Hips", 0.5, 0.22, 0.68, 0.22, color, 0, 0.3)
-	shape(parent, "ThighLeft", 0.33, 0.63, 0.26, 0.66, color, -5, 0.3)
-	shape(parent, "ThighRight", 0.67, 0.63, 0.26, 0.66, color, 5, 0.3)
+-- Legs — movement speed. A shoe and two motion rails read instantly as running.
+local function drawLegs(parent: GuiObject, color: Color3, hole: Color3)
+	shape(parent, "SpeedTop", 0.18, 0.37, 0.28, 0.09, color, 0, 1)
+	shape(parent, "SpeedBottom", 0.14, 0.53, 0.2, 0.09, color, 0, 1)
+	shape(parent, "Heel", 0.35, 0.52, 0.25, 0.48, color, -6, 0.28)
+	shape(parent, "Shoe", 0.57, 0.62, 0.66, 0.34, color, 7, 0.28)
+	shape(parent, "Sole", 0.58, 0.81, 0.78, 0.12, color, 0, 0.45)
+	knockout(parent, "Opening", 0.36, 0.42, 0.25, 0.16, hole, -6, 1)
+	knockout(parent, "Lace", 0.58, 0.57, 0.22, 0.08, hole, 7, 1)
 end
 
 --[[
