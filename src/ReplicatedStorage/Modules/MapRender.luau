@@ -292,6 +292,50 @@ function MapRender.Bounds(
 end
 
 --[[
+	A square of world centred on a point — what a follow-cam minimap actually needs.
+
+	The minimap used to draw the entire city into one canvas thousands of pixels across
+	and slide it under a small window. That works right up until the canvas is rotated,
+	because Roblox will not reliably clip a rotated descendant, and an unclipped
+	city-sized canvas is a slab of pale map painted over the whole screen. Drawing only
+	the square the player can actually see bounds that failure to something the size of
+	the panel, and it is a fraction of the Frames either way.
+]]
+function MapRender.BoundsAround(x: number, z: number, halfSize: number): Bounds
+	local side = math.max(halfSize, 1) * 2
+	return { MinX = x - side / 2, MinZ = z - side / 2, Width = side, Depth = side }
+end
+
+--[[
+	The features whose footprint touches `bounds`, so a region canvas draws the dozens of
+	shapes near the player rather than the hundreds in the city.
+]]
+function MapRender.FeaturesWithin(worldFeatures: { Feature }, bounds: Bounds): { Feature }
+	local maxX, maxZ = bounds.MinX + bounds.Width, bounds.MinZ + bounds.Depth
+	local near: { Feature } = {}
+
+	for _, feature in worldFeatures do
+		-- The same axis-aligned half-extents Bounds uses, so a rotated footprint that
+		-- only just reaches into the square is still drawn rather than popping in later.
+		local angle = math.rad(feature.Rotation)
+		local halfX = math.abs(math.cos(angle)) * feature.Width / 2
+			+ math.abs(math.sin(angle)) * feature.Depth / 2
+		local halfZ = math.abs(math.sin(angle)) * feature.Width / 2
+			+ math.abs(math.cos(angle)) * feature.Depth / 2
+		if
+			feature.X + halfX >= bounds.MinX
+			and feature.X - halfX <= maxX
+			and feature.Z + halfZ >= bounds.MinZ
+			and feature.Z - halfZ <= maxZ
+		then
+			table.insert(near, feature)
+		end
+	end
+
+	return near
+end
+
+--[[
 	Turns world XZ into a position inside a canvas that fills the bounds.
 
 	Always scale, never offset, so the same projection works for a 260-pixel minimap and

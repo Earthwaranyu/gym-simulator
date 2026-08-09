@@ -830,6 +830,55 @@ punches for a whole phase, so the game had two answers to one question.
       a control tween frozen at 1.000 while reporting `Playing` — so the five motions are
       verified as geometry and rigging, not as something a human has watched.
 
+- [x] 101. **The map stops escaping its window, and the muscles become models.**
+      #100's rotation shipped a serious bug: a white rectangle over much of the screen.
+      **Roblox does not clip rotated descendants** — `ClipsDescendants` gives up on them —
+      so from the first frame the camera was not facing due north, the entire 3294x2968
+      canvas, filled with land and water washed most of the way to white, stopped being
+      clipped by the 260x150 window and painted itself across the HUD. The same bug
+      explains the second report, "move right and the minimap shows me moving left":
+      what was on screen was the escaped slab, not the panel, and a slab sliding left as
+      the player moves right reads as the player moving left once the marker anchoring it
+      is off in a corner. The pan and heading maths were never wrong.
+      Two changes, because one of them should not have to be trusted alone. The window is
+      now a **`CanvasGroup`**, which composites its descendants into a texture its own
+      size and therefore cannot be escaped. And the minimap stops drawing the city: it
+      draws a **1000-stud square around the player** — `MapRender.BoundsAround` and
+      `MapRender.FeaturesWithin` — redrawn when they wander 90 studs from its middle. The
+      canvas is 384 pixels instead of 3294, so the worst a clipping failure could now do
+      is show a little more map than intended, and the rotation re-lays out tens of
+      Frames rather than hundreds.
+      **The stat icons became 3D.** Flat art failed twice, and the third attempt was not
+      going to be more linework: a chest and a back are the same rounded blob in
+      silhouette however boldly they are drawn. The Creator Store was checked for free
+      icons on request and has no usable set — the results are a Battle Cats logo,
+      "hieroglyphs", "Oi", and one `strong-bodybuilder-biceps-flex-arm-vector-icon`,
+      i.e. re-uploaded stock art with nothing matching it for the other four muscles, so
+      taking them would have broken the project's own asset rule for a worse dock.
+      **`MuscleIcons`** builds each slot as anchored Parts in a `ViewportFrame` with its
+      own camera at a front-left three-quarter angle and its own light: an arm with a
+      bicep, a torso with pecs, a back with wedge lats, a six-pack, hips over legs.
+      Nothing uploaded, nothing anyone else drew. Each figure exposes one number —
+      `SetFlex(0)` resting to `SetFlex(1)` contracted — and decides for itself what that
+      means: the arm curls 105 degrees while its bicep swells 34%, the pecs press
+      forward, the lats swing out, the abs shorten and thicken, the hips drop into a
+      squat. The HUD drives it with a single cosine, phase-staggered per slot, at idle
+      amplitude off a machine and full amplitude for the muscle a machine is working —
+      which also retires #100's per-part tween rig and its lifetimes. A stat with no
+      figure still falls back to the flat glyph and `Icons.Animate`.
+      Verified in a Studio play session: the window is a `CanvasGroup` with a 384px
+      canvas against a 221x127 panel; with the pivot rotated -70.7 degrees,
+      `GetGuiObjectsAtPosition` — which accounts for rotation — finds **no** minimap
+      descendant at the screen centre, 300px right of the panel, the far right edge or
+      the bottom, where before the fix the same probe at the same rotation found the
+      canvas and a water feature at the screen centre and the far right; walking 600
+      studs leaves exactly one canvas parented, the old one destroyed; all five slots
+      hold a ViewportFrame with a camera and 5 to 15 parts; and flexing the arm moves its
+      fist 0.63 studs while the bicep grows 1.15 to 1.33. Still unwatched: Studio's
+      renderer was stalled for a third session — RenderStepped 0 against a live
+      Heartbeat — so the white rectangle being gone is proven by the hit-test oracle and
+      the bounded canvas, not by a human looking at it.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

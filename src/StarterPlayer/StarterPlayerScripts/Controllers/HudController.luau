@@ -25,6 +25,7 @@ local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local Types = require(ReplicatedStorage.Modules.Types)
 local Icons = require(ReplicatedStorage.Modules.Icons)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
+local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
 
 -- Punch's cooldown, mirrored for the cooldown sweep. The server remains the
 -- authority; this only decides when the pip looks ready.
@@ -45,6 +46,10 @@ local SLOT_IDLE_STRENGTH = 0.45
 -- Staggered per slot so the five do not breathe in unison, which reads as the whole bar
 -- throbbing rather than as five separate muscles.
 local SLOT_IDLE_STAGGER = 0.17
+-- Radians a second for the figures' rep cycle. About one contraction every three
+-- seconds — a working pace, not an anxious one, for something that sits under the
+-- player's eyeline all session.
+local SLOT_MOTION_SPEED = 2.1
 
 -- The minimap, in the corner the eye already goes to for Power and Tokens.
 local MINIMAP_WIDTH = 260
@@ -53,6 +58,14 @@ local MINIMAP_HEIGHT = 150
 -- roughly the district around the player: close enough that the streets are streets,
 -- wide enough that the next island is on screen before you swim to it.
 local MINIMAP_STUDS_PER_PIXEL = 2.6
+-- The side of the square of world the minimap draws, in studs. Comfortably more than
+-- the window's diagonal (260x150 at 2.6 studs a pixel is about 780 studs corner to
+-- corner) so the map never runs out under a rotation, and no larger — see the note on
+-- _drawMinimapRegion for why a city-sized canvas was the wrong shape entirely.
+local MINIMAP_REGION_STUDS = 1000
+-- How far the player may wander from the middle of the drawn square before it is
+-- redrawn around them. Well inside the margin the region has over the window.
+local MINIMAP_REDRAW_STUDS = 90
 -- The minimap redraws on a timer rather than every frame. Thirty a second rather than
 -- the ten it started at, because the map now turns with the camera and a rotation
 -- stepping ten times a second is visibly notchy where a pan is not. The refresh skips
@@ -83,11 +96,14 @@ type Slot = {
 	Number: TextLabel,
 	Name: TextLabel,
 	Icon: Frame,
-	-- The glyph's name, so the motion can be started without asking StatConfig again.
+	-- The 3D figure, when this muscle has one. Nil falls back to the flat glyph and its
+	-- tweened animation.
+	Figure: MuscleIcons.Figure?,
+	-- The glyph's name, so the fallback motion can start without asking StatConfig again.
 	Glyph: string,
 	Order: number,
-	-- How hard this slot is currently moving, and how to stop it. Held per slot rather
-	-- than as one global pair because every slot idles at once now.
+	-- How hard this slot is currently moving, and — for the flat fallback only — how to
+	-- stop it. A figure needs no stopper: it is posed from one number every frame.
 	Strength: number?,
 	Stop: (() -> ())?,
 }
@@ -108,7 +124,12 @@ local goalDetail: TextLabel
 local goalBar: UI.Bar
 local minimapCanvas: Frame? = nil
 local minimapPivot: Frame? = nil
+local minimapMarker: Frame? = nil
+local minimapLoading: TextLabel? = nil
 local minimapProject: ((number, number) -> UDim2)? = nil
+-- Where the drawn square is centred, and whether the server has answered yet.
+local minimapCentre: Vector3? = nil
+local minimapReady = false
 local minimapAt = 0
 
 local lastPunchAt = -math.huge
@@ -255,7 +276,17 @@ function HudController:_build()
 		iconHolder.Size = UDim2.fromScale(SLOT_ICON_SCALE, SLOT_ICON_SCALE)
 		iconHolder.BackgroundTransparency = 1
 		iconHolder.Parent = button
-		Icons.Draw(definition.Icon, iconHolder, definition.Color, UI.Palette.Backdrop)
+
+		-- A 3D figure if the muscle has one, the flat glyph if it does not. Flat art of
+		-- a muscle failed twice: a chest and a back are the same rounded blob in
+		-- silhouette however boldly they are drawn, and a lit volume seen from the front
+		-- left is recognised where a silhouette has to be deciphered. A sixth stat with
+		-- no figure still gets its glyph and its motion, so nothing here has to know
+		-- which muscles have been modelled.
+		local figure = MuscleIcons.Build(iconHolder, definition.Icon, definition.Color)
+		if figure == nil then
+			Icons.Draw(definition.Icon, iconHolder, definition.Color, UI.Palette.Backdrop)
+		end
 
 		-- And the word, under the picture.
 		--
@@ -290,6 +321,7 @@ function HudController:_build()
 			Number = number,
 			Name = name,
 			Icon = iconHolder,
+			Figure = figure,
 			Glyph = definition.Icon,
 			Order = index,
 		}
@@ -440,7 +472,18 @@ function HudController:_buildMinimap(screen: ScreenGui)
 		MenuController:Toggle("Map")
 	end)
 
-	local window = Instance.new("Frame")
+	-- A CanvasGroup, and it has to be one.
+	--
+	-- ClipsDescendants does not clip a descendant that is rotated. The map canvas turns
+	-- with the camera, so the moment the player looked anywhere but due north the whole
+	-- thing — three thousand pixels of land and water, washed most of the way to white —
+	-- stopped being clipped by this window and painted itself across the HUD. That was
+	-- the white rectangle, and it was also why moving right looked like moving left:
+	-- what was on screen was the escaped canvas, not the panel it belongs in.
+	--
+	-- A CanvasGroup composites its descendants into a texture its own size first, so
+	-- anything outside simply is not in the texture. Rotation cannot escape that.
+	local window = Instance.new("CanvasGroup")
 	window.Name = "Window"
 	window.Size = UDim2.fromScale(1, 1)
 	window.BackgroundColor3 = MapRender.Paper
@@ -504,6 +547,20 @@ function HudController:_buildMinimap(screen: ScreenGui)
 	here.Parent = window
 	Icons.Draw("Arrow", here, UI.Palette.Accent, UI.Palette.Backdrop)
 
+	-- A pivot with no size, sitting exactly where the player marker is. Rotating it
+	-- turns the map about the player rather than about the middle of the city, which is
+	-- the difference between a minimap and a spinning poster.
+	local pivot = Instance.new("Frame")
+	pivot.Name = "Pivot"
+	pivot.AnchorPoint = Vector2.new(0.5, 0.5)
+	pivot.Position = UDim2.fromScale(0.5, 0.5)
+	pivot.Size = UDim2.fromOffset(0, 0)
+	pivot.BackgroundTransparency = 1
+	pivot.Parent = window
+	minimapPivot = pivot
+	minimapMarker = here
+	minimapLoading = loading
+
 	-- The fetch is a server round-trip, so it happens off to one side. The panel is a
 	-- working button the whole time it is loading.
 	task.spawn(function()
@@ -512,59 +569,86 @@ function HudController:_buildMinimap(screen: ScreenGui)
 			loading.Text = "no map data"
 			return
 		end
-
-		local bounds = MapRender.Bounds(feats, dests)
-		local pixels = Vector2.new(
-			math.max(bounds.Width / MINIMAP_STUDS_PER_PIXEL, MINIMAP_WIDTH),
-			math.max(bounds.Depth / MINIMAP_STUDS_PER_PIXEL, MINIMAP_HEIGHT)
-		)
-
-		-- A pivot with no size, sitting exactly where the player marker is. Rotating it
-		-- turns the whole map about the player rather than about the middle of the city,
-		-- which is the difference between a minimap and a spinning poster.
-		local pivot = Instance.new("Frame")
-		pivot.Name = "Pivot"
-		pivot.AnchorPoint = Vector2.new(0.5, 0.5)
-		pivot.Position = UDim2.fromScale(0.5, 0.5)
-		pivot.Size = UDim2.fromOffset(0, 0)
-		pivot.BackgroundTransparency = 1
-		pivot.Parent = window
-
-		local canvas = Instance.new("Frame")
-		canvas.Name = "Canvas"
-		canvas.Size = UDim2.fromOffset(pixels.X, pixels.Y)
-		-- Position stays at the pivot's origin forever; panning is done by moving the
-		-- canvas's own AnchorPoint to the player's place on it, which puts that place
-		-- under the pivot without any arithmetic and keeps it there when the pivot turns.
-		canvas.Position = UDim2.fromOffset(0, 0)
-		canvas.BackgroundTransparency = 1
-		canvas.BorderSizePixel = 0
-		canvas.Parent = pivot
-
-		-- No strokes and no rounded corners down here: both are invisible on a
-		-- building three pixels wide, and both cost an instance on a canvas that
-		-- holds every building in the city.
-		MapRender.DrawFeatures(canvas, feats, bounds, false)
-
-		local project = MapRender.Project(bounds)
-		for _, destination in dests do
-			local stat = StatConfig.Get(destination.StatId)
-			if stat == nil then
-				continue
-			end
-			-- A dot in the muscle's colour and nothing else. The names, the
-			-- multipliers and the locks are on the full map, and none of them can be
-			-- read at this size anyway.
-			local pin = MapRender.Dot(canvas, destination.Id, 6, stat.Color, 20)
-			pin.Position = project(destination.Position.X, destination.Position.Z)
-		end
-
-		loading:Destroy()
-		here.Visible = true
-		minimapCanvas = canvas
-		minimapPivot = pivot
-		minimapProject = project
+		minimapReady = true
 	end)
+end
+
+--[[
+	Draws the square of city around a point, replacing whatever was drawn before.
+
+	Only the player's own region, not the whole map. The first version drew every feature
+	in the city into one canvas 3294 pixels across and slid it under a 260-pixel window,
+	which was fine until the canvas started rotating: Roblox does not reliably clip a
+	rotated descendant, and an unclipped city-sized canvas is a slab of pale map over the
+	whole screen. A region canvas is barely larger than the window, so the worst a
+	clipping failure can now do is show a little more map than intended.
+
+	It is also most of the work gone — tens of Frames re-laid-out when the camera turns
+	instead of hundreds.
+]]
+function HudController:_drawMinimapRegion(centre: Vector3)
+	local pivot = minimapPivot
+	if pivot == nil or not minimapReady then
+		return
+	end
+
+	local dests, feats = MapRender.Fetch()
+	local bounds = MapRender.BoundsAround(centre.X, centre.Z, MINIMAP_REGION_STUDS / 2)
+	local side = MINIMAP_REGION_STUDS / MINIMAP_STUDS_PER_PIXEL
+
+	local canvas = Instance.new("Frame")
+	canvas.Name = "Canvas"
+	canvas.Size = UDim2.fromOffset(side, side)
+	-- Position stays at the pivot's origin forever; panning is done by moving the
+	-- canvas's own AnchorPoint to the player's place on it, which puts that place under
+	-- the pivot without any arithmetic and keeps it there when the pivot turns.
+	canvas.Position = UDim2.fromOffset(0, 0)
+	canvas.AnchorPoint = Vector2.new(0.5, 0.5)
+	canvas.BackgroundTransparency = 1
+	canvas.BorderSizePixel = 0
+
+	-- No strokes and no rounded corners down here: both are invisible on a building
+	-- three pixels wide, and both cost an instance each.
+	MapRender.DrawFeatures(canvas, MapRender.FeaturesWithin(feats, bounds), bounds, false)
+
+	local project = MapRender.Project(bounds)
+	for _, destination in dests do
+		local stat = StatConfig.Get(destination.StatId)
+		if stat == nil then
+			continue
+		end
+		local at = destination.Position
+		if
+			at.X < bounds.MinX
+			or at.X > bounds.MinX + bounds.Width
+			or at.Z < bounds.MinZ
+			or at.Z > bounds.MinZ + bounds.Depth
+		then
+			continue
+		end
+		-- A dot in the muscle's colour and nothing else. The names, the multipliers and
+		-- the locks are on the full map, and none of them can be read at this size.
+		local pin = MapRender.Dot(canvas, destination.Id, 6, stat.Color, 20)
+		pin.Position = project(at.X, at.Z)
+	end
+
+	canvas.Parent = pivot
+
+	local previous = minimapCanvas
+	minimapCanvas = canvas
+	minimapProject = project
+	minimapCentre = centre
+	if previous ~= nil then
+		previous:Destroy()
+	end
+
+	if minimapLoading ~= nil then
+		minimapLoading:Destroy()
+		minimapLoading = nil
+	end
+	if minimapMarker ~= nil then
+		minimapMarker.Visible = true
+	end
 end
 
 --[[
@@ -581,6 +665,24 @@ end
 	pointing up and left alone.
 ]]
 function HudController:_refreshMinimap()
+	local character = Players.LocalPlayer.Character
+	local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+	if root == nil or not root:IsA("BasePart") then
+		return
+	end
+
+	-- Redraw the region when the player nears the edge of the square that was drawn.
+	-- The margin is generous, so a walk across the city is a handful of redraws of a few
+	-- dozen Frames each rather than anything the player could feel.
+	local here = root.Position
+	if
+		minimapCentre == nil
+		or (Vector2.new(here.X, here.Z) - Vector2.new(minimapCentre.X, minimapCentre.Z)).Magnitude
+			> MINIMAP_REDRAW_STUDS
+	then
+		self:_drawMinimapRegion(here)
+	end
+
 	local canvas = minimapCanvas
 	local pivot = minimapPivot
 	local project = minimapProject
@@ -588,16 +690,10 @@ function HudController:_refreshMinimap()
 		return
 	end
 
-	local character = Players.LocalPlayer.Character
-	local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
-	if root == nil or not root:IsA("BasePart") then
-		return
-	end
-
 	-- The projection is already in canvas fractions, which is exactly what AnchorPoint
 	-- wants — no multiplying by a pixel size, and nothing to go wrong when the HUD's
 	-- viewport scale changes the panel's real size underneath us.
-	local at = project(root.Position.X, root.Position.Z)
+	local at = project(here.X, here.Z)
 	local anchor = Vector2.new(at.X.Scale, at.Y.Scale)
 
 	local camera = workspace.CurrentCamera
@@ -648,17 +744,18 @@ function HudController:_select(statId: Types.StatId)
 		slot.Name.TextColor3 = if chosen
 			then UI.Palette.Backdrop
 			else (if definition ~= nil then definition.Color else UI.Palette.TextMuted)
-		-- The glyph inverts on the selected tile: dark on the stat's colour, because a
-		-- coloured drawing on a tile of its own colour is invisible. `fill` is passed as
-		-- the knockout colour for the same reason — a gap punched in the icon has to be
-		-- whatever is behind it, and behind it just changed.
-		Icons.Recolour(
-			slot.Icon,
-			if chosen
-				then UI.Palette.Backdrop
-				else (if definition ~= nil then definition.Color else UI.Palette.TextMuted),
-			fill
-		)
+		-- The picture inverts on the selected tile: dark on the stat's colour, because a
+		-- coloured drawing on a tile of its own colour is invisible.
+		local ink = if chosen
+			then UI.Palette.Backdrop
+			else (if definition ~= nil then definition.Color else UI.Palette.TextMuted)
+		if slot.Figure ~= nil then
+			slot.Figure.SetColor(ink)
+		else
+			-- `fill` is the knockout colour for the flat glyph: a gap punched in an icon
+			-- has to be whatever is behind it, and behind it just changed.
+			Icons.Recolour(slot.Icon, ink, fill)
+		end
 	end
 
 	-- Only on an actual change: Start calls this once to paint the initial state, and a
@@ -673,13 +770,22 @@ end
 --[[
 	Sets how hard one slot's muscle is moving. Zero stops it.
 
-	Started and stopped only when the strength actually changes, because the caller runs
-	every frame and a tween restarted sixty times a second is a still image. That guard
-	is the whole reason strength is stored on the slot.
+	A figure needs nothing started: it is posed from a number every frame, so this only
+	records the amplitude. The flat fallback is tween-driven, and there the guard on an
+	unchanged strength matters — the caller runs every frame and a tween restarted sixty
+	times a second is a still image.
 ]]
 function HudController:_setSlotMotion(statId: Types.StatId, strength: number)
 	local slot = slotButtons[statId]
 	if slot == nil or slot.Strength == strength then
+		return
+	end
+	slot.Strength = strength
+
+	if slot.Figure ~= nil then
+		if strength <= 0 then
+			slot.Figure.SetFlex(0)
+		end
 		return
 	end
 
@@ -687,8 +793,6 @@ function HudController:_setSlotMotion(statId: Types.StatId, strength: number)
 		slot.Stop()
 		slot.Stop = nil
 	end
-	slot.Strength = strength
-
 	if strength <= 0 then
 		return
 	end
@@ -700,11 +804,12 @@ end
 	Decides which of the five are moving and how hard, from what the player is doing.
 
 	Two levels, because the dock answers two questions at once. Standing free, every
-	muscle idles: a fist jabs, pecs press, lats spread, abs crunch, thighs squat — which
-	is both a sign of life on a bar that was completely static and the clearest statement
-	of what each picture means, since a muscle that moves the way that muscle moves needs
-	no caption. Locked into a machine, only that machine's muscle moves, and it moves
-	properly: the row stops being decoration and starts naming what is earning.
+	muscle idles: the arm curls, the pecs press, the lats spread, the abs crunch, the legs
+	squat — which is both a sign of life on a bar that was completely static and the
+	clearest statement of what each picture means, since a muscle that moves the way that
+	muscle moves needs no caption. Locked into a machine, only that machine's muscle
+	moves, and it moves properly: the row stops being decoration and starts naming what
+	is earning.
 
 	`trained` is the muscle the machine works, or nil when the player is not on one.
 ]]
@@ -712,6 +817,27 @@ function HudController:_refreshSlotMotion(trained: Types.StatId?)
 	for id in slotButtons do
 		local strength = if trained == nil then SLOT_IDLE_STRENGTH elseif id == trained then 1 else 0
 		self:_setSlotMotion(id, strength)
+	end
+end
+
+--[[
+	Poses every 3D figure for this frame.
+
+	One sine, five figures, no tweens to own or leak: `alpha` runs 0 to 1 and back, the
+	phase is offset per slot so the row does not pump in unison, and the amplitude is
+	whatever `_refreshSlotMotion` last decided. A figure at strength zero is left where it
+	was put — resting — rather than being driven at zero amplitude every frame.
+]]
+function HudController:_poseFigures(clock: number)
+	for _, slot in slotButtons do
+		local figure = slot.Figure
+		local strength = slot.Strength
+		if figure == nil or strength == nil or strength <= 0 then
+			continue
+		end
+		local phase = (slot.Order - 1) * SLOT_IDLE_STAGGER * math.pi
+		local wave = 0.5 - 0.5 * math.cos(clock * SLOT_MOTION_SPEED + phase)
+		figure.SetFlex(wave * strength)
 	end
 end
 
@@ -925,6 +1051,7 @@ function HudController:Start()
 
 	RunService.RenderStepped:Connect(function()
 		self:_refreshVitals()
+		self:_poseFigures(os.clock())
 
 		-- The map pans on its own clock. Nothing on it changes between frames except
 		-- where the player is standing, and ten updates a second is already smoother
