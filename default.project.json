@@ -23,6 +23,12 @@
         "$path": "ServerPackages"
       }
     },
+    "StarterGui": {
+      "$className": "StarterGui",
+      "$properties": {
+        "ClipsDescendantsSupportsRotation": "Enabled"
+      }
+    },
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "$properties": {

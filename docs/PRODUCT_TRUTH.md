@@ -1,4 +1,4 @@
-# Product Truth — v13 (2026-08-09)
+# Product Truth — v14 (2026-08-09)
 
 The single versioned inventory of what this build actually is. `CLAUDE.md`, `AGENTS.md`,
 `README.md`, `CHECKLIST.md`, and `docs/PLAYTEST.md` are all reconciled against this file.
@@ -51,7 +51,7 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Physique shape | athletic 2.2 cap with restrained height: full chest ≈3.30 wide vs ≈2.41 waist; upper arm ≈1.35 girth × 1.36 long, with tapered forearms/calves | `PhysiqueConfig`, `MuscleController` |
 | Vascularity | 9 subtle vein cylinders on arms and chest, fading in late from scale 1.60 to 2.15, client-side only | `PhysiqueConfig.VEINS`, `VeinController` |
 | Scenery | decorative props are non-colliding and cleared 72 studs from any machine; kerbs no longer block | `scripts/build_gym.py` `_decorate`, `PROP_CLEARANCE` |
-| Full map | dedicated 980×620 modal: every rotated feature and pin is a direct child of a non-scrollable `ScrollingFrame`, and the controller applies the canvas zoom/pan transform explicitly. This keeps Roblox's native clip immediately above every shape; title, controls, fixed legend and sidebar remain higher layers | `FullMapController`, `MapRender` |
+| Full map | dedicated 980×620 modal: every rotated feature and pin is a direct child of a non-scrollable `ScrollingFrame`, and the controller applies the canvas zoom/pan transform explicitly. `StarterGui.ClipsDescendantsSupportsRotation` is explicitly Enabled so Roblox actually applies that clip to rotated map geometry; title, controls, fixed legend and sidebar remain higher layers | `default.project.json`, `FullMapController`, `MapRender` |
 | Live Power displays | top-left HUD, Info page and the local player's top-right roster row all repaint from the same private profile snapshot; other players remain on the one-second public roster broadcast | `HudController`, `MenuController`, `TabBarController`, `ProfileController` |
 | Muscle growth | per stat, not per total: Arms→upper/lower arms, Chest→UpperTorso, Back→UpperTorso (0.6), Core→LowerTorso, Legs→upper/lower legs. Shared parts take the largest contribution, never the product | `StatConfig.BodyScales`, `MuscleService:ComputeScales` |
 | Machine visibility | the nearest 14 of 35 stations within 260 studs carry muscle-coloured outlines and floor rings | `StationHighlightController` |

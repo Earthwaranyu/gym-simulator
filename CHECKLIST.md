@@ -1330,6 +1330,20 @@ punches for a whole phase, so the game had two answers to one question.
       validation, `git diff --check`, and a clean Rojo build; Studio remains the visual
       proof for all four edges at maximum zoom.
 
+- [x] 124. **Opt the place into Roblox's rotated-GUI clipping renderer.** A second Studio
+      screenshot proved #123 still leaked every non-zero-rotation building even when it
+      was an immediate child of the clipped viewport. Roblox's current rollout keeps
+      rotated clipping disabled for existing places unless
+      `StarterGui.ClipsDescendantsSupportsRotation` is explicitly Enabled; under the
+      legacy renderer, hierarchy changes cannot make `ClipsDescendants` crop rotated
+      Frames. `default.project.json` now owns that saved place setting. The Rojo build
+      serializes it as RolloutState token 2, activating the engine path that clips the
+      rotated features against the map square while leaving fixed legend and controls
+      alone. Product truth and the Studio playtest call out the required setting.
+      Verified with StyLua, Selene, strict Luau analysis, pure self-tests, generated-gym
+      and balance validation, `git diff --check`, a clean Rojo build, and inspection of
+      the built rbxlx property.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
