@@ -17,6 +17,7 @@ local BalanceInputs = {}
 
 BalanceInputs.COMBO_STEP = 0.02
 BalanceInputs.MAX_COMBO_MULTIPLIER = 2
+BalanceInputs.STAT_TICK_SECONDS = 1
 
 BalanceInputs.Equipment = {
 	{ Id = "BenchPress", StatId = "Chest", BaseGain = 0.9, RepInterval = 0.9, UnlockPower = 0 },

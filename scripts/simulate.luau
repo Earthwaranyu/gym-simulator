@@ -31,8 +31,8 @@ local Inputs = require("./_balance_inputs")
 
 local STATS = { "Arms", "Chest", "Back", "Core", "Legs" }
 
--- Simulation resolution. Small enough that a 0.5s rep interval is not distorted,
--- large enough that a full day of play runs in a moment.
+-- Simulation resolution. Small enough to place one-second stat ticks and interruptions
+-- accurately, large enough that a full day of play runs in a moment.
 local STEP = 0.25
 local HORIZON_HOURS = 24
 
@@ -163,7 +163,7 @@ type Result = {
 	TokensEarned: number,
 	TokensSpent: number,
 	Upgrades: number,
-	RepsLost: number,
+	ComboTicksLost: number,
 	Deaths: number,
 	LongestStallSeconds: number,
 	StallAt: string?,
@@ -201,7 +201,7 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 		TokensEarned = 0,
 		TokensSpent = 0,
 		Upgrades = 0,
-		RepsLost = 0,
+		ComboTicksLost = 0,
 		Deaths = 0,
 		LongestStallSeconds = 0,
 		Timeline = {},
@@ -277,7 +277,7 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 			nextInterruptAt = time + style.InterruptEvery
 			if mounted then
 				result.Deaths += 1
-				result.RepsLost += combo
+				result.ComboTicksLost += combo
 				combo = 0
 				downUntil = time + style.InterruptCost
 				-- Ticks that fall while the player is dead are forfeited, not banked.
@@ -311,25 +311,27 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 			local best = nil
 			for _, machine in Inputs.Equipment do
 				if machine.StatId == targetStat and power >= machine.UnlockPower then
-					if best == nil or machine.BaseGain / machine.RepInterval > best.BaseGain / best.RepInterval then
+					if
+						best == nil
+						or machine.BaseGain / machine.RepInterval > best.BaseGain / best.RepInterval
+					then
 						best = machine
 					end
 				end
 			end
 
 			if best ~= nil and time >= nextRepAt then
-				nextRepAt = time + best.RepInterval
-				combo += 1
-
-				local comboMultiplier =
-					math.min(Inputs.MAX_COMBO_MULTIPLIER, 1 + combo * Inputs.COMBO_STEP)
+				nextRepAt = time + Inputs.STAT_TICK_SECONDS
+				local comboMultiplier = math.min(Inputs.MAX_COMBO_MULTIPLIER, 1 + combo * Inputs.COMBO_STEP)
 				local multiplier = Formulas.MultiplierValue(levels[targetStat])
 					* comboMultiplier
 					* zoneMultiplier
 					* style.GainBoost
 					* gainScale
 
-				stats[targetStat] += Formulas.GainPerRep(best.BaseGain, multiplier)
+				local basePerSecond = best.BaseGain / best.RepInterval
+				stats[targetStat] += Formulas.GainPerRep(basePerSecond * Inputs.STAT_TICK_SECONDS, multiplier)
+				combo += 1
 			end
 		else
 			-- Dismounting to walk around resets the combo, same as in game.
@@ -394,7 +396,9 @@ for _, style in STYLES do
 end
 
 header("Time to the first things that matter")
-print(string.format("%-20s %12s %12s %12s %14s", "Style", "1st upgrade", "1st rank", "2nd zone", "power @ 1h"))
+print(
+	string.format("%-20s %12s %12s %12s %14s", "Style", "1st upgrade", "1st rank", "2nd zone", "power @ 1h")
+)
 for _, result in results do
 	local secondZone: number? = nil
 	for _, zone in Inputs.Zones do
@@ -439,10 +443,10 @@ for _, result in results do
 		local lost = 1 - (result.Power / baseline.Power)
 		print(
 			string.format(
-				"%-20s %5d deaths, %6d reps of combo lost, %.1f%% less power than an uninterrupted Active player",
+				"%-20s %5d deaths, %6d combo ticks lost, %.1f%% less power than an uninterrupted Active player",
 				result.Style.Name,
 				result.Deaths,
-				result.RepsLost,
+				result.ComboTicksLost,
 				lost * 100
 			)
 		)
@@ -451,13 +455,27 @@ end
 
 header("Longest stall (no upgrade, rank, or zone)")
 for _, result in results do
-	print(string.format("%-20s %10s  %s", result.Style.Name, duration(result.LongestStallSeconds), result.StallAt or "-"))
+	print(
+		string.format(
+			"%-20s %10s  %s",
+			result.Style.Name,
+			duration(result.LongestStallSeconds),
+			result.StallAt or "-"
+		)
+	)
 end
 
 header("Zone pacing — Active player")
 for _, zone in Inputs.Zones do
 	local at = baseline.ZoneAt[zone.Id]
-	print(string.format("  %-12s needs %10s power   reached %s", zone.Id, short(zone.RequiredPower), duration(at)))
+	print(
+		string.format(
+			"  %-12s needs %10s power   reached %s",
+			zone.Id,
+			short(zone.RequiredPower),
+			duration(at)
+		)
+	)
 end
 
 header("Sensitivity — how much do the levers actually move things?")

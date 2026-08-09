@@ -2,10 +2,9 @@
 --[[
 	Daily: gain Power through training.
 
-	Manual training pays four small slices per second while machines pay once per
-	exercise cycle. Counting StatChanged events therefore made the same +1 Power read
-	as four "reps" in the quest HUD. Progress uses the amount that actually reached the
-	profile instead, so the quest and the player's Power rise by the same number.
+	Every training source now pays on one shared one-second cadence. Progress still uses
+	the amount that actually reached the profile rather than counting events, so combo,
+	upgrades and stat caps can never make the quest disagree with visible Power.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

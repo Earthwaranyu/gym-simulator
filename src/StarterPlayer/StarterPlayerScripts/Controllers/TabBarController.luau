@@ -21,6 +21,7 @@ local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
 local Icons = require(ReplicatedStorage.Modules.Icons)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 local ROW_HEIGHT = 26
 local MAX_ROWS = 5
@@ -36,9 +37,12 @@ local header: TextLabel? = nil
 local rankButton: TextButton? = nil
 local visible = true
 local MenuController: any = nil
+local ProfileController: any = nil
+local latestRoster: { any } = {}
 
 function TabBarController:Init()
 	MenuController = Loader.Get("MenuController")
+	ProfileController = Loader.Get("ProfileController")
 end
 
 function TabBarController:_build()
@@ -182,7 +186,14 @@ function TabBarController:_render(roster: { any })
 		power.TextSize = 14
 		power.Font = UI.Font.Numeric
 		power.TextColor3 = UI.Palette.Power
-		power.Text = NumberFormat.Format(entry.Power)
+		local shownPower = entry.Power
+		if entry.UserId == Players.LocalPlayer.UserId then
+			local data = ProfileController:Get()
+			if data ~= nil then
+				shownPower = Formulas.TotalPower(data.Stats)
+			end
+		end
+		power.Text = NumberFormat.Format(shownPower)
 
 		local reputation = UI.Label("Reputation", row)
 		reputation.Size = UDim2.fromScale(0.26, 1)
@@ -204,7 +215,17 @@ function TabBarController:Start()
 
 	Net.Event("RosterChanged").OnClientEvent:Connect(function(roster: any)
 		if type(roster) == "table" then
+			latestRoster = roster
 			self:_render(roster)
+		end
+	end)
+
+	-- The public roster intentionally broadcasts only once a second, but the local
+	-- profile arrives on the exact stat mutation. Repaint our own row from that same
+	-- profile snapshot so top-left HUD, Info, and top-right Power cannot be one tick apart.
+	ProfileController.Changed:Connect(function()
+		if #latestRoster > 0 then
+			self:_render(latestRoster)
 		end
 	end)
 

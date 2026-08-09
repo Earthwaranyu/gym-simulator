@@ -20,10 +20,9 @@
 	    goes through StatService, which applies the modifier stack — so a Core on
 	    x4 earns +4/s exactly as the Info screen advertises, and token upgrades and
 	    boosts compose without this file knowing they exist.
-	  * **It stacks with a machine, but only on the same muscle.** Standing at a
-	    chest press with Chest held pays the machine's rate *and* this one. Holding
-	    Core there pays only the machine, because a machine you are strapped into is
-	    not somewhere you can also be doing sit-ups.
+	  * **It never stacks with a machine.** A mounted player is already training on the
+	    server's one-second machine clock. Mouse hold is the anywhere fallback, not a
+	    second payout source hidden on top of the same workout.
 ]]
 
 local Players = game:GetService("Players")
@@ -44,9 +43,8 @@ local BASE_RATE = 1
 -- letting go stops the gain before the player notices they are still earning.
 local ACTIVE_WINDOW = 0.9
 
--- How often gains are paid out. Frequent enough to feel continuous, rare enough
--- that a full server is not calling AddStat sixty times a second per player.
-local TICK = 0.25
+-- The same visible one-second cadence used by mounted machine training.
+local TICK = 1
 
 -- Client pings are rate limited here as well as paid by time. The time-based payout
 -- already makes flooding pointless; this stops it being *free* in bandwidth.
@@ -78,15 +76,11 @@ end
 --[[
 	Whether this player may currently earn manual reps for `statId`.
 
-	Mounted on a machine, the answer is yes only for the muscle that machine trains.
-	Off a machine it is always yes — that is the point of the mechanic.
+	Mounted on a machine, the answer is always no: the machine already owns the stat
+	clock. Off a machine it is always yes — that is the point of the fallback.
 ]]
-function ManualTrainingService:_allowed(player: Player, statId: Types.StatId): boolean
-	local session = TrainingService:GetSession(player)
-	if session == nil then
-		return true
-	end
-	return session.definition.StatId == statId
+function ManualTrainingService:_allowed(player: Player, _statId: Types.StatId): boolean
+	return TrainingService:GetSession(player) == nil
 end
 
 function ManualTrainingService:Start()

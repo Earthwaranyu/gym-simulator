@@ -90,8 +90,9 @@ export type TrainingState = {
 	StaggerSeconds: number,
 }
 
--- One machine rep after every server-side modifier and stat cap has been applied.
--- Amount is the payout for this rep; PerSecond is its equivalent live rate.
+-- One machine stat tick after every server-side modifier and stat cap has been applied.
+-- Ticks are one second apart; PerSecond stays explicit so feedback never reconstructs
+-- the multiplier stack locally.
 export type TrainingGain = {
 	StatId: StatId,
 	Amount: number,

@@ -33,7 +33,8 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Character | **uniform for everyone** — `LoadCharacterAppearance` off, clothing/accessories stripped, one skin tone, shorts painted onto the R15 UpperLegs | `AppearanceService.luau`, `default.project.json` |
 | Stats | 5 — Arms (damage), Chest (max HP), Back (durability), Core (retaliation knockback), Legs (Shift sprint + flight speed) | `StatConfig.luau`, Phase 14 |
 | Abilities | **1 — Punch only.** Slam and Dash are *deferred*, not shipped | `CombatService/Abilities/` |
-| Training start | hold **E** at a station prompt; server mounts, locks, and poses the player; reps tick automatically | `TrainingService.luau` |
+| Training start | hold **E** at a station prompt; server mounts, locks, and poses the player. Every machine awards once per second even though exercise animations retain varied natural cycle lengths | `TrainingService.luau`, `EquipmentConfig.luau` |
+| Manual training | hold left mouse while unmounted to award the selected dock stat once per second. It is disabled while mounted, so manual and machine payouts cannot stack | `ManualTrainingService.luau`, `HudController.luau` |
 | Training stop | hold **E** again, or press **Space** / jump | `TrainingService.luau`, `Net` `StopTraining` |
 | Training interruption | **kill-only.** A hit deals damage and grounds the victim but does *not* dismount them; only death ends the set | `CombatService/init.luau` |
 | Death cost | respawn timer, combo reset, in-flight token tick forfeited. No stat, cash, or token loss | `CHECKLIST.md` #33 |
@@ -49,7 +50,8 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Physique shape | athletic 2.2 cap with restrained height: full chest ≈3.30 wide vs ≈2.41 waist; upper arm ≈1.35 girth × 1.36 long, with tapered forearms/calves | `PhysiqueConfig`, `MuscleController` |
 | Vascularity | 9 subtle vein cylinders on arms and chest, fading in late from scale 1.60 to 2.15, client-side only | `PhysiqueConfig.VEINS`, `VeinController` |
 | Scenery | decorative props are non-colliding and cleared 72 studs from any machine; kerbs no longer block | `scripts/build_gym.py` `_decorate`, `PROP_CLEARANCE` |
-| Full map | dedicated 980×620 modal: subdued dark-slate city layer, fixed destination sidebar, wheel/button zoom, mouse/touch drag, no nested page scrolling, and explicit X/Escape/M closing so a drag release cannot dismiss it | `FullMapController`, `MapRender` |
+| Full map | dedicated 980×620 modal: dark-slate city layer beneath undimmed current-tier pins, fixed destination sidebar, wheel/button zoom, mouse/touch drag, no nested page scrolling, and explicit X/Escape/M closing | `FullMapController`, `MapRender` |
+| Live Power displays | top-left HUD, Info page and the local player's top-right roster row all repaint from the same private profile snapshot; other players remain on the one-second public roster broadcast | `HudController`, `MenuController`, `TabBarController`, `ProfileController` |
 | Muscle growth | per stat, not per total: Arms→upper/lower arms, Chest→UpperTorso, Back→UpperTorso (0.6), Core→LowerTorso, Legs→upper/lower legs. Shared parts take the largest contribution, never the product | `StatConfig.BodyScales`, `MuscleService:ComputeScales` |
 | Machine visibility | the nearest 14 of 35 stations within 260 studs carry muscle-coloured outlines and floor rings | `StationHighlightController` |
 | Dev commands | `/power`, `/stat`, `/tokens`, `/unlockall`, `/reset`, `/where`, `/help` — **Studio only**, gated on `RunService:IsStudio()` | `DevService.luau` |

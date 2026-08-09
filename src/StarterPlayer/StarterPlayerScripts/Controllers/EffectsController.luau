@@ -6,9 +6,9 @@
 	modified to make noise. Entries with a blank SoundId are skipped, which is why the
 	game is silent but functional until real asset ids are pasted into EffectsConfig.
 
-	Rep ticks are generated locally from the machine's own RepInterval rather than from
-	a server event. The server throttles training pushes to four a second precisely so
-	it is not sending a packet per rep, and audio does not justify undoing that.
+	Exercise-motion sounds are generated locally from the pose's own RepInterval. The
+	server's stat award is deliberately independent and lands once per second; varied
+	animation pace should sound natural without changing progression cadence.
 ]]
 
 local Players = game:GetService("Players")

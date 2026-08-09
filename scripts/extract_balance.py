@@ -152,6 +152,7 @@ def render() -> str:
     training = ROOT / "src" / "ServerScriptService" / "Core" / "TrainingService.luau"
     combo_step = _constant(training, "COMBO_STEP")
     max_combo = _constant(training, "MAX_COMBO_MULTIPLIER")
+    stat_tick = _constant(training, "STAT_TICK_SECONDS")
 
     lines = [
         "--!strict",
@@ -173,6 +174,7 @@ def render() -> str:
         "",
         f"BalanceInputs.COMBO_STEP = {_number(combo_step)}",
         f"BalanceInputs.MAX_COMBO_MULTIPLIER = {_number(max_combo)}",
+        f"BalanceInputs.STAT_TICK_SECONDS = {_number(stat_tick)}",
         "",
         "BalanceInputs.Equipment = {",
     ]

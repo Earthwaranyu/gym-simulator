@@ -61,6 +61,15 @@ and whether any balance number feels right.
 - [ ] Hold **E**. You are placed on the machine, locked there, and start repping.
 - [ ] You spawn in the safe-zone bubble, not loose on the gym floor.
 - [ ] The trained stat climbs in the HUD; total power climbs with it.
+- [ ] Time the floating stat awards on the fastest animation (Treadmill, 0.5s), a
+      middle animation, and the slowest (Deadlift, 1.2s). All three award exactly once
+      per second; animation speed changes motion only. Repeat across all five muscles.
+- [ ] Hold left mouse while unmounted. The selected dock stat updates once per second.
+      Mount a machine without releasing the mouse: only the machine award continues,
+      with no second manual payout stacked on it.
+- [ ] Keep Info open during several training ticks. After every tick, top-left Power,
+      Info Power and the local top-right roster Power show the same number—never N,
+      N and N−1. Other players may still refresh on the public one-second roster clock.
 - [ ] The combo readout rises the longer you stay on.
 - [ ] **Hold E again** to dismount. Then remount and **press Space** — that must also
       dismount you (`StopTraining`). Then remount and **jump** — same. All three paths work
@@ -126,7 +135,7 @@ The rule under test: **a hit does not dismount; only death does.**
       ocean or fall into the void.
 - [ ] Click the minimap. The full map opens as its own wide modal with **no**
       Info/Shop/Settings tabs, Train list, or vertically scrolling page around it.
-- [ ] The map uses a subdued dark-slate wash while every district, road and building
+- [ ] The map uses a clearly dark slate wash while every district, road and building
       remains legible. All **35** coloured location circles are present and
       selectable; locked locations remain visible rather than disappearing. Every
       circle shows an unambiguous muscle code and its exact multiplier (`AR ×1`,
@@ -220,8 +229,8 @@ The rule under test: **a hit does not dismount; only death does.**
       is shown through `NumberFormat`, not as `2.00x`. The stat's rate visibly increases.
 - [ ] Quests page shows progress for the three shipped quests (`DailyReps`,
       `DailyBounties`, `FirstMillion`); completing one awards tokens with a toast.
-- [ ] Hold manual training for ten displayed Power. Gym Rat also rises by ten, not by
-      roughly forty quarter-second server ticks; machine and multiplier gains match too.
+- [ ] Hold manual training for ten displayed Power. Gym Rat also rises by ten—not by
+      event count—and machine, combo and multiplier gains match visible Power too.
 - [ ] Shop tab: buy a Protein Shake with cash and confirm the boost applies and expires.
 - [ ] Reputation drops toward Criminal after killing a peaceful player, and rises after
       killing someone already marked Criminal.

@@ -23,7 +23,7 @@ export type SoundSpec = {
 local EffectsConfig = {}
 
 EffectsConfig.Sounds = {
-	-- A rep landing on a machine. Plays in time with the machine's RepInterval.
+	-- An exercise motion landing. Plays in time with the pose's RepInterval.
 	Rep = { SoundId = "", Volume = 0.35, Pitch = 1, PitchJitter = 0.08 } :: SoundSpec,
 	-- You landed a punch.
 	Hit = { SoundId = "", Volume = 0.6, Pitch = 1, PitchJitter = 0.1 } :: SoundSpec,

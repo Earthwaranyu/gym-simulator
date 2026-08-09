@@ -1257,6 +1257,28 @@ punches for a whole phase, so the game had two answers to one question.
       balance validation, `git diff --check`, and a clean Rojo place build. Studio
       remains the required brightness and tier-transition check.
 
+- [x] 120. **Every muscle pays on one clock and every local Power display agrees.**
+      Exercise `RepInterval` remains an animation choice—Treadmill can move at 0.5s and
+      Deadlift at 1.2s—but `TrainingService` now converts each definition back to its
+      normalized per-second base rate and awards every machine exactly once per second.
+      Combo advances on that shared tick, so fast animations cannot build it sooner.
+      Manual hold training also moves from four 0.25s slices to one one-second payout
+      and is disabled while mounted, removing the hidden machine+mouse double award.
+      The top-left HUD and Info page already consumed the immediate private profile;
+      the local top-right roster row now overlays its one-second public roster snapshot
+      with that same profile Power, eliminating the screenshot's 42/41/42 disagreement
+      without broadcasting every player's entire roster on every stat change. The full
+      map's slate overlay becomes twelve percentage points more opaque while its current
+      tier pins remain above and undimmed. The balance extractor exports the authoritative
+      one-second tick, the simulator pays and advances combo on it, and all published
+      pacing tables are regenerated (active 1-hour Power 95.8K→100.9K; 24-hour Power
+      11.03B→11.40B). Product truth and playtests now require one visible payout per
+      second across every muscle, no mounted stacking, three-way local Power agreement,
+      and the darker map. Verified with StyLua, Selene (zero warnings), strict Luau LSP
+      analysis, every pure self-test, generated-gym and balance validation, a deterministic
+      24-hour simulation, `git diff --check`, and a clean Rojo place build. Studio remains
+      the required real-time cadence, display synchronization, and map-contrast check.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

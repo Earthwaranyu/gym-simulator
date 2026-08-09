@@ -470,7 +470,7 @@ function FullMapController:_render()
 	mapShade.Name = "MapShade"
 	mapShade.Size = UDim2.fromScale(1, 1)
 	mapShade.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
-	mapShade.BackgroundTransparency = 0.3
+	mapShade.BackgroundTransparency = 0.18
 	mapShade.BorderSizePixel = 0
 	mapShade.ZIndex = 10
 	mapShade.Parent = canvas

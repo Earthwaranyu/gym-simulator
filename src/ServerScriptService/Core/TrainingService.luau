@@ -40,10 +40,13 @@ local PoseConfig = require(ReplicatedStorage.Modules.PoseConfig)
 
 -- How long being hit keeps a player off the machines.
 local STAGGER_SECONDS = 3
--- Combo grows this much per rep...
+-- Combo grows this much per one-second stat tick...
 local COMBO_STEP = 0.02
 -- ...up to this multiplier.
 local MAX_COMBO_MULTIPLIER = 2
+-- Stats land on one shared clock for every exercise. Pose cycles remain free to use
+-- their natural 0.5–1.2 second timing without making one muscle update more often.
+local STAT_TICK_SECONDS = 1
 -- Ceiling on how often mid-set combo updates are pushed to a client.
 local PUSH_INTERVAL = 0.25
 -- Slack on the prompt's own distance check, in case a player is thrown while the
@@ -79,7 +82,7 @@ type Session = {
 	-- Humanoid properties as they were before the machine took them over.
 	restore: { walkSpeed: number, jumpPower: number, jumpHeight: number, autoRotate: boolean },
 	combo: number,
-	lastRepAt: number,
+	lastGainAt: number,
 }
 
 local TrainingService = {
@@ -329,7 +332,7 @@ function TrainingService:_mount(player: Player, station: Instance, record: Stati
 			autoRotate = humanoid.AutoRotate,
 		},
 		combo = 0,
-		lastRepAt = os.clock(),
+		lastGainAt = os.clock(),
 	}
 
 	sessions[player] = session
@@ -623,7 +626,7 @@ end
 
 --[[
 	One tick for one mounted player: confirm they are still fit to train, then pay
-	out a rep when the machine's interval is up.
+	one normalized second of progress. Animation cycles do not control stat cadence.
 ]]
 function TrainingService:_step(player: Player, session: Session, now: number)
 	if session.character.Parent == nil or session.humanoid.Health <= 0 or session.root.Parent == nil then
@@ -636,27 +639,31 @@ function TrainingService:_step(player: Player, session: Session, now: number)
 		return
 	end
 
-	if now - session.lastRepAt < session.definition.RepInterval then
+	if now - session.lastGainAt < STAT_TICK_SECONDS then
 		return
 	end
 
-	session.lastRepAt = now
-	session.combo += 1
+	session.lastGainAt = now
 
 	-- Cheap insurance that nothing has nudged the player off their spot. Writing an
 	-- identical CFrame is a no-op, so this costs no replication in the normal case.
 	session.root.CFrame = session.anchorCFrame
 
-	local gain = session.definition.BaseGain * self:GetComboMultiplier(player) * session.record.zoneMultiplier
+	local basePerSecond = session.definition.BaseGain / session.definition.RepInterval
+	local gain = basePerSecond
+		* STAT_TICK_SECONDS
+		* self:GetComboMultiplier(player)
+		* session.record.zoneMultiplier
 	local gained = StatService:AddStat(player, session.definition.StatId, gain)
 	if gained > 0 then
 		local payload: Types.TrainingGain = {
 			StatId = session.definition.StatId,
 			Amount = gained,
-			PerSecond = gained / session.definition.RepInterval,
+			PerSecond = gained / STAT_TICK_SECONDS,
 		}
 		Net.Event("TrainingGain"):FireClient(player, payload)
 	end
+	session.combo += 1
 
 	if now - (lastPushAt[player] or 0) >= PUSH_INTERVAL then
 		self:_push(player)
