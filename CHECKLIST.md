@@ -878,6 +878,41 @@ punches for a whole phase, so the game had two answers to one question.
       renderer was stalled for a third session — RenderStepped 0 against a live
       Heartbeat — so the white rectangle being gone is proven by the hit-test oracle and
       the bounded canvas, not by a human looking at it.
+      **Correction, from #102:** that hit-test oracle was worthless.
+      `GetGuiObjectsAtPosition` returns nothing for content inside a `CanvasGroup` — and
+      nothing for the synthetic controls either — so "no minimap descendant found
+      outside the panel" was measuring the query's blindness, not the fix. The bounded
+      canvas stands; the clipping claim does not.
+
+- [x] 102. **The map was a mirror image of the world.** A screenshot settled it: the
+      player standing on the right of the starter island, drawn on the left of their own
+      minimap. Not the rotation — the projection.
+      `MapRender.Project` mapped world +X to the right *and* world +Z upward, on the
+      reasoning that +Z is north and screen Y grows downward so north belongs at the top.
+      Both halves of that are true and the conclusion was still wrong: flipping one axis
+      and not the other is a reflection. Every pin, every island and every building had
+      been drawn on the wrong side of the player since the map existed. It hid on the
+      Map screen, where nobody knows which side of an unfamiliar city they are on, and
+      became obvious the moment a minimap put the player in the middle of it.
+      The check that settles the orientation: an identity `CFrame` in Roblox faces -Z
+      with its `RightVector` at +X, so a character seen from above facing up the screen
+      has +X to the screen's right, which puts **+Z down**. North is a label; not being
+      mirrored is a fact. The projection drops the flip, and the minimap's heading
+      becomes `-deg(atan2(look.X, -look.Z))` to match — up the panel is now -Z.
+      Also fixed while there: the minimap was a pale grey box because every feature was
+      washed 62% toward white, the same as the big paper board it inherited that from.
+      `DrawFeatures` takes a wash override, the minimap uses 0.2, and its ground is the
+      HUD's own dark backdrop rather than paper, so water, land and buildings are three
+      different colours instead of three off-whites.
+      Verified in a Studio play session, and this time with an oracle that has teeth. For
+      five camera headings, every destination pin the real code drew was carried through
+      the real pivot rotation and compared against ground truth — the pin's true offset
+      resolved onto the camera's own right and forward vectors. **New code: 5/5 pins
+      correct at every heading, worst alignment 1.000.** The same measurement re-derived
+      for the old projection and old heading formula: **0/5, 0/5 and 1/5, with alignments
+      down to -0.998** — pins pointing the exact opposite way. Still unwatched: Studio's
+      renderer has been stalled for four sessions, so the wash and the dark ground are
+      chosen, not seen.
 
 ---
 

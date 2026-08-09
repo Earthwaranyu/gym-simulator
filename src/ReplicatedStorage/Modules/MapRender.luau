@@ -343,8 +343,21 @@ end
 ]]
 function MapRender.Project(bounds: Bounds): (number, number) -> UDim2
 	return function(x: number, z: number): UDim2
-		-- World +Z is north, and screen Y grows downward, so Z is flipped.
-		return UDim2.fromScale((x - bounds.MinX) / bounds.Width, 1 - (z - bounds.MinZ) / bounds.Depth)
+		-- +X to the right and +Z DOWN, which is what looking at the world from above
+		-- actually gives you.
+		--
+		-- This used to flip Z, on the reasoning that +Z is north and screen Y grows
+		-- downward so north belongs at the top. Both halves are true and the conclusion
+		-- was still wrong: flipping one axis and not the other is a reflection, and it
+		-- drew the whole city as its own mirror image. Every pin sat on the wrong side
+		-- of the player, which is invisible on a static map of an unfamiliar city and
+		-- glaring the moment a minimap puts the player in the middle of it.
+		--
+		-- The check that settles it: an identity CFrame in Roblox faces -Z with its
+		-- RightVector at +X. Seen from above, a character facing up the screen therefore
+		-- has +X to the screen's right — so +Z has to go down. "North" is not a fact
+		-- about this world, it is a label; not being mirrored is a fact.
+		return UDim2.fromScale((x - bounds.MinX) / bounds.Width, (z - bounds.MinZ) / bounds.Depth)
 	end
 end
 
@@ -353,12 +366,19 @@ end
 
 	`detail` false drops the strokes and corner rounding, which are invisible on a
 	minimap and cost an instance each on a canvas that can hold hundreds of buildings.
+
+	`wash` overrides how far the colours are pulled toward white. The map screen wants
+	them pale, because it is a big bright board you study and the pins have to sit on top
+	of it. The minimap wants them far less pale: it is a 220-pixel window glanced at for
+	half a second, and at the board's wash every feature and the paper behind it are the
+	same off-white and the whole panel reads as an empty grey box.
 ]]
 function MapRender.DrawFeatures(
 	canvas: GuiObject,
 	worldFeatures: { Feature },
 	bounds: Bounds,
-	detail: boolean?
+	detail: boolean?,
+	wash: number?
 )
 	local project = MapRender.Project(bounds)
 	local wantsDetail = detail ~= false
@@ -370,8 +390,13 @@ function MapRender.DrawFeatures(
 		shape.Position = project(feature.X, feature.Z)
 		shape.Size = UDim2.fromScale(feature.Width / bounds.Width, feature.Depth / bounds.Depth)
 		shape.Rotation = feature.Rotation
-		shape.BackgroundColor3 =
-			MapRender.Tint(feature.Color, if feature.Kind == "Building" then BUILDING_WASH else nil)
+		-- Buildings keep more of their own colour than everything else at any wash, so
+		-- streets stay readable as the gaps between them.
+		local base = wash or MapRender.WashAmount
+		local amount = if feature.Kind == "Building"
+			then base * (BUILDING_WASH / MapRender.WashAmount)
+			else base
+		shape.BackgroundColor3 = MapRender.Tint(feature.Color, amount)
 		shape.BackgroundTransparency = if feature.Kind == "SafeZone"
 			then 0.45
 			elseif feature.Kind == "Water" then 0.1

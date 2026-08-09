@@ -66,6 +66,10 @@ local MINIMAP_REGION_STUDS = 1000
 -- How far the player may wander from the middle of the drawn square before it is
 -- redrawn around them. Well inside the margin the region has over the window.
 local MINIMAP_REDRAW_STUDS = 90
+-- How far the minimap pulls the world's colours toward white. Much less than the map
+-- screen, which is a big board you study; this is a small window you glance at, and it
+-- needs the contrast more than it needs the paper look.
+local MINIMAP_WASH = 0.2
 -- The minimap redraws on a timer rather than every frame. Thirty a second rather than
 -- the ten it started at, because the map now turns with the camera and a rotation
 -- stepping ten times a second is visibly notchy where a pan is not. The refresh skips
@@ -486,8 +490,11 @@ function HudController:_buildMinimap(screen: ScreenGui)
 	local window = Instance.new("CanvasGroup")
 	window.Name = "Window"
 	window.Size = UDim2.fromScale(1, 1)
-	window.BackgroundColor3 = MapRender.Paper
-	window.BackgroundTransparency = 0.08
+	-- Dark behind the map, not paper. Anywhere the city has no footprint is open water
+	-- or nothing at all, and a pale ground made those gaps indistinguishable from the
+	-- features drawn on it.
+	window.BackgroundColor3 = UI.Palette.Backdrop
+	window.BackgroundTransparency = 0.1
 	window.BorderSizePixel = 0
 	window.ClipsDescendants = true
 	window.Parent = panel
@@ -495,7 +502,7 @@ function HudController:_buildMinimap(screen: ScreenGui)
 	local loading = UI.Label("Loading", window)
 	loading.Size = UDim2.fromScale(1, 1)
 	loading.TextXAlignment = Enum.TextXAlignment.Center
-	loading.TextColor3 = MapRender.Ink
+	loading.TextColor3 = UI.Palette.TextMuted
 	loading.TextTransparency = 0.4
 	loading.Text = "mapping…"
 
@@ -608,8 +615,10 @@ function HudController:_drawMinimapRegion(centre: Vector3)
 	canvas.BorderSizePixel = 0
 
 	-- No strokes and no rounded corners down here: both are invisible on a building
-	-- three pixels wide, and both cost an instance each.
-	MapRender.DrawFeatures(canvas, MapRender.FeaturesWithin(feats, bounds), bounds, false)
+	-- three pixels wide, and both cost an instance each. The wash comes down hard from
+	-- the map screen's: at its 0.62 the water, the land and the paper behind them were
+	-- three shades of the same off-white and the panel read as an empty grey box.
+	MapRender.DrawFeatures(canvas, MapRender.FeaturesWithin(feats, bounds), bounds, false, MINIMAP_WASH)
 
 	local project = MapRender.Project(bounds)
 	for _, destination in dests do
@@ -700,10 +709,10 @@ function HudController:_refreshMinimap()
 	local rotation = 0
 	if camera ~= nil then
 		local look = camera.CFrame.LookVector
-		-- The map is drawn north-up, so world +Z is up the panel. atan2(X, Z) is the
-		-- camera's heading measured from that axis, and negating it turns the map by as
-		-- much as the camera turned, in the opposite direction.
-		rotation = -math.deg(math.atan2(look.X, look.Z))
+		-- The canvas puts +X to the right and +Z down, so "up the panel" is -Z. The
+		-- camera's heading measured clockwise from there is atan2(X, -Z), and turning
+		-- the map by the negative of it leaves whatever the camera faces pointing up.
+		rotation = -math.deg(math.atan2(look.X, -look.Z))
 	end
 
 	-- Writing these every frame re-lays out every feature on the canvas, so skip the
