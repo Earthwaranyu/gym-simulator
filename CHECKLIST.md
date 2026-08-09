@@ -963,6 +963,28 @@ punches for a whole phase, so the game had two answers to one question.
       striped fragments; after, it is one clean paved disc. `validate_gym.py` passes with
       3927 instances and the new rule armed.
 
+- [x] 105. **Grounded again, and a health bar you can read at a glance.**
+      #104 fixed the tearing by sinking the ground half a twentieth of a stud, and got
+      the direction wrong: the ground is what things stand on, so every lamp post and
+      bench on it started hovering. The lift moved to the surface laid *on top* instead —
+      `SURFACE_LIFT` on the plaza, the site pavement and the launch pads, twice over for
+      an interior floor that sits on pavement that sits on ground. Anything standing on
+      those is now bedded four hundredths of a stud into them, which nobody can see,
+      where hovering four hundredths above them is exactly the kind of thing that gets
+      noticed.
+      Chasing that turned up an older one. **`PLAZA_TOP` was `FLOOR_TOP + 0.8`** and had
+      been for a long time — a height the plaza has never had — so the benches, the coach
+      and the leaderboard plinth had all been floating **0.72 studs** in the air, small
+      enough to read as a rendering quirk and large enough to see standing next to one.
+      It is now the plaza's actual surface. A raycast sweep of everything at ground level
+      within 240 studs of spawn reports no unexplained gap left; what remains is machine
+      internals held up by their own frames, which is what a roller on its posts is
+      supposed to do.
+      **The health bar shows both halves.** It was one red block whose length you had to
+      judge against a dark track. `UI.Bar` takes an optional colour for the empty part, so
+      health is green for what is left and red for what has been taken — at 79/100, 79%
+      green and 21% red, and the split tells you the number before the caption does.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

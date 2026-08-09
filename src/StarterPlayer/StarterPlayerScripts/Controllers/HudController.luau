@@ -345,11 +345,10 @@ function HudController:_build()
 	--
 	-- What is left is the one number that changes while you are being hit, and it goes
 	-- in the corner where a health bar belongs.
-	healthBar = UI.Bar("Health", UI.Palette.Health, screen)
+	healthBar = UI.Bar("Health", UI.Palette.Vital, screen, UI.Palette.Health)
 	healthBar.Root.AnchorPoint = Vector2.new(0, 1)
 	healthBar.Root.Position = UDim2.new(0, 16, 1, -16)
 	healthBar.Root.Size = UDim2.fromOffset(240, 26)
-	healthBar.Root.BackgroundTransparency = 0.2
 
 	-- Under the compact summary: the minimap.
 	--

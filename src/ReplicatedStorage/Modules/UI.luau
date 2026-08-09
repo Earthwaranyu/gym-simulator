@@ -29,6 +29,10 @@ UI.Palette = {
 	Token = Color3.fromRGB(126, 231, 255),
 
 	Health = Color3.fromRGB(239, 83, 80),
+	-- The healthy part of the health bar. Health above stays the colour of the part that
+	-- is gone, so a bar reads as "this much left, that much taken" rather than as one
+	-- block whose length you have to judge against a track.
+	Vital = Color3.fromRGB(88, 202, 106),
 	Combo = Color3.fromRGB(255, 138, 61),
 
 	Danger = Color3.fromRGB(255, 92, 92),
@@ -105,11 +109,14 @@ export type Bar = {
 	A labelled progress bar. Returns a Set function rather than exposing the fill, so
 	callers cannot forget to clamp the ratio.
 ]]
-function UI.Bar(name: string, color: Color3, parent: Instance?): Bar
+function UI.Bar(name: string, color: Color3, parent: Instance?, emptyColor: Color3?): Bar
 	local root = Instance.new("Frame")
 	root.Name = name
-	root.BackgroundColor3 = UI.Palette.Backdrop
-	root.BackgroundTransparency = 0.35
+	-- The track behind the fill. Normally the backdrop, so an empty bar reads as an
+	-- empty slot; a bar that passes `emptyColor` paints the missing part instead, which
+	-- is what health wants — green for what is left, red for what has been taken.
+	root.BackgroundColor3 = emptyColor or UI.Palette.Backdrop
+	root.BackgroundTransparency = if emptyColor ~= nil then 0.1 else 0.35
 	root.BorderSizePixel = 0
 	root.Size = UDim2.new(1, 0, 0, 22)
 
