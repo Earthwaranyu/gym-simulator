@@ -1314,6 +1314,22 @@ punches for a whole phase, so the game had two answers to one question.
       validation, `git diff --check`, and a clean Rojo build; Studio remains the required
       proof for Roblox's native rotated-Gui clipping behavior.
 
+- [x] 123. **Map containment moves from container hope to direct-child geometry.** The
+      screenshot after #122 proved that even a non-scrollable `ScrollingFrame` does not
+      clip rotated GuiObjects nested beneath an enlarged intermediate canvas: the legend
+      stayed fixed, but land, buildings, cluster circles and pins still escaped all four
+      sides. `FullMapController` now creates every MapRender feature, training pin, spawn
+      label and player marker as a direct viewport child. A stored normalized position/
+      size record reproduces the former canvas transform for each item on zoom and pan;
+      cluster offsets and pin sizes remain screen-readable while feature footprints scale.
+      Only the plain paper and dark wash remain enlarged direct rectangles. Roblox's
+      native scissor is therefore the immediate parent of every potentially rotated or
+      rounded shape, eliminating the descendant-clipping failure rather than covering it
+      with masks. Product truth and edge-focused playtests are updated. Verified with
+      StyLua, Selene, strict Luau analysis, pure self-tests, generated-gym and balance
+      validation, `git diff --check`, and a clean Rojo build; Studio remains the visual
+      proof for all four edges at maximum zoom.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

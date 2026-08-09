@@ -15,7 +15,7 @@ Freeze these before the first session. Every later comparison is against this ro
 
 | What | Value |
 |---|---|
-| Commit | checklist #122 build (record the final commit in each filled sheet) |
+| Commit | checklist #123 build (record the final commit in each filled sheet) |
 | World build hash | `ffc81d90b4ee` (35 stations, 35 unique exercises, 3,927 instances) |
 | Interruption rule | kill-only |
 | Abilities | Punch only |

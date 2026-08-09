@@ -34,6 +34,10 @@ local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 
 type Destination = MapRender.Destination
+type MapItemLayout = {
+	Position: UDim2,
+	Size: UDim2,
+}
 
 local FullMapController = {
 	Name = "FullMapController",
@@ -465,13 +469,35 @@ function FullMapController:_render()
 	canvas:SetAttribute("Zoom", mapZoom)
 	canvas.Parent = viewport
 
-	local features = Instance.new("Frame")
-	features.Name = "Features"
-	features.Size = UDim2.fromScale(1, 1)
-	features.BackgroundTransparency = 1
-	features.ZIndex = 1
-	features.Parent = canvas
-	MapRender.DrawFeatures(features, mapFeatures, bounds)
+	-- Roblox does not reliably apply an ancestor's clipping rectangle to deeply nested
+	-- rotated GuiObjects. Keep every moving feature and pin as a *direct* child of the
+	-- native viewport, and reproduce the canvas transform explicitly.
+	local mapItems: { [GuiObject]: MapItemLayout } = {}
+	local function registerMapItem(object: GuiObject)
+		mapItems[object] = {
+			Position = object.Position,
+			Size = object.Size,
+		}
+	end
+	local function setMapItemSize(object: GuiObject, size: UDim2)
+		local layout = mapItems[object]
+		if layout ~= nil then
+			layout.Size = size
+		end
+	end
+
+	local featureSource = Instance.new("Frame")
+	featureSource.Name = "FeatureSource"
+	featureSource.Size = UDim2.fromScale(1, 1)
+	featureSource.BackgroundTransparency = 1
+	MapRender.DrawFeatures(featureSource, mapFeatures, bounds)
+	for _, child in featureSource:GetChildren() do
+		if child:IsA("GuiObject") then
+			registerMapItem(child)
+			child.Parent = viewport
+		end
+	end
+	featureSource:Destroy()
 
 	-- The full map is deliberately moodier than the minimap. This quiet overlay keeps
 	-- the complete street/building context visible without letting it compete with the
@@ -483,16 +509,11 @@ function FullMapController:_render()
 	mapShade.BackgroundTransparency = 0.18
 	mapShade.BorderSizePixel = 0
 	mapShade.ZIndex = 10
-	mapShade.Parent = canvas
+	mapShade.Parent = viewport
+	mapShade.Position = canvas.Position
+	mapShade.Size = canvas.Size
 
-	local pins = Instance.new("Frame")
-	pins.Name = "Pins"
-	pins.Size = UDim2.fromScale(1, 1)
-	pins.BackgroundTransparency = 1
-	pins.ZIndex = 20
-	pins.Parent = canvas
-
-	local hub = UI.Label("Hub", pins)
+	local hub = UI.Label("Hub", viewport)
 	hub.AnchorPoint = Vector2.new(0.5, 0.5)
 	hub.Position = project(0, 0)
 	hub.Size = UDim2.fromOffset(72, 18)
@@ -502,6 +523,7 @@ function FullMapController:_render()
 	hub.TextColor3 = Color3.fromRGB(0, 118, 160)
 	hub.Text = "◆ SPAWN"
 	hub.ZIndex = 24
+	registerMapItem(hub)
 
 	local unlockedCount = 0
 	local pinRecords: { [string]: { Button: TextButton, Stroke: UIStroke } } = {}
@@ -583,7 +605,8 @@ function FullMapController:_render()
 			destination.GainMultiplier
 		)}`
 		pin.ZIndex = if selected then 25 else 22
-		pin.Parent = pins
+		pin.Parent = viewport
+		registerMapItem(pin)
 		addCorner(pin, 20)
 		local textLimit = Instance.new("UITextSizeConstraint")
 		textLimit.MinTextSize = 6
@@ -597,10 +620,12 @@ function FullMapController:_render()
 			selectedDestination = destination.Id
 			for id, record in pinRecords do
 				local nowSelected = id == selectedDestination
-				record.Button.Size = UDim2.fromOffset(
+				local size = UDim2.fromOffset(
 					if nowSelected then SELECTED_PIN_SIZE else PIN_SIZE,
 					if nowSelected then SELECTED_PIN_SIZE else PIN_SIZE
 				)
+				setMapItemSize(record.Button, size)
+				record.Button.Size = size
 				record.Button.ZIndex = if nowSelected then 25 else 22
 				record.Stroke.Color = if nowSelected then MAP_PAPER else MAP_INK
 				record.Stroke.Thickness = if nowSelected then 2 else 1
@@ -619,13 +644,33 @@ function FullMapController:_render()
 	local character = player.Character
 	local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
 	if root ~= nil and root:IsA("BasePart") then
-		local here = MapRender.Dot(pins, "You", 12, UI.Palette.Text, 28)
+		local here = MapRender.Dot(viewport, "You", 12, UI.Palette.Text, 28)
 		here.Position = project(root.Position.X, root.Position.Z)
 		addBorder(here, MAP_INK, 0, 2)
+		registerMapItem(here)
 	end
 
 	local function theoreticalCanvasSize(): Vector2
 		return viewport.AbsoluteSize * mapZoom
+	end
+
+	local function layoutMapItems()
+		local canvasSize = theoreticalCanvasSize()
+		local offset = Vector2.new(canvas.Position.X.Offset, canvas.Position.Y.Offset)
+		for object, layout in mapItems do
+			if object.Parent == nil then
+				mapItems[object] = nil
+				continue
+			end
+			object.Position = UDim2.fromOffset(
+				offset.X + layout.Position.X.Scale * canvasSize.X + layout.Position.X.Offset,
+				offset.Y + layout.Position.Y.Scale * canvasSize.Y + layout.Position.Y.Offset
+			)
+			object.Size = UDim2.fromOffset(
+				layout.Size.X.Scale * canvasSize.X + layout.Size.X.Offset,
+				layout.Size.Y.Scale * canvasSize.Y + layout.Size.Y.Offset
+			)
+		end
 	end
 
 	local function setCanvasOffset(rawOffset: Vector2)
@@ -639,6 +684,9 @@ function FullMapController:_render()
 		local offset =
 			Vector2.new(math.clamp(rawOffset.X, -overflow.X, 0), math.clamp(rawOffset.Y, -overflow.Y, 0))
 		canvas.Position = UDim2.fromOffset(offset.X, offset.Y)
+		mapShade.Position = canvas.Position
+		mapShade.Size = canvas.Size
+		layoutMapItems()
 		mapCenter = Vector2.new(
 			math.clamp((windowSize.X / 2 - offset.X) / canvasSize.X, 0, 1),
 			math.clamp((windowSize.Y / 2 - offset.Y) / canvasSize.Y, 0, 1)
