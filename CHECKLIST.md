@@ -1003,6 +1003,33 @@ punches for a whole phase, so the game had two answers to one question.
       a held button sends one request per cooldown instead of one per click, which also
       keeps the remote clear of its own eight-a-second limit.
 
+- [x] 107. **Enemy health, in the same two colours as your own.** The whole hook of this
+      game is that other players interrupt your training, so the most useful thing to
+      know about someone across the plaza is how close they are to going down — and the
+      only thing on screen was Roblox's built-in plate: a hairline that appears once
+      somebody is already hurt, in a red that reads as *empty* on a player at full
+      health. **`NameplateController`** switches the default off
+      (`HealthDisplayType.AlwaysOff`) and draws a real one over every other player's
+      head: their name, and a `UI.Bar` in the same green-over-red as the bar in the
+      corner of your own screen. One visual language — green is what is left, red is
+      what has been taken, wherever it appears.
+      It carries the numbers as well as the length, because Chest pushes max health into
+      the thousands and "half a bar" stops meaning a fixed amount of damage very early
+      on. Occluded by walls like the machine signs, since seeing health through a
+      building is a wallhack the game would be handing out for free, and dropped past
+      150 studs where it is unreadable anyway. Event-driven off `HealthChanged` and
+      `MaxHealth` rather than polled: a plate changes a handful of times a minute, and
+      the alternative is recomputing every plate on the server every frame. MaxHealth is
+      watched precisely because training Chest mid-fight would otherwise leave a player
+      at full health drawn as wounded until their next hit.
+      Verified in a play session by driving the real `_attach` path against a live rig:
+      the plate adorns the head at 140x36 with MaxDistance 150 and AlwaysOnTop false,
+      both default displays report off, the fill is (88,202,106) over a (239,83,80)
+      track, and it reads 1.00/"100 / 100" at full, 0.40/"40 / 100" after damage and
+      1.00/"200 / 200" once MaxHealth doubles — not 0.40 — with `_clear` removing it
+      cleanly. The local player correctly gets no plate. Not covered: the two-player
+      join path, which needs a Studio local server this session cannot launch.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

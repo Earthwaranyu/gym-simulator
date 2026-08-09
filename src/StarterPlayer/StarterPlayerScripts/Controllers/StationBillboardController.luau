@@ -78,9 +78,8 @@ function StationBillboardController:_bind(station: Instance)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "StationLabel"
 	gui.Adornee = adornee
-	-- Four lines now: name, rate, what the stat buys you, and how to get on.
-	-- Three lines now that the stat's effect line is gone, so the sign shrinks with it
-	-- rather than floating a band of empty glass over every machine.
+	-- Three lines: name, rate, and how to get on. The sign shrank with the stat's effect
+	-- line rather than floating a band of empty glass over every machine.
 	gui.Size = UDim2.fromOffset(210, 70)
 	gui.StudsOffsetWorldSpace = headroomOffset(station, adornee)
 	gui.AlwaysOnTop = false
