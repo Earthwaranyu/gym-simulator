@@ -1083,6 +1083,22 @@ punches for a whole phase, so the game had two answers to one question.
       5.3 MB Rojo place build. A human Studio screenshot pass is still required to judge
       the subjective final colors and optical spacing.
 
+- [x] 110. **Rank joins the actual top-right roster, and Info reads as five rows.** The
+      earlier interpretation placed Rank beside the bottom muscle dock. It now sits
+      immediately left of the custom player/power/reputation roster, shares its top edge,
+      opens the existing Ranks page, and hides with that roster when Tab is pressed. The
+      duplicate bottom Rank card and its narrow-screen health workaround are removed.
+      Info now mirrors the five-slot muscle pattern literally: Arms, Chest, Back, Core,
+      and Legs each own one full-width, equal-height row. The profile hero and five rows
+      fit the fixed viewport without scrolling or replacing a muscle with a summary
+      card. Gotham Bold/Medium, larger high-contrast values and effects, compact icons,
+      and one readable single-line upgrade button per row replace the cramped two-column
+      typography.
+      Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure
+      self-test, generated-gym and balance validation, `git diff --check`, and a clean
+      5.3 MB Rojo place build. A human Studio screenshot pass remains the final optical
+      check because Studio is not available in this workspace.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

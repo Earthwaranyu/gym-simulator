@@ -16,8 +16,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 
+local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
+local Icons = require(ReplicatedStorage.Modules.Icons)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 
 local ROW_HEIGHT = 26
@@ -31,7 +33,13 @@ local TabBarController = {
 local panel: Frame? = nil
 local rows: Frame? = nil
 local header: TextLabel? = nil
+local rankButton: TextButton? = nil
 local visible = true
+local MenuController: any = nil
+
+function TabBarController:Init()
+	MenuController = Loader.Get("MenuController")
+end
 
 function TabBarController:_build()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
@@ -66,9 +74,61 @@ function TabBarController:_build()
 
 	UI.VerticalList(newRows, 1)
 
+	-- Rank belongs to the roster cluster: immediately left of the player list at the
+	-- top-right, sharing its top edge and disappearing with it when Tab hides the list.
+	local newRankButton = Instance.new("TextButton")
+	newRankButton.Name = "OpenRanks"
+	newRankButton.AnchorPoint = Vector2.new(1, 0)
+	newRankButton.Position = UDim2.new(1, -326, 0, 16)
+	newRankButton.Size = UDim2.fromOffset(88, 72)
+	newRankButton.BackgroundColor3 = UI.Palette.Accent
+	newRankButton.BackgroundTransparency = 0
+	newRankButton.BorderSizePixel = 0
+	newRankButton.AutoButtonColor = false
+	newRankButton.Text = ""
+	newRankButton.Parent = screen
+
+	local rankCorner = Instance.new("UICorner")
+	rankCorner.CornerRadius = UDim.new(0, 10)
+	rankCorner.Parent = newRankButton
+
+	local rankStroke = Instance.new("UIStroke")
+	rankStroke.Color = UI.Palette.CartoonInk
+	rankStroke.Thickness = 3
+	rankStroke.Parent = newRankButton
+
+	local rankIcon = Instance.new("Frame")
+	rankIcon.Name = "Icon"
+	rankIcon.AnchorPoint = Vector2.new(0.5, 0)
+	rankIcon.Position = UDim2.new(0.5, 0, 0, 7)
+	rankIcon.Size = UDim2.fromOffset(36, 36)
+	rankIcon.BackgroundTransparency = 1
+	rankIcon.Parent = newRankButton
+
+	local rankAspect = Instance.new("UIAspectRatioConstraint")
+	rankAspect.AspectRatio = 1
+	rankAspect.Parent = rankIcon
+	Icons.Draw("Rank", rankIcon, UI.Palette.CartoonInk, UI.Palette.Accent)
+
+	local rankLabel = UI.Label("Label", newRankButton)
+	rankLabel.AnchorPoint = Vector2.new(0.5, 1)
+	rankLabel.Position = UDim2.new(0.5, 0, 1, -7)
+	rankLabel.Size = UDim2.new(1, -10, 0, 18)
+	rankLabel.Font = Enum.Font.GothamBold
+	rankLabel.TextSize = 12
+	rankLabel.TextColor3 = UI.Palette.CartoonInk
+	rankLabel.TextXAlignment = Enum.TextXAlignment.Center
+	rankLabel.Text = "RANK"
+
+	UI.Pressable(newRankButton, { PressScale = 0.95, HoverScale = 1.03 })
+	newRankButton.Activated:Connect(function()
+		MenuController:Open("Ranks")
+	end)
+
 	panel = newPanel
 	header = newHeader
 	rows = newRows
+	rankButton = newRankButton
 end
 
 function TabBarController:_render(roster: { any })
@@ -154,6 +214,9 @@ function TabBarController:Start()
 		visible = not visible
 		if panel ~= nil then
 			panel.Visible = visible
+		end
+		if rankButton ~= nil then
+			rankButton.Visible = visible
 		end
 	end)
 end

@@ -1024,14 +1024,14 @@ function MenuController:_renderInfo(parent: Frame)
 	local reputation = ReputationConfig.Get(if data ~= nil then data.Reputation else 0)
 
 	local header = UI.CartoonCard("ProfileHero", rank.Color, parent)
-	header.Size = UDim2.new(1, 0, 0, 78)
+	header.Size = UDim2.new(1, 0, 0, 64)
 	header.LayoutOrder = 1
 
 	local portrait = Instance.new("ImageLabel")
 	portrait.Name = "Portrait"
 	portrait.AnchorPoint = Vector2.new(0, 0.5)
-	portrait.Position = UDim2.new(0, 9, 0.5, 0)
-	portrait.Size = UDim2.fromOffset(58, 58)
+	portrait.Position = UDim2.new(0, 8, 0.5, 0)
+	portrait.Size = UDim2.fromOffset(48, 48)
 	portrait.BackgroundColor3 = UI.Palette.CartoonCream
 	portrait.BorderSizePixel = 0
 	portrait.ScaleType = Enum.ScaleType.Crop
@@ -1042,7 +1042,7 @@ function MenuController:_renderInfo(parent: Frame)
 	portraitAspect.Parent = portrait
 
 	local portraitCorner = Instance.new("UICorner")
-	portraitCorner.CornerRadius = UDim.new(0, 12)
+	portraitCorner.CornerRadius = UDim.new(0, 10)
 	portraitCorner.Parent = portrait
 
 	local portraitStroke = Instance.new("UIStroke")
@@ -1064,23 +1064,25 @@ function MenuController:_renderInfo(parent: Frame)
 	end)
 
 	local name = UI.Label("Name", header)
-	name.Size = UDim2.new(0.45, -80, 0, 24)
-	name.Position = UDim2.fromOffset(80, 8)
-	name.Font = UI.Font.Heading
-	name.TextSize = 18
+	name.Size = UDim2.new(0.5, -74, 0, 22)
+	name.Position = UDim2.fromOffset(68, 6)
+	name.Font = Enum.Font.GothamBold
+	name.TextSize = 17
 	name.TextColor3 = UI.Palette.CartoonCream
 	name.Text = Players.LocalPlayer.DisplayName
 
 	local rankLabel = UI.Label("Rank", header)
-	rankLabel.Size = UDim2.new(0.45, -80, 0, 20)
-	rankLabel.Position = UDim2.fromOffset(80, 34)
-	rankLabel.TextSize = 13
+	rankLabel.Size = UDim2.new(0.5, -74, 0, 18)
+	rankLabel.Position = UDim2.fromOffset(68, 27)
+	rankLabel.Font = Enum.Font.GothamMedium
+	rankLabel.TextSize = 12
 	rankLabel.TextColor3 = Color3.new(1, 1, 1)
 	rankLabel.Text = `{rank.DisplayName}  ·  {reputation.DisplayName}`
 
 	local record = UI.Label("Record", header)
-	record.Size = UDim2.new(0.45, -80, 0, 16)
-	record.Position = UDim2.fromOffset(80, 54)
+	record.Size = UDim2.new(0.5, -74, 0, 16)
+	record.Position = UDim2.fromOffset(68, 44)
+	record.Font = Enum.Font.GothamMedium
 	record.TextSize = 11
 	record.TextColor3 = UI.Palette.CartoonCream
 	record.Text =
@@ -1088,59 +1090,44 @@ function MenuController:_renderInfo(parent: Frame)
 
 	local heroPower = UI.Label("Power", header)
 	heroPower.AnchorPoint = Vector2.new(1, 0)
-	heroPower.Position = UDim2.new(1, -14, 0, 8)
-	heroPower.Size = UDim2.new(0.5, -10, 0, 34)
+	heroPower.Position = UDim2.new(1, -12, 0, 7)
+	heroPower.Size = UDim2.new(0.48, -10, 0, 28)
 	heroPower.Font = UI.Font.Numeric
-	heroPower.TextSize = 24
+	heroPower.TextSize = 21
 	heroPower.TextXAlignment = Enum.TextXAlignment.Right
 	heroPower.TextColor3 = UI.Palette.Power
 	heroPower.Text = `{NumberFormat.Format(power)} POWER`
 
 	local heroTokens = UI.Label("Tokens", header)
 	heroTokens.AnchorPoint = Vector2.new(1, 0)
-	heroTokens.Position = UDim2.new(1, -14, 0, 43)
-	heroTokens.Size = UDim2.new(0.5, -10, 0, 22)
-	heroTokens.Font = UI.Font.Heading
-	heroTokens.TextSize = 13
+	heroTokens.Position = UDim2.new(1, -12, 0, 36)
+	heroTokens.Size = UDim2.new(0.48, -10, 0, 20)
+	heroTokens.Font = Enum.Font.GothamBold
+	heroTokens.TextSize = 12
 	heroTokens.TextXAlignment = Enum.TextXAlignment.Right
 	heroTokens.TextColor3 = UI.Palette.Token
 	heroTokens.Text = `{NumberFormat.Format(if data ~= nil then data.Tokens else 0)} TOKENS READY`
 
-	local statGrid = Instance.new("Frame")
-	statGrid.Name = "StatGrid"
-	statGrid.BackgroundTransparency = 1
-	statGrid.Size = UDim2.new(1, 0, 0, 300)
-	statGrid.LayoutOrder = 2
-	statGrid.Parent = parent
+	-- Five equal rows mirror the five-slot training dock. They deliberately fit in the
+	-- fixed body height, so the character sheet never hides Legs below a scrollbar.
+	local statList = Instance.new("Frame")
+	statList.Name = "StatList"
+	statList.BackgroundTransparency = 1
+	statList.Size = UDim2.new(1, 0, 0, 335)
+	statList.LayoutOrder = 2
+	statList.Parent = parent
 
-	local rows: { Frame } = {}
-	for rowIndex = 1, 3 do
-		local statRow = Instance.new("Frame")
-		statRow.Name = `Row{rowIndex}`
-		statRow.BackgroundTransparency = 1
-		statRow.Position = UDim2.fromOffset(0, (rowIndex - 1) * 102)
-		statRow.Size = UDim2.new(1, 0, 0, 96)
-		statRow.Parent = statGrid
-
-		local rowLayout = Instance.new("UIListLayout")
-		rowLayout.FillDirection = Enum.FillDirection.Horizontal
-		rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		rowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-		rowLayout.Padding = UDim.new(0, 8)
-		rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		rowLayout.Parent = statRow
-		table.insert(rows, statRow)
-	end
+	local listLayout = UI.VerticalList(statList, 5)
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 	local function statCard(definition: StatConfig.StatDefinition, index: number)
 		local level = if data ~= nil then (data.MultiplierLevels[definition.Id] or 0) else 0
 		local cost = Formulas.MultiplierCost(level)
 		local current = Formulas.MultiplierValue(level)
 		local next = Formulas.MultiplierValue(level + 1)
-		local rowIndex = math.ceil(index / 2)
-		local card = UI.CartoonCard(definition.Id, definition.Color, rows[rowIndex])
+		local card = UI.CartoonCard(definition.Id, definition.Color, statList)
 		card.LayoutOrder = index
-		card.Size = UDim2.new(0.5, -4, 1, 0)
+		card.Size = UDim2.new(1, 0, 0, 63)
 
 		local glyphHolder = Instance.new("Frame")
 		glyphHolder.Name = "Glyph"
@@ -1148,8 +1135,8 @@ function MenuController:_renderInfo(parent: Frame)
 		glyphHolder.BackgroundTransparency = 0.18
 		glyphHolder.BorderSizePixel = 0
 		glyphHolder.AnchorPoint = Vector2.new(0, 0.5)
-		glyphHolder.Position = UDim2.new(0, 9, 0.5, 0)
-		glyphHolder.Size = UDim2.fromOffset(62, 62)
+		glyphHolder.Position = UDim2.new(0, 8, 0.5, 0)
+		glyphHolder.Size = UDim2.fromOffset(48, 48)
 		glyphHolder.Parent = card
 
 		local glyphCorner = Instance.new("UICorner")
@@ -1161,34 +1148,36 @@ function MenuController:_renderInfo(parent: Frame)
 		glyphAspect.Parent = glyphHolder
 
 		local glyphPadding = Instance.new("UIPadding")
-		glyphPadding.PaddingTop = UDim.new(0, 10)
-		glyphPadding.PaddingBottom = UDim.new(0, 10)
-		glyphPadding.PaddingLeft = UDim.new(0, 10)
-		glyphPadding.PaddingRight = UDim.new(0, 10)
+		glyphPadding.PaddingTop = UDim.new(0, 8)
+		glyphPadding.PaddingBottom = UDim.new(0, 8)
+		glyphPadding.PaddingLeft = UDim.new(0, 8)
+		glyphPadding.PaddingRight = UDim.new(0, 8)
 		glyphPadding.Parent = glyphHolder
 		Icons.Draw(definition.Icon, glyphHolder, UI.Palette.CartoonCream, UI.Palette.CartoonInk)
 
 		local label = UI.Label("Name", card)
-		label.Position = UDim2.fromOffset(82, 8)
-		label.Size = UDim2.new(1, -190, 0, 20)
-		label.Font = UI.Font.Heading
-		label.TextSize = 13
+		label.Position = UDim2.fromOffset(68, 6)
+		label.Size = UDim2.fromOffset(132, 20)
+		label.Font = Enum.Font.GothamBold
+		label.TextSize = 14
 		label.TextColor3 = UI.Palette.CartoonCream
 		label.Text = `{string.upper(definition.DisplayName)}  ·  x{NumberFormat.Format(current)}`
 
 		local value = UI.Label("Value", card)
-		value.Position = UDim2.fromOffset(82, 28)
-		value.Size = UDim2.new(1, -190, 0, 28)
+		value.Position = UDim2.fromOffset(68, 26)
+		value.Size = UDim2.fromOffset(132, 32)
 		value.Font = UI.Font.Numeric
-		value.TextSize = 21
+		value.TextSize = 20
 		value.TextColor3 = Color3.new(1, 1, 1)
 		value.Text = NumberFormat.Format(stats[definition.Id] or 0)
 
 		local effect = UI.Label("Effect", card)
-		effect.Position = UDim2.fromOffset(82, 58)
-		effect.Size = UDim2.new(1, -190, 0, 20)
-		effect.TextSize = 11
-		effect.TextColor3 = UI.Palette.CartoonCream
+		effect.AnchorPoint = Vector2.new(0, 0.5)
+		effect.Position = UDim2.new(0, 210, 0.5, 0)
+		effect.Size = UDim2.new(1, -416, 0, 30)
+		effect.Font = Enum.Font.GothamMedium
+		effect.TextSize = 13
+		effect.TextColor3 = Color3.new(1, 1, 1)
 		effect.TextTruncate = Enum.TextTruncate.AtEnd
 		effect.Text = definition.Effect(stats)
 
@@ -1196,15 +1185,14 @@ function MenuController:_renderInfo(parent: Frame)
 		upgrade.Name = "Upgrade"
 		upgrade.AnchorPoint = Vector2.new(1, 0.5)
 		upgrade.Position = UDim2.new(1, -9, 0.5, 0)
-		upgrade.Size = UDim2.fromOffset(96, 64)
+		upgrade.Size = UDim2.fromOffset(188, 42)
 		upgrade.BackgroundColor3 = UI.Palette.Token
 		upgrade.BorderSizePixel = 0
 		upgrade.AutoButtonColor = false
-		upgrade.Font = UI.Font.Heading
-		upgrade.TextSize = 12
+		upgrade.Font = Enum.Font.GothamBold
+		upgrade.TextSize = 13
 		upgrade.TextColor3 = UI.Palette.CartoonInk
-		upgrade.TextWrapped = true
-		upgrade.Text = `UPGRADE\nx{NumberFormat.Format(next)}  ·  {NumberFormat.Format(cost)}`
+		upgrade.Text = `UPGRADE TO x{NumberFormat.Format(next)}  ·  {NumberFormat.Format(cost)} TOKENS`
 		upgrade.Parent = card
 
 		local upgradeCorner = Instance.new("UICorner")
@@ -1247,44 +1235,6 @@ function MenuController:_renderInfo(parent: Frame)
 	for index, definition in StatConfig.List do
 		statCard(definition, index)
 	end
-
-	local summary = UI.CartoonCard("BuildSummary", UI.Palette.Accent, rows[3])
-	summary.LayoutOrder = 6
-	summary.Size = UDim2.new(0.5, -4, 1, 0)
-
-	local summaryIcon = Instance.new("Frame")
-	summaryIcon.AnchorPoint = Vector2.new(0, 0.5)
-	summaryIcon.Position = UDim2.new(0, 12, 0.5, 0)
-	summaryIcon.Size = UDim2.fromOffset(58, 58)
-	summaryIcon.BackgroundTransparency = 1
-	summaryIcon.Parent = summary
-	local summaryAspect = Instance.new("UIAspectRatioConstraint")
-	summaryAspect.AspectRatio = 1
-	summaryAspect.Parent = summaryIcon
-	Icons.Draw("Rank", summaryIcon, UI.Palette.CartoonInk, UI.Palette.Accent)
-
-	local summaryTitle = UI.Label("Title", summary)
-	summaryTitle.Position = UDim2.fromOffset(82, 14)
-	summaryTitle.Size = UDim2.new(1, -94, 0, 22)
-	summaryTitle.Font = UI.Font.Heading
-	summaryTitle.TextSize = 13
-	summaryTitle.TextColor3 = UI.Palette.CartoonInk
-	summaryTitle.Text = "YOUR TOTAL BUILD"
-
-	local summaryPower = UI.Label("Power", summary)
-	summaryPower.Position = UDim2.fromOffset(82, 34)
-	summaryPower.Size = UDim2.new(1, -94, 0, 32)
-	summaryPower.Font = UI.Font.Numeric
-	summaryPower.TextSize = 22
-	summaryPower.TextColor3 = UI.Palette.CartoonInk
-	summaryPower.Text = `${NumberFormat.Format(power)} POWER`
-
-	local summaryHint = UI.Label("Hint", summary)
-	summaryHint.Position = UDim2.fromOffset(82, 66)
-	summaryHint.Size = UDim2.new(1, -94, 0, 18)
-	summaryHint.TextSize = 11
-	summaryHint.TextColor3 = UI.Palette.CartoonInk
-	summaryHint.Text = "Train all five muscles to climb ranks."
 end
 
 function MenuController:_renderQuests(parent: Frame)
