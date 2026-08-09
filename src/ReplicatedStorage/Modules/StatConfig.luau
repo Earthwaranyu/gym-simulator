@@ -13,6 +13,7 @@
 
 local Types = require(script.Parent.Types)
 local Formulas = require(script.Parent.Formulas)
+local NumberFormat = require(script.Parent.NumberFormat)
 
 export type StatDefinition = {
 	Id: Types.StatId,
@@ -49,9 +50,10 @@ local definitions: { StatDefinition } = {
 		DisplayName = "Arms",
 		Icon = "Fist",
 		Color = Color3.fromRGB(239, 83, 80),
-		Description = "Raw punching power. Every point of damage you deal starts here.",
+		Description = "Every Arms point adds exactly 1 raw punch damage.",
 		Effect = function(stats)
-			return `{string.format("%.0f", Formulas.AttackDamage(get(stats, "Arms")))} damage a hit`
+			local arms = Formulas.SanitizeStat(get(stats, "Arms"))
+			return `+{NumberFormat.Format(arms)} damage · {NumberFormat.Format(Formulas.AttackDamage(arms))} total`
 		end,
 		BodyScales = {
 			LeftUpperArm = 1.0,
@@ -65,9 +67,10 @@ local definitions: { StatDefinition } = {
 		DisplayName = "Chest",
 		Icon = "Chest",
 		Color = Color3.fromRGB(255, 167, 38),
-		Description = "How much punishment you can take before you drop.",
+		Description = "Every Chest point adds exactly 1 current and max health.",
 		Effect = function(stats)
-			return `{string.format("%.0f", Formulas.MaxHealth(get(stats, "Chest")))} max health`
+			local chest = Formulas.SanitizeStat(get(stats, "Chest"))
+			return `+{NumberFormat.Format(chest)} health · {NumberFormat.Format(Formulas.MaxHealth(chest))} total`
 		end,
 		BodyScales = {
 			UpperTorso = 1.0,
@@ -111,11 +114,12 @@ local definitions: { StatDefinition } = {
 		DisplayName = "Legs",
 		Icon = "Legs",
 		Color = Color3.fromRGB(171, 71, 188),
-		Description = "Ground speed and air speed. The stat that makes the map smaller.",
+		Description = "Each Legs point adds 1 sprint and flight speed until the safe velocity caps.",
 		Effect = function(stats)
 			local legs = get(stats, "Legs")
-			return `{string.format("%.0f", Formulas.SprintSpeed(legs))} sprint · `
-				.. `{string.format("%.0f", Formulas.FlightSpeed(legs))} fly`
+			local sprintBonus = Formulas.SprintSpeed(legs) - Formulas.BASE_SPRINT_SPEED
+			local flightBonus = Formulas.FlightSpeed(legs) - Formulas.BASE_FLIGHT_SPEED
+			return `+{NumberFormat.Format(sprintBonus)} sprint · +{NumberFormat.Format(flightBonus)} fly`
 		end,
 		BodyScales = {
 			LeftUpperLeg = 1.0,

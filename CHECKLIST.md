@@ -1146,6 +1146,26 @@ punches for a whole phase, so the game had two answers to one question.
       Rojo place build. Studio remains the final optical check at desktop and mobile
       sizes.
 
+- [x] 114. **Muscle numbers and their visible effects advance together.** Arms and
+      Chest now grant direct one-for-one bonuses above clearly separated avatar bases:
+      +1 Arms is +1 raw punch damage, and +1 Chest is +1 current and max health. Legs
+      is also +1 stud/second to both sprinting and flight until the existing 64/120
+      physical safety ceilings; its Info row shows the two earned bonuses rather than
+      hiding them inside total velocities. Back and Core deliberately remain contested
+      reduction and retaliation percentages.
+      Chest and Legs effects now apply on the same `StatChanged` event as the stored
+      muscle instead of waiting for the old one-second vitals poll. Chest preserves
+      missing health, so even an injured player sees the same +1 in current and maximum
+      health. Direct Arms scaling is paired with proportional power-gap protection so
+      massive players still need several hits against a beginner rather than inheriting
+      the old unsafe 25% damage floor. Manual input remains server-clocked hold-to-train:
+      clicking five times in a second cannot manufacture five reps, but every point the
+      server awards now moves its matching effect at the documented rate.
+      Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure
+      self-test (including explicit +1/+5 mappings), generated-gym and balance
+      validation, `git diff --check`, and a clean Rojo place build. Studio remains the
+      final live health-bar, sprint and flight feel check.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

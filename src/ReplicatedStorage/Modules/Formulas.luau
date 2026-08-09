@@ -5,16 +5,11 @@
 	No side effects and no Roblox API, so these can be tuned and self-tested without
 	opening Studio (`luau` can run RunSelfTest directly).
 
-	The central problem this file solves: stats climb into the trillions, but PvP has to
-	stay playable at every scale. If damage scaled linearly with Arms, a player with 1e12
-	would one-shot a player with 1e9 a thousand times over and combat would be decorative.
-
-	So progression and combat use different curves:
-	  * Training gains scale MULTIPLICATIVELY, so the numbers keep exploding — that is
-	    the dopamine loop, and it is what token multipliers buy.
-	  * Combat stats scale LOGARITHMICALLY, so a 1000x stat lead is roughly a 1.3x
-	    damage lead. A stronger player reliably wins, but a weaker one can still fight
-	    back, and the griefing hook stays fun instead of hopeless.
+	Training gains scale multiplicatively into enormous numbers, while every formula
+	still has to produce a finite Roblox property. Arms and Chest therefore grant direct
+	one-for-one bonuses, Back and Core are percentages, and Legs grants one stud/second
+	per point until the movement safety caps. Muscle deformation and percentage effects
+	remain logarithmic because they must stay useful without becoming physically invalid.
 ]]
 
 local Formulas = {}
@@ -169,29 +164,35 @@ end
 
 -- === Combat =================================================================
 
---[[
-	Max health, from Chest. The log curve means a 1e12 player has roughly 6x the
-	health of a 1e2 player, not 1e10 times.
+-- Built-in character values are separate from muscle bonuses. Exporting these keeps
+-- UI copy honest: a player can see "+5 health" and "105 total" without mistaking the
+-- avatar's free starting health for five Chest points they did not earn.
+Formulas.BASE_HEALTH = 100
+Formulas.BASE_ATTACK_DAMAGE = 8
+Formulas.BASE_WALK_SPEED = 16
+Formulas.BASE_SPRINT_SPEED = 24
+Formulas.BASE_FLIGHT_SPEED = 40
 
-	This used to read Core, which was simply the wrong stat: CLAUDE.md gives Chest
-	the health and Core the retaliation, and the code had the two swapped. Only the
-	input changed — the curve is untouched, so nobody's health moved.
-]]
+-- Direct velocity scaling has to stop before a Humanoid or flight constraint starts
+-- skipping through the map. These are bonus caps, not hidden conversion curves: every
+-- Legs point before a cap is exactly +1 stud/second and the Info row shows both bonuses.
+Formulas.MAX_SPRINT_BONUS = 40
+Formulas.MAX_FLIGHT_BONUS = 80
+
+-- One Chest point is exactly one additional max-health point. The previous log curve
+-- made the first Chest point add about twelve health, then made later points add less
+-- than one; that is why the visible Chest number and health bar appeared to disagree.
 function Formulas.MaxHealth(chestStat: number): number
-	return 100 + softScale(Formulas.SanitizeStat(chestStat), 40)
+	return Formulas.BASE_HEALTH + Formulas.SanitizeStat(chestStat)
 end
 
 --[[
-	Base melee damage before per-ability multipliers. Arms, and only Arms.
-
-	Chest used to contribute a third of this on top of Arms' two thirds, which left
-	Chest doing two jobs and Arms sharing its one. The weight here rose from 6 to 9
-	to absorb exactly what Chest was adding, so a player who trained both evenly
-	deals the same damage as before — 116 at 1e12, 35 at 1e3. This is a
-	reassignment, not a rebalance, and the time-to-kill check below proves it.
+	Base melee damage before per-ability multipliers. One Arms point is one point of
+	additional raw damage, on top of the avatar's small built-in hit. PowerGapFalloff
+	then protects a much weaker victim without falsifying the attacker's Arms number.
 ]]
 function Formulas.AttackDamage(armsStat: number): number
-	return 8 + softScale(Formulas.SanitizeStat(armsStat), 9)
+	return Formulas.BASE_ATTACK_DAMAGE + Formulas.SanitizeStat(armsStat)
 end
 
 --[[
@@ -255,13 +256,13 @@ end
 	player now, not the inability to run away.
 ]]
 function Formulas.WalkSpeed(_legsStat: number): number
-	return 16
+	return Formulas.BASE_WALK_SPEED
 end
 
--- Shift sprint is where Legs matters on the ground. A fresh player runs at 24,
--- while extreme Legs approaches 64 rather than the previous 112-stud blur.
+-- Shift sprint is where Legs matters on the ground. Every point is +1 stud/second
+-- until the established 64-stud safety ceiling.
 function Formulas.SprintSpeed(legsStat: number): number
-	return 24 + math.min(40, softScale(Formulas.SanitizeStat(legsStat), 3))
+	return Formulas.BASE_SPRINT_SPEED + math.min(Formulas.MAX_SPRINT_BONUS, Formulas.SanitizeStat(legsStat))
 end
 
 --[[
@@ -275,14 +276,15 @@ end
 	player still has time to read landmarks and land accurately.
 ]]
 function Formulas.FlightSpeed(legsStat: number): number
-	return 40 + math.min(80, softScale(Formulas.SanitizeStat(legsStat), 4))
+	return Formulas.BASE_FLIGHT_SPEED + math.min(Formulas.MAX_FLIGHT_BONUS, Formulas.SanitizeStat(legsStat))
 end
 
 --[[
 	Damage scaling applied when a much stronger player hits a much weaker one.
-	Returns a value in [0.25, 1]: the wider the power gap in the attacker's favour,
-	the less damage lands. This is the anti-grief dial — a maxed player can still kill
-	a beginner, it just is not instant, so being farmed stays survivable.
+	Direct Arms damage needs a proportional falloff rather than the old logarithmic
+	minimum of 25%, which would let trillion-power players erase beginners instantly.
+	The 75-point baseline leaves a fresh victim vulnerable but gives them several hits
+	of warning. Equal and weaker attackers still deal their full raw damage.
 ]]
 function Formulas.PowerGapFalloff(rawAttackerPower: number, rawVictimPower: number): number
 	local attackerPower = Formulas.SanitizeStat(rawAttackerPower)
@@ -291,9 +293,8 @@ function Formulas.PowerGapFalloff(rawAttackerPower: number, rawVictimPower: numb
 		return 1
 	end
 
-	-- Orders of magnitude the attacker is ahead by.
-	local decades = math.log(1 + attackerPower, 10) - math.log(1 + victimPower, 10)
-	return math.clamp(1 - decades * 0.12, 0.25, 1)
+	local protectionBaseline = 75
+	return math.clamp((victimPower + protectionBaseline) / (attackerPower + protectionBaseline), 0, 1)
 end
 
 --[[
@@ -393,17 +394,18 @@ function Formulas.RunSelfTest(): { string }
 	check("multiplier cost grows", Formulas.MultiplierCost(10) > Formulas.MultiplierCost(9))
 	check("first upgrade is affordable", Formulas.MultiplierCost(0) <= 10)
 
-	check("health has a floor", Formulas.MaxHealth(0) == 100)
-	check("health grows with chest", Formulas.MaxHealth(1e12) > Formulas.MaxHealth(1e6))
-	-- The whole point of log scaling: a trillion-Chest player is tanky, not invincible.
-	check("health stays bounded", Formulas.MaxHealth(1e12) < 1000)
+	check("health has a 100-point base", Formulas.MaxHealth(0) == Formulas.BASE_HEALTH)
+	check("one Chest is one health", Formulas.MaxHealth(1) - Formulas.MaxHealth(0) == 1)
+	check("five Chest is five health", Formulas.MaxHealth(5) - Formulas.MaxHealth(0) == 5)
+	check("Chest stays one-to-one at scale", Formulas.MaxHealth(1e12) - Formulas.BASE_HEALTH == 1e12)
 
-	check("damage grows with arms", Formulas.AttackDamage(1e9) > Formulas.AttackDamage(1e3))
-	check("damage stays bounded", Formulas.AttackDamage(1e12) < 200)
+	check("damage has an 8-point base", Formulas.AttackDamage(0) == Formulas.BASE_ATTACK_DAMAGE)
+	check("one Arms is one damage", Formulas.AttackDamage(1) - Formulas.AttackDamage(0) == 1)
+	check("five Arms is five damage", Formulas.AttackDamage(5) - Formulas.AttackDamage(0) == 5)
+	check("Arms stays one-to-one at scale", Formulas.AttackDamage(1e12) - Formulas.BASE_ATTACK_DAMAGE == 1e12)
 
-	-- The griefing invariant. Raw damage at 1e12 (~116) does exceed a fresh player's
-	-- 100 health, so this only holds once falloff is applied — which is exactly why
-	-- CombatService must never skip it.
+	-- The griefing invariant. Direct trillion-scale damage is safe only once the
+	-- proportional power-gap falloff is applied.
 	local bullyDamage = Formulas.AttackDamage(1e12) * Formulas.PowerGapFalloff(3e12, 0)
 	check("a maxed player cannot one-shot a beginner", bullyDamage < Formulas.MaxHealth(0))
 	check("a maxed player still kills a beginner in a few hits", bullyDamage * 6 > Formulas.MaxHealth(0))
@@ -414,21 +416,16 @@ function Formulas.RunSelfTest(): { string }
 	local highTtk = Formulas.MaxHealth(1e12) / Formulas.AttackDamage(1e12)
 	check("time-to-kill stays stable across scales", math.abs(lowTtk - highTtk) < 3)
 
-	-- Moving damage off Chest and onto Arms must not have moved these. The numbers
-	-- are the ones the old Arms+Chest model produced for an evenly-trained player;
-	-- if a weight is ever retuned, this is what says so out loud.
-	check("an even build deals what it always did, low", math.abs(Formulas.AttackDamage(1e3) - 35) < 0.5)
-	check("an even build deals what it always did, high", math.abs(Formulas.AttackDamage(1e12) - 116) < 0.5)
-
-	-- Flight begins useful without crossing the city in seconds, then grows with Legs.
+	-- Flight begins useful without crossing the city in seconds. Legs is exactly
+	-- one-to-one before each physical velocity cap, and never exceeds that cap.
 	check("fresh flight beats fresh sprint", Formulas.FlightSpeed(0) > Formulas.SprintSpeed(0))
-	check("flight rewards legs", Formulas.FlightSpeed(1e12) > Formulas.FlightSpeed(1e3) * 1.15)
+	check("one Legs is one flight speed", Formulas.FlightSpeed(1) - Formulas.FlightSpeed(0) == 1)
 	check("flight is capped", Formulas.FlightSpeed(1e30) <= 120)
 
 	check("walkspeed floor", Formulas.WalkSpeed(0) == 16)
 	check("ordinary walking is stable", Formulas.WalkSpeed(1e30) == 16)
 	check("fresh sprint starts at 24", Formulas.SprintSpeed(0) == 24)
-	check("sprint rewards Legs", Formulas.SprintSpeed(1e9) > Formulas.SprintSpeed(1e3) * 1.15)
+	check("one Legs is one sprint speed", Formulas.SprintSpeed(1) - Formulas.SprintSpeed(0) == 1)
 	check("sprint is capped", Formulas.SprintSpeed(1e30) <= 64)
 
 	-- Back is a counter to Arms, not a tax on everyone. If equal investment ever
@@ -465,7 +462,7 @@ function Formulas.RunSelfTest(): { string }
 	check("no falloff when weaker", Formulas.PowerGapFalloff(100, 1000) == 1)
 	check("no falloff when equal", Formulas.PowerGapFalloff(1000, 1000) == 1)
 	check("falloff when far stronger", Formulas.PowerGapFalloff(1e12, 1e3) < 0.5)
-	check("falloff never fully blocks", Formulas.PowerGapFalloff(1e30, 1) >= 0.25)
+	check("falloff never fully blocks", Formulas.PowerGapFalloff(1e30, 1) > 0)
 
 	check("total power sums", Formulas.TotalPower({ a = 2, b = 3 }) == 5)
 

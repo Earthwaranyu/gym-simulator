@@ -33,7 +33,8 @@ local SAFE_ZONE_TAG = "SafeZone"
 -- Killing the same victim again inside this window still works — griefing is the
 -- point of the game — but pays nothing, so farming one person is not a strategy.
 local REPEAT_KILL_WINDOW = 120
--- How often stat-derived health and speed are re-applied to living characters.
+-- Slow fallback for respawn/property interference. Chest and Legs changes also apply
+-- immediately below, so the health bar and Info value never drift for a full second.
 local VITALS_REFRESH_SECONDS = 1
 -- Generosity on the client's claimed range, to absorb latency.
 local RANGE_TOLERANCE = 1.35
@@ -403,9 +404,9 @@ function CombatService:GetBaseDamage(player: Player): number
 end
 
 --[[
-	Pushes stat-derived health and walkspeed onto a living character, preserving the
-	current health ratio so growing your Chest heals proportionally rather than
-	leaving you at a sliver of a bigger bar.
+	Pushes stat-derived health and walkspeed onto a living character. Growing Chest
+	preserves missing health rather than health percentage: +1 Chest is therefore
+	exactly +1 current and max health, whether the player is full or injured.
 ]]
 function CombatService:_applyVitals(player: Player)
 	local _, humanoid, _ = getLivingParts(player)
@@ -415,9 +416,9 @@ function CombatService:_applyVitals(player: Player)
 
 	local maxHealth = Formulas.MaxHealth(StatService:GetStat(player, "Chest"))
 	if math.abs(humanoid.MaxHealth - maxHealth) > 0.01 then
-		local ratio = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
+		local missingHealth = math.max(0, humanoid.MaxHealth - humanoid.Health)
 		humanoid.MaxHealth = maxHealth
-		humanoid.Health = math.clamp(ratio * maxHealth, 1, maxHealth)
+		humanoid.Health = math.clamp(maxHealth - missingHealth, 1, maxHealth)
 	end
 
 	local legs = StatService:GetStat(player, "Legs")
@@ -475,8 +476,17 @@ function CombatService:Start()
 		end
 	end)
 
-	-- Stats change constantly while training, so vitals are refreshed on a slow timer
-	-- rather than on every StatChanged, which would fire several times a second.
+	-- Apply visible effects in the same server update that changed their raw muscle.
+	-- The old one-second polling delay made several quarter-second manual gains appear
+	-- as one unrelated health jump, even though the stored Chest value was correct.
+	StatService.StatChanged:Connect(function(player: Player, statId: string)
+		if statId == "Chest" or statId == "Legs" then
+			self:_applyVitals(player)
+		end
+	end)
+
+	-- Keep a slow reconciliation pass for character scripts or Roblox systems that
+	-- overwrite the properties independently of a stat change.
 	task.spawn(function()
 		while true do
 			task.wait(VITALS_REFRESH_SECONDS)
