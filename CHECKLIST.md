@@ -1166,6 +1166,24 @@ punches for a whole phase, so the game had two answers to one question.
       validation, `git diff --check`, and a clean Rojo place build. Studio remains the
       final live health-bar, sprint and flight feel check.
 
+- [x] 115. **Percentage muscles have visible, enforceable ceilings.** A fresh avatar's
+      punch now starts at 1 damage rather than 8, while every trained Arms point still
+      adds exactly one. Back and Core keep the logarithmic progression required by an
+      exponential-stat game, but their safety rules are no longer hidden magic numbers:
+      Back is capped at 50% resistance and Core at 35% reflection. One hundred points
+      therefore gives roughly 16% best-case Back resistance and 6% Core reflection—not
+      immunity—and further training advances with diminishing returns toward, never
+      through, the caps. Back remains contested against the attacker's Arms, and Core
+      only reflects a hit the defender survives.
+      The Info rows now show the live percentage with one decimal place beside the hard
+      cap, and their descriptions explain the relevant combat condition. Named formula
+      constants drive both mechanics and copy; a dedicated `RetaliationRate` removes the
+      old UI trick of calculating reflection from a sample 100-damage hit. Hostile-input,
+      100-point and astronomical-stat self-tests assert neither percentage can reach
+      100%. Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis,
+      every pure self-test, generated-gym and balance validation, `git diff --check`, and
+      a clean Rojo place build. Studio remains the final optical and combat-feel check.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

@@ -168,10 +168,16 @@ end
 -- UI copy honest: a player can see "+5 health" and "105 total" without mistaking the
 -- avatar's free starting health for five Chest points they did not earn.
 Formulas.BASE_HEALTH = 100
-Formulas.BASE_ATTACK_DAMAGE = 8
+Formulas.BASE_ATTACK_DAMAGE = 1
 Formulas.BASE_WALK_SPEED = 16
 Formulas.BASE_SPRINT_SPEED = 24
 Formulas.BASE_FLIGHT_SPEED = 40
+
+-- Percentage defenses must never reach 100%. Full Back resistance would create
+-- permanent immunity, while full Core reflection would make attacking equivalent to
+-- hitting yourself. Named caps let formulas, tests and UI communicate one rule.
+Formulas.MAX_BACK_RESISTANCE = 0.5
+Formulas.MAX_CORE_REFLECTION = 0.35
 
 -- Direct velocity scaling has to stop before a Humanoid or flight constraint starts
 -- skipping through the map. These are bonus caps, not hidden conversion curves: every
@@ -206,7 +212,8 @@ end
 	a world where Back did not exist, and time-to-kill is untouched at every scale.
 
 	What Back buys is an answer to somebody who out-levelled you on Arms alone.
-	Capped at half, because a stat that could reach immunity is not a stat.
+	Capped at half, because a stat that could reach immunity is not a stat. Diminishing
+	logarithmic growth keeps later Back training useful without ever approaching 100%.
 ]]
 function Formulas.DamageResistance(backStat: number, attackerArmsStat: number): number
 	-- Orders of magnitude the defender's Back leads the attacker's Arms by.
@@ -215,29 +222,32 @@ function Formulas.DamageResistance(backStat: number, attackerArmsStat: number): 
 	if advantage <= 0 then
 		return 0
 	end
-	return math.min(advantage * 0.08, 0.5)
+	return math.min(advantage * 0.08, Formulas.MAX_BACK_RESISTANCE)
 end
 
 --[[
 	Damage dealt back to an attacker by the victim's Core, as a share of the damage
-	that just landed. Capped at just over a third.
+	that just landed. Capped at just over a third. This separate rate function lets UI
+	show the exact percentage without pretending a sample 100-damage hit is the rule.
 
 	Expressed as a fraction of the incoming hit rather than as a flat number on
 	purpose: it means a heavy hitter takes more back than a light one, so Core is a
 	deterrent proportional to what is being done to you, and it can never punish
 	somebody for a hit that barely scratched you.
 
-	The cap is where it is because of what it costs over a whole fight. An evenly
-	matched attacker needs five hits to win and takes 35% back on each, spending
-	about a third of their own health to do it — expensive, survivable, and not an
-	inversion. A defender who wants to actually win on retaliation has to out-train
-	the attacker on Chest as well, which is a build rather than a free ride.
+	The 35% cap means a surviving defender can return a meaningful piece of a hit, but
+	never the full hit. A defender who wants to win through retaliation must also invest
+	in enough Chest to survive, which makes it a build rather than automatic immunity.
 ]]
+function Formulas.RetaliationRate(coreStat: number): number
+	return math.min(Formulas.MAX_CORE_REFLECTION, softScale(Formulas.SanitizeStat(coreStat), 0.03))
+end
+
 function Formulas.Retaliation(coreStat: number, damageTaken: number): number
 	if not Formulas.IsFinite(damageTaken) or damageTaken <= 0 then
 		return 0
 	end
-	return damageTaken * math.min(0.35, softScale(Formulas.SanitizeStat(coreStat), 0.03))
+	return damageTaken * Formulas.RetaliationRate(coreStat)
 end
 
 --[[
@@ -366,6 +376,7 @@ function Formulas.RunSelfTest(): { string }
 	fuzz("MuscleScale", Formulas.MuscleScale, 2)
 	fuzz("GainPerRep", Formulas.GainPerRep, 2)
 	fuzz("DamageResistance", Formulas.DamageResistance, 2)
+	fuzz("RetaliationRate", Formulas.RetaliationRate, 1)
 	fuzz("Retaliation", Formulas.Retaliation, 2)
 	fuzz("PowerGapFalloff", Formulas.PowerGapFalloff, 2)
 
@@ -399,7 +410,7 @@ function Formulas.RunSelfTest(): { string }
 	check("five Chest is five health", Formulas.MaxHealth(5) - Formulas.MaxHealth(0) == 5)
 	check("Chest stays one-to-one at scale", Formulas.MaxHealth(1e12) - Formulas.BASE_HEALTH == 1e12)
 
-	check("damage has an 8-point base", Formulas.AttackDamage(0) == Formulas.BASE_ATTACK_DAMAGE)
+	check("damage has a 1-point base", Formulas.AttackDamage(0) == Formulas.BASE_ATTACK_DAMAGE)
 	check("one Arms is one damage", Formulas.AttackDamage(1) - Formulas.AttackDamage(0) == 1)
 	check("five Arms is five damage", Formulas.AttackDamage(5) - Formulas.AttackDamage(0) == 5)
 	check("Arms stays one-to-one at scale", Formulas.AttackDamage(1e12) - Formulas.BASE_ATTACK_DAMAGE == 1e12)
@@ -432,12 +443,17 @@ function Formulas.RunSelfTest(): { string }
 	-- stops cancelling, every balance number above it silently changes meaning.
 	check("back does nothing against equal arms", Formulas.DamageResistance(1e9, 1e9) == 0)
 	check("back does nothing against stronger arms", Formulas.DamageResistance(1e6, 1e12) == 0)
+	check("100 Back is not immunity", Formulas.DamageResistance(100, 0) < Formulas.MAX_BACK_RESISTANCE)
 	check("back reduces a weaker attacker", Formulas.DamageResistance(1e12, 1e6) > 0.4)
 	check(
 		"back grows with the gap",
 		Formulas.DamageResistance(1e12, 1e3) > Formulas.DamageResistance(1e12, 1e9)
 	)
-	check("back caps at half", Formulas.DamageResistance(1e30, 0) <= 0.5)
+	check(
+		"back never reaches full immunity",
+		Formulas.DamageResistance(1e30, 0) <= Formulas.MAX_BACK_RESISTANCE
+			and Formulas.MAX_BACK_RESISTANCE < 1
+	)
 	-- Resistance stacks with falloff, so the two together must still leave a hit
 	-- that lands. A defensive build should be expensive to kill, never impossible.
 	local vsTank = Formulas.AttackDamage(1e12)
@@ -446,8 +462,16 @@ function Formulas.RunSelfTest(): { string }
 	check("nothing is immune", vsTank > 0)
 
 	check("no core, no retaliation", Formulas.Retaliation(0, 100) == 0)
+	check("100 Core is not full reflection", Formulas.RetaliationRate(100) < Formulas.MAX_CORE_REFLECTION)
 	check("retaliation grows with core", Formulas.Retaliation(1e9, 100) > Formulas.Retaliation(1e3, 100))
-	check("retaliation caps", Formulas.Retaliation(1e30, 100) <= 35.001)
+	check(
+		"core never reaches full reflection",
+		Formulas.RetaliationRate(1e30) <= Formulas.MAX_CORE_REFLECTION and Formulas.MAX_CORE_REFLECTION < 1
+	)
+	check(
+		"retaliation uses the named cap",
+		Formulas.Retaliation(1e30, 100) <= 100 * Formulas.MAX_CORE_REFLECTION
+	)
 	check("retaliation never exceeds the hit", Formulas.Retaliation(1e30, 100) < 100)
 	-- Thorns must not invert a fair fight: winning an even duel should cost the
 	-- attacker a chunk of health, never more than they have.

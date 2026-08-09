@@ -81,16 +81,16 @@ local definitions: { StatDefinition } = {
 		DisplayName = "Back",
 		Icon = "Back",
 		Color = Color3.fromRGB(102, 187, 106),
-		Description = "Braced against heavier hitters. Blunts damage from anyone whose Arms trail your Back.",
+		Description = "Diminishing resistance against Arms below your Back. Hard-capped at 50%; never immunity.",
 		Effect = function(stats)
 			-- Resistance is contested, so there is no single number for it. Quoted
 			-- against an attacker with nothing in Arms, which is the ceiling, and
 			-- labelled as such rather than pretending it applies to everyone.
 			local best = Formulas.DamageResistance(get(stats, "Back"), 0)
-			if best < 0.005 then
-				return "no damage reduction yet"
-			end
-			return `up to -{string.format("%.0f", best * 100)}% damage taken`
+			return `up to {string.format("%.1f", best * 100)}% resist · {string.format(
+				"%.0f",
+				Formulas.MAX_BACK_RESISTANCE * 100
+			)}% cap`
 		end,
 		BodyScales = {
 			UpperTorso = 0.6,
@@ -100,9 +100,12 @@ local definitions: { StatDefinition } = {
 		Id = "Core",
 		DisplayName = "Core",
 		Icon = "Core",
-		Description = "Hitting you costs the attacker. A share of every blow goes straight back.",
+		Description = "Reflects part of each surviving hit with diminishing returns. Hard-capped at 35%.",
 		Effect = function(stats)
-			return `{string.format("%.0f", Formulas.Retaliation(get(stats, "Core"), 100))}% of hits sent back`
+			return `{string.format("%.1f", Formulas.RetaliationRate(get(stats, "Core")) * 100)}% reflect · {string.format(
+				"%.0f",
+				Formulas.MAX_CORE_REFLECTION * 100
+			)}% cap`
 		end,
 		Color = Color3.fromRGB(66, 165, 245),
 		BodyScales = {
