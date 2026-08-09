@@ -134,6 +134,7 @@ local minimapProject: ((number, number) -> UDim2)? = nil
 -- Where the drawn square is centred, and whether the server has answered yet.
 local minimapCentre: Vector3? = nil
 local minimapReady = false
+local minimapDrawing = false
 local minimapAt = 0
 
 local lastPunchAt = -math.huge
@@ -446,7 +447,11 @@ function HudController:_buildMinimap(screen: ScreenGui)
 	panel.Position = UDim2.fromOffset(16, 68)
 	panel.Size = UDim2.fromOffset(MINIMAP_WIDTH, MINIMAP_HEIGHT)
 	panel.BackgroundColor3 = UI.Palette.Glass
-	panel.BackgroundTransparency = 0.25
+	-- Opaque, unlike every other HUD panel. The rest of the HUD is glass over the world
+	-- because text reads fine with a city faintly behind it; a map does not. A dark roof
+	-- passing behind a translucent map is indistinguishable from a feature drawn on it,
+	-- and the whole panel reads as two pictures on top of each other.
+	panel.BackgroundTransparency = 0
 	panel.BorderSizePixel = 0
 	panel.AutoButtonColor = false
 	panel.Text = ""
@@ -494,7 +499,7 @@ function HudController:_buildMinimap(screen: ScreenGui)
 	-- or nothing at all, and a pale ground made those gaps indistinguishable from the
 	-- features drawn on it.
 	window.BackgroundColor3 = UI.Palette.Backdrop
-	window.BackgroundTransparency = 0.1
+	window.BackgroundTransparency = 0
 	window.BorderSizePixel = 0
 	window.ClipsDescendants = true
 	window.Parent = panel
@@ -595,9 +600,15 @@ end
 ]]
 function HudController:_drawMinimapRegion(centre: Vector3)
 	local pivot = minimapPivot
-	if pivot == nil or not minimapReady then
+	if pivot == nil or not minimapReady or minimapDrawing then
 		return
 	end
+
+	-- Re-entrancy guard. MapRender.Fetch only yields while the server has not answered,
+	-- but if it ever did yield here — a redraw is driven from RenderStepped — two draws
+	-- would overlap and leave two canvases stacked on the pivot, which is exactly what a
+	-- doubled-up map looks like.
+	minimapDrawing = true
 
 	local dests, feats = MapRender.Fetch()
 	local bounds = MapRender.BoundsAround(centre.X, centre.Z, MINIMAP_REGION_STUDS / 2)
@@ -658,6 +669,16 @@ function HudController:_drawMinimapRegion(centre: Vector3)
 	if minimapMarker ~= nil then
 		minimapMarker.Visible = true
 	end
+
+	-- Belt and braces: any stray canvas from an earlier draw goes, so the pivot holds
+	-- exactly one map and a doubled image is impossible by construction.
+	for _, child in pivot:GetChildren() do
+		if child ~= canvas then
+			child:Destroy()
+		end
+	end
+
+	minimapDrawing = false
 end
 
 --[[

@@ -914,6 +914,23 @@ punches for a whole phase, so the game had two answers to one question.
       renderer has been stalled for four sessions, so the wash and the dark ground are
       chosen, not seen.
 
+- [x] 103. **An opaque minimap, and one sentence deleted from thirty-five signs.**
+      The minimap was still reading as two pictures on top of each other. Every other
+      HUD panel is glass over the world, which is right for text — a city faintly behind
+      a number costs nothing — and wrong for a map, where anything showing through is
+      indistinguishable from something drawn on it. The panel was 25% transparent and the
+      water drawn on it another 10%, so a dark roof passing behind the corner came
+      through both and read as terrain. The panel and its window are now fully opaque on
+      the HUD's own dark ground. The redraw also gained a re-entrancy guard and a sweep
+      of any stray canvas, so two maps stacked on the pivot is impossible by
+      construction rather than merely unlikely.
+      **The machine signs lost a line.** Each one printed what the stat is FOR — "14
+      damage a hit" — which is a fact about the player, not about the machine, so all
+      thirty-five signs in the city printed the same sentence. Thirty-four of those are
+      clutter standing in the middle of the world, and the Info screen already answers
+      it once in the place a player goes to ask. The sign is three lines now — name,
+      stat and rate, how to get on — and shrank from 90 to 70 pixels to match.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

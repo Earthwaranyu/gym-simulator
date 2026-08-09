@@ -79,7 +79,9 @@ function StationBillboardController:_bind(station: Instance)
 	gui.Name = "StationLabel"
 	gui.Adornee = adornee
 	-- Four lines now: name, rate, what the stat buys you, and how to get on.
-	gui.Size = UDim2.fromOffset(210, 90)
+	-- Three lines now that the stat's effect line is gone, so the sign shrinks with it
+	-- rather than floating a band of empty glass over every machine.
+	gui.Size = UDim2.fromOffset(210, 70)
 	gui.StudsOffsetWorldSpace = headroomOffset(station, adornee)
 	gui.AlwaysOnTop = false
 	gui.MaxDistance = 70
@@ -151,17 +153,15 @@ function StationBillboardController:_refresh()
 				* Formulas.MultiplierValue(level)
 				/ definition.RepInterval
 
-			-- The third line is what the stat is FOR. A player standing at the
-			-- pull-up bar could previously read that it trains Back and how fast,
-			-- and still have no idea what Back does to them.
-			local effect = if statDefinition ~= nil
-				then statDefinition.Effect(if data ~= nil then data.Stats else {})
-				else ""
-
+			-- Three lines, not four. The fourth used to be what the stat is FOR —
+			-- "14 damage a hit" — which is a fact about the player, not about this
+			-- machine, and it was therefore printed identically over every machine in
+			-- the city. Thirty-five signs repeating one sentence is thirty-four signs
+			-- of clutter in the middle of the world, and the Info screen already says
+			-- it once, in the place a player goes to ask.
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
 				.. `<font color="#{color:ToHex()}">{definition.StatId}</font>  `
 				.. `+{NumberFormat.Format(perSecond)}/s\n`
-				.. `<font color="#8A93A8">{effect}</font>\n`
 				.. statusLine(entry)
 		else
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
