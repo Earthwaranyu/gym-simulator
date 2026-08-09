@@ -36,6 +36,8 @@ type Entry = {
 	station: Instance,
 	definition: EquipmentConfig.EquipmentDefinition,
 	label: TextLabel,
+	warningFrame: Frame,
+	warningText: TextLabel,
 	gui: BillboardGui,
 }
 
@@ -78,16 +80,52 @@ function StationBillboardController:_bind(station: Instance)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "StationLabel"
 	gui.Adornee = adornee
-	-- Three lines: name, rate, and how to get on. The sign shrank with the stat's effect
-	-- line rather than floating a band of empty glass over every machine.
-	gui.Size = UDim2.fromOffset(210, 70)
+	gui.Size = UDim2.fromOffset(260, 105)
 	gui.StudsOffsetWorldSpace = headroomOffset(station, adornee)
 	gui.AlwaysOnTop = false
-	gui.MaxDistance = 70
+	gui.MaxDistance = 80
 	gui.Parent = adornee
 
-	local panel = UI.Panel("Body", gui)
-	panel.Size = UDim2.fromScale(1, 1)
+	-- Container layout to hold warning circle on top and text panel below
+	local container = Instance.new("Frame")
+	container.Name = "Container"
+	container.BackgroundTransparency = 1
+	container.Size = UDim2.fromScale(1, 1)
+	container.Parent = gui
+
+	local warningFrame = Instance.new("Frame")
+	warningFrame.Name = "WarningBadge"
+	warningFrame.AnchorPoint = Vector2.new(0.5, 0)
+	warningFrame.Position = UDim2.fromScale(0.5, 0)
+	warningFrame.Size = UDim2.fromOffset(36, 36)
+	warningFrame.BackgroundColor3 = Color3.fromRGB(235, 75, 60)
+	warningFrame.BackgroundTransparency = 0.05
+	warningFrame.BorderSizePixel = 0
+	warningFrame.Visible = false
+	warningFrame.Parent = container
+
+	local warningCorner = Instance.new("UICorner")
+	warningCorner.CornerRadius = UDim.new(1, 0)
+	warningCorner.Parent = warningFrame
+
+	local warningStroke = Instance.new("UIStroke")
+	warningStroke.Color = Color3.fromRGB(255, 255, 255)
+	warningStroke.Thickness = 2
+	warningStroke.Parent = warningFrame
+
+	local warningText = UI.Label("ExclamationMark", warningFrame)
+	warningText.Size = UDim2.fromScale(1, 1)
+	warningText.Text = "!"
+	warningText.Font = Enum.Font.GothamBlack
+	warningText.TextSize = 24
+	warningText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	warningText.TextXAlignment = Enum.TextXAlignment.Center
+	warningText.TextYAlignment = Enum.TextYAlignment.Center
+
+	local panel = UI.Panel("Body", container)
+	panel.AnchorPoint = Vector2.new(0.5, 1)
+	panel.Position = UDim2.fromScale(0.5, 1)
+	panel.Size = UDim2.new(1, 0, 1, -40)
 	panel.BackgroundTransparency = 0.2
 
 	local label = UI.Label("Text", panel)
@@ -95,7 +133,14 @@ function StationBillboardController:_bind(station: Instance)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextSize = 13
 
-	billboards[station] = { station = station, definition = definition, label = label, gui = gui }
+	billboards[station] = {
+		station = station,
+		definition = definition,
+		label = label,
+		warningFrame = warningFrame,
+		warningText = warningText,
+		gui = gui,
+	}
 end
 
 function StationBillboardController:_unbind(station: Instance)
@@ -137,34 +182,46 @@ function StationBillboardController:_refresh()
 	for _, entry in billboards do
 		local definition = entry.definition
 		local statDefinition = StatConfig.Get(definition.StatId)
+		local statDisplayName = if statDefinition ~= nil
+			then statDefinition.DisplayName
+			else definition.StatId
 		local color = if statDefinition ~= nil then statDefinition.Color else UI.Palette.Text
 
+		local reqPowerAttribute = entry.station:GetAttribute("RequiredPower")
+		local reqPower = if type(reqPowerAttribute) == "number"
+			then reqPowerAttribute
+			else definition.UnlockPower
+		local requiredPower = math.max(reqPower, definition.UnlockPower)
+
 		local owned = data ~= nil and data.OwnedEquipment[definition.Id] == true
-		local unlocked = owned or power >= definition.UnlockPower
+		local unlocked = owned or power >= requiredPower
+
+		-- Required-power stations carry the warning badge from the reference. Starter
+		-- machines do not shout "warning" when there is no gate to warn about.
+		entry.warningFrame.Visible = requiredPower > 0
+		entry.warningFrame.BackgroundColor3 = Color3.fromRGB(235, 75, 60)
+
+		local level = if data ~= nil then (data.MultiplierLevels[definition.StatId] or 0) else 0
+		local locationMultiplier = entry.station:GetAttribute("GainMultiplier")
+		local zoneRate = if type(locationMultiplier) == "number" then locationMultiplier else 1
+		local perSecond = definition.BaseGain
+			* zoneRate
+			* Formulas.MultiplierValue(level)
+			/ definition.RepInterval
+
+		local reqLine = if requiredPower > 0
+			then `<font color="#FF7B7B">Require : {NumberFormat.Format(requiredPower)}+ Power</font>\n`
+			else ""
 
 		if unlocked then
-			-- Show the rate the player would actually get, multipliers included.
-			local level = if data ~= nil then (data.MultiplierLevels[definition.StatId] or 0) else 0
-			local locationMultiplier = entry.station:GetAttribute("GainMultiplier")
-			local zoneRate = if type(locationMultiplier) == "number" then locationMultiplier else 1
-			local perSecond = definition.BaseGain
-				* zoneRate
-				* Formulas.MultiplierValue(level)
-				/ definition.RepInterval
-
-			-- Three lines, not four. The fourth used to be what the stat is FOR —
-			-- "14 damage a hit" — which is a fact about the player, not about this
-			-- machine, and it was therefore printed identically over every machine in
-			-- the city. Thirty-five signs repeating one sentence is thirty-four signs
-			-- of clutter in the middle of the world, and the Info screen already says
-			-- it once, in the place a player goes to ask.
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
-				.. `<font color="#{color:ToHex()}">{definition.StatId}</font>  `
-				.. `+{NumberFormat.Format(perSecond)}/s\n`
+				.. reqLine
+				.. `<font color="#{color:ToHex()}">+{NumberFormat.Format(perSecond)} {statDisplayName}</font>/s\n`
 				.. statusLine(entry)
 		else
 			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
-				.. `<font color="#FF5C5C">Locked — {NumberFormat.Format(definition.UnlockPower)} power</font>`
+				.. reqLine
+				.. `<font color="#FF5C5C">Locked — {NumberFormat.Format(requiredPower)} total power needed</font>`
 		end
 	end
 end

@@ -350,6 +350,51 @@ function HudController:_build()
 	healthBar.Root.Position = UDim2.new(0, 16, 1, -16)
 	healthBar.Root.Size = UDim2.fromOffset(240, 26)
 
+	-- The sketch gives Rank its own bottom-left route rather than burying it inside
+	-- the store menu. It sits directly above health, clear of the minimap and dock.
+	local rankButton = Instance.new("TextButton")
+	rankButton.Name = "OpenRanks"
+	rankButton.AnchorPoint = Vector2.new(0, 1)
+	rankButton.Position = UDim2.new(0, 16, 1, -52)
+	rankButton.Size = UDim2.fromOffset(112, 42)
+	rankButton.BackgroundColor3 = UI.Palette.Glass
+	rankButton.BackgroundTransparency = 0.08
+	rankButton.BorderSizePixel = 0
+	rankButton.AutoButtonColor = false
+	rankButton.Font = UI.Font.Heading
+	rankButton.TextSize = 13
+	rankButton.TextColor3 = UI.Palette.Text
+	rankButton.TextXAlignment = Enum.TextXAlignment.Right
+	rankButton.Text = "RANK   "
+	rankButton.Parent = screen
+
+	local rankCorner = Instance.new("UICorner")
+	rankCorner.CornerRadius = UDim.new(0, 8)
+	rankCorner.Parent = rankButton
+
+	local rankStroke = Instance.new("UIStroke")
+	rankStroke.Color = UI.Palette.GlassStroke
+	rankStroke.Transparency = 0.6
+	rankStroke.Parent = rankButton
+
+	local rankIcon = Instance.new("Frame")
+	rankIcon.Name = "Icon"
+	rankIcon.AnchorPoint = Vector2.new(0, 0.5)
+	rankIcon.Position = UDim2.new(0, 7, 0.5, 0)
+	rankIcon.Size = UDim2.fromOffset(30, 30)
+	rankIcon.BackgroundTransparency = 1
+	rankIcon.Parent = rankButton
+
+	local rankAspect = Instance.new("UIAspectRatioConstraint")
+	rankAspect.AspectRatio = 1
+	rankAspect.Parent = rankIcon
+	Icons.Draw("Rank", rankIcon, UI.Palette.Accent, UI.Palette.Backdrop)
+
+	UI.Pressable(rankButton)
+	rankButton.Activated:Connect(function()
+		MenuController:Open("Ranks")
+	end)
+
 	-- Under the compact summary: the minimap.
 	--
 	-- This corner used to be the combat feed — four lines of text that were blank
@@ -367,7 +412,7 @@ function HudController:_build()
 	-- keeps its own original dark gym styling.
 	goalPanel = UI.Panel("MainGoal", screen)
 	goalPanel.AnchorPoint = Vector2.new(1, 0)
-	goalPanel.Position = UDim2.new(1, -16, 0, 102)
+	goalPanel.Position = UDim2.new(1, -16, 0, 206)
 	goalPanel.Size = UDim2.fromOffset(260, 116)
 	goalPanel.Visible = false
 

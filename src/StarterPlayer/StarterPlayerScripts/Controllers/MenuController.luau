@@ -47,6 +47,8 @@ local ToastController: any = nil
 local screen: ScreenGui
 local body: Frame
 local titleLabel: TextLabel
+local tabStrip: Frame
+local tabButtons: { [string]: TextButton } = {}
 local isOpen = false
 local activeTab = "Info"
 local quests: { any } = {}
@@ -1019,18 +1021,54 @@ function MenuController:_renderInfo(parent: Frame)
 	local power = Formulas.TotalPower(stats)
 	local rank = RankConfig.Get(power)
 
-	local header = row(parent, 78, 1)
+	local header = row(parent, 96, 1)
+
+	local portrait = Instance.new("ImageLabel")
+	portrait.Name = "Portrait"
+	portrait.AnchorPoint = Vector2.new(0, 0.5)
+	portrait.Position = UDim2.fromScale(0, 0.5)
+	portrait.Size = UDim2.fromOffset(68, 68)
+	portrait.BackgroundColor3 = UI.Palette.Backdrop
+	portrait.BorderSizePixel = 0
+	portrait.ScaleType = Enum.ScaleType.Crop
+	portrait.Parent = header
+
+	local portraitAspect = Instance.new("UIAspectRatioConstraint")
+	portraitAspect.AspectRatio = 1
+	portraitAspect.Parent = portrait
+
+	local portraitCorner = Instance.new("UICorner")
+	portraitCorner.CornerRadius = UDim.new(0, 9)
+	portraitCorner.Parent = portrait
+
+	local portraitStroke = Instance.new("UIStroke")
+	portraitStroke.Color = rank.Color
+	portraitStroke.Thickness = 2
+	portraitStroke.Parent = portrait
+
+	task.spawn(function()
+		local ok, image = pcall(function()
+			return Players:GetUserThumbnailAsync(
+				Players.LocalPlayer.UserId,
+				Enum.ThumbnailType.HeadShot,
+				Enum.ThumbnailSize.Size150x150
+			)
+		end)
+		if ok and portrait.Parent ~= nil then
+			portrait.Image = image
+		end
+	end)
 
 	local name = UI.Label("Name", header)
-	name.Size = UDim2.new(1, 0, 0, 24)
-	name.Position = UDim2.fromOffset(0, 6)
+	name.Size = UDim2.new(1, -80, 0, 24)
+	name.Position = UDim2.fromOffset(80, 6)
 	name.Font = UI.Font.Heading
 	name.TextSize = 17
 	name.Text = `Name: {Players.LocalPlayer.DisplayName}`
 
 	local rankLabel = UI.Label("Rank", header)
-	rankLabel.Size = UDim2.new(1, 0, 0, 20)
-	rankLabel.Position = UDim2.fromOffset(0, 30)
+	rankLabel.Size = UDim2.new(1, -80, 0, 20)
+	rankLabel.Position = UDim2.fromOffset(80, 32)
 	rankLabel.TextSize = 14
 	rankLabel.TextColor3 = rank.Color
 	rankLabel.Text =
@@ -1046,11 +1084,11 @@ function MenuController:_renderInfo(parent: Frame)
 	end
 
 	local kills = UI.Label("Kills", header)
-	kills.Size = UDim2.new(1, 0, 0, 18)
-	kills.Position = UDim2.fromOffset(0, 52)
+	kills.Size = UDim2.new(1, -80, 0, 34)
+	kills.Position = UDim2.fromOffset(80, 54)
 	kills.TextSize = 12
 	kills.TextColor3 = UI.Palette.TextMuted
-	kills.TextTruncate = Enum.TextTruncate.AtEnd
+	kills.TextWrapped = true
 	kills.Text = table.concat(parts, "   ")
 
 	for index, definition in StatConfig.List do
@@ -1068,13 +1106,10 @@ function MenuController:_renderInfo(parent: Frame)
 		glyphHolder.Position = UDim2.fromScale(0, 0.5)
 		glyphHolder.Size = UDim2.fromOffset(28, 28)
 		glyphHolder.Parent = line
-		-- Arms is the fist, because the fist is how you train it and how you fight.
-		Icons.Draw(
-			if definition.Id == "Arms" then "Fist" else "Train",
-			glyphHolder,
-			definition.Color,
-			UI.Palette.Backdrop
-		)
+		local glyphAspect = Instance.new("UIAspectRatioConstraint")
+		glyphAspect.AspectRatio = 1
+		glyphAspect.Parent = glyphHolder
+		Icons.Draw(definition.Icon, glyphHolder, definition.Color, UI.Palette.Backdrop)
 
 		local label = UI.Label("Text", line)
 		label.Position = UDim2.fromOffset(36, 6)
@@ -1157,15 +1192,73 @@ end
 function MenuController:_renderShop(parent: Frame)
 	local order = 0
 
-	local function heading(text: string)
+	local function heading(text: string, detail: string)
 		order += 1
 		local label = UI.Label("Heading", parent)
-		label.Size = UDim2.new(1, 0, 0, 28)
+		label.Size = UDim2.new(1, 0, 0, 38)
 		label.LayoutOrder = order
 		label.Font = UI.Font.Heading
 		label.TextSize = 15
 		label.TextColor3 = UI.Palette.Accent
-		label.Text = string.upper(text)
+		label.Text = `{string.upper(text)}\n<font color="#8A93A8" size="12">{detail}</font>`
+	end
+
+	local function productRow(product: any, group: string)
+		order += 1
+		local line = row(parent, 68, order)
+		local accent = if group == "Potion"
+			then Color3.fromRGB(55, 222, 207)
+			elseif group == "Token" then UI.Palette.Token
+			else UI.Palette.Accent
+		local iconName = if group == "Potion" then "Potion" elseif group == "Token" then "Token" else "Vip"
+
+		local glyphHolder = Instance.new("Frame")
+		glyphHolder.Name = "Glyph"
+		glyphHolder.AnchorPoint = Vector2.new(0, 0.5)
+		glyphHolder.Position = UDim2.fromScale(0, 0.5)
+		glyphHolder.Size = UDim2.fromOffset(44, 44)
+		glyphHolder.BackgroundColor3 = accent:Lerp(UI.Palette.Backdrop, 0.75)
+		glyphHolder.BorderSizePixel = 0
+		glyphHolder.Parent = line
+
+		local glyphCorner = Instance.new("UICorner")
+		glyphCorner.CornerRadius = UDim.new(0, 8)
+		glyphCorner.Parent = glyphHolder
+
+		local glyphAspect = Instance.new("UIAspectRatioConstraint")
+		glyphAspect.AspectRatio = 1
+		glyphAspect.Parent = glyphHolder
+
+		local glyphPadding = Instance.new("UIPadding")
+		glyphPadding.PaddingTop = UDim.new(0, 7)
+		glyphPadding.PaddingBottom = UDim.new(0, 7)
+		glyphPadding.PaddingLeft = UDim.new(0, 7)
+		glyphPadding.PaddingRight = UDim.new(0, 7)
+		glyphPadding.Parent = glyphHolder
+		Icons.Draw(iconName, glyphHolder, accent, UI.Palette.Backdrop)
+
+		local label = UI.Label("Text", line)
+		label.Position = UDim2.fromOffset(56, 0)
+		label.Size = UDim2.new(1, -188, 1, 0)
+		label.TextSize = 13
+		label.TextWrapped = true
+		label.Text = `<b>{product.DisplayName}</b>\n<font color="#8A93A8">{product.Description}</font>`
+
+		local text = if product.Owned
+			then "OWNED"
+			elseif not product.Available then "SOON"
+			else `R$ {NumberFormat.Format(product.RobuxPrice)}`
+		local colour = if product.Owned or not product.Available then UI.Palette.TextMuted else accent
+
+		button(line, text, colour, function()
+			if product.Owned or not product.Available then
+				return
+			end
+			local bought, message = Net.Function("PromptProduct"):InvokeServer(product.Id)
+			if not bought then
+				toast(message)
+			end
+		end)
 	end
 
 	local ok, catalogue = pcall(function()
@@ -1186,53 +1279,49 @@ function MenuController:_renderShop(parent: Frame)
 		end
 	end
 
+	local groupCopy = {
+		Gamepass = { "VIP & PASSES", "Permanent privileges and daily protection" },
+		Potion = { "IMMORTAL POTIONS", "Train in open PvP without taking damage" },
+		Token = { "TOKEN WEIGHTS", "Dumbbells buy permanent stat multipliers" },
+	}
+
 	for _, group in { "Gamepass", "Potion", "Token" } do
 		if #sections[group] == 0 then
 			continue
 		end
-		heading(group)
+		local copy = groupCopy[group]
+		heading(copy[1], copy[2])
 
 		for _, product in sections[group] do
-			order += 1
-			local line = row(parent, 50, order)
-
-			local label = UI.Label("Text", line)
-			label.Size = UDim2.new(1, -120, 1, 0)
-			label.TextSize = 13
-			label.Text = `{product.DisplayName}\n<font color="#8A93A8">{product.Description}</font>`
-
-			local text = if product.Owned
-				then "OWNED"
-				elseif not product.Available then "SOON"
-				else `R$ {NumberFormat.Format(product.RobuxPrice)}`
-			local colour = if product.Owned or not product.Available
-				then UI.Palette.TextMuted
-				else UI.Palette.Accent
-
-			button(line, text, colour, function()
-				if product.Owned or not product.Available then
-					return
-				end
-				local bought, message = Net.Function("PromptProduct"):InvokeServer(product.Id)
-				if not bought then
-					toast(message)
-				end
-			end)
+			productRow(product, group)
 		end
 	end
 
 	if #ShopConfig.List > 0 then
-		heading("Supplements")
+		heading("SUPPLEMENTS", "Short boosts bought with earned cash")
 		for _, item in ShopConfig.List do
 			order += 1
-			local line = row(parent, 50, order)
+			local line = row(parent, 62, order)
+
+			local glyphHolder = Instance.new("Frame")
+			glyphHolder.Name = "Glyph"
+			glyphHolder.AnchorPoint = Vector2.new(0, 0.5)
+			glyphHolder.Position = UDim2.fromScale(0, 0.5)
+			glyphHolder.Size = UDim2.fromOffset(38, 38)
+			glyphHolder.BackgroundTransparency = 1
+			glyphHolder.Parent = line
+			local glyphAspect = Instance.new("UIAspectRatioConstraint")
+			glyphAspect.AspectRatio = 1
+			glyphAspect.Parent = glyphHolder
+			Icons.Draw("Train", glyphHolder, UI.Palette.Power, UI.Palette.Backdrop)
 
 			local label = UI.Label("Text", line)
-			label.Size = UDim2.new(1, -120, 1, 0)
+			label.Position = UDim2.fromOffset(50, 0)
+			label.Size = UDim2.new(1, -182, 1, 0)
 			label.TextSize = 13
-			label.Text = `{item.DisplayName}\n<font color="#8A93A8">{item.Description}</font>`
+			label.Text = `<b>{item.DisplayName}</b>\n<font color="#8A93A8">{item.Description}</font>`
 
-			button(line, `${NumberFormat.Format(item.Price)}`, UI.Palette.Power, function()
+			button(line, `$ {NumberFormat.Format(item.Price)}`, UI.Palette.Power, function()
 				local bought, message = Net.Function("PurchaseShopItem"):InvokeServer(item.Id)
 				toast(message)
 				if bought then
@@ -1289,33 +1378,85 @@ function MenuController:_renderLeaderboard(parent: Frame)
 end
 
 function MenuController:_renderSettings(parent: Frame)
-	local claim = row(parent, 44, 1)
+	local data = ProfileController:Get()
+	local settings = if data ~= nil then data.Settings else { MusicEnabled = true, SfxEnabled = true }
+	local order = 0
 
+	local function toggleRow(settingName: string, displayName: string, detail: string, enabled: boolean)
+		order += 1
+		local line = row(parent, 58, order)
+
+		local label = UI.Label("Text", line)
+		label.Size = UDim2.new(1, -132, 1, 0)
+		label.TextSize = 14
+		label.Text = `<b>{displayName}</b>\n<font color="#8A93A8">{detail}</font>`
+
+		button(
+			line,
+			if enabled then "ON" else "OFF",
+			if enabled then UI.Palette.Vital else UI.Palette.Danger,
+			function()
+				local ok, message = Net.Function("UpdateSetting"):InvokeServer(settingName, not enabled)
+				toast(message)
+				if ok then
+					self:_refresh()
+				end
+			end
+		)
+	end
+
+	toggleRow("MusicEnabled", "Music", "Background soundtrack", settings.MusicEnabled)
+	toggleRow("SfxEnabled", "Sound effects", "Training, combat, and menu feedback", settings.SfxEnabled)
+
+	order += 1
+	local claim = row(parent, 58, order)
 	local label = UI.Label("Text", claim)
-	label.Size = UDim2.new(1, -120, 1, 0)
-	label.Text = "VIP daily potion"
+	label.Size = UDim2.new(1, -132, 1, 0)
+	label.Text =
+		`<b>VIP daily protection</b>\n<font color="#8A93A8">Claim one hour of immortality every day</font>`
 
-	button(claim, "Claim", UI.Palette.Token, function()
+	button(claim, "CLAIM", UI.Palette.Token, function()
 		local _, message = Net.Function("ClaimVipDaily"):InvokeServer()
 		toast(message)
 	end)
 
-	local note = UI.Label("Note", parent)
-	note.Size = UDim2.new(1, 0, 0, 92)
-	note.LayoutOrder = 2
-	note.TextSize = 13
-	note.TextWrapped = true
-	note.TextColor3 = UI.Palette.TextMuted
-	note.Text = "Walk up to any machine to train automatically.\n"
-		.. "Hold Left Shift to sprint — Legs makes sprinting faster.\n"
-		.. "Q flies, Space climbs, Left Control descends.\n"
-		.. "Press F to punch whoever you are looking at.\n"
-		.. "Tab toggles the player list."
+	order += 1
+	local heading = UI.Label("ControlsHeading", parent)
+	heading.Size = UDim2.new(1, 0, 0, 28)
+	heading.LayoutOrder = order
+	heading.Font = UI.Font.Heading
+	heading.TextSize = 14
+	heading.TextColor3 = UI.Palette.Accent
+	heading.Text = "CONTROLS"
+
+	order += 1
+	local note = row(parent, 112, order)
+	local noteText = UI.Label("Note", note)
+	noteText.Size = UDim2.fromScale(1, 1)
+	noteText.TextSize = 13
+	noteText.TextWrapped = true
+	noteText.TextColor3 = UI.Palette.TextMuted
+	noteText.Text = "Hold E at a machine to mount or dismount  ·  Space dismounts\n"
+		.. "Hold mouse to train the selected hotbar muscle  ·  F punches\n"
+		.. "Shift sprints  ·  Q flies  ·  Space climbs  ·  Ctrl descends\n"
+		.. "M opens the menu  ·  Tab toggles the player list"
 end
 
 function MenuController:_refresh()
 	if not isOpen then
 		return
+	end
+
+	for tabId, tabButton in tabButtons do
+		local selected = tabId == activeTab
+		tabButton.BackgroundColor3 = if selected then UI.Palette.Accent else UI.Palette.Backdrop
+		tabButton.BackgroundTransparency = if selected then 0 else 0.2
+		tabButton.TextColor3 = if selected then UI.Palette.Backdrop else UI.Palette.TextMuted
+		local stroke = tabButton:FindFirstChildOfClass("UIStroke")
+		if stroke ~= nil then
+			stroke.Transparency = if selected then 0.05 else 0.75
+			stroke.Color = if selected then UI.Palette.Accent else UI.Palette.GlassStroke
+		end
 	end
 
 	body:ClearAllChildren()
@@ -1447,22 +1588,28 @@ function MenuController:_build()
 	screen = Instance.new("ScreenGui")
 	screen.Name = "GymMenu"
 	screen.ResetOnSpawn = false
-	screen.IgnoreGuiInset = true
+	screen.IgnoreGuiInset = false
 	screen.DisplayOrder = 5
 	screen.Enabled = false
 	screen.Parent = playerGui
+	UI.ScaleWithViewport(screen)
 
 	local panel = UI.Panel("Menu", screen)
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.fromOffset(640, 500)
-	panel.BackgroundTransparency = 0.05
+	panel.Size = UDim2.fromOffset(720, 510)
+	panel.BackgroundTransparency = 0.02
+
+	local panelAspect = Instance.new("UIAspectRatioConstraint")
+	panelAspect.AspectRatio = 720 / 510
+	panelAspect.Parent = panel
 
 	titleLabel = UI.Label("Title", panel)
-	titleLabel.Size = UDim2.new(1, 0, 0, 28)
+	titleLabel.Size = UDim2.new(1, -42, 0, 22)
 	titleLabel.Font = UI.Font.Heading
-	titleLabel.TextSize = 20
-	titleLabel.TextColor3 = UI.Palette.Accent
+	titleLabel.TextSize = 13
+	titleLabel.TextColor3 = UI.Palette.TextMuted
+	titleLabel.Text = "GYM NETWORK"
 
 	local close = Instance.new("TextButton")
 	close.AnchorPoint = Vector2.new(1, 0)
@@ -1478,16 +1625,60 @@ function MenuController:_build()
 		self:Toggle()
 	end)
 
-	-- No tab strip. Every screen has its own button on the bar, so a strip here
-	-- would be a second copy of that navigation inside the thing it opened — and
-	-- it cost the panel 38 vertical pixels to say nothing new. The title tells you
-	-- where you are; the bar tile stays lit to say the same thing.
+	-- The user's three top-level pages live together here. Map, Quests, and Ranks are
+	-- still direct HUD routes; opening one leaves this strip visible as a quick way
+	-- back to the main menu without inventing another back button.
+	tabStrip = Instance.new("Frame")
+	tabStrip.Name = "Tabs"
+	tabStrip.BackgroundTransparency = 1
+	tabStrip.Position = UDim2.fromOffset(0, 28)
+	tabStrip.Size = UDim2.new(1, -38, 0, 44)
+	tabStrip.Parent = panel
+
+	local tabLayout = Instance.new("UIListLayout")
+	tabLayout.FillDirection = Enum.FillDirection.Horizontal
+	tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	tabLayout.Padding = UDim.new(0, 8)
+	tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tabLayout.Parent = tabStrip
+
+	for index, tabId in { "Info", "Shop", "Settings" } do
+		local tabButton = Instance.new("TextButton")
+		tabButton.Name = tabId
+		tabButton.LayoutOrder = index
+		tabButton.Size = UDim2.new(1 / 3, -6, 1, 0)
+		tabButton.BackgroundColor3 = UI.Palette.Backdrop
+		tabButton.BackgroundTransparency = 0.2
+		tabButton.BorderSizePixel = 0
+		tabButton.AutoButtonColor = false
+		tabButton.Font = UI.Font.Heading
+		tabButton.TextSize = 15
+		tabButton.TextColor3 = UI.Palette.TextMuted
+		tabButton.Text = string.upper(tabId)
+		tabButton.Parent = tabStrip
+
+		local tabCorner = Instance.new("UICorner")
+		tabCorner.CornerRadius = UDim.new(0, 8)
+		tabCorner.Parent = tabButton
+
+		local tabStroke = Instance.new("UIStroke")
+		tabStroke.Color = UI.Palette.GlassStroke
+		tabStroke.Transparency = 0.75
+		tabStroke.Parent = tabButton
+
+		UI.Pressable(tabButton, { PressScale = 0.97, HoverScale = 1.01 })
+		tabButton.Activated:Connect(function()
+			self:Open(tabId)
+		end)
+		tabButtons[tabId] = tabButton
+	end
+
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "Body"
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
-	scroll.Position = UDim2.fromOffset(0, 38)
-	scroll.Size = UDim2.new(1, 0, 1, -38)
+	scroll.Position = UDim2.fromOffset(0, 82)
+	scroll.Size = UDim2.new(1, 0, 1, -82)
 	scroll.CanvasSize = UDim2.new()
 	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	scroll.ScrollBarThickness = 4
@@ -1509,7 +1700,10 @@ function MenuController:Start()
 	end)
 
 	ProfileController.Changed:Connect(function()
-		if isOpen and (activeTab == "Info" or activeTab == "Shop" or activeTab == "Map") then
+		if
+			isOpen
+			and (activeTab == "Info" or activeTab == "Shop" or activeTab == "Settings" or activeTab == "Map")
+		then
 			self:_refresh()
 		end
 	end)

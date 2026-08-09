@@ -31,6 +31,9 @@ local EVENT_NAMES: { string } = {
 	-- Server -> client: training state (station, combo, stagger) changed. Training is
 	-- automatic, so there is no client -> server counterpart.
 	"TrainingChanged",
+	-- Server -> client: one authoritative stat payout that actually landed. Drives the
+	-- floating +gain feedback; the client never guesses multipliers or combo math.
+	"TrainingGain",
 	-- Client -> server: fire an ability by id at an optional target.
 	"AbilityActivate",
 	-- Client -> server: Shift sprint began/ended. The server resolves the actual
@@ -90,6 +93,8 @@ local FUNCTION_NAMES: { string } = {
 	-- Client -> server: every district's landing pad in world space, for the
 	-- travel map's pins. Streaming means the client cannot measure them itself.
 	"GetDestinations",
+	-- Client -> server: save one whitelisted boolean preference. Returns ok, message.
+	"UpdateSetting",
 }
 
 local folder: Folder

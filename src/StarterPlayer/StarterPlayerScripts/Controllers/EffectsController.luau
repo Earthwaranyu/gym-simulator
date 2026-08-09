@@ -18,12 +18,16 @@ local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
+local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
 local EffectsConfig = require(ReplicatedStorage.Modules.EffectsConfig)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
+local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
+local Icons = require(ReplicatedStorage.Modules.Icons)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local Types = require(ReplicatedStorage.Modules.Types)
 
 local EffectsController = {
 	Name = "EffectsController",
@@ -38,12 +42,18 @@ local ToastController: any = nil
 local lastRepSoundAt = 0
 local lastRankId: string? = nil
 local damageLayer: Frame? = nil
+local activeTrainingGains = 0
 
 --[[
 	Plays a configured sound, or does nothing if it has no asset id yet.
 	Sounds are one-shot and clean themselves up, so nothing accumulates in SoundService.
 ]]
 function EffectsController:Play(name: string)
+	local data = if ProfileController ~= nil then ProfileController:Get() else nil
+	if data ~= nil and data.Settings.SfxEnabled == false then
+		return
+	end
+
 	local spec = (EffectsConfig.Sounds :: any)[name] :: EffectsConfig.SoundSpec?
 	if spec == nil or spec.SoundId == "" then
 		return
@@ -107,6 +117,106 @@ function EffectsController:_showDamage(amount: number, color: Color3, dealt: boo
 	rise:Play()
 end
 
+--[[
+	World-space payout card above the local avatar. It deliberately uses the amount
+	the server says landed instead of reconstructing the multiplier stack locally.
+]]
+function EffectsController:_showTrainingGain(payload: Types.TrainingGain)
+	local character = Players.LocalPlayer.Character
+	local head = if character ~= nil then character:FindFirstChild("Head") else nil
+	if head == nil or not head:IsA("BasePart") then
+		return
+	end
+
+	local definition = StatConfig.Get(payload.StatId)
+	local displayName = if definition ~= nil then definition.DisplayName else payload.StatId
+	local color = if definition ~= nil then definition.Color else UI.Palette.Accent
+	local iconName = if definition ~= nil then definition.Icon else "Train"
+
+	local billboard = Instance.new("BillboardGui")
+	activeTrainingGains += 1
+	billboard.Name = "TrainingGain"
+	billboard.Adornee = head
+	billboard.Size = UDim2.fromOffset(310, 66)
+	billboard.StudsOffsetWorldSpace =
+		Vector3.new((math.random() - 0.5) * 0.5, 3.25 + math.min(activeTrainingGains - 1, 2) * 0.45, 0)
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 110
+	billboard.LightInfluence = 0
+	billboard.Parent = head
+
+	local card = Instance.new("CanvasGroup")
+	card.Name = "Card"
+	card.AnchorPoint = Vector2.new(0.5, 0.5)
+	card.Position = UDim2.fromScale(0.5, 0.58)
+	card.Size = UDim2.new(1, -8, 1, -8)
+	card.BackgroundColor3 = UI.Palette.Backdrop
+	card.BackgroundTransparency = 0.12
+	card.BorderSizePixel = 0
+	card.Parent = billboard
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = card
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = color
+	stroke.Thickness = 2
+	stroke.Transparency = 0.1
+	stroke.Parent = card
+
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, color:Lerp(UI.Palette.Backdrop, 0.78)),
+		ColorSequenceKeypoint.new(1, UI.Palette.Backdrop),
+	})
+	gradient.Rotation = 8
+	gradient.Parent = card
+
+	local icon = Instance.new("Frame")
+	icon.Name = "StatIcon"
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position = UDim2.new(0, 10, 0.5, 0)
+	icon.Size = UDim2.fromOffset(42, 42)
+	icon.BackgroundTransparency = 1
+	icon.Parent = card
+
+	local iconAspect = Instance.new("UIAspectRatioConstraint")
+	iconAspect.AspectRatio = 1
+	iconAspect.Parent = icon
+	Icons.Draw(iconName, icon, color, UI.Palette.Backdrop)
+
+	local amount = UI.Label("Amount", card)
+	amount.Position = UDim2.fromOffset(62, 5)
+	amount.Size = UDim2.new(1, -72, 0, 32)
+	amount.Font = UI.Font.Numeric
+	amount.TextSize = 23
+	amount.TextColor3 = color
+	amount.TextStrokeColor3 = Color3.new(0, 0, 0)
+	amount.TextStrokeTransparency = 0.35
+	amount.Text = `+{NumberFormat.Format(payload.Amount)} {displayName}`
+
+	local rate = UI.Label("Rate", card)
+	rate.Position = UDim2.fromOffset(63, 35)
+	rate.Size = UDim2.new(1, -73, 0, 18)
+	rate.Font = UI.Font.Heading
+	rate.TextSize = 11
+	rate.TextColor3 = UI.Palette.TextMuted
+	rate.Text = `{NumberFormat.Format(payload.PerSecond)} / SEC  ·  ACTUAL GAIN`
+
+	local info = TweenInfo.new(1.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local rise = TweenService:Create(card, info, {
+		Position = UDim2.fromScale(0.5, 0.18),
+		GroupTransparency = 1,
+	})
+
+	rise.Completed:Connect(function()
+		activeTrainingGains = math.max(0, activeTrainingGains - 1)
+		billboard:Destroy()
+	end)
+	rise:Play()
+end
+
 function EffectsController:Init()
 	ProfileController = Loader.Get("ProfileController")
 	TrainingController = Loader.Get("TrainingController")
@@ -135,6 +245,19 @@ end
 
 function EffectsController:Start()
 	self:_build()
+
+	Net.Event("TrainingGain").OnClientEvent:Connect(function(payload: Types.TrainingGain)
+		if
+			type(payload) ~= "table"
+			or type(payload.StatId) ~= "string"
+			or type(payload.Amount) ~= "number"
+			or type(payload.PerSecond) ~= "number"
+			or payload.Amount <= 0
+		then
+			return
+		end
+		self:_showTrainingGain(payload)
+	end)
 
 	CombatController.Feedback:Connect(function(payload: any)
 		if type(payload) ~= "table" then

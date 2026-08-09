@@ -1030,6 +1030,31 @@ punches for a whole phase, so the game had two answers to one question.
       cleanly. The local player correctly gets no plate. Not covered: the two-player
       join path, which needs a Studio local server this session cannot launch.
 
+- [x] 108. **Training says exactly what it paid, and the menu follows the HUD sketch.**
+      Machine feedback used to be either absent or reconstructed on the client from a
+      zone attribute and token-upgrade level. That estimate could not see the full
+      modifier stack, the live combo, or a gain clipped by the stat cap, so the number
+      over the player could disagree with the profile it claimed to describe.
+      `TrainingService` now sends a `TrainingGain` only after `StatService:AddStat`
+      returns the amount that actually landed. `EffectsController` turns it into an
+      original world-space card above the local avatar: the muscle's procedural icon,
+      `+amount Stat`, and the equivalent `/ SEC` rate, rising and fading in a bounded
+      stack. The client grants nothing and guesses nothing.
+      The navigation now matches the supplied wireframe's hierarchy: one bottom-right
+      **MENU** button opens a dark three-tab **INFO / SHOP / SETTINGS** panel; the five
+      muscle hotbar remains bottom-centre; Rank has its own bottom-left route; the
+      compact power/reputation roster stays top-right; and the main goal sits beneath
+      it instead of overlapping it. Info has a player portrait and the five-stat
+      multiplier ladder with confirmation. Shop groups the live server catalogue into
+      VIP/passes, immortal potions, token dumbbells, and cash supplements. Settings has
+      server-whitelisted, persisted Music/SFX toggles plus the VIP daily claim; disabled
+      SFX now actually silences the shared effects path. Required-power machine signs
+      also carry the warning badge and honest `+Stat/s` copy from the reference without
+      warning on ungated starter machines.
+      Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure
+      self-test, generated-gym and balance validation, `git diff --check`, and a clean
+      5.3 MB Rojo place build. Visual Studio playtesting remains the next human check.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
@@ -1077,4 +1102,3 @@ traffic exists:
 | Discovery | qPTR at or above benchmark with honest, meaningfully different creatives; judge each source by downstream D7, not clicks alone |
 | Monetization | 100% idempotent grants; no statistically meaningful D1/D7 or non-payer/PvP-victim regression after a store change |
 | Reliability | crash-free sessions ≥99.5%; OOM exits <0.1%; p95 join→interactive ≤10s; p50 ≥55 FPS on the chosen low-end mobile tier; healthy server heartbeat at capacity |
-

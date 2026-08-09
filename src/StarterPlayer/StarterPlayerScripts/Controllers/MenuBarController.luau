@@ -1,15 +1,9 @@
 --!strict
 --[[
-	MenuBarController — one persistent MENU button.
+	MenuBarController — the one persistent MENU button from the HUD sketch.
 
-	The reference experience uses one strong menu entry and leaves the action HUD
-	compact. This project follows that hierarchy without copying its artwork: one
-	original map-pin tile opens the full tabbed menu, while the five stat routes are
-	always available from HudController's bottom training dock.
-
-	The button stays on the right edge above Roblox's jump corner, uses a 56-pixel
-	touch target, and visibly fills with the accent colour whenever any menu tab is
-	open. Keyboard M and every internal tab continue to work unchanged.
+	Info, Shop, and Settings are tabs inside MenuController. This control is only the
+	door: bottom-right on desktop, lifted above Roblox's jump controls on touch.
 ]]
 
 local Players = game:GetService("Players")
@@ -18,21 +12,6 @@ local UserInputService = game:GetService("UserInputService")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local UI = require(ReplicatedStorage.Modules.UI)
-local Icons = require(ReplicatedStorage.Modules.Icons)
-
--- Square side of the icon tile, and therefore the height of the whole button.
-local TILE = 56
--- Room for the label beside the tile.
-local LABEL_WIDTH = 108
--- Gap between buttons. Enough that a thumb cannot catch two at once.
-local SPACING = 8
-local EDGE_MARGIN = 16
--- Where the HUD's top-left block ends. The bar never starts above this.
-local HUD_BLOCK = 108
--- On a touch device the bottom of the screen belongs to Roblox: the movement
--- thumbstick bottom-left and the jump button bottom-right. Measured generously,
--- because a button a thumb *nearly* hits is worse than one it cannot reach.
-local TOUCH_RESERVED_BOTTOM = 0.6
 
 local MenuBarController = {
 	Name = "MenuBarController",
@@ -41,277 +20,124 @@ local MenuBarController = {
 
 local MenuController: any = nil
 local EffectsController: any = nil
-
-type Entry = {
-	Id: string,
-	-- Which MenuController tab this tile shows. Not the same as Id: the Rank tile
-	-- opens the tab MenuController calls "Ranks".
-	Tab: string,
-	Button: TextButton,
-	Tile: Frame,
-	Label: TextLabel,
-	Glyph: Frame,
-	Stroke: UIStroke,
-}
-
-local entries: { Entry } = {}
-local screenGui: ScreenGui
-local bar: Frame
-local layout: UIListLayout
-local barScale: UIScale
-
--- Anchor is the y of the column's centre, or of the strip's top edge.
-export type Plan = { Mode: string, Scale: number, Anchor: number }
-
---[[
-	Decides how the bar is laid out on a given screen. Pure, so it can be checked
-	against a table of real device sizes without a device to hand.
-
-	The helper remains count-driven so the control can grow without another layout
-	rewrite. A short screen uses a horizontal strip if a future update adds entries;
-	the current one-button build naturally stays a full labelled touch target.
-
-	The mode is computed from the geometry rather than switched on `TouchEnabled`,
-	so a large tablet keeps the column it has room for.
-]]
-function MenuBarController._plan(viewportHeight: number, count: number, touch: boolean): Plan
-	local scale = UI.LayoutScale(viewportHeight)
-	local column = count * TILE + math.max(0, count - 1) * SPACING
-
-	-- The window the bar is allowed to occupy: below the HUD block, and above the
-	-- touch controls if there are any.
-	local top = HUD_BLOCK * scale + EDGE_MARGIN
-	local bottom = if touch then viewportHeight * TOUCH_RESERVED_BOTTOM else viewportHeight - EDGE_MARGIN
-	local window = bottom - top
-
-	-- Centred in the window rather than in the viewport. Centring on the viewport
-	-- is what a first version did, and on a tablet it pushed a column that had
-	-- been *sized* to fit the window straight back down through the bottom of it.
-	if column * scale <= window then
-		local half = column * scale / 2
-		return {
-			Mode = "Column",
-			Scale = scale,
-			Anchor = math.clamp(viewportHeight / 2, top + half, bottom - half),
-		}
-	end
-
-	-- Nearly fits: shrink rather than change shape.
-	local fitting = window / column
-	if fitting >= UI.MIN_LAYOUT_SCALE then
-		return { Mode = "Column", Scale = fitting, Anchor = top + column * fitting / 2 }
-	end
-
-	return { Mode = "Strip", Scale = scale, Anchor = top }
-end
+local menuButton: TextButton
+local iconTile: Frame
+local iconBars: { Frame } = {}
+local buttonStroke: UIStroke
 
 function MenuBarController:Init()
 	MenuController = Loader.Get("MenuController")
 	EffectsController = Loader.Get("EffectsController")
 end
 
---[[
-	Paints one button for the state it is in. Resting is a dark tile with an accent
-	glyph; open is the accent filled in and the glyph knocked out of it, which is
-	the strongest signal available without introducing a second colour.
-]]
-local function paint(entry: Entry, open: boolean)
-	local tileColor = if open then UI.Palette.Accent else UI.Palette.Backdrop
-	local glyphColor = if open then UI.Palette.Backdrop else UI.Palette.Accent
+local function paint(open: boolean)
+	menuButton.BackgroundColor3 = if open then UI.Palette.Accent else UI.Palette.Glass
+	menuButton.BackgroundTransparency = if open then 0.02 else 0.08
+	menuButton.TextColor3 = if open then UI.Palette.Backdrop else UI.Palette.Text
+	iconTile.BackgroundColor3 = if open then UI.Palette.Backdrop else UI.Palette.Accent
+	buttonStroke.Color = if open then UI.Palette.Accent else UI.Palette.GlassStroke
+	buttonStroke.Transparency = if open then 0.05 else 0.45
 
-	entry.Tile.BackgroundColor3 = tileColor
-	entry.Button.BackgroundTransparency = if open then 0.05 else 0.25
-	entry.Label.TextColor3 = if open then UI.Palette.Text else UI.Palette.TextMuted
-	entry.Stroke.Transparency = if open then 0.35 else 0.75
-	Icons.Recolour(entry.Glyph, glyphColor, tileColor)
-end
-
-function MenuBarController:_refresh(openTab: string?)
-	for _, entry in entries do
-		-- Only the tile whose screen is actually showing lights up. Lighting all
-		-- three whenever anything was open, which is what the single-button version
-		-- did, would now say "you are in the map" while you are in the shop.
-		paint(entry, openTab == entry.Tab)
+	for _, bar in iconBars do
+		bar.BackgroundColor3 = if open then UI.Palette.Accent else UI.Palette.Backdrop
 	end
 end
 
 function MenuBarController:_build()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-	-- One button per screen, and each opens only that screen.
-	--
-	-- There is deliberately no tab strip inside the panel any more. A strip is a
-	-- second copy of this bar, drawn inside the thing this bar just opened: pressing
-	-- Info and then being shown Info, Shop and Settings again says nothing the bar
-	-- did not already say, and it cost the panel 38 pixels of height to say it.
-	--
-	-- Five is the ceiling here. _plan already shrinks or reflows the column when it
-	-- will not fit, but a sixth tile would start crowding the touch controls on a
-	-- phone, so a new screen should replace one of these rather than join them.
-	--
-	-- Map is not one of them. The HUD's minimap is already a picture of where the
-	-- player is, drawn in the corner they are looking at anyway, and it opens the same
-	-- screen when clicked — so a button here saying "Map" was a second door into a room
-	-- whose window was already on screen.
-	local tabs = {
-		{ Id = "Info", DisplayName = "Info", Icon = "Info", Tab = "Info" },
-		{ Id = "Shop", DisplayName = "Shop", Icon = "Shop", Tab = "Shop" },
-		{ Id = "Settings", DisplayName = "Settings", Icon = "Settings", Tab = "Settings" },
-		{ Id = "Rank", DisplayName = "Rank", Icon = "Rank", Tab = "Ranks" },
-	}
-
 	local screen = Instance.new("ScreenGui")
-	screenGui = screen
-	screen.Name = "GymMenuBar"
+	screen.Name = "GymMenuButton"
 	screen.ResetOnSpawn = false
-	-- Matches the HUD, so both live in the same coordinate space and "vertically
-	-- centred" means centred in the area the player can actually see.
 	screen.IgnoreGuiInset = false
-	-- Below the menu itself, so an open panel is never covered by its own buttons.
 	screen.DisplayOrder = 4
 	screen.Parent = playerGui
+	UI.ScaleWithViewport(screen)
 
-	-- Created here, driven by _arrange: the bar's scale is not simply
-	-- UI.LayoutScale, because a column that nearly fits is shrunk further to fit
-	-- rather than allowed to run into the touch controls.
-	barScale = Instance.new("UIScale")
-	barScale.Parent = screen
+	menuButton = Instance.new("TextButton")
+	menuButton.Name = "Menu"
+	menuButton.AnchorPoint = Vector2.new(1, 1)
+	menuButton.Position = if UserInputService.TouchEnabled
+		then UDim2.new(1, -18, 1, -146)
+		else UDim2.new(1, -18, 1, -18)
+	menuButton.Size = UDim2.fromOffset(132, 54)
+	menuButton.BackgroundColor3 = UI.Palette.Glass
+	menuButton.BackgroundTransparency = 0.08
+	menuButton.BorderSizePixel = 0
+	menuButton.AutoButtonColor = false
+	menuButton.Font = UI.Font.Heading
+	menuButton.TextSize = 17
+	menuButton.TextColor3 = UI.Palette.Text
+	menuButton.TextXAlignment = Enum.TextXAlignment.Right
+	menuButton.Text = "MENU   "
+	menuButton.Parent = screen
 
-	bar = Instance.new("Frame")
-	bar.Name = "Bar"
-	bar.BackgroundTransparency = 1
-	bar.Parent = screen
+	local buttonCorner = Instance.new("UICorner")
+	buttonCorner.CornerRadius = UDim.new(0, 9)
+	buttonCorner.Parent = menuButton
 
-	layout = UI.VerticalList(bar, SPACING)
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	buttonStroke = Instance.new("UIStroke")
+	buttonStroke.Color = UI.Palette.GlassStroke
+	buttonStroke.Thickness = 2
+	buttonStroke.Transparency = 0.45
+	buttonStroke.Parent = menuButton
 
-	for index, tab in tabs do
-		local button = Instance.new("TextButton")
-		button.Name = tab.Id
-		button.LayoutOrder = index
-		button.Size = UDim2.fromOffset(TILE + LABEL_WIDTH, TILE)
-		button.BackgroundColor3 = UI.Palette.Glass
-		button.BorderSizePixel = 0
-		button.Text = ""
-		button.Parent = bar
+	iconTile = Instance.new("Frame")
+	iconTile.Name = "Icon"
+	iconTile.AnchorPoint = Vector2.new(0, 0.5)
+	iconTile.Position = UDim2.new(0, 7, 0.5, 0)
+	iconTile.Size = UDim2.fromOffset(40, 40)
+	iconTile.BackgroundColor3 = UI.Palette.Accent
+	iconTile.BorderSizePixel = 0
+	iconTile.Parent = menuButton
 
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 10)
-		corner.Parent = button
+	local iconAspect = Instance.new("UIAspectRatioConstraint")
+	iconAspect.AspectRatio = 1
+	iconAspect.Parent = iconTile
 
-		local stroke = Instance.new("UIStroke")
-		stroke.Color = UI.Palette.GlassStroke
-		stroke.Parent = button
+	local iconCorner = Instance.new("UICorner")
+	iconCorner.CornerRadius = UDim.new(0, 7)
+	iconCorner.Parent = iconTile
 
-		-- The tile is a square inset in the button's leading edge. The icon is
-		-- drawn into it at scale, so both follow whatever TILE ends up being.
-		local tile = Instance.new("Frame")
-		tile.Name = "Tile"
-		tile.AnchorPoint = Vector2.new(0, 0.5)
-		tile.Position = UDim2.new(0, 8, 0.5, 0)
-		tile.Size = UDim2.fromOffset(TILE - 16, TILE - 16)
-		tile.BackgroundColor3 = UI.Palette.Backdrop
-		tile.BorderSizePixel = 0
-		tile.Parent = button
+	for index, width in { 22, 17, 22 } do
+		local bar = Instance.new("Frame")
+		bar.Name = `Bar{index}`
+		bar.AnchorPoint = Vector2.new(0.5, 0.5)
+		bar.Position = UDim2.fromOffset(20, 12 + (index - 1) * 8)
+		bar.Size = UDim2.fromOffset(width, 3)
+		bar.BackgroundColor3 = UI.Palette.Backdrop
+		bar.BorderSizePixel = 0
+		bar.Parent = iconTile
 
-		local tileCorner = Instance.new("UICorner")
-		tileCorner.CornerRadius = UDim.new(0, 8)
-		tileCorner.Parent = tile
+		local barCorner = Instance.new("UICorner")
+		barCorner.CornerRadius = UDim.new(1, 0)
+		barCorner.Parent = bar
+		table.insert(iconBars, bar)
+	end
 
-		local inset = Instance.new("UIPadding")
-		for _, side in { "PaddingTop", "PaddingBottom", "PaddingLeft", "PaddingRight" } do
-			(inset :: any)[side] = UDim.new(0.2, 0)
+	UI.Pressable(menuButton, {
+		PressScale = 0.95,
+		HoverScale = 1.02,
+		OnPress = function()
+			EffectsController:Play("UiClick")
+		end,
+	})
+
+	menuButton.Activated:Connect(function()
+		if MenuController:GetOpenTab() ~= nil then
+			MenuController:Toggle()
+		else
+			MenuController:Open("Info")
 		end
-		inset.Parent = tile
-
-		local glyph = Icons.Draw(tab.Icon, tile, UI.Palette.Accent, UI.Palette.Backdrop)
-
-		local label = UI.Label("Label", button)
-		label.AnchorPoint = Vector2.new(0, 0.5)
-		label.Position = UDim2.new(0, TILE + 2, 0.5, 0)
-		label.Size = UDim2.new(0, LABEL_WIDTH - 12, 1, 0)
-		label.Font = UI.Font.Heading
-		label.TextSize = 15
-		label.TextColor3 = UI.Palette.TextMuted
-		label.Text = string.upper(tab.DisplayName)
-
-		UI.Pressable(button, {
-			OnPress = function()
-				EffectsController:Play("UiClick")
-			end,
-		})
-
-		-- Toggle by tab: pressing the tile you are already on closes the menu, and
-		-- pressing a different one switches to it rather than closing.
-		button.Activated:Connect(function()
-			MenuController:Toggle(tab.Tab)
-		end)
-
-		table.insert(entries, {
-			Id = tab.Id,
-			Tab = tab.Tab,
-			Button = button,
-			Tile = tile,
-			Label = label,
-			Glyph = glyph,
-			Stroke = stroke,
-		})
-	end
-end
-
---[[
-	Applies a plan: direction, button width, whether labels show, and where the
-	whole thing sits.
-]]
-function MenuBarController:_arrange()
-	-- The ScreenGui's own height, not the camera's: this GUI respects the inset,
-	-- so the space it can use is already smaller than the screen.
-	local height = screenGui.AbsoluteSize.Y
-	if height <= 0 then
-		return
-	end
-	local plan = MenuBarController._plan(height, #entries, UserInputService.TouchEnabled)
-
-	barScale.Scale = plan.Scale
-	local column = plan.Mode == "Column"
-	local width = if column then TILE + LABEL_WIDTH else TILE
-
-	layout.FillDirection = if column then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal
-
-	for _, entry in entries do
-		entry.Button.Size = UDim2.fromOffset(width, TILE)
-		-- The label is what does not fit in a strip; the glyph is the part that
-		-- has to survive, so the label is what goes.
-		entry.Label.Visible = column
-	end
-
-	local span = #entries * TILE + math.max(0, #entries - 1) * SPACING
-	-- Anchor is in real pixels; the bar's own offsets are multiplied by the
-	-- UIScale, so the position has to be divided by it to land where planned.
-	local margin = EDGE_MARGIN / plan.Scale
-
-	if column then
-		bar.Size = UDim2.fromOffset(width, span)
-		bar.AnchorPoint = Vector2.new(1, 0.5)
-	else
-		bar.Size = UDim2.fromOffset(span, TILE)
-		bar.AnchorPoint = Vector2.new(1, 0.5)
-	end
-	-- Right-side, above the jump-control corner and clear of the bottom stat dock.
-	bar.Position = UDim2.new(1, -margin, 0.62, 0)
+	end)
 end
 
 function MenuBarController:Start()
 	self:_build()
-	self:_arrange()
-	self:_refresh(MenuController:GetOpenTab())
+	paint(MenuController:GetOpenTab() ~= nil)
 
 	MenuController.Changed:Connect(function(openTab: string?)
-		self:_refresh(openTab)
-	end)
-
-	screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		self:_arrange()
+		paint(openTab ~= nil)
 	end)
 end
 

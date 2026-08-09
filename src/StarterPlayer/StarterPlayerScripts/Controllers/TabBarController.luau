@@ -21,7 +21,7 @@ local UI = require(ReplicatedStorage.Modules.UI)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 
 local ROW_HEIGHT = 26
-local MAX_ROWS = 16
+local MAX_ROWS = 5
 
 local TabBarController = {
 	Name = "TabBarController",
@@ -55,7 +55,7 @@ function TabBarController:_build()
 	newHeader.Font = UI.Font.Heading
 	newHeader.TextColor3 = UI.Palette.TextMuted
 	newHeader.TextSize = 13
-	newHeader.Text = "PLAYERS"
+	newHeader.Text = "PLAYER                 POWER        REPUTATION"
 
 	local newRows = Instance.new("Frame")
 	newRows.Name = "Rows"
@@ -81,7 +81,7 @@ function TabBarController:_render(roster: { any })
 	list:ClearAllChildren()
 	UI.VerticalList(list, 1)
 
-	title.Text = `PLAYERS  ({#roster})`
+	title.Text = `PLAYER ({#roster})          POWER        REPUTATION`
 	if panel ~= nil then
 		local shown = math.min(#roster, MAX_ROWS)
 		panel.Size = UDim2.fromOffset(300, ROW_HEIGHT * (shown + 1) + 20)

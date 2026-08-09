@@ -598,6 +598,7 @@ function TrainingService:_bindStation(station: Instance)
 	-- Replicate the resolved rate to streamed clients. The zone volume is server-only
 	-- knowledge at long range, while billboards must say +1/s through +64/s honestly.
 	station:SetAttribute("GainMultiplier", record.zoneMultiplier)
+	station:SetAttribute("RequiredPower", record.zoneRequiredPower)
 
 	prompt.Triggered:Connect(function(player: Player)
 		self:_onTriggered(player, station)
@@ -647,7 +648,15 @@ function TrainingService:_step(player: Player, session: Session, now: number)
 	session.root.CFrame = session.anchorCFrame
 
 	local gain = session.definition.BaseGain * self:GetComboMultiplier(player) * session.record.zoneMultiplier
-	StatService:AddStat(player, session.definition.StatId, gain)
+	local gained = StatService:AddStat(player, session.definition.StatId, gain)
+	if gained > 0 then
+		local payload: Types.TrainingGain = {
+			StatId = session.definition.StatId,
+			Amount = gained,
+			PerSecond = gained / session.definition.RepInterval,
+		}
+		Net.Event("TrainingGain"):FireClient(player, payload)
+	end
 
 	if now - (lastPushAt[player] or 0) >= PUSH_INTERVAL then
 		self:_push(player)

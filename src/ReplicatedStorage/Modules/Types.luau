@@ -90,6 +90,14 @@ export type TrainingState = {
 	StaggerSeconds: number,
 }
 
+-- One machine rep after every server-side modifier and stat cap has been applied.
+-- Amount is the payout for this rep; PerSecond is its equivalent live rate.
+export type TrainingGain = {
+	StatId: StatId,
+	Amount: number,
+	PerSecond: number,
+}
+
 --[[
 	A source of stat multiplication. Everything that boosts gains — token upgrades,
 	gamepasses, timed supplements, event buffs — registers as one of these rather
