@@ -788,6 +788,48 @@ punches for a whole phase, so the game had two answers to one question.
       reporting `PlaybackState.Playing` — so the animation needs a human eye on a real
       client before it is called done.
 
+- [x] 100. **A map that turns, slots you can read, and a motion per muscle.** Playing #99
+      found three things wrong with it.
+      **The minimap was north-up and never turned**, which is only ever right for a
+      player whose camera happens to face world north — walk south under a north-up map
+      and the marker slides *down* the screen while you walk up it. It now turns with the
+      camera. A zero-sized `Pivot` sits where the marker is and the canvas hangs off it by
+      its own `AnchorPoint`, which is set to the player's fraction of the map: the point
+      the player stands on lands under the pivot with no arithmetic and stays there when
+      the pivot rotates. `Pivot.Rotation` is `-deg(atan2(look.X, look.Z))`, and the dot
+      became an arrow that always points up, because once the map turns the marker is the
+      thing that says which way up currently means. Refresh went from 10Hz to 30Hz —
+      a rotation stepping ten times a second is notchy where a pan is not — and skips its
+      writes when neither heading nor position moved enough to see.
+      **The glyphs were unreadable**: drawn in the HUD's muted grey on a near-black tile
+      at about thirty pixels, which is a smudge however good the shape is. They are now
+      drawn in their own stat colour, the slot grew from 48² to 56×62, and the muscle's
+      name sits under the picture in 9pt caps — the picture makes a slot findable once
+      learned, the word is what teaches it. `Back`'s hairline spine and `Core`'s thin
+      punched rows were fattened at the same time.
+      **Nothing animated**, for two real reasons and not the stalled renderer: the pulse
+      was only ever started while mounted on a machine, so a click-training player never
+      saw it, and `UI.Pop` and `UI.Pulse` drove the *same* `UIScale`, so the first slot
+      change cancelled the pulse for good. Motion moved into `Icons.Animate`, which owns
+      it for the same reason the drawing lives there — only that file knows Chest is made
+      of `PecLeft` and `PecRight`. Each glyph gets the motion its muscle has: the fist
+      jabs, the pecs press, the lats spread, the abs crunch, the thighs squat. Animators
+      are written against a Move/Grow/Turn rig that records each part's resting value, so
+      stopping restores the glyph exactly. Standing free, all five idle at 0.45 strength,
+      staggered 0.17s apart so the row does not throb in unison; on a machine only that
+      muscle moves, at full strength. `UI.Pop` keeps the `UIScale` to itself, so the
+      collision is gone.
+      Verified in a Studio play session: `pivot.Rotation` reads 0 / -90 / -180 / +90 for
+      cameras facing north / east / south / west — facing east puts north on the left,
+      which is the check the old map failed — walking 400 studs north moves the anchor
+      up the canvas (0.5003 to 0.4563) with the marker staying centred, the dock lays out
+      278×69 with all five names, keybinds and stat-coloured glyphs (Arms inverted to the
+      backdrop colour because it is selected), and `Icons.Animate` on Chest drives the
+      real `PecLeft` and restores its exact `Position` on stop. Still not seen moving:
+      Studio's renderer was stalled again — RenderStepped 0 against a live Heartbeat, and
+      a control tween frozen at 1.000 while reporting `Playing` — so the five motions are
+      verified as geometry and rigging, not as something a human has watched.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

@@ -243,21 +243,24 @@ end
 local function drawBack(parent: GuiObject, color: Color3, _hole: Color3)
 	-- Wide at the shoulders, converging at the waist. Positive rotation is clockwise,
 	-- so the left wing leans anticlockwise to put its top on the outside.
-	shape(parent, "WingLeft", 0.28, 0.5, 0.26, 0.78, color, -22, 0.34)
-	shape(parent, "WingRight", 0.72, 0.5, 0.26, 0.78, color, 22, 0.34)
-	shape(parent, "Spine", 0.5, 0.5, 0.13, 0.86, color, 0, 0.4)
+	shape(parent, "WingLeft", 0.27, 0.5, 0.3, 0.8, color, -22, 0.34)
+	shape(parent, "WingRight", 0.73, 0.5, 0.3, 0.8, color, 22, 0.34)
+	-- Fat enough to still be a spine at thirty pixels. At 0.13 it was a hairline that
+	-- vanished into the gap between the wings and left the glyph reading as two blobs.
+	shape(parent, "Spine", 0.5, 0.5, 0.2, 0.88, color, 0, 0.4)
 end
 
 --[[
 	Core — a six-pack: one slab with the grid punched out of it.
 ]]
 local function drawCore(parent: GuiObject, color: Color3, hole: Color3)
-	local slab = shape(parent, "Abs", 0.5, 0.5, 0.62, 0.84, color, 0, 0.22)
+	local slab = shape(parent, "Abs", 0.5, 0.5, 0.66, 0.86, color, 0, 0.22)
 	-- Punched rather than drawn as six separate blocks, so the glyph stays a single
-	-- silhouette when the tile behind it changes colour.
-	knockout(slab, "HoleSpine", 0.5, 0.5, 0.09, 1, hole, 0, 0)
+	-- silhouette when the tile behind it changes colour. The gaps are wide — a six-pack
+	-- read at thirty pixels is mostly the gaps, and thin ones close up into a plain slab.
+	knockout(slab, "HoleSpine", 0.5, 0.5, 0.13, 1, hole, 0, 0)
 	for index, y in { 0.36, 0.64 } do
-		knockout(slab, `HoleRow{index}`, 0.5, y, 1, 0.09, hole, 0, 0)
+		knockout(slab, `HoleRow{index}`, 0.5, y, 1, 0.13, hole, 0, 0)
 	end
 end
 
@@ -269,6 +272,22 @@ local function drawLegs(parent: GuiObject, color: Color3, _hole: Color3)
 	shape(parent, "Hips", 0.5, 0.22, 0.68, 0.22, color, 0, 0.3)
 	shape(parent, "ThighLeft", 0.33, 0.63, 0.26, 0.66, color, -5, 0.3)
 	shape(parent, "ThighRight", 0.67, 0.63, 0.26, 0.66, color, 5, 0.3)
+end
+
+--[[
+	Arrow — where the player is facing, for the minimap.
+
+	A solid delta rather than the open chevron Upgrades uses: on the minimap this sits on
+	top of a busy map of streets and buildings, and an outline disappears into them where
+	a filled shape does not.
+]]
+local function drawArrow(parent: GuiObject, color: Color3, _hole: Color3)
+	-- Two fat blades meeting at the top and a stem under them. Fatter than the chevron
+	-- Upgrades draws, because that one sits alone on a dark tile while this one has a
+	-- city under it and a thin line disappears into a street.
+	shape(parent, "BladeLeft", 0.33, 0.36, 0.2, 0.54, color, -38, 0.5)
+	shape(parent, "BladeRight", 0.67, 0.36, 0.2, 0.54, color, 38, 0.5)
+	shape(parent, "Stem", 0.5, 0.58, 0.22, 0.6, color, 0, 0.45)
 end
 
 --[[
@@ -316,6 +335,7 @@ local ICONS: { [string]: Builder } = {
 	Back = drawBack,
 	Core = drawCore,
 	Legs = drawLegs,
+	Arrow = drawArrow,
 	Potion = drawPotion,
 	Vip = drawVip,
 	Quest = drawQuest,
@@ -378,6 +398,178 @@ function Icons.Recolour(holder: Frame, color: Color3, hole: Color3)
 		-- is the glyph. They say so themselves, so this never has to know how any
 		-- individual icon is put together.
 		child.BackgroundColor3 = if child:GetAttribute("Knockout") == true then hole else color
+	end
+end
+
+--[[
+	Motion.
+
+	A glyph that stands for a muscle should move the way that muscle moves. Pecs press,
+	lats spread, abs crunch, thighs squat, a fist jabs — five motions a player recognises
+	without being told, which is the same argument that put a picture on the slot in the
+	first place.
+
+	The animation lives here rather than in the HUD for the reason the drawing does: only
+	this file knows that Chest is made of parts called PecLeft and PecRight. A new glyph
+	brings its own motion in the same edit, and nothing downstream branches on a stat id.
+
+	Each animator is written against a small rig — Move, Grow, Turn — which records the
+	part's resting value before touching it, so stopping restores the glyph exactly
+	rather than approximately. Amplitudes are all multiplied by `strength`, which is how
+	an idling slot and the slot actually being trained share one definition.
+]]
+
+local TweenService = game:GetService("TweenService")
+
+export type Rig = {
+	-- Slide a part, in the glyph's own 0..1 space.
+	Move: (name: string, dx: number, dy: number) -> (),
+	-- Stretch or squash it.
+	Grow: (name: string, dw: number, dh: number) -> (),
+	-- Swing it, in degrees, on top of whatever rotation it was drawn with.
+	Turn: (name: string, degrees: number) -> (),
+}
+
+export type Animator = (rig: Rig) -> ()
+
+--[[
+	Fist — a jab. Drives up and forward, which on a flat glyph is up and slightly out.
+]]
+local function animateFist(rig: Rig)
+	rig.Move("Hand", 0.03, -0.09)
+	rig.Move("Wrist", 0.02, -0.05)
+end
+
+--[[
+	Chest — a press: the pecs push apart at the top of the rep and close again.
+]]
+local function animateChest(rig: Rig)
+	rig.Move("PecLeft", -0.05, -0.02)
+	rig.Move("PecRight", 0.05, -0.02)
+	rig.Turn("PecLeft", -6)
+	rig.Turn("PecRight", 6)
+end
+
+--[[
+	Back — a lat spread: the wings open out and come back in.
+]]
+local function animateBack(rig: Rig)
+	rig.Turn("WingLeft", -12)
+	rig.Turn("WingRight", 12)
+	rig.Grow("WingLeft", 0.04, 0)
+	rig.Grow("WingRight", 0.04, 0)
+end
+
+--[[
+	Core — a crunch: the slab shortens and thickens, the way a torso does folding over.
+]]
+local function animateCore(rig: Rig)
+	rig.Grow("Abs", 0.05, -0.14)
+end
+
+--[[
+	Legs — a squat: the thighs compress and the hips drop onto them.
+]]
+local function animateLegs(rig: Rig)
+	rig.Grow("ThighLeft", 0.03, -0.14)
+	rig.Grow("ThighRight", 0.03, -0.14)
+	rig.Move("Hips", 0, 0.07)
+end
+
+local MOTIONS: { [string]: Animator } = {
+	Fist = animateFist,
+	Chest = animateChest,
+	Back = animateBack,
+	Core = animateCore,
+	Legs = animateLegs,
+}
+
+-- Slow, because these run under the player's eyeline for the length of a session and
+-- anything brisker becomes something to look away from. One full cycle is out and back.
+local MOTION_SECONDS = 1.15
+
+--[[
+	Starts a glyph moving and returns the function that stops it.
+
+	`delay` staggers a row of glyphs so five of them do not breathe in unison, which
+	reads as the whole bar throbbing rather than as five muscles working.
+
+	A glyph with no motion of its own gets a gentle overall swell instead of nothing, so
+	a sixth stat is never the one dead tile in the row.
+]]
+function Icons.Animate(holder: Frame, name: string, strength: number?, delay: number?): () -> ()
+	local amount = strength or 1
+	local info =
+		TweenInfo.new(MOTION_SECONDS, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true, delay or 0)
+
+	local tweens: { Tween } = {}
+	-- What each part looked like before this touched it, so stopping is exact.
+	local resting: { { instance: Instance, property: string, value: any } } = {}
+
+	local function drive(partName: string, property: string, goal: any)
+		local part = holder:FindFirstChild(partName, true)
+		if part == nil or not part:IsA("Frame") then
+			return
+		end
+		table.insert(
+			resting,
+			{ instance = part :: Instance, property = property, value = (part :: any)[property] }
+		)
+		local tween = TweenService:Create(part, info, { [property] = goal })
+		table.insert(tweens, tween)
+		tween:Play()
+	end
+
+	local animator = MOTIONS[name]
+	if animator ~= nil then
+		local rig: Rig = {
+			Move = function(partName, dx, dy)
+				local part = holder:FindFirstChild(partName, true)
+				if part ~= nil and part:IsA("Frame") then
+					drive(partName, "Position", part.Position + UDim2.fromScale(dx * amount, dy * amount))
+				end
+			end,
+			Grow = function(partName, dw, dh)
+				local part = holder:FindFirstChild(partName, true)
+				if part ~= nil and part:IsA("Frame") then
+					drive(partName, "Size", part.Size + UDim2.fromScale(dw * amount, dh * amount))
+				end
+			end,
+			Turn = function(partName, degrees)
+				local part = holder:FindFirstChild(partName, true)
+				if part ~= nil and part:IsA("Frame") then
+					drive(partName, "Rotation", part.Rotation + degrees * amount)
+				end
+			end,
+		}
+		animator(rig)
+	else
+		-- The fallback swells the whole glyph. It uses the holder's own UIScale, which
+		-- is the one thing UI.Pop also drives — but only glyphs with no motion of their
+		-- own ever reach here, and a stat with a picture has a motion.
+		local existing = holder:FindFirstChildOfClass("UIScale")
+		local live: UIScale
+		if existing ~= nil then
+			live = existing
+		else
+			live = Instance.new("UIScale")
+			live.Parent = holder
+		end
+		table.insert(resting, { instance = live :: Instance, property = "Scale", value = live.Scale })
+		local tween = TweenService:Create(live, info, { Scale = 1 + 0.09 * amount })
+		table.insert(tweens, tween)
+		tween:Play()
+	end
+
+	return function()
+		for _, tween in tweens do
+			tween:Cancel()
+		end
+		for _, entry in resting do
+			if entry.instance.Parent ~= nil then
+				(entry.instance :: any)[entry.property] = entry.value
+			end
+		end
 	end
 end
 
