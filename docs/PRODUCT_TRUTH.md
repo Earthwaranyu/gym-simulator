@@ -1,4 +1,4 @@
-# Product Truth — v15 (2026-08-09)
+# Product Truth — v16 (2026-08-09)
 
 The single versioned inventory of what this build actually is. `CLAUDE.md`, `AGENTS.md`,
 `README.md`, `CHECKLIST.md`, and `docs/PLAYTEST.md` are all reconciled against this file.
@@ -34,7 +34,7 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Stats | 5 — Arms (damage), Chest (max HP), Back (durability), Core (retaliation knockback), Legs (Shift sprint + flight speed) | `StatConfig.luau`, Phase 14 |
 | Abilities | **1 — Punch only.** Slam and Dash are *deferred*, not shipped | `CombatService/Abilities/` |
 | Training start | hold **E** at a station prompt; server mounts, locks, and poses the player. Every machine awards once per second even though exercise animations retain varied natural cycle lengths. Rate = universal +1 base + the printed x1–x64 equipment bonus, then owned multipliers | `TrainingService.luau`, `Formulas.MachineTrainingRate` |
-| Manual training | hold left mouse while unmounted to award the selected dock stat an exact +1 base tick once per second before owned multipliers. Release sends an explicit stop; it is disabled while mounted | `ManualTrainingService.luau`, `HudController.luau` |
+| Manual training | hold any bottom stat card with mouse or touch to train that exact muscle, or hold world-space left mouse to train the selected card. Both award one exact +1 base tick per second before owned multipliers. Release sends an explicit stop; manual training is disabled while mounted | `ManualTrainingService.luau`, `HudController.luau` |
 | Training feedback | all five muscles use one server-authored `+amount Muscle` card. A new tick replaces the old card and each card fades in 0.78s, so gains never overlap. Manual cards identify base training; machine cards show the 50-tick set progress/full-set x2 | `EffectsController:_showTrainingGain`, `TrainingGain` |
 | Training stop | hold **E** again, or press **Space** / jump | `TrainingService.luau`, `Net` `StopTraining` |
 | Training interruption | **kill-only.** A hit deals damage and grounds the victim but does *not* dismount them; only death ends the set | `CombatService/init.luau` |

@@ -4,7 +4,7 @@ Everything static is already enforced by `./scripts/check.sh` — build, lints, 
 `--!strict` types, plus `python3 scripts/validate_gym.py` for the generated world. This
 file covers what only a running game can answer.
 
-Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v15. If a
+Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v16. If a
 step below contradicts that file, the step is stale — fix it.
 
 Run a **two-client Studio playtest** (Test → Clients and Servers → 2 players) unless a
@@ -64,10 +64,12 @@ and whether any balance number feels right.
 - [ ] Time the floating stat awards on the fastest animation (Treadmill, 0.5s), a
       middle animation, and the slowest (Deadlift, 1.2s). All three award exactly once
       per second; animation speed changes motion only. Repeat across all five muscles.
-- [ ] Hold left mouse while unmounted. The selected dock stat updates by exactly +1
-      once per second before owned multipliers. Release before the next second: no
-      delayed reward appears. Mount a machine without releasing the mouse: only the
-      machine award continues, with no second manual payout stacked on it.
+- [ ] Hold each of the five bottom stat cards while unmounted, using mouse and touch.
+      The pressed stat updates by exactly +1 once per second before owned multipliers,
+      even if selection changes during the hold. Holding world-space left mouse trains
+      the selected card by the same rule. Release before the next second: no delayed
+      reward appears. Mount a machine without releasing: only the machine award
+      continues, with no second manual payout stacked on it.
 - [ ] Mount any x1 starter machine with no owned multiplier. Its sign distinguishes
       `+1 EQUIP` from `+2 Muscle/s TRAINING`, and every tick adds exactly +2: +1 universal
       training base plus +1 equipment bonus. Check an x4 district too: raw total is +5.

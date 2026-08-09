@@ -1358,6 +1358,20 @@ punches for a whole phase, so the game had two answers to one question.
       StyLua, Selene, strict Luau analysis, all pure self-tests, generated-gym and
       balance validation, `git diff --check`, and a clean Rojo build.
 
+- [x] 126. **Make every bottom stat card a real +1/s training control.** The dock cards
+      previously changed selection without owning the press, while the global mouse
+      release stopped the server clock before its first one-second tick. Each Arms,
+      Chest, Back, Core and Legs card now owns its mouse/touch hold and locks the trained
+      muscle for that hold. A GUI hit-test prevents the same card press from also becoming
+      a world-space training click or Arms attack. The authoritative server clock and
+      standard replacement gain card remain unchanged, so each completed base interval
+      awards exactly one point and displays `+1 Muscle` without client-side stat math.
+      Live Studio holds of 1.15 seconds verified Arms 41→42, Chest 31→32, Back 32→33,
+      Core 33→34 and Legs 34→35; live GUI inspection read `+1 Chest` and
+      `1 / SEC · BASE TRAINING`. Verified with StyLua, Selene, strict Luau analysis, all
+      pure self-tests, generated-gym and balance validation, `git diff --check`, and a
+      clean Rojo build.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

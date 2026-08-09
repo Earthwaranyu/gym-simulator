@@ -110,6 +110,10 @@ local slotButtons: { [Types.StatId]: Slot } = {}
 -- click has to do something, so there is always a slot selected.
 local selectedStat: Types.StatId = StatConfig.List[1].Id
 local clicking = false
+-- The input/stat that owns the current manual hold. A dock press must keep training
+-- the card that was pressed even if a number key changes the visual selection midway.
+local manualInput: InputObject? = nil
+local manualStat: Types.StatId? = nil
 local powerLabel: TextLabel
 local tokenLabel: TextLabel
 local healthBar: UI.Bar
@@ -378,6 +382,19 @@ function HudController:_build()
 				self:_select(definition.Id)
 			end,
 		})
+		-- The five cards are training controls, not merely selectors. Mouse and touch
+		-- holds start the same server-authoritative +1/s clock as a world-space click.
+		button.InputBegan:Connect(function(input: InputObject)
+			if
+				input.UserInputType == Enum.UserInputType.MouseButton1
+				or input.UserInputType == Enum.UserInputType.Touch
+			then
+				self:_beginManualTraining(definition.Id, input)
+			end
+		end)
+		button.InputEnded:Connect(function(input: InputObject)
+			self:_endManualTraining(input)
+		end)
 	end
 
 	-- Bottom-left: health, and nothing else.
@@ -877,7 +894,45 @@ end
 	no amount and the server trusts no number from here.
 ]]
 function HudController:_trainPing()
-	Net.Event("ManualTrain"):FireServer(selectedStat)
+	Net.Event("ManualTrain"):FireServer(manualStat or selectedStat)
+end
+
+function HudController:_beginManualTraining(statId: Types.StatId, input: InputObject)
+	if manualInput ~= nil and manualInput ~= input then
+		Net.Event("ManualTrain"):FireServer("Stop")
+	end
+	self:_select(statId)
+	manualInput = input
+	manualStat = statId
+	clicking = true
+	self:_trainPing()
+end
+
+function HudController:_endManualTraining(input: InputObject)
+	if manualInput ~= input then
+		return
+	end
+	manualInput = nil
+	manualStat = nil
+	clicking = false
+	Net.Event("ManualTrain"):FireServer("Stop")
+end
+
+-- UI input also reaches UserInputService. Hit-test the dock first so a press on a
+-- stat card is not interpreted a second time as a world click (or an Arms punch).
+function HudController:_statSlotAt(position: Vector3): Types.StatId?
+	local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if playerGui == nil then
+		return nil
+	end
+	for _, object in playerGui:GetGuiObjectsAtPosition(position.X, position.Y) do
+		for statId, slot in slotButtons do
+			if object == slot.Button or object:IsDescendantOf(slot.Button) then
+				return statId
+			end
+		end
+	end
+	return nil
 end
 
 function HudController:_refreshGoal(view: { any })
@@ -991,21 +1046,25 @@ function HudController:Start()
 		end
 
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			clicking = true
+			if self:_statSlotAt(input.Position) ~= nil then
+				return
+			end
+			self:_beginManualTraining(selectedStat, input)
 			-- Arms is the fist, so a click that has someone in reach is a punch as
 			-- well as a rep. CombatService rejects it if the target is out of range
 			-- or immune, and the training ping is unaffected either way.
 			if selectedStat == ARMS_STAT then
 				CombatController:Attack()
 			end
-			self:_trainPing()
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			clicking = false
-			Net.Event("ManualTrain"):FireServer("Stop")
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
+			self:_endManualTraining(input)
 		end
 	end)
 
