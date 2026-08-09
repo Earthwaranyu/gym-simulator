@@ -28,14 +28,16 @@ local MapRender = require(ReplicatedStorage.Modules.MapRender)
 local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
 
 -- A slot is big enough to hit with a thumb and small enough that five of them plus
--- their gaps stay narrow under the middle of the screen. It stopped being square when
--- the muscle's name went under its picture: 5*56 + 4*6 + 24 = 328.
-local SLOT_WIDTH = 56
-local SLOT_HEIGHT = 62
-local SLOT_GAP = 6
+-- their gaps stay narrow under the middle of the screen. The wider cartoon cards still
+-- fit comfortably at the 720p reference size: 5*66 + 4*7 + 24 = 382.
+local SLOT_WIDTH = 66
+local SLOT_HEIGHT = 76
+local SLOT_GAP = 7
+local DOCK_WIDTH = SLOT_WIDTH * 5 + SLOT_GAP * 4 + 24
+local DOCK_HEIGHT = SLOT_HEIGHT + 20
 -- How much of the slot's width the muscle glyph takes. The rest is the name strip, the
 -- keybind corner, and enough margin that the glyph's motion never touches the edge.
-local SLOT_ICON_SCALE = 0.62
+local SLOT_ICON_SCALE = 0.68
 -- How hard a slot's muscle moves when it is merely idling in the dock, against the 1.0
 -- of the muscle actually being worked on a machine. Low: five of these are on screen at
 -- once and the row has to read as alive, not as busy.
@@ -93,8 +95,11 @@ local MenuController: any = nil
 type Slot = {
 	Button: TextButton,
 	Stroke: UIStroke,
+	Gradient: UIGradient,
 	Number: TextLabel,
+	KeyBadge: Frame,
 	Name: TextLabel,
+	NameBand: Frame,
 	Icon: Frame,
 	-- The 3D figure, when this muscle has one. Nil falls back to the flat glyph and its
 	-- tweened animation.
@@ -217,8 +222,16 @@ function HudController:_build()
 	local chips = UI.Panel("TrainingDock", screen)
 	chips.AnchorPoint = Vector2.new(0.5, 1)
 	chips.Position = UDim2.new(0.5, 0, 1, -12)
-	chips.Size = UDim2.fromOffset(SLOT_WIDTH * 5 + SLOT_GAP * 4 + 24, SLOT_HEIGHT + 20)
-	chips.BackgroundTransparency = 0.16
+	chips.Size = UDim2.fromOffset(DOCK_WIDTH, DOCK_HEIGHT)
+	chips.BackgroundColor3 = UI.Palette.CartoonInk
+	chips.BackgroundTransparency = 0.02
+
+	local dockStroke = chips:FindFirstChildOfClass("UIStroke")
+	if dockStroke ~= nil then
+		dockStroke.Color = Color3.fromRGB(12, 12, 20)
+		dockStroke.Thickness = 3
+		dockStroke.Transparency = 0
+	end
 
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = UDim2.fromOffset(SLOT_WIDTH, SLOT_HEIGHT)
@@ -232,22 +245,40 @@ function HudController:_build()
 		local button = Instance.new("TextButton")
 		button.Name = definition.Id
 		button.LayoutOrder = index
-		button.BackgroundColor3 = UI.Palette.Backdrop
-		button.BackgroundTransparency = 0.08
+		button.BackgroundColor3 = definition.Color:Lerp(UI.Palette.CartoonInk, 0.72)
+		button.BackgroundTransparency = 0
 		button.BorderSizePixel = 0
 		button.AutoButtonColor = false
 		button.Text = ""
 		button.Parent = chips
 
 		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 7)
+		corner.CornerRadius = UDim.new(0, 10)
 		corner.Parent = button
 
 		local stroke = Instance.new("UIStroke")
 		stroke.Color = definition.Color
-		stroke.Thickness = 2
-		stroke.Transparency = 1
+		stroke.Thickness = 3
+		stroke.Transparency = 0.25
 		stroke.Parent = button
+
+		local gradient = Instance.new("UIGradient")
+		gradient.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, definition.Color:Lerp(Color3.new(1, 1, 1), 0.22)),
+			ColorSequenceKeypoint.new(0.42, definition.Color:Lerp(UI.Palette.CartoonInk, 0.48)),
+			ColorSequenceKeypoint.new(1, definition.Color:Lerp(UI.Palette.CartoonInk, 0.8)),
+		})
+		gradient.Rotation = 90
+		gradient.Parent = button
+
+		local shine = Instance.new("Frame")
+		shine.Name = "Shine"
+		shine.Size = UDim2.new(1, 0, 0, 3)
+		shine.BackgroundColor3 = Color3.new(1, 1, 1)
+		shine.BackgroundTransparency = 0.5
+		shine.BorderSizePixel = 0
+		shine.ZIndex = 2
+		shine.Parent = button
 
 		-- The picture of the muscle, not its name.
 		--
@@ -269,7 +300,7 @@ function HudController:_build()
 		local iconHolder = Instance.new("Frame")
 		iconHolder.Name = "Glyph"
 		iconHolder.AnchorPoint = Vector2.new(0.5, 0.5)
-		iconHolder.Position = UDim2.fromScale(0.5, 0.4)
+		iconHolder.Position = UDim2.fromScale(0.5, 0.39)
 		iconHolder.Size = UDim2.fromScale(SLOT_ICON_SCALE, SLOT_ICON_SCALE)
 		iconHolder.BackgroundTransparency = 1
 		iconHolder.Parent = button
@@ -291,32 +322,63 @@ function HudController:_build()
 		-- someone who has not been told which is which, however carefully they are
 		-- drawn. The picture is what makes a slot findable at a glance once learned; the
 		-- name is what teaches it, and four characters of Gotham costs one label.
-		local name = UI.Label("Name", button)
-		name.AnchorPoint = Vector2.new(0.5, 1)
-		name.Position = UDim2.new(0.5, 0, 1, -3)
-		name.Size = UDim2.new(1, -4, 0, 10)
-		name.Font = UI.Font.Heading
-		name.TextSize = 9
-		name.TextXAlignment = Enum.TextXAlignment.Center
-		name.TextColor3 = definition.Color
-		name.Text = string.upper(definition.DisplayName)
+		local nameBand = Instance.new("Frame")
+		nameBand.Name = "NameBand"
+		nameBand.AnchorPoint = Vector2.new(0, 1)
+		nameBand.Position = UDim2.fromScale(0, 1)
+		nameBand.Size = UDim2.new(1, 0, 0, 18)
+		nameBand.BackgroundColor3 = UI.Palette.CartoonInk
+		nameBand.BackgroundTransparency = 0.18
+		nameBand.BorderSizePixel = 0
+		nameBand.ZIndex = 2
+		nameBand.Parent = button
 
-		-- The keybind, demoted to a corner badge. It is how you press the slot, not
-		-- what the slot is, so it no longer gets the whole tile.
-		local number = UI.Label("Slot", button)
-		number.AnchorPoint = Vector2.new(1, 0)
-		number.Position = UDim2.new(1, -4, 0, 2)
-		number.Size = UDim2.fromOffset(10, 12)
+		local name = UI.Label("Name", nameBand)
+		name.AnchorPoint = Vector2.new(0.5, 1)
+		name.Position = UDim2.new(0.5, 0, 1, -2)
+		name.Size = UDim2.new(1, -4, 0, 14)
+		name.Font = UI.Font.Heading
+		name.TextSize = 10
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		name.TextColor3 = Color3.new(1, 1, 1)
+		name.Text = string.upper(definition.DisplayName)
+		name.ZIndex = 3
+
+		local numberBadge = Instance.new("Frame")
+		numberBadge.Name = "KeyBadge"
+		numberBadge.AnchorPoint = Vector2.new(1, 0)
+		numberBadge.Position = UDim2.new(1, -4, 0, 4)
+		numberBadge.Size = UDim2.fromOffset(18, 18)
+		numberBadge.BackgroundColor3 = UI.Palette.CartoonCream
+		numberBadge.BorderSizePixel = 0
+		numberBadge.ZIndex = 4
+		numberBadge.Parent = button
+
+		local badgeAspect = Instance.new("UIAspectRatioConstraint")
+		badgeAspect.AspectRatio = 1
+		badgeAspect.Parent = numberBadge
+
+		local badgeCorner = Instance.new("UICorner")
+		badgeCorner.CornerRadius = UDim.new(1, 0)
+		badgeCorner.Parent = numberBadge
+
+		local number = UI.Label("Slot", numberBadge)
+		number.Size = UDim2.fromScale(1, 1)
 		number.Font = UI.Font.Numeric
-		number.TextSize = 11
-		number.TextXAlignment = Enum.TextXAlignment.Right
+		number.TextSize = 10
+		number.TextXAlignment = Enum.TextXAlignment.Center
+		number.TextColor3 = UI.Palette.CartoonInk
 		number.Text = tostring(index)
+		number.ZIndex = 5
 
 		slotButtons[definition.Id] = {
 			Button = button,
 			Stroke = stroke,
+			Gradient = gradient,
 			Number = number,
+			KeyBadge = numberBadge,
 			Name = name,
+			NameBand = nameBand,
 			Icon = iconHolder,
 			Figure = figure,
 			Glyph = definition.Icon,
@@ -350,50 +412,75 @@ function HudController:_build()
 	healthBar.Root.Position = UDim2.new(0, 16, 1, -16)
 	healthBar.Root.Size = UDim2.fromOffset(240, 26)
 
-	-- The sketch gives Rank its own bottom-left route rather than burying it inside
-	-- the store menu. It sits directly above health, clear of the minimap and dock.
+	-- Rank is the sixth action beside the five-stat dock, not a detached bottom-left
+	-- button. Its right edge is ten pixels from the dock's left edge at every width.
 	local rankButton = Instance.new("TextButton")
 	rankButton.Name = "OpenRanks"
-	rankButton.AnchorPoint = Vector2.new(0, 1)
-	rankButton.Position = UDim2.new(0, 16, 1, -52)
-	rankButton.Size = UDim2.fromOffset(112, 42)
-	rankButton.BackgroundColor3 = UI.Palette.Glass
-	rankButton.BackgroundTransparency = 0.08
+	rankButton.AnchorPoint = Vector2.new(1, 1)
+	rankButton.Position = UDim2.new(0.5, -(DOCK_WIDTH / 2 + 10), 1, -12)
+	rankButton.Size = UDim2.fromOffset(94, DOCK_HEIGHT)
+	rankButton.BackgroundColor3 = UI.Palette.Accent
+	rankButton.BackgroundTransparency = 0
 	rankButton.BorderSizePixel = 0
 	rankButton.AutoButtonColor = false
-	rankButton.Font = UI.Font.Heading
-	rankButton.TextSize = 13
-	rankButton.TextColor3 = UI.Palette.Text
-	rankButton.TextXAlignment = Enum.TextXAlignment.Right
-	rankButton.Text = "RANK   "
+	rankButton.Text = ""
 	rankButton.Parent = screen
 
 	local rankCorner = Instance.new("UICorner")
-	rankCorner.CornerRadius = UDim.new(0, 8)
+	rankCorner.CornerRadius = UDim.new(0, 12)
 	rankCorner.Parent = rankButton
 
 	local rankStroke = Instance.new("UIStroke")
-	rankStroke.Color = UI.Palette.GlassStroke
-	rankStroke.Transparency = 0.6
+	rankStroke.Color = UI.Palette.CartoonInk
+	rankStroke.Thickness = 3
+	rankStroke.Transparency = 0
 	rankStroke.Parent = rankButton
+
+	local rankGradient = Instance.new("UIGradient")
+	rankGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 229, 103)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 164, 47)),
+	})
+	rankGradient.Rotation = 90
+	rankGradient.Parent = rankButton
 
 	local rankIcon = Instance.new("Frame")
 	rankIcon.Name = "Icon"
-	rankIcon.AnchorPoint = Vector2.new(0, 0.5)
-	rankIcon.Position = UDim2.new(0, 7, 0.5, 0)
-	rankIcon.Size = UDim2.fromOffset(30, 30)
+	rankIcon.AnchorPoint = Vector2.new(0.5, 0)
+	rankIcon.Position = UDim2.new(0.5, 0, 0, 10)
+	rankIcon.Size = UDim2.fromOffset(46, 46)
 	rankIcon.BackgroundTransparency = 1
 	rankIcon.Parent = rankButton
 
 	local rankAspect = Instance.new("UIAspectRatioConstraint")
 	rankAspect.AspectRatio = 1
 	rankAspect.Parent = rankIcon
-	Icons.Draw("Rank", rankIcon, UI.Palette.Accent, UI.Palette.Backdrop)
+	Icons.Draw("Rank", rankIcon, UI.Palette.CartoonInk, UI.Palette.Accent)
+
+	local rankLabel = UI.Label("Label", rankButton)
+	rankLabel.AnchorPoint = Vector2.new(0.5, 1)
+	rankLabel.Position = UDim2.new(0.5, 0, 1, -9)
+	rankLabel.Size = UDim2.new(1, -12, 0, 18)
+	rankLabel.Font = UI.Font.Heading
+	rankLabel.TextSize = 12
+	rankLabel.TextColor3 = UI.Palette.CartoonInk
+	rankLabel.TextXAlignment = Enum.TextXAlignment.Center
+	rankLabel.Text = "RANK"
 
 	UI.Pressable(rankButton)
 	rankButton.Activated:Connect(function()
 		MenuController:Open("Ranks")
 	end)
+
+	-- On narrow screens the centred action dock reaches the health bar's horizontal
+	-- space, so lift health above it. Wide desktop keeps health in its usual corner.
+	local function arrangeBottomHud()
+		healthBar.Root.Position = if screen.AbsoluteSize.X < 980
+			then UDim2.new(0, 16, 1, -(DOCK_HEIGHT + 24))
+			else UDim2.new(0, 16, 1, -16)
+	end
+	arrangeBottomHud()
+	screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(arrangeBottomHud)
 
 	-- Under the compact summary: the minimap.
 	--
@@ -797,21 +884,27 @@ function HudController:_select(statId: Types.StatId)
 	for id, slot in slotButtons do
 		local definition = StatConfig.Get(id)
 		local chosen = id == statId
-		local fill = if chosen
-			then (if definition ~= nil then definition.Color else UI.Palette.Accent)
-			else UI.Palette.Backdrop
+		local statColor = if definition ~= nil then definition.Color else UI.Palette.Accent
+		local fill = if chosen then statColor else statColor:Lerp(UI.Palette.CartoonInk, 0.72)
 		slot.Button.BackgroundColor3 = fill
-		slot.Button.BackgroundTransparency = if chosen then 0.05 else 0.08
-		slot.Stroke.Transparency = if chosen then 0 else 1
-		slot.Number.TextColor3 = if chosen then UI.Palette.Backdrop else UI.Palette.TextMuted
-		slot.Name.TextColor3 = if chosen
-			then UI.Palette.Backdrop
-			else (if definition ~= nil then definition.Color else UI.Palette.TextMuted)
+		slot.Button.BackgroundTransparency = 0
+		slot.Stroke.Transparency = if chosen then 0 else 0.25
+		slot.Gradient.Color = if chosen
+			then ColorSequence.new({
+				ColorSequenceKeypoint.new(0, statColor:Lerp(Color3.new(1, 1, 1), 0.28)),
+				ColorSequenceKeypoint.new(1, statColor:Lerp(UI.Palette.CartoonInk, 0.18)),
+			})
+			else ColorSequence.new({
+				ColorSequenceKeypoint.new(0, statColor:Lerp(UI.Palette.CartoonInk, 0.48)),
+				ColorSequenceKeypoint.new(1, statColor:Lerp(UI.Palette.CartoonInk, 0.82)),
+			})
+		slot.KeyBadge.BackgroundColor3 = if chosen then UI.Palette.CartoonInk else UI.Palette.CartoonCream
+		slot.Number.TextColor3 = if chosen then statColor else UI.Palette.CartoonInk
+		slot.NameBand.BackgroundTransparency = if chosen then 0.08 else 0.18
+		slot.Name.TextColor3 = Color3.new(1, 1, 1)
 		-- The picture inverts on the selected tile: dark on the stat's colour, because a
 		-- coloured drawing on a tile of its own colour is invisible.
-		local ink = if chosen
-			then UI.Palette.Backdrop
-			else (if definition ~= nil then definition.Color else UI.Palette.TextMuted)
+		local ink = if chosen then UI.Palette.Backdrop else statColor
 		if slot.Figure ~= nil then
 			slot.Figure.SetColor(ink)
 		else

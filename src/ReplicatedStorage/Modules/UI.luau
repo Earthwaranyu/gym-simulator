@@ -36,6 +36,13 @@ UI.Palette = {
 	Combo = Color3.fromRGB(255, 138, 61),
 
 	Danger = Color3.fromRGB(255, 92, 92),
+
+	-- Saturated surfaces used by the stat identity and store. These keep the game's
+	-- dark world-readable base while letting the requested cartoon UI feel playful.
+	CartoonInk = Color3.fromRGB(35, 34, 52),
+	CartoonCream = Color3.fromRGB(255, 247, 218),
+	CartoonLime = Color3.fromRGB(154, 236, 91),
+	CartoonPink = Color3.fromRGB(255, 108, 176),
 }
 
 UI.Font = {
@@ -73,6 +80,52 @@ function UI.Panel(name: string, parent: Instance?): Frame
 	padding.PaddingLeft = UDim.new(0, 12)
 	padding.PaddingRight = UDim.new(0, 12)
 	padding.Parent = frame
+
+	frame.Parent = parent
+	return frame
+end
+
+--[[
+	A chunky, stat-coloured card for the cartoony HUD and shop. It remains a plain
+	Frame so callers can choose their own layout, while the outline, gradient, corner,
+	and highlight stay consistent everywhere.
+]]
+function UI.CartoonCard(name: string, accent: Color3, parent: Instance?): Frame
+	local frame = Instance.new("Frame")
+	frame.Name = name
+	frame.BackgroundColor3 = accent:Lerp(UI.Palette.CartoonInk, 0.72)
+	frame.BackgroundTransparency = 0
+	frame.BorderSizePixel = 0
+	frame.ClipsDescendants = true
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = frame
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Name = "CartoonStroke"
+	stroke.Color = UI.Palette.CartoonInk
+	stroke.Thickness = 3
+	stroke.Transparency = 0
+	stroke.Parent = frame
+
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, accent:Lerp(Color3.new(1, 1, 1), 0.18)),
+		ColorSequenceKeypoint.new(0.1, accent:Lerp(UI.Palette.CartoonInk, 0.56)),
+		ColorSequenceKeypoint.new(1, accent:Lerp(UI.Palette.CartoonInk, 0.84)),
+	})
+	gradient.Rotation = 90
+	gradient.Parent = frame
+
+	local shine = Instance.new("Frame")
+	shine.Name = "Shine"
+	shine.Size = UDim2.new(1, 0, 0, 4)
+	shine.BackgroundColor3 = Color3.new(1, 1, 1)
+	shine.BackgroundTransparency = 0.45
+	shine.BorderSizePixel = 0
+	shine.ZIndex = 2
+	shine.Parent = frame
 
 	frame.Parent = parent
 	return frame

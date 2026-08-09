@@ -46,6 +46,7 @@ local ToastController: any = nil
 
 local screen: ScreenGui
 local body: Frame
+local bodyScroll: ScrollingFrame
 local titleLabel: TextLabel
 local tabStrip: Frame
 local tabButtons: { [string]: TextButton } = {}
@@ -1020,15 +1021,18 @@ function MenuController:_renderInfo(parent: Frame)
 	local stats = if data ~= nil then data.Stats else {}
 	local power = Formulas.TotalPower(stats)
 	local rank = RankConfig.Get(power)
+	local reputation = ReputationConfig.Get(if data ~= nil then data.Reputation else 0)
 
-	local header = row(parent, 96, 1)
+	local header = UI.CartoonCard("ProfileHero", rank.Color, parent)
+	header.Size = UDim2.new(1, 0, 0, 78)
+	header.LayoutOrder = 1
 
 	local portrait = Instance.new("ImageLabel")
 	portrait.Name = "Portrait"
 	portrait.AnchorPoint = Vector2.new(0, 0.5)
-	portrait.Position = UDim2.fromScale(0, 0.5)
-	portrait.Size = UDim2.fromOffset(68, 68)
-	portrait.BackgroundColor3 = UI.Palette.Backdrop
+	portrait.Position = UDim2.new(0, 9, 0.5, 0)
+	portrait.Size = UDim2.fromOffset(58, 58)
+	portrait.BackgroundColor3 = UI.Palette.CartoonCream
 	portrait.BorderSizePixel = 0
 	portrait.ScaleType = Enum.ScaleType.Crop
 	portrait.Parent = header
@@ -1038,12 +1042,12 @@ function MenuController:_renderInfo(parent: Frame)
 	portraitAspect.Parent = portrait
 
 	local portraitCorner = Instance.new("UICorner")
-	portraitCorner.CornerRadius = UDim.new(0, 9)
+	portraitCorner.CornerRadius = UDim.new(0, 12)
 	portraitCorner.Parent = portrait
 
 	local portraitStroke = Instance.new("UIStroke")
-	portraitStroke.Color = rank.Color
-	portraitStroke.Thickness = 2
+	portraitStroke.Color = UI.Palette.CartoonInk
+	portraitStroke.Thickness = 3
 	portraitStroke.Parent = portrait
 
 	task.spawn(function()
@@ -1060,98 +1064,227 @@ function MenuController:_renderInfo(parent: Frame)
 	end)
 
 	local name = UI.Label("Name", header)
-	name.Size = UDim2.new(1, -80, 0, 24)
-	name.Position = UDim2.fromOffset(80, 6)
+	name.Size = UDim2.new(0.45, -80, 0, 24)
+	name.Position = UDim2.fromOffset(80, 8)
 	name.Font = UI.Font.Heading
-	name.TextSize = 17
-	name.Text = `Name: {Players.LocalPlayer.DisplayName}`
+	name.TextSize = 18
+	name.TextColor3 = UI.Palette.CartoonCream
+	name.Text = Players.LocalPlayer.DisplayName
 
 	local rankLabel = UI.Label("Rank", header)
-	rankLabel.Size = UDim2.new(1, -80, 0, 20)
-	rankLabel.Position = UDim2.fromOffset(80, 32)
-	rankLabel.TextSize = 14
-	rankLabel.TextColor3 = rank.Color
-	rankLabel.Text =
-		`Rank: {rank.DisplayName}  <font color="#8A93A8">· {NumberFormat.Format(power)} power</font>`
+	rankLabel.Size = UDim2.new(0.45, -80, 0, 20)
+	rankLabel.Position = UDim2.fromOffset(80, 34)
+	rankLabel.TextSize = 13
+	rankLabel.TextColor3 = Color3.new(1, 1, 1)
+	rankLabel.Text = `{rank.DisplayName}  ·  {reputation.DisplayName}`
 
-	-- Who you have killed, by what they were when they died. Built from
-	-- ReputationConfig rather than from three named counters, so rebanding the
-	-- tiers changes this line without touching it.
-	local record = if data ~= nil then data.KillsByReputation else {}
-	local parts = {}
-	for _, tier in ReputationConfig.List do
-		table.insert(parts, `{tier.DisplayName} killed: {record[tier.Id] or 0}`)
+	local record = UI.Label("Record", header)
+	record.Size = UDim2.new(0.45, -80, 0, 16)
+	record.Position = UDim2.fromOffset(80, 54)
+	record.TextSize = 11
+	record.TextColor3 = UI.Palette.CartoonCream
+	record.Text =
+		`{if data ~= nil then data.Kills else 0} KOs  ·  {if data ~= nil then data.Deaths else 0} downs`
+
+	local heroPower = UI.Label("Power", header)
+	heroPower.AnchorPoint = Vector2.new(1, 0)
+	heroPower.Position = UDim2.new(1, -14, 0, 8)
+	heroPower.Size = UDim2.new(0.5, -10, 0, 34)
+	heroPower.Font = UI.Font.Numeric
+	heroPower.TextSize = 24
+	heroPower.TextXAlignment = Enum.TextXAlignment.Right
+	heroPower.TextColor3 = UI.Palette.Power
+	heroPower.Text = `{NumberFormat.Format(power)} POWER`
+
+	local heroTokens = UI.Label("Tokens", header)
+	heroTokens.AnchorPoint = Vector2.new(1, 0)
+	heroTokens.Position = UDim2.new(1, -14, 0, 43)
+	heroTokens.Size = UDim2.new(0.5, -10, 0, 22)
+	heroTokens.Font = UI.Font.Heading
+	heroTokens.TextSize = 13
+	heroTokens.TextXAlignment = Enum.TextXAlignment.Right
+	heroTokens.TextColor3 = UI.Palette.Token
+	heroTokens.Text = `{NumberFormat.Format(if data ~= nil then data.Tokens else 0)} TOKENS READY`
+
+	local statGrid = Instance.new("Frame")
+	statGrid.Name = "StatGrid"
+	statGrid.BackgroundTransparency = 1
+	statGrid.Size = UDim2.new(1, 0, 0, 300)
+	statGrid.LayoutOrder = 2
+	statGrid.Parent = parent
+
+	local rows: { Frame } = {}
+	for rowIndex = 1, 3 do
+		local statRow = Instance.new("Frame")
+		statRow.Name = `Row{rowIndex}`
+		statRow.BackgroundTransparency = 1
+		statRow.Position = UDim2.fromOffset(0, (rowIndex - 1) * 102)
+		statRow.Size = UDim2.new(1, 0, 0, 96)
+		statRow.Parent = statGrid
+
+		local rowLayout = Instance.new("UIListLayout")
+		rowLayout.FillDirection = Enum.FillDirection.Horizontal
+		rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		rowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		rowLayout.Padding = UDim.new(0, 8)
+		rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		rowLayout.Parent = statRow
+		table.insert(rows, statRow)
 	end
 
-	local kills = UI.Label("Kills", header)
-	kills.Size = UDim2.new(1, -80, 0, 34)
-	kills.Position = UDim2.fromOffset(80, 54)
-	kills.TextSize = 12
-	kills.TextColor3 = UI.Palette.TextMuted
-	kills.TextWrapped = true
-	kills.Text = table.concat(parts, "   ")
-
-	for index, definition in StatConfig.List do
+	local function statCard(definition: StatConfig.StatDefinition, index: number)
 		local level = if data ~= nil then (data.MultiplierLevels[definition.Id] or 0) else 0
 		local cost = Formulas.MultiplierCost(level)
 		local current = Formulas.MultiplierValue(level)
 		local next = Formulas.MultiplierValue(level + 1)
-
-		local line = row(parent, 62, index + 1)
+		local rowIndex = math.ceil(index / 2)
+		local card = UI.CartoonCard(definition.Id, definition.Color, rows[rowIndex])
+		card.LayoutOrder = index
+		card.Size = UDim2.new(0.5, -4, 1, 0)
 
 		local glyphHolder = Instance.new("Frame")
 		glyphHolder.Name = "Glyph"
-		glyphHolder.BackgroundTransparency = 1
+		glyphHolder.BackgroundColor3 = UI.Palette.CartoonInk
+		glyphHolder.BackgroundTransparency = 0.18
+		glyphHolder.BorderSizePixel = 0
 		glyphHolder.AnchorPoint = Vector2.new(0, 0.5)
-		glyphHolder.Position = UDim2.fromScale(0, 0.5)
-		glyphHolder.Size = UDim2.fromOffset(28, 28)
-		glyphHolder.Parent = line
+		glyphHolder.Position = UDim2.new(0, 9, 0.5, 0)
+		glyphHolder.Size = UDim2.fromOffset(62, 62)
+		glyphHolder.Parent = card
+
+		local glyphCorner = Instance.new("UICorner")
+		glyphCorner.CornerRadius = UDim.new(1, 0)
+		glyphCorner.Parent = glyphHolder
+
 		local glyphAspect = Instance.new("UIAspectRatioConstraint")
 		glyphAspect.AspectRatio = 1
 		glyphAspect.Parent = glyphHolder
-		Icons.Draw(definition.Icon, glyphHolder, definition.Color, UI.Palette.Backdrop)
 
-		local label = UI.Label("Text", line)
-		label.Position = UDim2.fromOffset(36, 6)
-		label.Size = UDim2.new(1, -156, 0, 26)
-		label.TextColor3 = definition.Color
-		label.Text = `{definition.DisplayName}: {NumberFormat.Format(stats[definition.Id] or 0)}  `
-			.. `<font color="#8A93A8">x{NumberFormat.Format(current)}</font>`
+		local glyphPadding = Instance.new("UIPadding")
+		glyphPadding.PaddingTop = UDim.new(0, 10)
+		glyphPadding.PaddingBottom = UDim.new(0, 10)
+		glyphPadding.PaddingLeft = UDim.new(0, 10)
+		glyphPadding.PaddingRight = UDim.new(0, 10)
+		glyphPadding.Parent = glyphHolder
+		Icons.Draw(definition.Icon, glyphHolder, UI.Palette.CartoonCream, UI.Palette.CartoonInk)
 
-		local effect = UI.Label("Effect", line)
-		effect.Position = UDim2.fromOffset(36, 32)
-		effect.Size = UDim2.new(1, -156, 0, 18)
-		effect.TextSize = 13
-		effect.TextColor3 = UI.Palette.TextMuted
+		local label = UI.Label("Name", card)
+		label.Position = UDim2.fromOffset(82, 8)
+		label.Size = UDim2.new(1, -190, 0, 20)
+		label.Font = UI.Font.Heading
+		label.TextSize = 13
+		label.TextColor3 = UI.Palette.CartoonCream
+		label.Text = `{string.upper(definition.DisplayName)}  ·  x{NumberFormat.Format(current)}`
+
+		local value = UI.Label("Value", card)
+		value.Position = UDim2.fromOffset(82, 28)
+		value.Size = UDim2.new(1, -190, 0, 28)
+		value.Font = UI.Font.Numeric
+		value.TextSize = 21
+		value.TextColor3 = Color3.new(1, 1, 1)
+		value.Text = NumberFormat.Format(stats[definition.Id] or 0)
+
+		local effect = UI.Label("Effect", card)
+		effect.Position = UDim2.fromOffset(82, 58)
+		effect.Size = UDim2.new(1, -190, 0, 20)
+		effect.TextSize = 11
+		effect.TextColor3 = UI.Palette.CartoonCream
 		effect.TextTruncate = Enum.TextTruncate.AtEnd
 		effect.Text = definition.Effect(stats)
 
-		-- The ladder button from the sketch: it names the multiplier you are buying,
-		-- not the level number, because "x8" is the thing the player wants and
-		-- "level 3" is bookkeeping.
-		button(
-			line,
-			`x{NumberFormat.Format(next)}  ·  {NumberFormat.Format(cost)}`,
-			UI.Palette.Token,
-			function()
-				UI.Confirm(screen, {
-					Title = `Upgrade {definition.DisplayName} Multiplier`,
-					Body = `Raise your {definition.DisplayName} multiplier from ` .. `x{NumberFormat.Format(
-						current
-					)} to x{NumberFormat.Format(next)} ` .. `for {NumberFormat.Format(cost)} tokens?`,
-					ConfirmText = "Confirm",
-					CancelText = "Cancel",
-					OnConfirm = function()
-						local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)
-						toast(message)
-						if ok then
-							self:_refresh()
-						end
-					end,
-				})
-			end
-		)
+		local upgrade = Instance.new("TextButton")
+		upgrade.Name = "Upgrade"
+		upgrade.AnchorPoint = Vector2.new(1, 0.5)
+		upgrade.Position = UDim2.new(1, -9, 0.5, 0)
+		upgrade.Size = UDim2.fromOffset(96, 64)
+		upgrade.BackgroundColor3 = UI.Palette.Token
+		upgrade.BorderSizePixel = 0
+		upgrade.AutoButtonColor = false
+		upgrade.Font = UI.Font.Heading
+		upgrade.TextSize = 12
+		upgrade.TextColor3 = UI.Palette.CartoonInk
+		upgrade.TextWrapped = true
+		upgrade.Text = `UPGRADE\nx{NumberFormat.Format(next)}  ·  {NumberFormat.Format(cost)}`
+		upgrade.Parent = card
+
+		local upgradeCorner = Instance.new("UICorner")
+		upgradeCorner.CornerRadius = UDim.new(0, 10)
+		upgradeCorner.Parent = upgrade
+
+		local upgradeStroke = Instance.new("UIStroke")
+		upgradeStroke.Color = UI.Palette.CartoonInk
+		upgradeStroke.Thickness = 3
+		upgradeStroke.Parent = upgrade
+
+		local upgradeGradient = Instance.new("UIGradient")
+		upgradeGradient.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(165, 245, 255)),
+			ColorSequenceKeypoint.new(1, UI.Palette.Token),
+		})
+		upgradeGradient.Rotation = 90
+		upgradeGradient.Parent = upgrade
+
+		UI.Pressable(upgrade, { PressScale = 0.94, HoverScale = 1.03 })
+		upgrade.Activated:Connect(function()
+			UI.Confirm(screen, {
+				Title = `Upgrade {definition.DisplayName} Multiplier`,
+				Body = `Raise your {definition.DisplayName} multiplier from ` .. `x{NumberFormat.Format(
+					current
+				)} to x{NumberFormat.Format(next)} ` .. `for {NumberFormat.Format(cost)} tokens?`,
+				ConfirmText = "Confirm",
+				CancelText = "Cancel",
+				OnConfirm = function()
+					local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)
+					toast(message)
+					if ok then
+						self:_refresh()
+					end
+				end,
+			})
+		end)
 	end
+
+	for index, definition in StatConfig.List do
+		statCard(definition, index)
+	end
+
+	local summary = UI.CartoonCard("BuildSummary", UI.Palette.Accent, rows[3])
+	summary.LayoutOrder = 6
+	summary.Size = UDim2.new(0.5, -4, 1, 0)
+
+	local summaryIcon = Instance.new("Frame")
+	summaryIcon.AnchorPoint = Vector2.new(0, 0.5)
+	summaryIcon.Position = UDim2.new(0, 12, 0.5, 0)
+	summaryIcon.Size = UDim2.fromOffset(58, 58)
+	summaryIcon.BackgroundTransparency = 1
+	summaryIcon.Parent = summary
+	local summaryAspect = Instance.new("UIAspectRatioConstraint")
+	summaryAspect.AspectRatio = 1
+	summaryAspect.Parent = summaryIcon
+	Icons.Draw("Rank", summaryIcon, UI.Palette.CartoonInk, UI.Palette.Accent)
+
+	local summaryTitle = UI.Label("Title", summary)
+	summaryTitle.Position = UDim2.fromOffset(82, 14)
+	summaryTitle.Size = UDim2.new(1, -94, 0, 22)
+	summaryTitle.Font = UI.Font.Heading
+	summaryTitle.TextSize = 13
+	summaryTitle.TextColor3 = UI.Palette.CartoonInk
+	summaryTitle.Text = "YOUR TOTAL BUILD"
+
+	local summaryPower = UI.Label("Power", summary)
+	summaryPower.Position = UDim2.fromOffset(82, 34)
+	summaryPower.Size = UDim2.new(1, -94, 0, 32)
+	summaryPower.Font = UI.Font.Numeric
+	summaryPower.TextSize = 22
+	summaryPower.TextColor3 = UI.Palette.CartoonInk
+	summaryPower.Text = `${NumberFormat.Format(power)} POWER`
+
+	local summaryHint = UI.Label("Hint", summary)
+	summaryHint.Position = UDim2.fromOffset(82, 66)
+	summaryHint.Size = UDim2.new(1, -94, 0, 18)
+	summaryHint.TextSize = 11
+	summaryHint.TextColor3 = UI.Palette.CartoonInk
+	summaryHint.Text = "Train all five muscles to climb ranks."
 end
 
 function MenuController:_renderQuests(parent: Frame)
@@ -1190,77 +1323,6 @@ end
 	player has already committed to buying it.
 ]]
 function MenuController:_renderShop(parent: Frame)
-	local order = 0
-
-	local function heading(text: string, detail: string)
-		order += 1
-		local label = UI.Label("Heading", parent)
-		label.Size = UDim2.new(1, 0, 0, 38)
-		label.LayoutOrder = order
-		label.Font = UI.Font.Heading
-		label.TextSize = 15
-		label.TextColor3 = UI.Palette.Accent
-		label.Text = `{string.upper(text)}\n<font color="#8A93A8" size="12">{detail}</font>`
-	end
-
-	local function productRow(product: any, group: string)
-		order += 1
-		local line = row(parent, 68, order)
-		local accent = if group == "Potion"
-			then Color3.fromRGB(55, 222, 207)
-			elseif group == "Token" then UI.Palette.Token
-			else UI.Palette.Accent
-		local iconName = if group == "Potion" then "Potion" elseif group == "Token" then "Token" else "Vip"
-
-		local glyphHolder = Instance.new("Frame")
-		glyphHolder.Name = "Glyph"
-		glyphHolder.AnchorPoint = Vector2.new(0, 0.5)
-		glyphHolder.Position = UDim2.fromScale(0, 0.5)
-		glyphHolder.Size = UDim2.fromOffset(44, 44)
-		glyphHolder.BackgroundColor3 = accent:Lerp(UI.Palette.Backdrop, 0.75)
-		glyphHolder.BorderSizePixel = 0
-		glyphHolder.Parent = line
-
-		local glyphCorner = Instance.new("UICorner")
-		glyphCorner.CornerRadius = UDim.new(0, 8)
-		glyphCorner.Parent = glyphHolder
-
-		local glyphAspect = Instance.new("UIAspectRatioConstraint")
-		glyphAspect.AspectRatio = 1
-		glyphAspect.Parent = glyphHolder
-
-		local glyphPadding = Instance.new("UIPadding")
-		glyphPadding.PaddingTop = UDim.new(0, 7)
-		glyphPadding.PaddingBottom = UDim.new(0, 7)
-		glyphPadding.PaddingLeft = UDim.new(0, 7)
-		glyphPadding.PaddingRight = UDim.new(0, 7)
-		glyphPadding.Parent = glyphHolder
-		Icons.Draw(iconName, glyphHolder, accent, UI.Palette.Backdrop)
-
-		local label = UI.Label("Text", line)
-		label.Position = UDim2.fromOffset(56, 0)
-		label.Size = UDim2.new(1, -188, 1, 0)
-		label.TextSize = 13
-		label.TextWrapped = true
-		label.Text = `<b>{product.DisplayName}</b>\n<font color="#8A93A8">{product.Description}</font>`
-
-		local text = if product.Owned
-			then "OWNED"
-			elseif not product.Available then "SOON"
-			else `R$ {NumberFormat.Format(product.RobuxPrice)}`
-		local colour = if product.Owned or not product.Available then UI.Palette.TextMuted else accent
-
-		button(line, text, colour, function()
-			if product.Owned or not product.Available then
-				return
-			end
-			local bought, message = Net.Function("PromptProduct"):InvokeServer(product.Id)
-			if not bought then
-				toast(message)
-			end
-		end)
-	end
-
 	local ok, catalogue = pcall(function()
 		return Net.Function("GetProductCatalogue"):InvokeServer()
 	end)
@@ -1279,57 +1341,218 @@ function MenuController:_renderShop(parent: Frame)
 		end
 	end
 
-	local groupCopy = {
-		Gamepass = { "VIP & PASSES", "Permanent privileges and daily protection" },
-		Potion = { "IMMORTAL POTIONS", "Train in open PvP without taking damage" },
-		Token = { "TOKEN WEIGHTS", "Dumbbells buy permanent stat multipliers" },
+	local order = 0
+
+	local function productCard(
+		grid: Frame,
+		layoutOrder: number,
+		title: string,
+		description: string,
+		iconName: string,
+		accent: Color3,
+		actionText: string,
+		enabled: boolean,
+		onClick: () -> ()
+	)
+		local card = UI.CartoonCard(title, accent, grid)
+		card.LayoutOrder = layoutOrder
+
+		local iconBubble = Instance.new("Frame")
+		iconBubble.Name = "Icon"
+		iconBubble.Position = UDim2.fromOffset(10, 12)
+		iconBubble.Size = UDim2.fromOffset(62, 62)
+		iconBubble.BackgroundColor3 = UI.Palette.CartoonInk
+		iconBubble.BackgroundTransparency = 0.12
+		iconBubble.BorderSizePixel = 0
+		iconBubble.Parent = card
+
+		local iconAspect = Instance.new("UIAspectRatioConstraint")
+		iconAspect.AspectRatio = 1
+		iconAspect.Parent = iconBubble
+
+		local iconCorner = Instance.new("UICorner")
+		iconCorner.CornerRadius = UDim.new(1, 0)
+		iconCorner.Parent = iconBubble
+
+		local iconPadding = Instance.new("UIPadding")
+		iconPadding.PaddingTop = UDim.new(0, 10)
+		iconPadding.PaddingBottom = UDim.new(0, 10)
+		iconPadding.PaddingLeft = UDim.new(0, 10)
+		iconPadding.PaddingRight = UDim.new(0, 10)
+		iconPadding.Parent = iconBubble
+		Icons.Draw(iconName, iconBubble, UI.Palette.CartoonCream, UI.Palette.CartoonInk)
+
+		local name = UI.Label("Name", card)
+		name.Position = UDim2.fromOffset(82, 10)
+		name.Size = UDim2.new(1, -92, 0, 22)
+		name.Font = UI.Font.Heading
+		name.TextSize = 14
+		name.TextColor3 = UI.Palette.CartoonCream
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		name.Text = string.upper(title)
+
+		local detail = UI.Label("Description", card)
+		detail.Position = UDim2.fromOffset(82, 32)
+		detail.Size = UDim2.new(1, -92, 0, 38)
+		detail.TextSize = 11
+		detail.TextColor3 = Color3.new(1, 1, 1)
+		detail.TextWrapped = true
+		detail.TextYAlignment = Enum.TextYAlignment.Top
+		detail.TextTruncate = Enum.TextTruncate.AtEnd
+		detail.Text = description
+
+		local action = Instance.new("TextButton")
+		action.Name = "Buy"
+		action.Position = UDim2.fromOffset(10, 78)
+		action.Size = UDim2.new(1, -20, 0, 26)
+		action.BackgroundColor3 = if enabled then UI.Palette.CartoonCream else UI.Palette.TextMuted
+		action.BackgroundTransparency = if enabled then 0 else 0.28
+		action.BorderSizePixel = 0
+		action.AutoButtonColor = false
+		action.Font = UI.Font.Heading
+		action.TextSize = 12
+		action.TextColor3 = UI.Palette.CartoonInk
+		action.Text = actionText
+		action.Parent = card
+
+		local actionCorner = Instance.new("UICorner")
+		actionCorner.CornerRadius = UDim.new(0, 8)
+		actionCorner.Parent = action
+
+		local actionStroke = Instance.new("UIStroke")
+		actionStroke.Color = UI.Palette.CartoonInk
+		actionStroke.Thickness = 2
+		actionStroke.Parent = action
+
+		if enabled then
+			UI.Pressable(action, { PressScale = 0.95, HoverScale = 1.02 })
+			action.Activated:Connect(onClick)
+		end
+	end
+
+	local function section(
+		title: string,
+		detail: string,
+		accent: Color3,
+		count: number,
+		render: (Frame) -> ()
+	)
+		if count == 0 then
+			return
+		end
+
+		order += 1
+		local rows = math.ceil(count / 2)
+		local root = Instance.new("Frame")
+		root.Name = title
+		root.BackgroundTransparency = 1
+		root.Size = UDim2.new(1, 0, 0, 42 + rows * 118)
+		root.LayoutOrder = order
+		root.Parent = parent
+
+		local heading = UI.Label("Heading", root)
+		heading.Size = UDim2.new(1, 0, 0, 38)
+		heading.Font = UI.Font.Heading
+		heading.TextSize = 16
+		heading.TextColor3 = accent
+		heading.Text = `{string.upper(title)}\n<font color="#AEB6CC" size="11">{detail}</font>`
+
+		local grid = Instance.new("Frame")
+		grid.Name = "Cards"
+		grid.Position = UDim2.fromOffset(0, 42)
+		grid.Size = UDim2.new(1, 0, 0, rows * 118)
+		grid.BackgroundTransparency = 1
+		grid.Parent = root
+
+		local layout = Instance.new("UIGridLayout")
+		layout.CellSize = UDim2.new(0.5, -5, 0, 108)
+		layout.CellPadding = UDim2.fromOffset(10, 10)
+		layout.FillDirectionMaxCells = 2
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Parent = grid
+
+		render(grid)
+	end
+
+	local groupVisuals = {
+		Gamepass = {
+			Title = "VIP & PASSES",
+			Detail = "Permanent perks for serious lifters",
+			Accent = UI.Palette.Accent,
+			Icon = "Vip",
+		},
+		Potion = {
+			Title = "IMMORTAL POTIONS",
+			Detail = "A glowing shield while you train",
+			Accent = UI.Palette.CartoonPink,
+			Icon = "Potion",
+		},
+		Token = {
+			Title = "TOKEN DUMBBELLS",
+			Detail = "Permanent multiplier currency",
+			Accent = UI.Palette.Token,
+			Icon = "Token",
+		},
 	}
 
 	for _, group in { "Gamepass", "Potion", "Token" } do
-		if #sections[group] == 0 then
-			continue
-		end
-		local copy = groupCopy[group]
-		heading(copy[1], copy[2])
-
-		for _, product in sections[group] do
-			productRow(product, group)
-		end
+		local products = sections[group]
+		local visual = groupVisuals[group]
+		section(visual.Title, visual.Detail, visual.Accent, #products, function(grid)
+			for index, product in products do
+				local enabled = product.Available and not product.Owned
+				local actionText = if product.Owned
+					then "OWNED"
+					elseif not product.Available then "COMING SOON"
+					else `BUY  ·  R$ {NumberFormat.Format(product.RobuxPrice)}`
+				productCard(
+					grid,
+					index,
+					product.DisplayName,
+					product.Description,
+					visual.Icon,
+					visual.Accent,
+					actionText,
+					enabled,
+					function()
+						local bought, message = Net.Function("PromptProduct"):InvokeServer(product.Id)
+						if not bought then
+							toast(message)
+						end
+					end
+				)
+			end
+		end)
 	end
 
-	if #ShopConfig.List > 0 then
-		heading("SUPPLEMENTS", "Short boosts bought with earned cash")
-		for _, item in ShopConfig.List do
-			order += 1
-			local line = row(parent, 62, order)
-
-			local glyphHolder = Instance.new("Frame")
-			glyphHolder.Name = "Glyph"
-			glyphHolder.AnchorPoint = Vector2.new(0, 0.5)
-			glyphHolder.Position = UDim2.fromScale(0, 0.5)
-			glyphHolder.Size = UDim2.fromOffset(38, 38)
-			glyphHolder.BackgroundTransparency = 1
-			glyphHolder.Parent = line
-			local glyphAspect = Instance.new("UIAspectRatioConstraint")
-			glyphAspect.AspectRatio = 1
-			glyphAspect.Parent = glyphHolder
-			Icons.Draw("Train", glyphHolder, UI.Palette.Power, UI.Palette.Backdrop)
-
-			local label = UI.Label("Text", line)
-			label.Position = UDim2.fromOffset(50, 0)
-			label.Size = UDim2.new(1, -182, 1, 0)
-			label.TextSize = 13
-			label.Text = `<b>{item.DisplayName}</b>\n<font color="#8A93A8">{item.Description}</font>`
-
-			button(line, `$ {NumberFormat.Format(item.Price)}`, UI.Palette.Power, function()
-				local bought, message = Net.Function("PurchaseShopItem"):InvokeServer(item.Id)
-				toast(message)
-				if bought then
-					self:_refresh()
-				end
-			end)
+	section(
+		"SUPPLEMENTS",
+		"Temporary boosts bought with earned cash",
+		UI.Palette.CartoonLime,
+		#ShopConfig.List,
+		function(grid)
+			for index, item in ShopConfig.List do
+				productCard(
+					grid,
+					index,
+					item.DisplayName,
+					item.Description,
+					"Train",
+					UI.Palette.CartoonLime,
+					`BUY  ·  $ {NumberFormat.Format(item.Price)}`,
+					true,
+					function()
+						local bought, message = Net.Function("PurchaseShopItem"):InvokeServer(item.Id)
+						toast(message)
+						if bought then
+							self:_refresh()
+						end
+					end
+				)
+			end
 		end
-	end
+	)
 end
 
 function MenuController:_renderLeaderboard(parent: Frame)
@@ -1458,6 +1681,12 @@ function MenuController:_refresh()
 			stroke.Color = if selected then UI.Palette.Accent else UI.Palette.GlassStroke
 		end
 	end
+
+	local fixedInfo = activeTab == "Info"
+	bodyScroll.ScrollingEnabled = not fixedInfo
+	bodyScroll.ScrollBarThickness = if fixedInfo then 0 else 4
+	bodyScroll.AutomaticCanvasSize = if fixedInfo then Enum.AutomaticSize.None else Enum.AutomaticSize.Y
+	bodyScroll.CanvasPosition = Vector2.zero
 
 	body:ClearAllChildren()
 	local layout = UI.VerticalList(body, 6)
@@ -1684,6 +1913,7 @@ function MenuController:_build()
 	scroll.ScrollBarThickness = 4
 	scroll.Parent = panel
 
+	bodyScroll = scroll
 	body = scroll :: any
 end
 

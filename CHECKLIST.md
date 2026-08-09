@@ -1055,6 +1055,34 @@ punches for a whole phase, so the game had two answers to one question.
       self-test, generated-gym and balance validation, `git diff --check`, and a clean
       5.3 MB Rojo place build. Visual Studio playtesting remains the next human check.
 
+- [x] 109. **The five muscles become the cartoon identity of the interface.** The first
+      pass had the right routes but still looked like a dark admin panel: Rank lived by
+      health rather than by the action dock, Info needed a scrollbar to reveal Legs,
+      and Shop presented products as full-width catalogue rows. The requested hierarchy
+      is now literal. Rank is a chunky sixth card immediately left of the five bottom
+      stat slots, and the entire group shares one baseline. The stat slots grow to
+      thumb-sized, outlined, saturated cards with a bright top shine, circular key
+      badges, dark name bands, and the original animated 3D muscle figures; selection
+      changes the card gradient, badge, outline, and figure ink as one state rather than
+      merely filling a background.
+      Info disables scrolling entirely. A rank-coloured profile hero fits above three
+      fixed rows: Arms/Chest, Back/Core, then Legs beside a total-build summary. Every
+      muscle owns a large round pictogram, current value, multiplier, gameplay effect,
+      and a two-line upgrade control without pushing another muscle below the fold.
+      Shop is rebuilt as responsive two-column card grids with separate saturated visual
+      families for VIP/passes, immortal potions, token dumbbells, and earned-cash
+      supplements. Each card has an original procedural glyph, short description, and
+      full-width price state; the existing server catalogue still decides availability,
+      ownership, pricing, and grants.
+      `UI.CartoonCard` and four shared palette colors keep the outline/gradient/highlight
+      language reusable rather than duplicating it per page. Narrow screens lift health
+      above the enlarged centred dock to avoid overlap. Roblox's current `UIGridLayout`
+      documentation was checked for the product-grid behavior and constraint support.
+      Verified with StyLua, Selene (zero warnings), strict Luau LSP analysis, every pure
+      self-test, generated-gym and balance validation, `git diff --check`, and a clean
+      5.3 MB Rojo place build. A human Studio screenshot pass is still required to judge
+      the subjective final colors and optical spacing.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
