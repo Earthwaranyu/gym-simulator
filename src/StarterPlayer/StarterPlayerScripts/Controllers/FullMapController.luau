@@ -410,6 +410,7 @@ function FullMapController:_render()
 
 	local board = Instance.new("Frame")
 	board.Name = "MapBoard"
+	board.ZIndex = 1
 	board.Size = UDim2.new(1, -SIDEBAR_WIDTH - CONTENT_GAP, 1, 0)
 	board.BackgroundColor3 = Color3.fromRGB(20, 24, 25)
 	board.BorderSizePixel = 0
@@ -419,6 +420,7 @@ function FullMapController:_render()
 	addBorder(board, UI.Palette.GlassStroke, 0.45, 2)
 
 	local sidebar = UI.Panel("Destination", content)
+	sidebar.ZIndex = 2
 	sidebar.AnchorPoint = Vector2.new(1, 0)
 	sidebar.Position = UDim2.fromScale(1, 0)
 	sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, 0)
@@ -437,16 +439,22 @@ function FullMapController:_render()
 	local bounds = MapRender.Bounds(mapFeatures, destinations, MAP_ASPECT)
 	local project = MapRender.Project(bounds)
 
-	-- A dedicated Frame owns the hard viewport rectangle. CanvasGroup clipping leaked
-	-- an enlarged canvas across the modal on some clients; a plain clipping frame keeps
-	-- every zoomed pin, road, and background behind the sidebar and window chrome.
-	local viewport = Instance.new("Frame")
+	-- ScrollingFrame provides Roblox's native rectangular canvas scissor without owning
+	-- scrolling. We still handle drag/wheel explicitly, but this stronger clip prevents
+	-- rotated building Frames from escaping the map at high zoom.
+	local viewport = Instance.new("ScrollingFrame")
 	viewport.Name = "Viewport"
 	viewport.Active = true
 	viewport.Size = UDim2.fromScale(1, 1)
 	viewport.BackgroundColor3 = Color3.fromRGB(20, 24, 25)
 	viewport.BorderSizePixel = 0
 	viewport.ClipsDescendants = true
+	viewport.ScrollingEnabled = false
+	viewport.ScrollBarThickness = 0
+	viewport.AutomaticCanvasSize = Enum.AutomaticSize.None
+	viewport.CanvasSize = UDim2.fromOffset(0, 0)
+	viewport.ElasticBehavior = Enum.ElasticBehavior.Never
+	viewport.ZIndex = 1
 	viewport.Parent = board
 
 	local canvas = Instance.new("Frame")
@@ -773,9 +781,9 @@ function FullMapController:_render()
 	legend.BackgroundTransparency = 0.03
 	legend.BorderSizePixel = 0
 	legend.ZIndex = 60
-	-- The legend describes the map sheet, so it belongs to that sheet. It now follows
-	-- the canvas when zoomed or panned instead of floating at an unrelated screen point.
-	legend.Parent = canvas
+	-- This is navigation chrome, not map geography. It must remain readable while the
+	-- sheet beneath it pans and zooms.
+	legend.Parent = board
 	addCorner(legend, 7)
 	addBorder(legend, UI.Palette.GlassStroke, 0.5, 1)
 	local legendLayout = Instance.new("UIListLayout")
@@ -829,6 +837,7 @@ function FullMapController:_build()
 	screen.ResetOnSpawn = false
 	screen.IgnoreGuiInset = false
 	screen.DisplayOrder = 6
+	screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screen.Enabled = false
 	screen.Parent = playerGui
 	UI.ScaleWithViewport(screen)
@@ -843,6 +852,7 @@ function FullMapController:_build()
 	scrim.BackgroundTransparency = 0.42
 	scrim.BorderSizePixel = 0
 	scrim.Active = true
+	scrim.ZIndex = 1
 	scrim.Parent = screen
 
 	local panel = UI.Panel("FullMap", screen)
@@ -850,6 +860,8 @@ function FullMapController:_build()
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Size = UDim2.fromOffset(PANEL_SIZE.X, PANEL_SIZE.Y)
 	panel.BackgroundTransparency = 0.01
+	panel.ClipsDescendants = true
+	panel.ZIndex = 2
 	-- Sink clicks inside the panel so they cannot reach the 3D world behind the map.
 	panel.Active = true
 	local aspect = Instance.new("UIAspectRatioConstraint")
@@ -863,6 +875,7 @@ function FullMapController:_build()
 	title.TextSize = 20
 	title.TextColor3 = UI.Palette.Text
 	title.Text = "CITY TRAINING MAP"
+	title.ZIndex = 5
 
 	local subtitle = UI.Label("Subtitle", panel)
 	subtitle.AnchorPoint = Vector2.new(1, 0)
@@ -873,6 +886,7 @@ function FullMapController:_build()
 	subtitle.TextXAlignment = Enum.TextXAlignment.Right
 	subtitle.TextColor3 = UI.Palette.TextMuted
 	subtitle.Text = "SELECT A CIRCLE · TRACK FREE · TELEPORT WITH PASS"
+	subtitle.ZIndex = 5
 
 	local close = Instance.new("TextButton")
 	close.Name = "Close"
@@ -887,6 +901,7 @@ function FullMapController:_build()
 	close.TextSize = 18
 	close.TextColor3 = UI.Palette.TextMuted
 	close.Text = "✕"
+	close.ZIndex = 6
 	close.Parent = panel
 	addCorner(close, 8)
 	UI.Pressable(close)
@@ -899,6 +914,7 @@ function FullMapController:_build()
 	content.Position = UDim2.fromOffset(0, HEADER_HEIGHT)
 	content.Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT)
 	content.BackgroundTransparency = 1
+	content.ZIndex = 2
 	content.Parent = panel
 end
 

@@ -100,7 +100,7 @@ system that consumes it:
       stats and left Back doing nothing. See #86–#90.*
 - [x] 31. **Ability registry** — folder of ability modules sharing one interface (`Cost`, `Cooldown`, `Validate`, `Execute`); new abilities are new files only.
       *Corrected by #96: only **Punch** ships. Slam and Dash are **deferred** to the
-      three-move kit in #122 — no doc may imply they exist. See `docs/PRODUCT_TRUTH.md`.*
+      planned three-move kit — no doc may imply they exist. See `docs/PRODUCT_TRUTH.md`.*
 - [x] 32. **Training interrupt** — the core hook.
       *Superseded by #96: interruption is now **kill-only**. A hit damages and grounds
       the victim but leaves them mounted; only death dismounts them and resets the
@@ -1298,6 +1298,22 @@ punches for a whole phase, so the game had two answers to one question.
       generated-gym/balance validation, deterministic simulation, `git diff --check`,
       and a clean Rojo build; Studio remains required for visual timing and clipping QA.
 
+- [x] 122. **The full-map legend stays visible and zoomed geometry stays inside.**
+      Parenting the five-muscle legend to the moving canvas made it correctly move—and
+      therefore disappear—as soon as the canvas panned under a zoom focus. A normal
+      clipping Frame also did not contain Roblox's rotated map-feature GuiObjects, which
+      painted pale buildings and land across the header, sidebar and world HUD. The
+      legend is fixed navigation chrome on `MapBoard` again. The map viewport is now a
+      non-scrollable `ScrollingFrame`: its native rectangular scissor is used only for
+      rendering, while the dedicated controller retains complete ownership of wheel,
+      mouse-drag and touch input. The outer modal also clips descendants, and Sibling
+      Z-index groups put the map below the fixed legend, zoom controls, title and sidebar.
+      Product truth and the visual playtest now require the legend at top-left and zero
+      geometry outside the map rectangle at every zoom/pan position. Verified with
+      StyLua, Selene, strict Luau analysis, pure self-tests, generated-gym and balance
+      validation, `git diff --check`, and a clean Rojo build; Studio remains the required
+      proof for Roblox's native rotated-Gui clipping behavior.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
@@ -1318,7 +1334,7 @@ The product loop this roadmap optimizes is:
 | Core fantasy | 35 locations, seven unique exercises and exact +1/s–+64/s tiers per muscle, athletic muscle growth, Legs sprint/flight, PvP, reputation | A new player is not taught or directed through the fantasy |
 | World | Massive bridge-free scattered archipelago, walkable water, interiors, third floors and skyline training, vector map, streaming-aware travel | The 35-pin map and long water routes still need human readability evidence |
 | Progression | ranks, tokens, multipliers, two daily quests, one one-shot quest | no balanced first-hour path, mastery, weekly goals, comeback loop, or post-endgame purpose |
-| Combat | authoritative Punch, damage, kills, bounties, safe zones; interruption settled as kill-only (#96) | only one ability — Slam/Dash deferred to #122; paid-peace fairness still open (Phase 26) |
+| Combat | authoritative Punch, damage, kills, bounties, safe zones; interruption settled as kill-only (#96) | only one ability — Slam/Dash remain planned; paid-peace fairness still open (Phase 26) |
 | Social | roster, kill feed, global Power/Kills boards | no parties, friend co-training, invites, rivals, crews, co-op events, or shareable moments |
 | Monetization | receipt architecture and four configured product definitions | every id is `0`; paid peace can still permit aggression; no live receipt evidence or cosmetic catalog |
 | Analytics | partial onboarding and economy logging | declared FirstMultiplier/FirstPurchase steps are not wired; no social, tutorial, interruption, source, or experiment telemetry |

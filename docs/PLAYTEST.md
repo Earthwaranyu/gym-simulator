@@ -4,7 +4,7 @@ Everything static is already enforced by `./scripts/check.sh` — build, lints, 
 `--!strict` types, plus `python3 scripts/validate_gym.py` for the generated world. This
 file covers what only a running game can answer.
 
-Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v11. If a
+Counts and behaviors here are taken from [`PRODUCT_TRUTH.md`](PRODUCT_TRUTH.md) v12. If a
 step below contradicts that file, the step is stale — fix it.
 
 Run a **two-client Studio playtest** (Test → Clients and Servers → 2 players) unless a
@@ -156,8 +156,9 @@ The rule under test: **a hit does not dismount; only death does.**
       readable and clickable before zooming in.
 - [ ] Zoom at the centre and edges, then pan. The map sheet remains hard-clipped inside
       its left viewport and never covers the destination sidebar or modal chrome. The
-      Arms/Back/Chest/Core/Legs legend moves with the map sheet instead of floating at
-      its old screen coordinate.
+      Arms/Back/Chest/Core/Legs legend stays fixed and readable at the viewport's top
+      left at every zoom and pan position. No pale building, land or safe-zone shape
+      appears outside the map rectangle.
 - [ ] Scroll up over the board to zoom in and scroll down to zoom out. The page must
       never move because there is no page scroll. Verify the +, − and reset controls,
       mouse drag, touch drag, and touch-friendly zoom buttons as well.

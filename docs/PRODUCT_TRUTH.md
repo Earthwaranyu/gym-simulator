@@ -1,4 +1,4 @@
-# Product Truth — v11 (2026-08-09)
+# Product Truth — v12 (2026-08-09)
 
 The single versioned inventory of what this build actually is. `CLAUDE.md`, `AGENTS.md`,
 `README.md`, `CHECKLIST.md`, and `docs/PLAYTEST.md` are all reconciled against this file.
@@ -46,12 +46,12 @@ this file is wrong until proven otherwise — fix it first, then the doc.
 | Leaderboards | 2 global boards — Power and Kills | `LeaderboardService.luau` |
 | Menu tabs | 3 — Info, Shop, Settings. Quests and Ranks are direct HUD pages; the full map is a separate modal with no menu tabs or page scroll | `MenuController.luau`, `FullMapController.luau` |
 | Persistent navigation | one right-side **MENU** button, a bottom five-stat training dock, a persistent training-first **MAIN GOAL** card, and a clickable minimap that opens the dedicated full map | `MenuBarController.luau`, `HudController.luau`, `FullMapController.luau` |
-| Finding a machine | the dedicated map shows all 35 labelled training circles in readable neighbourhood clusters. All five muscles in the player's highest Power-unlocked multiplier tier stay equally bright; earlier and future tiers are subdued but selectable. The muscle legend belongs to the map sheet and follows zoom/pan | `FullMapController:_currentMultiplier`, `FullMapController:_render`, `MapRender` |
+| Finding a machine | the dedicated map shows all 35 labelled training circles in readable neighbourhood clusters. All five muscles in the player's highest Power-unlocked multiplier tier stay equally bright; earlier and future tiers are subdued but selectable. The five-muscle legend is fixed navigation chrome and remains visible through zoom/pan | `FullMapController:_currentMultiplier`, `FullMapController:_render`, `MapRender` |
 | Teleporting | Selecting a map circle always shows two separate actions. **Track is free** and creates the beacon/off-screen arrow; **Teleport requires the Fast Travel gamepass** and enough Power, with both conditions rechecked server-side | `FullMapController`, `TravelService:Travel`, `WaypointController` |
 | Physique shape | athletic 2.2 cap with restrained height: full chest ≈3.30 wide vs ≈2.41 waist; upper arm ≈1.35 girth × 1.36 long, with tapered forearms/calves | `PhysiqueConfig`, `MuscleController` |
 | Vascularity | 9 subtle vein cylinders on arms and chest, fading in late from scale 1.60 to 2.15, client-side only | `PhysiqueConfig.VEINS`, `VeinController` |
 | Scenery | decorative props are non-colliding and cleared 72 studs from any machine; kerbs no longer block | `scripts/build_gym.py` `_decorate`, `PROP_CLEARANCE` |
-| Full map | dedicated 980×620 modal: hard-clipped dark-slate city viewport beneath undimmed current-tier pins, fixed destination sidebar, map-attached muscle legend, wheel/button zoom, mouse/touch drag, no nested page scrolling, and explicit X/Escape/M closing | `FullMapController`, `MapRender` |
+| Full map | dedicated 980×620 modal: a non-scrollable `ScrollingFrame` supplies native rectangular clipping beneath undimmed current-tier pins; the title, controls, fixed muscle legend and destination sidebar are explicit higher layers. Wheel/button zoom and mouse/touch drag remain custom, with no nested page scrolling | `FullMapController`, `MapRender` |
 | Live Power displays | top-left HUD, Info page and the local player's top-right roster row all repaint from the same private profile snapshot; other players remain on the one-second public roster broadcast | `HudController`, `MenuController`, `TabBarController`, `ProfileController` |
 | Muscle growth | per stat, not per total: Arms→upper/lower arms, Chest→UpperTorso, Back→UpperTorso (0.6), Core→LowerTorso, Legs→upper/lower legs. Shared parts take the largest contribution, never the product | `StatConfig.BodyScales`, `MuscleService:ComputeScales` |
 | Machine visibility | the nearest 14 of 35 stations within 260 studs carry muscle-coloured outlines and floor rings | `StationHighlightController` |
@@ -70,7 +70,7 @@ this file is wrong until proven otherwise — fix it first, then the doc.
    fights a decision rather than a drive-by tax on anyone standing at a machine, and it
    keeps the interruption cost proportional to the effort of causing it.
 2. **Slam and Dash are deferred, not shipped.** Only Punch exists. They remain a wanted
-   item for Phase 21's three-move kit (#122); until then no doc may imply they are in.
+   item for the planned Phase 21 three-move kit; until then no doc may imply they are in.
 3. **Reputation, bounties, and safe zones are in.** Paid-peace fairness (whether an
    immortal player may still attack) is *not* settled here — it belongs to Phase 26.
 4. **The repeated-machine and connected-city versions are superseded.** Each muscle has
