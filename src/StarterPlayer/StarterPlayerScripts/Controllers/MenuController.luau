@@ -28,6 +28,7 @@ local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local MapRender = require(ReplicatedStorage.Modules.MapRender)
 
 local MenuController = {
 	Name = "MenuController",
@@ -50,41 +51,14 @@ local isOpen = false
 local activeTab = "Info"
 local quests: { any } = {}
 
-type Destination = {
-	Id: string,
-	ZoneId: string,
-	EquipmentId: string,
-	StatId: string,
-	RequiredPower: number,
-	GainMultiplier: number,
-	Position: Vector3,
-	AccessKind: string,
-	FloorIndex: number,
-	EnvironmentId: string,
-	VariantId: string,
-	ExerciseFamily: string,
-	RequiresFlight: boolean,
-	LocationName: string,
-	LocationTagline: string,
-}
-
-type MapFeature = {
-	Kind: string,
-	Shape: string,
-	X: number,
-	Z: number,
-	Width: number,
-	Depth: number,
-	Rotation: number,
-	Color: Color3,
-}
+type Destination = MapRender.Destination
 
 -- All training locations come from the server because StreamingEnabled means
 -- most physical stations do not exist in the spawn client's Workspace yet.
+-- MapRender owns the round-trip and caches it, so the HUD's minimap and this screen
+-- share one answer rather than asking the same question twice.
 local destinations: { Destination } = {}
-local destinationsById: { [string]: Destination } = {}
-local mapFeatures: { MapFeature } = {}
-local mapLoaded = false
+local mapFeatures: { MapRender.Feature } = {}
 local selectedDestination: string? = nil
 
 -- Train panel: which muscle group is being shown, and the last live status the server
@@ -105,18 +79,10 @@ local hasFastTravel = false
 local mapZoom = 1
 local mapCenter = Vector2.new(0.5, 0.5)
 
--- The map is the one panel that is NOT dark.
---
--- The rest of the UI is a dark HUD over a bright world, which is right for something
--- you read at a glance. A map is the opposite job: you study it, and every feature on
--- it is a shade of the city's own concrete and asphalt — dark grey shapes on a dark
--- grey board, which is unreadable no matter how carefully the greys are chosen.
--- Lifting the whole thing to paper gives every feature somewhere to contrast against.
-local MAP_PAPER = Color3.fromRGB(232, 234, 238)
-local MAP_INK = Color3.fromRGB(38, 42, 52)
--- How far each feature's real colour is pulled toward white. High, because the source
--- colours are city-dark; the tint that survives is enough to tell water from park.
-local MAP_WASH = 0.62
+-- The map's paper palette lives in MapRender, so the minimap in the HUD and this board
+-- cannot drift into being two different-looking maps of the same city.
+local MAP_PAPER = MapRender.Paper
+local MAP_INK = MapRender.Ink
 
 local MAP_HEIGHT = 300
 local MAP_ASPECT = 2.05
@@ -140,13 +106,7 @@ type Tab = {
 
 local tabs: { Tab } = {}
 
---[[
-	Lightens a world colour into something readable on paper, keeping its hue so the
-	map still reads as the city rather than as an abstract diagram.
-]]
-local function wash(color: Color3, amount: number?): Color3
-	return color:Lerp(Color3.new(1, 1, 1), amount or MAP_WASH)
-end
+local wash = MapRender.Tint
 
 local function row(parent: Frame, height: number, order: number): Frame
 	local frame = Instance.new("Frame")
@@ -266,88 +226,7 @@ end
 
 -- Pull every map-enabled training station from the server once.
 function MenuController:_fetchDestinations()
-	if mapLoaded then
-		return
-	end
-
-	local ok, list, features = pcall(function()
-		return Net.Function("GetDestinations"):InvokeServer()
-	end)
-	if not ok or type(list) ~= "table" then
-		return
-	end
-
-	table.clear(destinations)
-	table.clear(destinationsById)
-	table.clear(mapFeatures)
-
-	for _, entry in list do
-		if
-			type(entry) ~= "table"
-			or type(entry.Id) ~= "string"
-			or type(entry.ZoneId) ~= "string"
-			or type(entry.EquipmentId) ~= "string"
-			or type(entry.StatId) ~= "string"
-			or type(entry.RequiredPower) ~= "number"
-			or type(entry.GainMultiplier) ~= "number"
-			or type(entry.X) ~= "number"
-			or type(entry.Y) ~= "number"
-			or type(entry.Z) ~= "number"
-		then
-			continue
-		end
-		local destination: Destination = {
-			Id = entry.Id,
-			ZoneId = entry.ZoneId,
-			EquipmentId = entry.EquipmentId,
-			StatId = entry.StatId,
-			RequiredPower = entry.RequiredPower,
-			GainMultiplier = entry.GainMultiplier,
-			Position = Vector3.new(entry.X, entry.Y, entry.Z),
-			AccessKind = if type(entry.AccessKind) == "string" then entry.AccessKind else "Street",
-			FloorIndex = if type(entry.FloorIndex) == "number" then entry.FloorIndex else 1,
-			EnvironmentId = if type(entry.EnvironmentId) == "string" then entry.EnvironmentId else "Unknown",
-			VariantId = if type(entry.VariantId) == "string" then entry.VariantId else entry.EquipmentId,
-			ExerciseFamily = if type(entry.ExerciseFamily) == "string"
-				then entry.ExerciseFamily
-				else entry.StatId,
-			RequiresFlight = entry.RequiresFlight == true,
-			LocationName = if type(entry.LocationName) == "string" then entry.LocationName else entry.ZoneId,
-			LocationTagline = if type(entry.LocationTagline) == "string" then entry.LocationTagline else "",
-		}
-		table.insert(destinations, destination)
-		destinationsById[destination.Id] = destination
-	end
-
-	if type(features) == "table" then
-		for _, entry in features do
-			if
-				type(entry) ~= "table"
-				or type(entry.Kind) ~= "string"
-				or type(entry.Shape) ~= "string"
-				or type(entry.X) ~= "number"
-				or type(entry.Z) ~= "number"
-				or type(entry.Width) ~= "number"
-				or type(entry.Depth) ~= "number"
-				or type(entry.Rotation) ~= "number"
-				or typeof(entry.Color) ~= "Color3"
-			then
-				continue
-			end
-			table.insert(mapFeatures, {
-				Kind = entry.Kind,
-				Shape = entry.Shape,
-				X = entry.X,
-				Z = entry.Z,
-				Width = entry.Width,
-				Depth = entry.Depth,
-				Rotation = entry.Rotation,
-				Color = entry.Color,
-			})
-		end
-	end
-
-	mapLoaded = #destinations > 0
+	destinations, mapFeatures = MapRender.Fetch()
 end
 
 -- Every training location appears immediately. Pin colour is the stat; locked
@@ -395,62 +274,10 @@ function MenuController:_renderMap(parent: Frame)
 		return
 	end
 
-	-- Bounds come from the generated walkable water and island footprints, not from
-	-- the outermost pins. The whole safe traversal field and its scattered islands
-	-- therefore stay in their true proportions.
-	local minX, maxX = math.huge, -math.huge
-	local minZ, maxZ = math.huge, -math.huge
-	local function includeFeature(feature: MapFeature)
-		local angle = math.rad(feature.Rotation)
-		local halfX = math.abs(math.cos(angle)) * feature.Width / 2
-			+ math.abs(math.sin(angle)) * feature.Depth / 2
-		local halfZ = math.abs(math.sin(angle)) * feature.Width / 2
-			+ math.abs(math.cos(angle)) * feature.Depth / 2
-		minX, maxX = math.min(minX, feature.X - halfX), math.max(maxX, feature.X + halfX)
-		minZ, maxZ = math.min(minZ, feature.Z - halfZ), math.max(maxZ, feature.Z + halfZ)
-	end
-
-	local foundWorld = false
-	for _, feature in mapFeatures do
-		if feature.Kind == "Land" or feature.Kind == "Water" then
-			includeFeature(feature)
-			foundWorld = true
-		end
-	end
-	if not foundWorld then
-		for _, feature in mapFeatures do
-			includeFeature(feature)
-		end
-	end
-	-- Aerial locations normally sit over a district, but destinations still take
-	-- part in the bounds so a later offshore roof can never produce a clipped pin.
-	for _, destination in destinations do
-		local at = destination.Position
-		minX, maxX = math.min(minX, at.X - 12), math.max(maxX, at.X + 12)
-		minZ, maxZ = math.min(minZ, at.Z - 12), math.max(maxZ, at.Z + 12)
-	end
-
-	local worldWidth = math.max(maxX - minX, 1)
-	local worldDepth = math.max(maxZ - minZ, 1)
-	local pad = math.max(worldWidth, worldDepth) * 0.025
-	minX, maxX = minX - pad, maxX + pad
-	minZ, maxZ = minZ - pad, maxZ + pad
-	worldWidth, worldDepth = maxX - minX, maxZ - minZ
-	if worldWidth / worldDepth > MAP_ASPECT then
-		local targetDepth = worldWidth / MAP_ASPECT
-		local extra = (targetDepth - worldDepth) / 2
-		minZ, maxZ = minZ - extra, maxZ + extra
-	else
-		local targetWidth = worldDepth * MAP_ASPECT
-		local extra = (targetWidth - worldWidth) / 2
-		minX, maxX = minX - extra, maxX + extra
-	end
-	worldWidth, worldDepth = maxX - minX, maxZ - minZ
-
-	local function project(x: number, z: number): UDim2
-		-- World +Z is north, and screen Y grows downward, so Z is flipped.
-		return UDim2.fromScale((x - minX) / worldWidth, 1 - (z - minZ) / worldDepth)
-	end
+	-- Bounds and projection are MapRender's, letterboxed to this board's aspect so the
+	-- whole archipelago fits without cropping an island.
+	local bounds = MapRender.Bounds(mapFeatures, destinations, MAP_ASPECT)
+	local project = MapRender.Project(bounds)
 
 	local viewport = Instance.new("ScrollingFrame")
 	viewport.Name = "MapViewport"
@@ -492,57 +319,7 @@ function MenuController:_renderMap(parent: Frame)
 	pinLayer.ZIndex = 20
 	pinLayer.Parent = canvas
 
-	local featureLayers: { [string]: number } = {
-		Water = 1,
-		Land = 2,
-		Block = 3,
-		Park = 4,
-		Road = 5,
-		Building = 6,
-		SkyPlatform = 7,
-		Plaza = 8,
-		SafeZone = 9,
-	}
-	for index, feature in mapFeatures do
-		local shape = Instance.new("Frame")
-		shape.Name = `Feature_{index}_{feature.Kind}`
-		shape.AnchorPoint = Vector2.new(0.5, 0.5)
-		shape.Position = project(feature.X, feature.Z)
-		shape.Size = UDim2.fromScale(feature.Width / worldWidth, feature.Depth / worldDepth)
-		shape.Rotation = feature.Rotation
-		-- Buildings stay closest to their real colour so streets read as gaps between
-		-- them; everything else is washed further out so the pins sit on top of it.
-		shape.BackgroundColor3 = wash(feature.Color, if feature.Kind == "Building" then 0.45 else MAP_WASH)
-		shape.BackgroundTransparency = if feature.Kind == "SafeZone"
-			then 0.45
-			elseif feature.Kind == "Water" then 0.1
-			elseif feature.Kind == "SkyPlatform" then 0.15
-			else 0
-		shape.BorderSizePixel = 0
-		shape.ZIndex = featureLayers[feature.Kind] or 3
-		shape.Parent = featureLayer
-
-		if feature.Shape == "Circle" then
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(1, 0)
-			corner.Parent = shape
-		elseif feature.Kind == "Building" or feature.Kind == "SafeZone" then
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 2)
-			corner.Parent = shape
-		end
-		if feature.Kind == "SafeZone" then
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(0, 132, 178)
-			stroke.Thickness = 2
-			stroke.Parent = shape
-		elseif feature.Kind == "SkyPlatform" then
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(96, 132, 168)
-			stroke.Thickness = 1.5
-			stroke.Parent = shape
-		end
-	end
+	MapRender.DrawFeatures(featureLayer, mapFeatures, bounds)
 
 	local hub = UI.Label("Hub", pinLayer)
 	hub.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -865,7 +642,9 @@ end
 
 -- The selected machine, its stat, tier multiplier and travel button.
 function MenuController:_renderDestination(parent: Frame, power: number)
-	local destination = if selectedDestination ~= nil then destinationsById[selectedDestination] else nil
+	local destination = if selectedDestination ~= nil
+		then MapRender.GetDestination(selectedDestination)
+		else nil
 	if destination == nil then
 		return
 	end
