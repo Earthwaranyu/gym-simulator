@@ -29,7 +29,6 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MovementConfig = require(ReplicatedStorage.Modules.MovementConfig)
-local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 local FlightController = {

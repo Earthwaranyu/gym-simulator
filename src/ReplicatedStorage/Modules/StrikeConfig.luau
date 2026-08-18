@@ -378,21 +378,54 @@ local HEAVY_FOLLOW = combatPose(Vector3.new(0, 0, -0.7), {
 })
 
 local strikes: { Strike } = {
+	--[[
+		The punch chain: one click, one swing.
+
+		This used to be a single 0.9-second clip that landed all three contacts on its
+		own, so a player pressed once and watched. Three separate strikes means the
+		player throws each punch, and the chain is something they do rather than
+		something the game does to them.
+
+		The poses are unchanged — these are the same coils and contacts the old combo
+		walked through, regrouped one swing at a time. What is new is that each ends by
+		returning to neutral, because a swing now has to be able to be the last one.
+		Punch.luau decides which of the three to stamp from the player's place in the
+		chain.
+	]]
 	{
-		-- Three visible hits per input: right jab, left cross, heavy right finisher.
-		-- The transitions between contacts double as recoil and the next punch's load,
-		-- keeping the sequence fast without snapping either arm back to idle mid-combo.
-		Id = "Punch",
-		Duration = 0.9,
-		Contacts = { 0.18, 0.43, 0.68 },
+		-- The jab. Right hand, fastest thing in the game to land, and the swing a chain
+		-- starts from.
+		Id = "PunchJab",
+		Duration = 0.34,
+		Contacts = { 0.5 },
 		Stages = {
-			transition(0.1, "Coil", NEUTRAL, RIGHT_COIL),
-			transition(0.08, "Snap", RIGHT_COIL, RIGHT_CONTACT),
-			transition(0.17, "Recover", RIGHT_CONTACT, LEFT_COIL),
-			transition(0.08, "Snap", LEFT_COIL, LEFT_CONTACT),
-			transition(0.17, "Recover", LEFT_CONTACT, FINISH_COIL),
-			transition(0.08, "Snap", FINISH_COIL, FINISH_CONTACT),
-			transition(0.32, "Recover", FINISH_CONTACT, NEUTRAL),
+			transition(0.3, "Coil", NEUTRAL, RIGHT_COIL),
+			transition(0.2, "Snap", RIGHT_COIL, RIGHT_CONTACT),
+			transition(0.5, "Recover", RIGHT_CONTACT, NEUTRAL),
+		},
+	},
+	{
+		-- The cross. Left hand, so the chain alternates rather than hammering one arm.
+		Id = "PunchCross",
+		Duration = 0.34,
+		Contacts = { 0.5 },
+		Stages = {
+			transition(0.3, "Coil", NEUTRAL, LEFT_COIL),
+			transition(0.2, "Snap", LEFT_COIL, LEFT_CONTACT),
+			transition(0.5, "Recover", LEFT_CONTACT, NEUTRAL),
+		},
+	},
+	{
+		-- The finisher. Longer than the other two, and most of the extra length is in
+		-- the recovery: reaching the end of a chain should visibly cost something, and
+		-- the swing that hits hardest is the one you are most exposed after.
+		Id = "PunchFinish",
+		Duration = 0.42,
+		Contacts = { 0.46 },
+		Stages = {
+			transition(0.28, "Coil", NEUTRAL, FINISH_COIL),
+			transition(0.18, "Snap", FINISH_COIL, FINISH_CONTACT),
+			transition(0.54, "Recover", FINISH_CONTACT, NEUTRAL),
 		},
 	},
 	{
@@ -496,8 +529,24 @@ function StrikeConfig.RunSelfTest(): { string }
 		check(seen.Waist == true, `{strike.Id} transfers force through the waist`)
 		check(seen.RightShoulder == true and seen.RightElbow == true, `{strike.Id} drives its punching arm`)
 	end
-	local punch = byId.Punch
-	check(punch ~= nil and #punch.Contacts == 3, "Punch is a three-hit sequence")
+	-- The punch chain. One click is one swing now, so each of the three lands exactly
+	-- once; the old single Punch strike landed three times on its own.
+	local jab = byId.PunchJab
+	local finish = byId.PunchFinish
+	for _, id in { "PunchJab", "PunchCross", "PunchFinish" } do
+		local strike = byId[id]
+		check(strike ~= nil, `the chain defines {id}`)
+		if strike ~= nil then
+			check(#strike.Contacts == 1, `{id} lands once`)
+		end
+	end
+	-- Committing to the end of the chain has to cost something, and the cost is the
+	-- finisher's longer recovery. A retune that made it the shortest swing would make
+	-- the chain strictly better than mashing the jab.
+	check(
+		jab ~= nil and finish ~= nil and finish.Duration > jab.Duration,
+		"the finisher commits for longer than the jab"
+	)
 
 	local slam = byId.GroundSlam
 	check(slam ~= nil and #slam.Contacts == 1, "Ground Slam lands once")
@@ -507,9 +556,7 @@ function StrikeConfig.RunSelfTest(): { string }
 	-- earlier than Punch's first, the heavy becomes the faster move and Block stops
 	-- having anything to react to.
 	check(
-		punch ~= nil
-			and heavy ~= nil
-			and heavy.Duration * heavy.Contacts[1] > punch.Duration * punch.Contacts[1],
+		jab ~= nil and heavy ~= nil and heavy.Duration * heavy.Contacts[1] > jab.Duration * jab.Contacts[1],
 		"Hard Punch is slower to land than a jab"
 	)
 	check(
@@ -532,11 +579,37 @@ function StrikeConfig.RunSelfTest(): { string }
 	-- The client mirrors these cooldowns to decline doomed requests. AbilityConfig is
 	-- Roblox-free so it cannot read a Strike's Duration itself; this is the check that
 	-- keeps the two numbers from drifting apart silently.
+	--
+	-- It only fires where an ability id and a strike id match, which is why the punch
+	-- needs its own check below: no strike is called "Punch" any more, so this loop
+	-- silently stopped covering the game's most-used move.
 	for _, entry in AbilityConfig.List do
 		local strike = byId[entry.Id]
 		if strike ~= nil then
 			check(entry.Cooldown >= strike.Duration, `{entry.Id}'s mirrored cooldown covers its animation`)
 		end
+	end
+
+	-- The punch's mirrored cooldown, checked against the chain rather than against one
+	-- clip. Deliberately *shorter* than a swing: the next click cuts the previous
+	-- swing's recovery, which is what makes a chain feel like a chain instead of three
+	-- separate punches. What it may not do is outrun the remote's rate limit, or drop
+	-- below the point where a swing has not even reached its contact frame.
+	local punchEntry = nil
+	for _, entry in AbilityConfig.List do
+		if entry.Id == "Punch" then
+			punchEntry = entry
+		end
+	end
+	check(punchEntry ~= nil, "AbilityConfig still declares the punch")
+	if punchEntry ~= nil and jab ~= nil then
+		check(
+			punchEntry.Cooldown > jab.Duration * jab.Contacts[1],
+			"a punch cannot be re-thrown before the last one has landed"
+		)
+		check(punchEntry.Cooldown < jab.Duration, "chained swings cut into the previous recovery")
+		-- AbilityActivate is rate-limited to eight a second server-side.
+		check(punchEntry.Cooldown >= 0.125, "the punch cooldown stays inside the remote's rate limit")
 	end
 
 	return failures

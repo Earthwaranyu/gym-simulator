@@ -1544,6 +1544,44 @@ punches for a whole phase, so the game had two answers to one question.
       only on the last, jabs and crosses lose to your own swing while a finisher
       interrupts it, and a full combo peaks at 14 effect parts.
 
+- [ ] 134. **One click, one punch.** The normal punch was one click that played a
+      0.9-second clip landing all three contacts by itself: the player pressed once and
+      watched. The three-hit combo the HUD advertised was something the game did to you
+      rather than something you did. Now each click is one swing, and clicking again
+      inside a 0.6-second window chains jab → cross → finisher before wrapping back to
+      the jab; stop, and the next click starts over.
+      `StrikeConfig` gains `PunchJab`, `PunchCross` and `PunchFinish` and the old
+      three-contact `Punch` strike is gone, so there is one definition of a jab rather
+      than two that can drift. The poses are unchanged — these are the same coils and
+      contacts the old combo walked through, regrouped one swing at a time, each now
+      returning to neutral because a swing has to be able to be the last one. The
+      finisher is longer and most of the extra length is recovery, so reaching the end of
+      a chain visibly costs something.
+      Damage is untouched in total. Each swing keeps its 25 / 30 / 45 per cent share, and
+      three clicks span roughly the same 0.9 seconds, so DPS and time-to-kill are exactly
+      where they were. The chain state lives inside `Punch.luau` in a **weak-keyed**
+      table: an ability has no `PlayerRemoving` hook, that belongs to `CombatService`, and
+      reaching in for one would put punch-specific knowledge into a system that
+      deliberately has none — while a plain table keyed by `Player` would leak an entry
+      per player for the life of the server.
+      `StrikeController` gained a blend. It used to clear every joint to identity and
+      start each clip from its own first pose, which was invisible while a strike only
+      ever began from a body at rest; chained swings interrupt each other mid-recovery,
+      and a click on the contact frame would have snapped a fully extended arm from 102
+      degrees to zero in one frame. Each swing now eases from wherever the joint actually
+      was — which improves every strike, not just the punch.
+      The cooldown is deliberately *shorter* than a swing's clip (0.3 against 0.34) so the
+      next click cuts the previous recovery. That broke the existing
+      `Cooldown >= Duration` self-test's coverage silently — it only checks ids that
+      match a strike, and no strike is called `Punch` any more — so the punch gets an
+      explicit chain-aware assertion instead, pinned from both directions and against the
+      remote's 8/sec rate limit.
+      Verified live against a goblin: one click throws one swing, four fast clicks give
+      jab, cross, finisher, jab, letting the window lapse resets to the jab, each swing
+      lands exactly one hit, the impact weights arrive 0.30/Light, 0.45/Solid,
+      0.80/Crushing, and a chained click reads 91° → 102° → 94° on the shoulder instead
+      of snapping to zero.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

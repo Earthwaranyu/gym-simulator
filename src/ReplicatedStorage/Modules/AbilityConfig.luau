@@ -67,11 +67,14 @@ local abilities: { AbilityEntry } = {
 	{
 		Id = "Punch",
 		DisplayName = "Punch",
-		Description = "A three-hit combo. Fast, cheap, and how most damage happens.",
+		Description = "One click, one swing. Keep clicking to chain jab, cross, finisher.",
 		KeyCode = nil,
 		GamepadKeyCode = "ButtonX",
 		Kind = "Press",
-		Cooldown = 0.9,
+		-- One swing, not the whole chain. Three clicks then span roughly the 0.9 seconds
+		-- the old single-input combo took, which is what keeps the damage arithmetic —
+		-- and therefore time-to-kill — exactly where it was.
+		Cooldown = 0.3,
 		HudOrder = 10,
 		Glyph = "M1",
 		Color = { 255, 138, 61 },
