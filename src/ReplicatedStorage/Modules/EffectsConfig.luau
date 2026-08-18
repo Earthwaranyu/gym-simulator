@@ -42,6 +42,12 @@ EffectsConfig.Sounds = {
 	BlockRaise = { SoundId = "", Volume = 0.55, Pitch = 1.15, PitchJitter = 0.04 } :: SoundSpec,
 	-- A hit stopped by a guard. Jittered because it can happen several times a second.
 	BlockAbsorb = { SoundId = "", Volume = 0.6, Pitch = 1.05, PitchJitter = 0.12 } :: SoundSpec,
+	-- Leaving the ground.
+	FlightTakeoff = { SoundId = "", Volume = 0.6, Pitch = 1.05, PitchJitter = 0.05 } :: SoundSpec,
+	-- Coming back down. Softer than a slam landing, which is the point of both.
+	FlightLanding = { SoundId = "", Volume = 0.5, Pitch = 0.95, PitchJitter = 0.06 } :: SoundSpec,
+	-- Crossing into top speed. Fires once per flight, so it can afford to be loud.
+	FlightBoom = { SoundId = "", Volume = 0.9, Pitch = 0.9, PitchJitter = 0 } :: SoundSpec,
 	-- The guard shattering. Distinct from BlockAbsorb because it is the moment the
 	-- player has to react to, and it must not sound like one more absorbed hit.
 	BlockBreak = { SoundId = "", Volume = 0.9, Pitch = 0.95, PitchJitter = 0 } :: SoundSpec,

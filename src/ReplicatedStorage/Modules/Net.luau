@@ -48,6 +48,15 @@ local EVENT_NAMES: { string } = {
 	-- rather than derived because the drain depends on damage the client never sees
 	-- the inputs to.
 	"BlockState",
+	-- Client -> server: which flight silhouette this player is in, or nil on landing.
+	-- Flight itself is the client's, like the dash; what the server owns is publishing
+	-- the state so *other* clients can pose the flier. Before this, nothing anywhere
+	-- said who was actually airborne, so a remote flier was a standing body sliding
+	-- through the air on every screen but their own.
+	--
+	-- Grants nothing. FlightService still decides who may fly at all, and still drops
+	-- anybody it has grounded.
+	"FlightChanged",
 	-- Client -> server: "I am dashing" / "I have stopped". The dash itself is the
 	-- client's, like flight; what the server owns is the collision group that stops
 	-- a dasher bulldozing anybody standing in the way. Granting nothing and lasting

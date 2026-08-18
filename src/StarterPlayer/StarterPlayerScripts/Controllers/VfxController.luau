@@ -29,6 +29,8 @@ local TweenService = game:GetService("TweenService")
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
+local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local VfxConfig = require(ReplicatedStorage.Modules.VfxConfig)
 
 local VfxController = {
@@ -37,6 +39,8 @@ local VfxController = {
 }
 
 local EffectsController: any = nil
+local FlightController: any = nil
+local ProfileController: any = nil
 
 -- Set by GroundSlam, read here. Declared as a plain string in both places rather than
 -- shared through a module because it is one attribute name and a config module holding
@@ -424,6 +428,133 @@ local function pulseGuard(character: Model)
 	out:Play()
 end
 
+--[[
+	Flight contrails — the third sustained thing in this file, after the guard dome.
+
+	Same lifecycle and the same reason. A trail exists for as long as somebody is
+	airborne, and routing that through Play() would give it an element's lifetime; that
+	is exactly the mistake the block dome shipped with, a barrier that flashed for a
+	third of a second while the guard was still up. Raised on FlightState, dropped when
+	it clears.
+
+	Trails hang off attachments on the character's own limbs rather than off parts we
+	own, because a Trail interpolates between two attachments and the limb is what is
+	actually moving. That means the attachments have to be cleaned up on landing — a
+	stray attachment on a hand is invisible but permanent.
+]]
+type Contrail = {
+	trails: { Trail },
+	attachments: { Attachment },
+}
+
+local contrails: { [Model]: Contrail } = {}
+
+local function dropContrail(character: Model)
+	local entry: Contrail? = contrails[character]
+	if entry == nil then
+		return
+	end
+	contrails[character] = nil
+
+	for _, trail in entry.trails do
+		-- Disabled rather than destroyed on the spot, so the ribbon already in the air
+		-- finishes fading instead of vanishing the instant somebody lands.
+		trail.Enabled = false
+		Debris:AddItem(trail, VfxConfig.Contrail.MaxLifetime + 0.1)
+	end
+	for _, attachment in entry.attachments do
+		Debris:AddItem(attachment, VfxConfig.Contrail.MaxLifetime + 0.2)
+	end
+end
+
+local function raiseContrail(character: Model)
+	if (contrails[character] :: Contrail?) ~= nil then
+		return
+	end
+
+	local spec = VfxConfig.Contrail
+	local trails: { Trail } = {}
+	local attachments: { Attachment } = {}
+
+	for _, partName in spec.Attachments do
+		local part = character:FindFirstChild(partName)
+		if part == nil or not part:IsA("BasePart") then
+			-- An R6 rig has no RightHand. Skipped rather than erroring: fewer ribbons is
+			-- a fine outcome, a broken flight is not.
+			continue
+		end
+
+		local top = Instance.new("Attachment")
+		top.Name = "ContrailTop"
+		top.Position = Vector3.new(0, part.Size.Y * 0.35, 0)
+		top.Parent = part
+
+		local bottom = Instance.new("Attachment")
+		bottom.Name = "ContrailBottom"
+		bottom.Position = Vector3.new(0, -part.Size.Y * 0.35, 0)
+		bottom.Parent = part
+
+		local trail = Instance.new("Trail")
+		trail.Attachment0 = top
+		trail.Attachment1 = bottom
+		trail.Color = ColorSequence.new(color(spec.Color))
+		trail.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.25),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		trail.Lifetime = spec.MinLifetime
+		trail.WidthScale = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		trail.LightEmission = 0.5
+		trail.FaceCamera = true
+		trail.Parent = part
+
+		table.insert(trails, trail)
+		table.insert(attachments, top)
+		table.insert(attachments, bottom)
+	end
+
+	if #trails == 0 then
+		return
+	end
+	contrails[character] = { trails = trails, attachments = attachments }
+end
+
+--[[
+	Rides the ribbons on the speed blend.
+
+	A trail of constant width reads as decoration bolted to the character; one that
+	lengthens and heats as they accelerate reads as air being torn. Below MinBlend they
+	switch off entirely, because a player hovering in place should not be streaming
+	contrails while standing still in the air.
+]]
+local function tuneContrail(character: Model, blend: number)
+	local entry: Contrail? = contrails[character]
+	if entry == nil then
+		return
+	end
+
+	local spec = VfxConfig.Contrail
+	local enabled = blend >= spec.MinBlend
+	local t = math.clamp((blend - spec.MinBlend) / math.max(1e-3, 1 - spec.MinBlend), 0, 1)
+	local tint = color(spec.Color):Lerp(color(spec.FastColor), t)
+
+	for _, trail in entry.trails do
+		if trail.Parent == nil then
+			continue
+		end
+		trail.Enabled = enabled
+		trail.Lifetime = spec.MinLifetime + (spec.MaxLifetime - spec.MinLifetime) * t
+		trail.Color = ColorSequence.new(tint)
+		trail.WidthScale = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, spec.MinWidth + (spec.MaxWidth - spec.MinWidth) * t),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+	end
+end
+
 local function playTrail(spec: VfxConfig.TrailSpec, attachTo: BasePart?)
 	if attachTo == nil then
 		return
@@ -460,6 +591,83 @@ local function playTrail(spec: VfxConfig.TrailSpec, attachTo: BasePart?)
 	Debris:AddItem(bottom, spec.Seconds + spec.Lifetime)
 end
 
+--[[
+	Speed lines: thin streaks sliding past the camera at high speed.
+
+	Local player only. They are a camera effect rather than a world one — drawing
+	another player's speed lines around your own view would be nonsense — so unlike the
+	contrails these are never raised on a remote character.
+
+	Spawned in a shell around the camera and left to expire on their own rather than
+	pooled and steered. A streak lives a third of a second; tracking one costs more than
+	rebuilding it, and the ones already in the air are what make the effect read while
+	the next batch is being made.
+]]
+local nextSpeedLineAt = 0
+-- True while the sonic boom has already fired for this run at top speed.
+local boomArmed = false
+
+local function emitSpeedLines(blend: number, travel: Vector3)
+	local spec = VfxConfig.SpeedLines
+	if blend < spec.MinBlend or travel.Magnitude < 1e-3 then
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	if camera == nil then
+		return
+	end
+
+	local now = os.clock()
+	if now < nextSpeedLineAt then
+		return
+	end
+
+	-- Scaled from nothing at MinBlend to the full count at top speed, so crossing the
+	-- threshold fades in rather than switching on.
+	local t = math.clamp((blend - spec.MinBlend) / math.max(1e-3, 1 - spec.MinBlend), 0, 1)
+	local count = math.floor(spec.MaxCount * t)
+	if count <= 0 then
+		return
+	end
+	nextSpeedLineAt = now + spec.Seconds / math.max(1, count)
+
+	local direction = travel.Unit
+	local origin = camera.CFrame.Position
+	local parent = ensureContainer()
+
+	-- One per tick rather than the whole batch at once: spread over the interval they
+	-- arrive as a stream, and spawning `count` parts in a single frame is a hitch at
+	-- exactly the moment the player is moving fastest.
+	local part = effectPart("SpeedLine")
+	part.Shape = Enum.PartType.Cylinder
+	part.Material = Enum.Material.Neon
+	part.Color = color(spec.Color)
+	part.Transparency = 0.35
+	part.Size = Vector3.new(spec.Length, spec.Thickness, spec.Thickness)
+
+	-- Somewhere on a ring around the direction of travel, ahead of the camera, so the
+	-- streaks appear to come at the player and sweep past.
+	local angle = math.random() * math.pi * 2
+	local radius = spec.MinDistance + math.random() * (spec.MaxDistance - spec.MinDistance)
+	local basis = CFrame.lookAt(origin, origin + direction)
+	local offset = basis:VectorToWorldSpace(
+		Vector3.new(math.cos(angle) * radius, math.sin(angle) * radius, -spec.MaxDistance)
+	)
+	-- A Cylinder's length runs along its X axis, so it is built pointing down the line
+	-- of travel rather than across it.
+	part.CFrame = CFrame.lookAt(origin + offset, origin + offset + direction)
+		* CFrame.Angles(0, math.rad(90), 0)
+	part.Parent = parent
+
+	TweenService:Create(part, TweenInfo.new(spec.Seconds, Enum.EasingStyle.Linear), {
+		CFrame = part.CFrame - direction * (spec.MaxDistance * 2),
+		Transparency = 1,
+	}):Play()
+
+	Debris:AddItem(part, spec.Seconds + 0.1)
+end
+
 -- === Camera ================================================================
 --
 -- Shake and the impact beat both write to the camera, so they share one render-step
@@ -476,7 +684,17 @@ type ShakeState = {
 local shake: ShakeState? = nil
 local holdUntil = 0
 local holdCFrame: CFrame? = nil
-local baseFieldOfView: number? = nil
+-- The camera's own resting field of view, captured the first time anything here wants
+-- to change it. Captured rather than assumed, because the default is a Roblox setting
+-- and a place that has changed it would otherwise be snapped to 70 the first time
+-- somebody flew or landed a slam.
+local restingFieldOfView: number? = nil
+-- Degrees of widening owed to flight speed right now, and how hard the impact beat is
+-- currently squeezing. Kept separate and combined below rather than each writing
+-- FieldOfView directly: the two overlap constantly — a slam landed while flying — and
+-- whichever wrote last would erase the other.
+local flightFovGain = 0
+local holdFovScale = 1
 
 local function updateCamera()
 	local camera = workspace.CurrentCamera
@@ -486,17 +704,33 @@ local function updateCamera()
 
 	local now = os.clock()
 
-	-- The impact beat, first: the camera stops where it was and the field of view snaps
-	-- in. Applied before shake so the shake still reads on top of a held frame.
+	-- The impact beat, first: the camera stops where it was. Applied before shake so
+	-- the shake still reads on top of a held frame.
 	if now < holdUntil then
 		local held = holdCFrame
 		if held ~= nil then
 			camera.CFrame = held
 		end
-	elseif baseFieldOfView ~= nil then
-		camera.FieldOfView = baseFieldOfView
-		baseFieldOfView = nil
+	else
 		holdCFrame = nil
+		holdFovScale = 1
+	end
+
+	-- One field-of-view write, from both contributors. Flight widens it and the impact
+	-- beat squeezes it, and a slam landed mid-flight has to do both — which is why
+	-- neither of them sets FieldOfView itself.
+	local resting = restingFieldOfView
+	if resting ~= nil then
+		local wanted = (resting + flightFovGain) * holdFovScale
+		if math.abs(camera.FieldOfView - wanted) > 1e-3 then
+			camera.FieldOfView = wanted
+		end
+		-- Released once nothing wants it any more, so the camera goes back to being
+		-- Roblox's to control rather than being pinned here forever.
+		if flightFovGain == 0 and holdFovScale == 1 then
+			camera.FieldOfView = resting
+			restingFieldOfView = nil
+		end
 	end
 
 	local state = shake
@@ -553,12 +787,31 @@ local function startHold(spec: VfxConfig.HitStopSpec)
 	end
 	holdCFrame = camera.CFrame
 	holdUntil = os.clock() + spec.Seconds
-	if baseFieldOfView == nil then
-		baseFieldOfView = camera.FieldOfView
+	if restingFieldOfView == nil then
+		restingFieldOfView = camera.FieldOfView
 	end
-	-- The punch inward. TimeScale is how hard the beat lands, so a full stop (0) is
-	-- also the deepest zoom.
-	camera.FieldOfView = (baseFieldOfView :: number) * (1 - (1 - spec.TimeScale) * 0.06)
+	-- The punch inward, as a scale rather than an absolute so it composes with the
+	-- flight widening. TimeScale is how hard the beat lands, so a full stop (0) is also
+	-- the deepest zoom.
+	holdFovScale = 1 - (1 - spec.TimeScale) * 0.06
+end
+
+--[[
+	How far flight has widened the view, in degrees.
+
+	Set by the flight update below rather than written to the camera directly, for the
+	reason in updateCamera: FieldOfView has two owners here and only one of them may
+	hold the pen.
+]]
+local function setFlightFov(gain: number)
+	if math.abs(flightFovGain - gain) < 1e-3 then
+		return
+	end
+	local camera = workspace.CurrentCamera
+	if camera ~= nil and restingFieldOfView == nil and gain > 0 then
+		restingFieldOfView = camera.FieldOfView
+	end
+	flightFovGain = gain
 end
 
 -- === Playback ===============================================================
@@ -721,11 +974,55 @@ function VfxController:_watch(character: Model)
 		end
 	end)
 
+	-- Flight, watched on every character for the same reason the guard is: the whole
+	-- point of the FlightState attribute is that somebody else's contrails are visible
+	-- to you, and before it existed a remote flier was an unmarked body sliding by.
+	character:GetAttributeChangedSignal(FlightConfig.STATE_ATTRIBUTE):Connect(function()
+		local root = rootOf(character)
+		if root == nil then
+			return
+		end
+
+		local state = character:GetAttribute(FlightConfig.STATE_ATTRIBUTE)
+		if type(state) == "string" then
+			if (contrails[character] :: Contrail?) == nil then
+				-- First frame of this flight: mark the launch on the floor, not on the
+				-- body, so it stays where the push happened as the flier leaves it.
+				self:Play(
+					"FlightTakeoff",
+					CFrame.new(root.Position - Vector3.yAxis * ROOT_TO_FLOOR),
+					root,
+					nil,
+					character
+				)
+				if EffectsController ~= nil then
+					EffectsController:Play("FlightTakeoff")
+				end
+			end
+			raiseContrail(character)
+		elseif (contrails[character] :: Contrail?) ~= nil then
+			dropContrail(character)
+			self:Play(
+				"FlightLanding",
+				CFrame.new(root.Position - Vector3.yAxis * ROOT_TO_FLOOR),
+				root,
+				nil,
+				character
+			)
+			if EffectsController ~= nil then
+				EffectsController:Play("FlightLanding")
+			end
+		end
+	end)
+
 	-- A character that dies or streams out mid-guard never gets the attribute change
 	-- that would take its dome down, so the dome would outlive the body wearing it.
+	-- Contrails hang off the limbs themselves, so they have the same problem and the
+	-- same answer.
 	character.AncestryChanged:Connect(function()
 		if character.Parent == nil then
 			dropGuard(character)
+			dropContrail(character)
 		end
 	end)
 end
@@ -739,8 +1036,76 @@ function VfxController:_track(player: Player)
 	end)
 end
 
+--[[
+	Rides the flight effects on how fast the local player is actually going.
+
+	Speed rather than the replicated band, because everything here belongs to the person
+	flying: their own trail width, their own speed lines, their own field of view. The
+	band exists so *other* clients can pose a flier without a per-frame float crossing
+	the wire; this side of it never needed the compromise.
+
+	Remote fliers get their contrails tuned to the coarse band instead, which is the
+	right trade — from across the gym the difference between a 0.7 and a 0.8 blend is
+	not something anybody can see.
+]]
+function VfxController:_updateFlight()
+	local localCharacter = Players.LocalPlayer.Character
+	local blend = 0
+	local travel = Vector3.zero
+
+	for character, _ in contrails do
+		if character.Parent == nil then
+			continue
+		end
+		local root = rootOf(character)
+		if root == nil then
+			continue
+		end
+
+		local characterBlend: number
+		if character == localCharacter then
+			local data = if ProfileController ~= nil then ProfileController:Get() else nil
+			local legs = if data ~= nil then (data.Stats.Legs or 0) else 0
+			travel = root.AssemblyLinearVelocity
+			characterBlend = Formulas.FlightBlend(travel.Magnitude, Formulas.FlightSpeed(legs))
+			blend = characterBlend
+		else
+			local state = character:GetAttribute(FlightConfig.STATE_ATTRIBUTE)
+			characterBlend = if state == "Cruise" then 1 elseif state == "Glide" then 0.5 else 0
+		end
+
+		tuneContrail(character, characterBlend)
+	end
+
+	setFlightFov(Formulas.FlightFovGain(blend))
+	emitSpeedLines(blend, travel)
+
+	-- The boom, once per flight. Re-armed only after dropping back out of the band, so
+	-- holding full throttle fires it on the way in rather than machine-gunning it for as
+	-- long as the key is down.
+	local flying = FlightController ~= nil and FlightController:IsFlying()
+	if flying and blend >= Formulas.FLIGHT_BOOM_FRACTION then
+		if not boomArmed and localCharacter ~= nil then
+			local root = rootOf(localCharacter)
+			if root ~= nil then
+				boomArmed = true
+				self:Play("FlightBoom", root.CFrame, root, nil, localCharacter)
+				if EffectsController ~= nil then
+					EffectsController:Play("FlightBoom")
+				end
+			end
+		end
+	elseif blend < Formulas.FLIGHT_BOOM_FRACTION * 0.9 then
+		-- Re-armed with hysteresis. Dropping out at exactly the same threshold it fires
+		-- at means hovering on the boundary retriggers it every other frame.
+		boomArmed = false
+	end
+end
+
 function VfxController:Init()
 	EffectsController = Loader.Get("EffectsController")
+	FlightController = Loader.Get("FlightController")
+	ProfileController = Loader.Get("ProfileController")
 end
 
 function VfxController:Start()
@@ -785,6 +1150,17 @@ function VfxController:Start()
 	-- are applied to the CFrame the player actually sees rather than to one the default
 	-- camera is about to overwrite.
 	RunService:BindToRenderStep("VfxCamera", Enum.RenderPriority.Camera.Value + 1, updateCamera)
+
+	-- Heartbeat, not RenderStepped, and the distinction is load-bearing. RenderStepped
+	-- only fires while the client is actually drawing frames: Studio throttles it to
+	-- nothing when the window is in the background, and a player who alt-tabs stops
+	-- rendering too. None of the work below is a camera write — it sets trail widths,
+	-- spawns streaks and computes a field-of-view *target* — so it belongs on the step
+	-- that keeps running. The one thing that genuinely has to happen at draw time, the
+	-- camera write itself, is the BindToRenderStep hook above.
+	RunService.Heartbeat:Connect(function()
+		self:_updateFlight()
+	end)
 end
 
 return VfxController

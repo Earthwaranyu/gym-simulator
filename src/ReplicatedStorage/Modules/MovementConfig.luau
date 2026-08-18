@@ -107,4 +107,10 @@ MovementConfig.DASH_COOLDOWN = 1.1
 -- sets the character spinning and nothing ever damps it out.
 MovementConfig.FLIGHT_ORIENT_RESPONSIVENESS = 40
 
+-- How fast the bank angle chases the turn it is reacting to. Much slower than
+-- FLIGHT_ORIENT_RESPONSIVENESS above, and deliberately so: the heading should snap to
+-- where the player is pointing, while the roll into and out of a turn is the part the
+-- eye reads as weight. Matching the two makes the body twitch on every camera nudge.
+MovementConfig.FLIGHT_BANK_RESPONSIVENESS = 5
+
 return MovementConfig

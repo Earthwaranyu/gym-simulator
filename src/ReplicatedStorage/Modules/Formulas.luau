@@ -186,6 +186,32 @@ Formulas.MAX_CORE_REFLECTION = 1
 Formulas.MAX_SPRINT_BONUS = 40
 Formulas.MAX_FLIGHT_BONUS = 80
 
+-- Flight silhouettes, as fractions of the flier's own top speed rather than as stud
+-- counts. Legs raises FlightSpeed toward a 120-stud ceiling, so an absolute threshold
+-- would put a fresh player permanently in the hover pose and a maxed one permanently
+-- in the cruise. Expressed as fractions, the same three bands mean the same thing to
+-- everybody: drifting, travelling, and going as fast as you personally can.
+Formulas.FLIGHT_GLIDE_FRACTION = 0.18
+Formulas.FLIGHT_CRUISE_FRACTION = 0.65
+-- Where the sonic boom fires, and the point speed lines reach full strength.
+Formulas.FLIGHT_BOOM_FRACTION = 0.92
+
+-- How far the body may pitch and bank. Both are readability limits, not physics: past
+-- roughly these angles a follow camera behind a pitched rig stops reading as flight and
+-- starts reading as a fall, which is the exact failure the old upright hold avoided by
+-- never tilting at all.
+Formulas.MAX_FLIGHT_PITCH_DEGREES = 42
+Formulas.MAX_FLIGHT_BANK_DEGREES = 34
+-- Turn rate, in radians per second, that earns a full bank. A gentle correction should
+-- barely roll the body; only a hard turn should lay it over.
+Formulas.FLIGHT_BANK_FULL_TURN_RATE = 2.4
+
+-- Field-of-view widening at top speed, in degrees over the camera's resting value.
+-- Small on purpose: FOV is the cheapest speed cue there is and also the fastest way to
+-- make somebody motion-sick, and it is being applied for minutes at a time rather than
+-- for the four frames an impact beat lasts.
+Formulas.MAX_FLIGHT_FOV_GAIN = 14
+
 -- Ground Slam's blast. A flat radius with a small Legs bonus: the slam is an Arms
 -- move and Legs only decides how far the shock carries. The bonus is deliberately
 -- tiny per point and capped early, because a radius that grew with a stat measured
@@ -486,6 +512,90 @@ function Formulas.BlockDrainForAbsorbed(absorbed: number, maxHealth: number): nu
 end
 
 --[[
+	Which flight silhouette a speed belongs to.
+
+	Three bands rather than a continuous blend parameter, because this is also what
+	crosses the wire: the client reports a band change and every other client poses the
+	flier from it. A float republished as it changed would be a property write to every
+	client in the server, every frame, for every player in the air.
+
+	The local flier still blends smoothly — it has its own velocity and never needs the
+	attribute — so the coarseness costs nothing to the person actually flying.
+]]
+function Formulas.FlightBand(speed: number, topSpeed: number): string
+	if not Formulas.IsFinite(speed) or not Formulas.IsFinite(topSpeed) or topSpeed <= 0 then
+		return "Hover"
+	end
+	local fraction = math.clamp(speed / topSpeed, 0, 1)
+	if fraction >= Formulas.FLIGHT_CRUISE_FRACTION then
+		return "Cruise"
+	elseif fraction >= Formulas.FLIGHT_GLIDE_FRACTION then
+		return "Glide"
+	end
+	return "Hover"
+end
+
+--[[
+	How far through the hover-glide-cruise range a speed sits, as 0 to 1.
+
+	Continuous, unlike FlightBand, and used only by the client that owns the flight —
+	for the pose blend, the trail width and the field of view, none of which anybody
+	else needs to agree with frame by frame.
+]]
+function Formulas.FlightBlend(speed: number, topSpeed: number): number
+	if not Formulas.IsFinite(speed) or not Formulas.IsFinite(topSpeed) or topSpeed <= 0 then
+		return 0
+	end
+	return math.clamp(speed / topSpeed, 0, 1)
+end
+
+--[[
+	Pitch, in degrees, for a flier climbing or diving at `verticalSpeed`.
+
+	Signed: positive pitches the nose up. Derived from the vertical share of the
+	movement rather than from the camera, so a player who is looking down while
+	travelling level stays level — the body reports what it is doing, not what the
+	player is looking at.
+]]
+function Formulas.FlightPitch(verticalSpeed: number, speed: number): number
+	if not Formulas.IsFinite(verticalSpeed) or not Formulas.IsFinite(speed) or speed <= 1e-3 then
+		return 0
+	end
+	local share = math.clamp(verticalSpeed / speed, -1, 1)
+	return share * Formulas.MAX_FLIGHT_PITCH_DEGREES
+end
+
+--[[
+	Bank, in degrees, for a flier turning at `turnRate` radians per second.
+
+	Signed, and rolls into the turn: a left turn drops the left shoulder. Linear up to
+	FLIGHT_BANK_FULL_TURN_RATE and clamped past it, so a twitchy camera cannot spin the
+	body faster than the eye can follow.
+]]
+function Formulas.FlightBank(turnRate: number): number
+	if not Formulas.IsFinite(turnRate) then
+		return 0
+	end
+	local share = math.clamp(turnRate / Formulas.FLIGHT_BANK_FULL_TURN_RATE, -1, 1)
+	return share * Formulas.MAX_FLIGHT_BANK_DEGREES
+end
+
+--[[
+	Extra field of view, in degrees, at a given fraction of top speed.
+
+	Quadratic rather than linear so the widening is imperceptible while manoeuvring and
+	only really arrives at the top of the range, where it is the difference between fast
+	and very fast.
+]]
+function Formulas.FlightFovGain(blend: number): number
+	if not Formulas.IsFinite(blend) then
+		return 0
+	end
+	local t = math.clamp(blend, 0, 1)
+	return t * t * Formulas.MAX_FLIGHT_FOV_GAIN
+end
+
+--[[
 	Total power, the single number shown in the tab bar. Plain sum: it should climb
 	visibly with every rep, which a log or average would flatten.
 ]]
@@ -715,6 +825,51 @@ function Formulas.RunSelfTest(): { string }
 	)
 	check("no damage costs no meter", Formulas.BlockDrainForAbsorbed(0, 100) == 0)
 	check("block drain survives bad input", Formulas.BlockDrainForAbsorbed(0 / 0, 100) == 0)
+
+	-- Flight bands are fractions of the flier's own top speed, so the same three
+	-- silhouettes mean the same thing to a fresh player and a maxed one. This is the
+	-- invariant that stops a beginner being stuck in the hover pose forever.
+	local freshTop = Formulas.FlightSpeed(0)
+	local maxedTop = Formulas.FlightSpeed(1e12)
+	check("a still flier hovers", Formulas.FlightBand(0, freshTop) == "Hover")
+	check("full speed is a cruise", Formulas.FlightBand(freshTop, freshTop) == "Cruise")
+	check(
+		"the bands are scale-free",
+		Formulas.FlightBand(freshTop * 0.4, freshTop) == Formulas.FlightBand(maxedTop * 0.4, maxedTop)
+	)
+	check("half speed is a glide", Formulas.FlightBand(freshTop * 0.4, freshTop) == "Glide")
+	check("bands survive a zero top speed", Formulas.FlightBand(10, 0) == "Hover")
+	check("bands survive bad input", Formulas.FlightBand(0 / 0, freshTop) == "Hover")
+	check(
+		"the glide band opens before the cruise band",
+		Formulas.FLIGHT_GLIDE_FRACTION < Formulas.FLIGHT_CRUISE_FRACTION
+			and Formulas.FLIGHT_CRUISE_FRACTION < Formulas.FLIGHT_BOOM_FRACTION
+	)
+
+	check("blend is zero at rest", Formulas.FlightBlend(0, freshTop) == 0)
+	check("blend saturates at top speed", Formulas.FlightBlend(freshTop * 2, freshTop) == 1)
+	check("blend survives bad input", Formulas.FlightBlend(0 / 0, freshTop) == 0)
+
+	-- Pitch and bank are signed and bounded. The bounds are the whole reason the body
+	-- can be tilted at all: past them a follow camera reads a pitched rig as falling.
+	check("level flight does not pitch", Formulas.FlightPitch(0, 100) == 0)
+	check("climbing pitches up", Formulas.FlightPitch(50, 100) > 0)
+	check("diving pitches down", Formulas.FlightPitch(-50, 100) < 0)
+	check("pitch is capped", math.abs(Formulas.FlightPitch(1e6, 1e6)) <= Formulas.MAX_FLIGHT_PITCH_DEGREES)
+	check("pitch survives a standstill", Formulas.FlightPitch(10, 0) == 0)
+
+	check("flying straight does not bank", Formulas.FlightBank(0) == 0)
+	check("turning banks into the turn", Formulas.FlightBank(1) > 0)
+	check("banking is signed", Formulas.FlightBank(-1) == -Formulas.FlightBank(1))
+	check("bank is capped", math.abs(Formulas.FlightBank(1e6)) <= Formulas.MAX_FLIGHT_BANK_DEGREES)
+	check("bank survives bad input", Formulas.FlightBank(0 / 0) == 0)
+
+	-- Field of view is held for minutes rather than for the four frames an impact beat
+	-- lasts, so it stays small and arrives late.
+	check("hovering does not widen the view", Formulas.FlightFovGain(0) == 0)
+	check("top speed widens it fully", Formulas.FlightFovGain(1) == Formulas.MAX_FLIGHT_FOV_GAIN)
+	check("the widening arrives late", Formulas.FlightFovGain(0.5) < Formulas.MAX_FLIGHT_FOV_GAIN * 0.5)
+	check("fov gain is capped", Formulas.FlightFovGain(9) == Formulas.MAX_FLIGHT_FOV_GAIN)
 
 	check("total power sums", Formulas.TotalPower({ a = 2, b = 3 }) == 5)
 

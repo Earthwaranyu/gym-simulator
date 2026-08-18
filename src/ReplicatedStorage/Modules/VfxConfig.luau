@@ -125,6 +125,60 @@ export type BurstSpec = {
 	alternative is a texture, and a texture is an upload. It costs the hex panelling a
 	hand-authored shield would have; what it buys is a shield that is ours.
 ]]
+--[[
+	Flight contrails, and — like the guard dome — a state rather than an event.
+
+	The same distinction that bit the block dome applies here for the same reason: a
+	trail exists for as long as somebody is in the air, which is anywhere from two
+	seconds to several minutes, and an element's lifetime is the wrong tool for that.
+	VfxController raises these off the FlightState attribute and drops them when it
+	clears, reusing the raiseGuard/dropGuard structure rather than rediscovering the
+	bug that produced a barrier which flashed for a third of a second.
+
+	Width and brightness ride the speed blend, so a hover barely wisps and a full cruise
+	pulls four hard ribbons. That is most of what sells speed — a trail of constant
+	width reads as decoration bolted to the character rather than as air being torn.
+]]
+export type ContrailSpec = {
+	-- Rig parts the ribbons hang off. Missing ones are skipped, so an R6 rig quietly
+	-- gets fewer trails rather than erroring.
+	Attachments: { string },
+	MinWidth: number,
+	MaxWidth: number,
+	MinLifetime: number,
+	MaxLifetime: number,
+	Color: { number },
+	-- Colour at full speed. Interpolated toward as the blend rises, so going fast
+	-- visibly heats the ribbons rather than just lengthening them.
+	FastColor: { number },
+	-- Blend below which no trail is drawn at all. A hovering player should not be
+	-- streaming contrails while standing still in the air.
+	MinBlend: number,
+	CullDistance: number,
+}
+
+--[[
+	Speed lines: thin streaks sliding past the camera at high speed.
+
+	Local player only, and deliberately so — they are a camera effect rather than a
+	world one, and drawing another player's speed lines around your own view would be
+	nonsense. Spawned in a shell around the camera and pulled backwards relative to
+	travel.
+]]
+export type SpeedLineSpec = {
+	-- Streaks alive at full speed. Scaled down by the blend, to nothing at MinBlend.
+	MaxCount: number,
+	MinBlend: number,
+	Length: number,
+	Thickness: number,
+	-- How far out from the camera they live. Inside the near plane they smear; too far
+	-- and they stop reading as motion.
+	MinDistance: number,
+	MaxDistance: number,
+	Seconds: number,
+	Color: { number },
+}
+
 export type GuardSpec = {
 	Radius: number,
 	Color: { number },
@@ -250,6 +304,11 @@ local IMPACT_HOT = rgb(255, 240, 210)
 local HEAVY = rgb(255, 122, 72)
 local DUST = rgb(168, 152, 132)
 local SCORCH = rgb(38, 32, 28)
+-- Flight is its own colour family. Not the warm orange of damage and not the blue of
+-- the guard: flying is neither hurting somebody nor surviving them, and a contrail that
+-- read as either would be misinformation in a crowded fight.
+local SKY = rgb(150, 214, 255)
+local SKY_HOT = rgb(236, 250, 255)
 local GUARD = rgb(96, 186, 255)
 local GUARD_HOT = rgb(214, 240, 255)
 
@@ -620,12 +679,184 @@ local effects: { Effect } = {
 			},
 		},
 	},
+	--[[
+		Leaving the ground. A ring and a dust kick under the feet — the same language as
+		the slam's shockwave, deliberately, because both are "something pushed off this
+		floor hard". Much smaller, and with no shards: takeoff displaces air, not
+		concrete.
+	]]
+	{
+		Id = "FlightTakeoff",
+		Radius = 8,
+		CullDistance = 260,
+		Elements = {
+			{
+				Kind = "Ring" :: "Ring",
+				Delay = 0,
+				Seconds = 0.42,
+				StartScale = 0.15,
+				EndScale = 1.25,
+				Thickness = 0.6,
+				Height = 0.12,
+				Color = SKY_HOT,
+				StartTransparency = 0.2,
+				Easing = "Out" :: "Out",
+			},
+			{
+				Kind = "Burst" :: "Burst",
+				Delay = 0,
+				Seconds = 0.7,
+				Texture = SMOKE,
+				Count = 20,
+				Speed = NumberRange.new(12, 30),
+				Size = NumberRange.new(1.2, 2.8),
+				Spread = 65,
+				Color = DUST,
+				Gravity = 10,
+				Lifetime = NumberRange.new(0.4, 0.9),
+			},
+			{
+				Kind = "Flash" :: "Flash",
+				Delay = 0,
+				Seconds = 0.14,
+				StartScale = 0.2,
+				EndScale = 0.7,
+				Color = SKY_HOT,
+				Easing = "Snap" :: "Snap",
+			},
+		},
+	},
+
+	--[[
+		Coming back down. Dust and a small ring, and pointedly no shards and no scorch.
+
+		Landing must not look like a Ground Slam. The slam earns its crater by costing a
+		six-second cooldown and a second of commitment; if stepping out of the air broke
+		the floor too, the crater would stop meaning anything the first time somebody
+		flew across the gym.
+	]]
+	{
+		Id = "FlightLanding",
+		Radius = 7,
+		CullDistance = 240,
+		Elements = {
+			{
+				Kind = "Ring" :: "Ring",
+				Delay = 0,
+				Seconds = 0.3,
+				StartScale = 0.2,
+				EndScale = 1,
+				Thickness = 0.45,
+				Height = 0.1,
+				Color = DUST,
+				StartTransparency = 0.45,
+				Easing = "Out" :: "Out",
+			},
+			{
+				Kind = "Burst" :: "Burst",
+				Delay = 0,
+				Seconds = 0.8,
+				Texture = SMOKE,
+				Count = 18,
+				Speed = NumberRange.new(8, 20),
+				Size = NumberRange.new(1.2, 2.6),
+				Spread = 72,
+				Color = DUST,
+				Gravity = 14,
+				Lifetime = NumberRange.new(0.5, 1),
+			},
+		},
+	},
+
+	--[[
+		Crossing into top speed. Fires once per flight, re-armed only after dropping out
+		of the band, so holding full throttle does not machine-gun it.
+	]]
+	{
+		Id = "FlightBoom",
+		Radius = 9,
+		CullDistance = 300,
+		Elements = {
+			{
+				Kind = "Shake" :: "Shake",
+				Delay = 0,
+				Seconds = 0.3,
+				Amplitude = 0.7,
+				Roughness = 24,
+				FalloffRadius = 90,
+			},
+			{
+				Kind = "Flash" :: "Flash",
+				Delay = 0,
+				Seconds = 0.12,
+				StartScale = 0.3,
+				EndScale = 1.6,
+				Color = SKY_HOT,
+				Easing = "Snap" :: "Snap",
+			},
+			-- Stood at the character rather than laid on the ground: this happens in
+			-- open air, and a ground ring would be drawing a shockwave on a floor that
+			-- may be a thousand studs below.
+			{
+				Kind = "Ring" :: "Ring",
+				Delay = 0,
+				Seconds = 0.35,
+				StartScale = 0.2,
+				EndScale = 2,
+				Thickness = 0.5,
+				Height = 0.1,
+				Color = SKY,
+				StartTransparency = 0.25,
+				Easing = "Out" :: "Out",
+			},
+			{
+				Kind = "Burst" :: "Burst",
+				Delay = 0,
+				Seconds = 0.5,
+				Texture = SPARK,
+				Count = 24,
+				Speed = NumberRange.new(30, 62),
+				Size = NumberRange.new(0.4, 1),
+				Spread = 80,
+				Color = SKY_HOT,
+				Gravity = 0,
+				Lifetime = NumberRange.new(0.25, 0.5),
+			},
+		},
+	},
 }
 
 --[[
 	The guard dome, which VfxController raises and drops off the Blocking attribute
 	rather than firing as an effect. See GuardSpec above for why it is not one.
 ]]
+--[[
+	Flight contrails and speed lines. Raised and dropped off the FlightState attribute
+	by VfxController rather than fired as effects — see ContrailSpec above for why.
+]]
+VfxConfig.Contrail = {
+	Attachments = { "RightHand", "LeftHand", "RightFoot", "LeftFoot" },
+	MinWidth = 0.35,
+	MaxWidth = 1.5,
+	MinLifetime = 0.18,
+	MaxLifetime = 0.55,
+	Color = SKY,
+	FastColor = SKY_HOT,
+	MinBlend = 0.12,
+	CullDistance = 320,
+} :: ContrailSpec
+
+VfxConfig.SpeedLines = {
+	MaxCount = 22,
+	MinBlend = 0.55,
+	Length = 14,
+	Thickness = 0.12,
+	MinDistance = 14,
+	MaxDistance = 42,
+	Seconds = 0.34,
+	Color = SKY_HOT,
+} :: SpeedLineSpec
+
 VfxConfig.Guard = {
 	Radius = 3.6,
 	Color = GUARD,

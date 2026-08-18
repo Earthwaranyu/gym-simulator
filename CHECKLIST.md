@@ -1440,6 +1440,36 @@ punches for a whole phase, so the game had two answers to one question.
       fire from their keys, the bar sweeps, the meter drains red and breaks, and the
       dome renders around the character.
 
+- [ ] 131. **Flight gets an animation, and the body earns the right to tilt.** Flight
+      had none: FlightController puts the humanoid on PlatformStand and drives a
+      LinearVelocity, so Roblox's freefall clip kept playing and the avatar read as a
+      standing body sliding through the air. That is also why the controller held the
+      body rigidly upright — its own comment said a rig with no flight animation looks
+      like a falling body when pitched — so the pose is what removes the workaround
+      rather than layering on it. `FlightConfig` holds three silhouettes (upright
+      hover, leaning glide, near-horizontal superhero cruise with the leading fist
+      out), deliberately not a `PoseConfig` entry because a Pose cycles on a machine's
+      rep interval and flight blends on speed. `FlightPoseController` consumes them on
+      PreSimulation, modelled on `TrainingPoseController`, and clears every joint to
+      identity on landing or death. The controller now pitches from vertical velocity
+      and banks from how fast the heading is swinging, both clamped and eased.
+      Flight was also the one body state nobody else could see: `FlightAllowed` said
+      who *may* fly and nothing said who *is*, so a remote flier was unmarked. A
+      `FlightChanged` remote and a `FlightState` attribute close that, carrying coarse
+      bands rather than a per-frame float — the local flier blends from its own
+      velocity and never reads the attribute, so the coarseness costs the only person
+      who could notice it nothing. VFX: four contrails that ride the speed blend in
+      width, lifetime and heat, camera speed lines, a takeoff ring, a landing dust puff
+      pointedly lighter than a slam, a one-shot sonic boom with hysteresis, and
+      speed-scaled field of view folded into the existing camera hook. The flight
+      update runs on Heartbeat rather than RenderStepped, which a Studio session proved
+      matters — a backgrounded window throttles RenderStepped to zero. `StrikeConfig`'s
+      self-test had been written and never called from anywhere; it and FlightConfig's
+      now run at Studio boot, since both build poses from Vector3 and the CLI cannot
+      require them. Verified live: the cruise silhouette applies to the rig, hovering
+      eases back upright, landing releases every joint and every trail, and contrails
+      sit disabled at rest and near-maximum at speed.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
