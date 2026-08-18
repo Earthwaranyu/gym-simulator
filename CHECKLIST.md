@@ -25,7 +25,7 @@ multiplayer balance, mobile controls, and load testing are incomplete. The curre
 |---|---|
 | Core stats | **5** — Arms, Chest, Back, Core, Legs |
 | PvP zoning | **Open PvP everywhere**, except safe spawn, shop, and quest board |
-| Death cost | **Time + broken combo only.** No stat, cash, or token loss |
+| Death cost | **Time + broken combo only.** No stat or token loss |
 | Progression sink | **Tokens → per-stat multiplier upgrades.** No rebirth system |
 | Token accrual | Passive per-tick, **only while alive, inside a gym zone, and somewhere you can be attacked**, plus quest rewards |
 | Training | **Hold E to mount.** You teleport onto the machine, lock into it, and reps tick on their own — no stamina, no clicking. Hold E again to get off |
@@ -61,7 +61,7 @@ system that consumes it:
 
 ## Phase 1 — Data Layer
 
-- [x] 8. `ProfileTemplate` schema: stats, tokens, per-stat multiplier levels, cash, owned equipment, quest progress, **reputation**, **immortality expiry**, kill/death record, settings, `SchemaVersion`.
+- [x] 8. `ProfileTemplate` schema: stats, tokens, per-stat multiplier levels, owned equipment, quest cycle progress, **reputation**, **immortality expiry**, kill/death record, settings, `SchemaVersion`.
 - [x] 9. `DataService` — session locking, release on leave, `BindToClose` flush.
 - [x] 10. Migration system: ordered list of version-bump functions, so the schema grows without breaking live saves.
 - [x] 11. Replication: server pushes an authoritative read-only profile view to the owning client; client never writes.
@@ -106,7 +106,7 @@ system that consumes it:
       the victim but leaves them mounted; only death dismounts them and resets the
       combo. The attacker must commit to a full kill, so the cost of interrupting is
       proportional to the effort of causing it.*
-- [x] 33. Death & respawn — respawn timer, rep-streak reset, in-flight token tick forfeited. **No stat, cash, or token loss on death.** *(ragdoll deferred to #56 VFX)*
+- [x] 33. Death & respawn — respawn timer, rep-streak reset, in-flight token tick forfeited. **No stat or token loss on death.** *(ragdoll deferred to #56 VFX)*
 - [x] 34. **Reputation system** — data-driven tiers (Criminal → Neutral → Guardian → Hero). Killing peaceful trainers pushes you toward Criminal; killing Criminals pushes you toward Hero. Tier table is config, not code.
 - [x] 35. **Immortality + barrier** — `CombatService` nullifies all damage while a potion is active, and the player wears a visible body barrier so attackers can see it before swinging.
 - [x] 36. Bounty / killstreak system with a revenge incentive so victims get a comeback path.
@@ -116,7 +116,7 @@ system that consumes it:
 
 ## Phase 6 — Economy & Monetisation
 
-- [x] 40. `CurrencyService` — cash from reps, kills, and bounties. Kept distinct from Tokens.
+- [x] 40. ~~`CurrencyService` — cash from reps, kills, and bounties.~~ **Removed.** Cash was deleted; the economy is Tokens (time, quests, bosses) and Fight Tokens (KOs, bounties, goblins).
 - [x] 41. Data-driven shop catalogue: gym-tier unlocks, supplements (timed multipliers), abilities.
 - [x] 42. `MarketplaceService` handler — gamepasses + dev products, **idempotent** receipt processing.
 - [x] 43. **Immortal potions** as dev products: 1 hour for 19 R$, 1 day for 79 R$. Expiry stored on the profile so it survives rejoin.
@@ -1046,7 +1046,7 @@ punches for a whole phase, so the game had two answers to one question.
       compact power/reputation roster stays top-right; and the main goal sits beneath
       it instead of overlapping it. Info has a player portrait and the five-stat
       multiplier ladder with confirmation. Shop groups the live server catalogue into
-      VIP/passes, immortal potions, token dumbbells, and cash supplements. Settings has
+      VIP/passes, immortal potions, token dumbbells, and Robux supplements. Settings has
       server-whitelisted, persisted Music/SFX toggles plus the VIP daily claim; disabled
       SFX now actually silences the shared effects path. Required-power machine signs
       also carry the warning badge and honest `+Stat/s` copy from the reference without
@@ -1070,7 +1070,7 @@ punches for a whole phase, so the game had two answers to one question.
       muscle owns a large round pictogram, current value, multiplier, gameplay effect,
       and a two-line upgrade control without pushing another muscle below the fold.
       Shop is rebuilt as responsive two-column card grids with separate saturated visual
-      families for VIP/passes, immortal potions, token dumbbells, and earned-cash
+      families for VIP/passes, immortal potions, token dumbbells, and Robux
       supplements. Each card has an original procedural glyph, short description, and
       full-width price state; the existing server catalogue still decides availability,
       ownership, pricing, and grants.
@@ -1371,6 +1371,74 @@ punches for a whole phase, so the game had two answers to one question.
       `1 / SEC · BASE TRAINING`. Verified with StyLua, Selene, strict Luau analysis, all
       pure self-tests, generated-gym and balance validation, `git diff --check`, and a
       clean Rojo build.
+
+- [x] 127. **Sculpt a Gym-League-style final form and identify the muscle being trained.**
+      Full in-class growth now cross-fades the visible rectangular R15 body into 15
+      overlapping torso/waist/arm/hand/leg shells while preserving the original rig as
+      its invisible hitbox. A broad upper torso, narrower midsection, compact waist and
+      continuous ellipsoid limbs replace the old spherical body blobs and cut-off limb
+      cylinders. Over that mass sit deltoid caps, separate biceps/triceps, paired rounded-
+      band pecs, a ten-piece trap/rhomboid/lat/erector back, six abs with obliques, and
+      quad/hamstring/calf contours. The anterior shapes were corrected to Roblox
+      avatar-front −Z, fixing pecs, abs and quads previously hidden behind the body. Each group
+      still listens only to its own progress since the last physique change, so the
+      player builds back from lean without losing lifetime stats. Machine and manual
+      training publish the authoritative active stat; the local avatar receives a faint
+      white wash on the supporting body part and a stronger white fill on that stat's
+      sculpted contours. Manual release and machine stop clear it locally before the
+      network round trip. Live Studio verified lean at 0 shells/0 contours, isolated Arms
+      at 6 shells/8 contours with an untouched torso, and full growth at 15 shells/34
+      contours. Arms/Chest/Back/Core/Legs highlight 18/6/14/13/16 pieces respectively,
+      with zero remaining after stop. Selene has zero warnings, all pure self-tests and
+      world validation pass, and strict analysis reports only existing UI/FullMap issues.
+
+- [ ] 128. **Combat gets a framework the abilities can be config in.** Abilities were
+      already open/closed on the server — a file in `CombatService/Abilities/` is
+      discovered at startup — but the client was not: `CombatController` hardcoded one
+      ability id, one cooldown mirror and one bind, so the second ability would have
+      needed a second copy of all three. `AbilityConfig` becomes the manifest both
+      realms read (id, key, cooldown, HUD glyph, colour), is deliberately free of the
+      Roblox API so `scripts/selftest.luau` can check it, and names E, C, Space and
+      LeftShift as reserved so no ability can silently fight the training prompt.
+      `CombatController` now binds every row in it and `HudController` draws one slot
+      per row with a cooldown sweep. Combat also gains three reusable primitives it had
+      no form of: `GetTargetsInRadius` (all targets, not the nearest, providers
+      included via an optional `FindAllInRadius`), `ApplyKnockback` (the game's first
+      impact physics, a short-lived `LinearVelocity`, refused for safe-zone and immortal
+      players and never dismounting a training victim), and a `RegisterDamageModifier`
+      registry so a defensive move can have the last word on damage without a branch
+      inside `ApplyDamage`. Dash moves from Q to C to free the key.
+
+- [ ] 129. **A procedural VFX system, because the game had none.** Nothing in the
+      workspace had ever flashed, cracked or shaken — `EffectsController` was damage
+      numbers and silent sounds. `VfxConfig` declares effects as layered data (ring,
+      flash, shards, burst, shake, impact beat, scorch, trail) and `VfxController`
+      builds them at runtime from Roblox primitives under `CurrentCamera`, so nothing
+      replicates and a crater costs one client one frame. Everything is ours by the
+      project's asset rule: engine-bundled `rbxasset://` particle textures and
+      `Enum.Material.ForceField`, no upload. Effects are timed against the strike clip
+      that owns them, so retiming an animation moves its crater with it. The impact beat
+      is named for what it does rather than how — a true hit-stop cannot freeze a
+      procedural animation without desyncing it from server damage timing, so the camera
+      holds and the FOV punches instead. Studio verified the slam crater builds 22
+      shards, 2 rings, 2 bursts and a scorch; the first pass was retuned after a
+      screenshot showed dinner-plate slabs and dust thick enough to hide the fight.
+
+- [ ] 130. **Ground Slam, Hard Punch and Block.** Q is a leap and a smash: one contact
+      two thirds through a 1.15s clip, damage falling off linearly to the rim, and
+      everybody inside launched. R is one telegraphed heavy — nearly half its clip is
+      wind-up, which is the entire reason Block has something to react to; the self-test
+      asserts it stays slower to land than a jab. F is a held guard owned by
+      `BlockService`: generous when outmatched by design (a defensive move that stops
+      working when you need it is not a move), draining on time and on damage absorbed
+      at a rate scaled to the victim's own health so it survives the same number of hits
+      at every point on the curve, and shattering into a three-second lockout if
+      emptied. The guard dome is deliberately not an effect but a state — the first
+      build made it one and shipped a barrier that flashed for 0.38s while the guard was
+      still up — and it is shrunk rather than faded away, because ForceField draws its
+      own shell and ignores `Transparency` entirely. Verified live in Studio: all three
+      fire from their keys, the bar sweeps, the meter drains red and breaks, and the
+      dome renders around the character.
 
 ---
 

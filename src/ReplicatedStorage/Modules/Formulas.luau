@@ -6,10 +6,11 @@
 	opening Studio (`luau` can run RunSelfTest directly).
 
 	Training gains scale multiplicatively into enormous numbers, while every formula
-	still has to produce a finite Roblox property. Arms and Chest therefore grant direct
-	one-for-one bonuses, Back and Core are percentages, and Legs grants one stud/second
-	per point until the movement safety caps. Muscle deformation and percentage effects
-	remain logarithmic because they must stay useful without becoming physically invalid.
+	still has to produce a finite Roblox property. Arms grants direct damage, Chest grants
+	ten health per point, and Back/Core compare their power directly with the attacker's
+	Arms using deliberate SPTS-style breakpoints. Legs grants one stud/second per point
+	until the movement safety caps. Muscle deformation remains logarithmic because it
+	must stay useful without becoming physically invalid.
 ]]
 
 local Formulas = {}
@@ -63,37 +64,18 @@ function Formulas.SanitizeStat(value: any): number
 	return math.clamp(value :: number, 0, Formulas.MAX_STAT)
 end
 
---[[
-	Forces any input into a usable upgrade level: a whole number in [0, cap].
-
-	Every formula below sanitizes its own arguments rather than trusting the caller.
-	That looks redundant when the caller is a service that already validated — but
-	these are pure functions reachable from combat, UI, replication, and a profile
-	written years ago, and the fuzz pass in RunSelfTest showed most of them happily
-	returning NaN or infinity when handed one. A formula that can produce NaN is a
-	formula that can freeze a player's progression with no error anywhere.
-]]
-local function level(value: any): number
-	if not Formulas.IsFinite(value) then
-		return 0
-	end
-	return math.clamp(math.floor(value :: number), 0, Formulas.MULTIPLIER_LEVEL_CAP)
-end
-
 -- === Training ===============================================================
 
--- Training always includes the player's own effort. A station adds its advertised
--- equipment rate on top: an x1 starter machine is therefore 1 base + 1 equipment =
--- 2 stats per second before the player's upgrade/boost multiplier stack.
+-- Manual training pays one point per second. Machine training is a separate route:
+-- its displayed x1 rate is the whole payout, not an invisible +1 stacked beneath it.
 Formulas.BASE_TRAINING_PER_SECOND = 1
 
 --[[
 	The raw per-second rate while mounted, before player-owned multipliers.
 
 	`equipmentPerSecond` is the machine's normalized rate and `zoneMultiplier` is the
-	map tier printed on its pin. They are additive with the universal base rate, so a
-	map pin remains an honest description of the *equipment bonus* instead of silently
-	replacing the training every player can already do without a machine.
+	map tier printed on its pin. Their product is the whole mounted payout: the x1
+	starter machine begins at +1/s rather than hiding another manual +1 beneath it.
 ]]
 function Formulas.MachineTrainingRate(equipmentPerSecond: number, zoneMultiplier: number): number
 	if not Formulas.IsFinite(equipmentPerSecond) or not Formulas.IsFinite(zoneMultiplier) then
@@ -102,11 +84,7 @@ function Formulas.MachineTrainingRate(equipmentPerSecond: number, zoneMultiplier
 	if equipmentPerSecond < 0 or zoneMultiplier < 0 then
 		return 0
 	end
-	return math.clamp(
-		Formulas.BASE_TRAINING_PER_SECOND + equipmentPerSecond * zoneMultiplier,
-		0,
-		Formulas.MAX_STAT
-	)
+	return math.clamp(equipmentPerSecond * zoneMultiplier, 0, Formulas.MAX_STAT)
 end
 
 --[[
@@ -119,35 +97,6 @@ function Formulas.GainPerRep(baseGain: number, multiplier: number): number
 		return 0
 	end
 	return math.clamp(baseGain * multiplier, 0, Formulas.MAX_STAT)
-end
-
--- === Token multipliers ======================================================
-
--- Safety rail: the highest level MultiplierValue will accept. 2^128 ≈ 3.4e38,
--- which is large but finite and fits comfortably in a double. The cost curve
--- puts level 60 far beyond any reachable token count, so this cap is a data
--- hygiene guard, not a gameplay limit.
-Formulas.MULTIPLIER_LEVEL_CAP = 128
-
---[[
-	The multiplier granted by owning `level` upgrades of a stat. Level 0 is 1x.
-	Each level doubles the previous value: 2^level. The doubling reads cleanly
-	in UI ("2x → 4x → 8x") and gives every purchase the same *relative* impact
-	while the exponential COST curve gates pacing.
-
-	Level is clamped to MULTIPLIER_LEVEL_CAP so the value can never reach inf
-	and poison a saved profile.
-]]
-function Formulas.MultiplierValue(upgradeLevel: number): number
-	return 2 ^ level(upgradeLevel)
-end
-
---[[
-	Token cost of buying the next level. Exponential, so upgrades stay meaningful
-	purchases rather than something you buy out in one session.
-]]
-function Formulas.MultiplierCost(upgradeLevel: number): number
-	return math.floor(10 * 1.35 ^ level(upgradeLevel))
 end
 
 -- === Token accrual ==========================================================
@@ -189,22 +138,47 @@ function Formulas.MuscleScale(statValue: number, weight: number): number
 	return 1 + math.clamp(growth, 0, Formulas.MAX_MUSCLE_SCALE - 1)
 end
 
+--[[
+	Visible size from progress inside the current physique, where 0 is lean and 1 is
+	fully developed. Unlike MuscleScale's lifetime logarithm, this has exact endpoints:
+	a transformation can reliably return every part to 1, and no amount of overtraining
+	can push it beyond MAX_MUSCLE_SCALE.
+
+	Smoothstep keeps the first few reps subtle, makes the middle of the class visibly
+	rewarding, and eases into the cap instead of hitting a visual wall.
+]]
+function Formulas.MuscleScaleForProgress(progress: number, weight: number): number
+	if not Formulas.IsFinite(progress) or not Formulas.IsFinite(weight) or weight <= 0 then
+		return 1
+	end
+	local clamped = math.clamp(progress, 0, 1)
+	local shaped = clamped * clamped * (3 - 2 * clamped)
+	local growth = (Formulas.MAX_MUSCLE_SCALE - 1) * shaped * weight
+	return 1 + math.clamp(growth, 0, Formulas.MAX_MUSCLE_SCALE - 1)
+end
+
 -- === Combat =================================================================
 
 -- Built-in character values are separate from muscle bonuses. Exporting these keeps
--- UI copy honest: a player can see "+5 health" and "105 total" without mistaking the
--- avatar's free starting health for five Chest points they did not earn.
+-- UI copy honest: a player can see "+50 health" and "150 total" without mistaking
+-- the avatar's free starting health for five Chest points they did not earn.
 Formulas.BASE_HEALTH = 100
-Formulas.BASE_ATTACK_DAMAGE = 1
+-- The smallest punch in the game. A floor rather than a base: it lifts an untrained
+-- fist off zero without being added to anybody else's damage, so a trained player's
+-- hit is still exactly their Arms. The old `1 + Arms` was a base, and at low Arms it
+-- was most of the hit — which is why two fresh players traded 1, 2, 3 and the number
+-- read as a counter rather than as their strength.
+Formulas.MIN_ATTACK_DAMAGE = 1
 Formulas.BASE_WALK_SPEED = 16
 Formulas.BASE_SPRINT_SPEED = 24
 Formulas.BASE_FLIGHT_SPEED = 40
 
--- Percentage defenses must never reach 100%. Full Back resistance would create
--- permanent immunity, while full Core reflection would make attacking equivalent to
--- hitting yourself. Named caps let formulas, tests and UI communicate one rule.
-Formulas.MAX_BACK_RESISTANCE = 0.5
-Formulas.MAX_CORE_REFLECTION = 0.35
+-- Extreme power gaps intentionally reach complete block/reflection. This is the
+-- defining SPTS-style rule: somebody with ten times the relevant defensive stat is
+-- not merely a little tougher, but outside the attacker's current combat tier.
+Formulas.FULL_DEFENSE_RATIO = 10
+Formulas.MAX_BACK_RESISTANCE = 1
+Formulas.MAX_CORE_REFLECTION = 1
 
 -- Direct velocity scaling has to stop before a Humanoid or flight constraint starts
 -- skipping through the map. These are bonus caps, not hidden conversion curves: every
@@ -212,69 +186,174 @@ Formulas.MAX_CORE_REFLECTION = 0.35
 Formulas.MAX_SPRINT_BONUS = 40
 Formulas.MAX_FLIGHT_BONUS = 80
 
--- One Chest point is exactly one additional max-health point. The previous log curve
--- made the first Chest point add about twelve health, then made later points add less
--- than one; that is why the visible Chest number and health bar appeared to disagree.
+-- Ground Slam's blast. A flat radius with a small Legs bonus: the slam is an Arms
+-- move and Legs only decides how far the shock carries. The bonus is deliberately
+-- tiny per point and capped early, because a radius that grew with a stat measured
+-- in trillions would cover the map by the second hour.
+Formulas.BASE_SLAM_RADIUS = 14
+Formulas.MAX_SLAM_RADIUS_BONUS = 16
+Formulas.SLAM_RADIUS_PER_LEG = 0.05
+-- What the slam does at the epicentre, relative to a punch's single contact. Punch
+-- splits its damage across three contacts and lands on one target; the slam is one
+-- contact on everybody, so the multiplier buys the loss of the combo, not a strictly
+-- better move.
+Formulas.SLAM_DAMAGE_MULTIPLIER = 2.5
+-- Damage at the rim, as a fraction of the epicentre. Standing at the edge of a slam
+-- should hurt without being the same hit as standing under it.
+Formulas.SLAM_RIM_SHARE = 0.35
+
+-- Hard Punch: one slow, telegraphed contact. Roughly three and a half punches of
+-- damage for roughly three punches of cooldown, with the wind-up long enough that a
+-- blocking opponent can react to it.
+Formulas.HARD_PUNCH_MULTIPLIER = 3.5
+
+-- Knockback, the game's only impact physics. Bounded at both ends: the floor keeps a
+-- hit from looking like it missed, and the ceiling keeps a trillion-Arms player from
+-- launching somebody out of the world. Between them it follows the same ten-times
+-- language the rest of combat uses — an even fight sits halfway up the range, and a
+-- tenfold Arms advantage reaches the top.
+Formulas.MIN_KNOCKBACK_SPEED = 40
+Formulas.MAX_KNOCKBACK_SPEED = 140
+-- Fraction of the launch that goes straight up. Purely a readability choice: a purely
+-- horizontal shove slides along the floor and reads as a physics glitch, while a hit
+-- that pops the victim off the ground reads as force.
+Formulas.KNOCKBACK_LIFT = 0.55
+
+-- Active block. Distinct from Back's passive resistance in ResolveDamage: that one is
+-- a stat comparison you cannot influence, this one is a button you are holding, and
+-- it works against an attacker you have no business surviving. Hence a large floor
+-- even when badly outmatched, and a ceiling short of total immunity.
+Formulas.BASE_BLOCK_REDUCTION = 0.6
+Formulas.MIN_BLOCK_REDUCTION = 0.35
+Formulas.MAX_BLOCK_REDUCTION = 0.9
+-- One ten-times step of Back over the attacker's Arms is worth this much reduction.
+Formulas.BLOCK_REDUCTION_PER_DECADE = 0.15
+
+-- The meter, measured in seconds of held guard. Core is the counter-force stat, so it
+-- is what decides how long you can stand there eating hits.
+Formulas.BASE_BLOCK_SECONDS = 4
+Formulas.MAX_BLOCK_SECONDS_BONUS = 6
+Formulas.BLOCK_REGEN_PER_SECOND = 0.6
+-- Absorbing a full health bar's worth of damage costs this many seconds of meter, so
+-- a block breaks under pressure rather than only under time.
+Formulas.BLOCK_DAMAGE_DRAIN_SECONDS = 8
+-- Dead time after a break. The punish for holding guard until it shattered.
+Formulas.BLOCK_BREAK_PENALTY_SECONDS = 3
+
+-- Ten health per Chest point makes equal Arms/Chest take roughly ten unblocked hits,
+-- while a ten-times Arms advantage naturally approaches a one-hit kill.
 function Formulas.MaxHealth(chestStat: number): number
-	return Formulas.BASE_HEALTH + Formulas.SanitizeStat(chestStat)
+	return math.min(Formulas.BASE_HEALTH + Formulas.SanitizeStat(chestStat) * 10, Formulas.MAX_STAT)
 end
 
 --[[
-	Base melee damage before per-ability multipliers. One Arms point is one point of
-	additional raw damage, on top of the avatar's small built-in hit. PowerGapFalloff
-	then protects a much weaker victim without falsifying the attacker's Arms number.
+	Base melee damage before per-ability multipliers: your Arms, and nothing else.
+
+	Nothing is added on top. The old formula was `1 + Arms`, and at low Arms that one
+	point was most of the hit — two fresh players traded 1, then 2, then 3 as Arms
+	crept up, and the punch read as a counter ticking rather than as their strength.
+	Above the floor, damage is the stat you trained and nothing else.
+
+	The floor exists only so an untrained fist is not a no-op. A brand-new player deals
+	1, and from their very first Arms point onward the number they see is their Arms.
 ]]
 function Formulas.AttackDamage(armsStat: number): number
-	return Formulas.BASE_ATTACK_DAMAGE + Formulas.SanitizeStat(armsStat)
+	return math.max(Formulas.SanitizeStat(armsStat), Formulas.MIN_ATTACK_DAMAGE)
 end
 
+-- Ratio helper shared by Back and Core. Attack power never drops below one because
+-- an untrained punch still deals one damage and dividing by zero would make zero Arms
+-- look weaker than the actual hit.
+local function defenseRatio(defenseStat: number, attackerArmsStat: number): number
+	local defense = Formulas.SanitizeStat(defenseStat)
+	local attack = math.max(Formulas.SanitizeStat(attackerArmsStat), Formulas.MIN_ATTACK_DAMAGE)
+	return defense / attack
+end
+
+Formulas.DefenseRatio = defenseRatio
+
 --[[
-	Damage reduction from the victim's Back, as a fraction in [0, 0.5].
-
-	Contested against the attacker's Arms rather than read off Back alone, and that
-	choice is the whole design. A flat reduction from your own Back would stack on
-	top of the power-gap falloff and make veteran fights drag; worse, it would be a
-	tax every attacker pays regardless of what they trained. Contested, two players
-	who invested equally cancel out exactly — so a fair fight is identical to one in
-	a world where Back did not exist, and time-to-kill is untouched at every scale.
-
-	What Back buys is an answer to somebody who out-levelled you on Arms alone.
-	Capped at half, because a stat that could reach immunity is not a stat. Diminishing
-	logarithmic growth keeps later Back training useful without ever approaching 100%.
+	SPTS-style physical resistance mapped onto Back. Equal or lower Back does not alter
+	the hit; greater Back blocks 10%, and ten-times Back nullifies it completely.
 ]]
 function Formulas.DamageResistance(backStat: number, attackerArmsStat: number): number
-	-- Orders of magnitude the defender's Back leads the attacker's Arms by.
-	local advantage = softScale(Formulas.SanitizeStat(backStat), 1)
-		- softScale(Formulas.SanitizeStat(attackerArmsStat), 1)
-	if advantage <= 0 then
-		return 0
+	local ratio = defenseRatio(backStat, attackerArmsStat)
+	if ratio >= 10 then
+		return 1
+	elseif ratio > 1 then
+		return 0.1
 	end
-	return math.min(advantage * 0.08, Formulas.MAX_BACK_RESISTANCE)
+	return 0
 end
 
 --[[
-	Damage dealt back to an attacker by the victim's Core, as a share of the damage
-	that just landed. Capped at just over a third. This separate rate function lets UI
-	show the exact percentage without pretending a sample 100-damage hit is the rule.
-
-	Expressed as a fraction of the incoming hit rather than as a flat number on
-	purpose: it means a heavy hitter takes more back than a light one, so Core is a
-	deterrent proportional to what is being done to you, and it can never punish
-	somebody for a hit that barely scratched you.
-
-	The 35% cap means a surviving defender can return a meaningful piece of a hit, but
-	never the full hit. A defender who wants to win through retaliation must also invest
-	in enough Chest to survive, which makes it a build rather than automatic immunity.
+	SPTS-style reflection mapped onto Core. Greater Core returns 10%; ten-times Core
+	fully nullifies the direct hit. The original game is closed-source and community
+	documentation only promises those two bands, so there are deliberately no invented
+	2x/5x tiers here.
 ]]
-function Formulas.RetaliationRate(coreStat: number): number
-	return math.min(Formulas.MAX_CORE_REFLECTION, softScale(Formulas.SanitizeStat(coreStat), 0.03))
+function Formulas.ReflectionRate(coreStat: number, attackerArmsStat: number): number
+	local ratio = defenseRatio(coreStat, attackerArmsStat)
+	if ratio >= 10 then
+		return 1
+	elseif ratio > 1 then
+		return 0.1
+	end
+	return 0
 end
 
-function Formulas.Retaliation(coreStat: number, damageTaken: number): number
-	if not Formulas.IsFinite(damageTaken) or damageTaken <= 0 then
+-- Compatibility name for consumers that describe reflection as retaliation.
+Formulas.RetaliationRate = Formulas.ReflectionRate
+
+function Formulas.Retaliation(coreStat: number, attackerArmsStat: number, incomingDamage: number): number
+	if not Formulas.IsFinite(incomingDamage) or incomingDamage <= 0 then
 		return 0
 	end
-	return damageTaken * Formulas.RetaliationRate(coreStat)
+	local rate = Formulas.ReflectionRate(coreStat, attackerArmsStat)
+	if rate >= 1 then
+		-- Documented SPTS returns the attacker's damage. The Core floor is this game's
+		-- explicit extension: it makes a zero-stat player die for punching somebody
+		-- whose Core outclasses them, which is the expected power-fantasy result.
+		local counterFloor =
+			math.min(Formulas.BASE_HEALTH + Formulas.SanitizeStat(coreStat), Formulas.MAX_STAT)
+		return math.max(incomingDamage, counterFloor)
+	end
+	return incomingDamage * rate
+end
+
+export type CombatBreakdown = {
+	Damage: number,
+	Blocked: number,
+	Reflected: number,
+	BlockRate: number,
+	ReflectionRate: number,
+}
+
+-- The complete direct-hit order in one pure function: Core splits the raw hit first,
+-- then Back blocks a share of what remains. CombatService consumes these exact values
+-- and the client displays them, so code, tests and feedback cannot disagree.
+function Formulas.ResolveDamage(
+	rawDamage: number,
+	backStat: number,
+	coreStat: number,
+	attackerArmsStat: number
+): CombatBreakdown
+	if not Formulas.IsFinite(rawDamage) or rawDamage <= 0 then
+		return { Damage = 0, Blocked = 0, Reflected = 0, BlockRate = 0, ReflectionRate = 0 }
+	end
+
+	local reflectionRate = Formulas.ReflectionRate(coreStat, attackerArmsStat)
+	local reflected = Formulas.Retaliation(coreStat, attackerArmsStat, rawDamage)
+	local afterReflection = rawDamage * (1 - reflectionRate)
+	local blockRate = Formulas.DamageResistance(backStat, attackerArmsStat)
+	local blocked = afterReflection * blockRate
+	return {
+		Damage = math.max(0, afterReflection - blocked),
+		Blocked = blocked,
+		Reflected = reflected,
+		BlockRate = blockRate,
+		ReflectionRate = reflectionRate,
+	}
 end
 
 --[[
@@ -317,21 +396,93 @@ function Formulas.FlightSpeed(legsStat: number): number
 end
 
 --[[
-	Damage scaling applied when a much stronger player hits a much weaker one.
-	Direct Arms damage needs a proportional falloff rather than the old logarithmic
-	minimum of 25%, which would let trillion-power players erase beginners instantly.
-	The 75-point baseline leaves a fresh victim vulnerable but gives them several hits
-	of warning. Equal and weaker attackers still deal their full raw damage.
+	Ground Slam's blast radius. Legs widens it slightly and then stops mattering.
 ]]
-function Formulas.PowerGapFalloff(rawAttackerPower: number, rawVictimPower: number): number
-	local attackerPower = Formulas.SanitizeStat(rawAttackerPower)
-	local victimPower = Formulas.SanitizeStat(rawVictimPower)
-	if attackerPower <= victimPower then
-		return 1
-	end
+function Formulas.SlamRadius(legsStat: number): number
+	local bonus = Formulas.SanitizeStat(legsStat) * Formulas.SLAM_RADIUS_PER_LEG
+	return Formulas.BASE_SLAM_RADIUS + math.min(Formulas.MAX_SLAM_RADIUS_BONUS, bonus)
+end
 
-	local protectionBaseline = 75
-	return math.clamp((victimPower + protectionBaseline) / (attackerPower + protectionBaseline), 0, 1)
+--[[
+	Ground Slam's damage at the epicentre, before the victim's own defenses.
+]]
+function Formulas.SlamDamage(armsStat: number): number
+	return math.min(Formulas.AttackDamage(armsStat) * Formulas.SLAM_DAMAGE_MULTIPLIER, Formulas.MAX_STAT)
+end
+
+--[[
+	How much of the slam reaches somebody `distance` studs from the epicentre.
+
+	Linear from 1 at the centre to SLAM_RIM_SHARE at the rim, and 0 past it. Linear
+	rather than inverse-square because the falloff is a gameplay dial the player has to
+	be able to feel from where they are standing, not a physical simulation.
+]]
+function Formulas.SlamFalloff(distance: number, radius: number): number
+	if not Formulas.IsFinite(distance) or not Formulas.IsFinite(radius) or radius <= 0 then
+		return 0
+	end
+	local alpha = math.clamp(distance / radius, 0, 1)
+	if alpha >= 1 then
+		return 0
+	end
+	return 1 + (Formulas.SLAM_RIM_SHARE - 1) * alpha
+end
+
+--[[
+	Launch speed of a knockback, in studs per second.
+
+	Reads the Arms-against-Back gap in decades, matching DamageResistance's bands: an
+	even fight is the middle of the range and a tenfold advantage is the top of it.
+	Both ends are hard-clamped, so this can never be the thing that throws a player
+	through the floor.
+]]
+function Formulas.KnockbackSpeed(attackerArmsStat: number, victimBackStat: number): number
+	local attack = math.max(Formulas.SanitizeStat(attackerArmsStat), Formulas.MIN_ATTACK_DAMAGE)
+	local defense = math.max(Formulas.SanitizeStat(victimBackStat), 1)
+	-- log10 of the ratio: -1 at a tenfold disadvantage, 0 when even, +1 at tenfold.
+	local decades = math.clamp(math.log(attack / defense, 10), -1, 1)
+	local alpha = (decades + 1) * 0.5
+	local span = Formulas.MAX_KNOCKBACK_SPEED - Formulas.MIN_KNOCKBACK_SPEED
+	return Formulas.MIN_KNOCKBACK_SPEED + span * alpha
+end
+
+--[[
+	Fraction of an incoming hit that an active block eats.
+
+	Deliberately generous even when outmatched: a block is a button held at the right
+	moment, and a defensive move that stops working exactly when you need it is not a
+	move. Back tilts it, but the floor is what makes it worth pressing.
+]]
+function Formulas.BlockReduction(backStat: number, attackerArmsStat: number): number
+	local defense = math.max(Formulas.SanitizeStat(backStat), 1)
+	local attack = math.max(Formulas.SanitizeStat(attackerArmsStat), Formulas.MIN_ATTACK_DAMAGE)
+	local decades = math.log(defense / attack, 10)
+	local reduction = Formulas.BASE_BLOCK_REDUCTION + decades * Formulas.BLOCK_REDUCTION_PER_DECADE
+	return math.clamp(reduction, Formulas.MIN_BLOCK_REDUCTION, Formulas.MAX_BLOCK_REDUCTION)
+end
+
+--[[
+	Block meter capacity, in seconds of held guard. Core is the counter-force stat and
+	softScale keeps a trillion-Core player from guarding forever.
+]]
+function Formulas.BlockMeter(coreStat: number): number
+	local bonus = softScale(Formulas.SanitizeStat(coreStat), 0.5)
+	return Formulas.BASE_BLOCK_SECONDS + math.min(Formulas.MAX_BLOCK_SECONDS_BONUS, bonus)
+end
+
+--[[
+	Meter spent absorbing `absorbed` damage against a `maxHealth` health bar.
+
+	Scaled against the victim's own health rather than an absolute number, so a block
+	holds for the same number of hits at every point on the progression curve — the
+	same reasoning behind the time-to-kill invariant in the self-test.
+]]
+function Formulas.BlockDrainForAbsorbed(absorbed: number, maxHealth: number): number
+	if not Formulas.IsFinite(absorbed) or absorbed <= 0 then
+		return 0
+	end
+	local health = math.max(Formulas.SanitizeStat(maxHealth), 1)
+	return math.min(absorbed / health, 1) * Formulas.BLOCK_DAMAGE_DRAIN_SECONDS
 end
 
 --[[
@@ -378,8 +529,10 @@ function Formulas.RunSelfTest(): { string }
 				local ok, result
 				if arity == 1 then
 					ok, result = pcall(fn, first)
-				else
+				elseif arity == 2 then
 					ok, result = pcall(fn, first, second)
+				else
+					ok, result = pcall(fn, first, second, first)
 				end
 				if not ok then
 					table.insert(failures, `{label} errored on ({first}, {second})`)
@@ -394,19 +547,17 @@ function Formulas.RunSelfTest(): { string }
 	end
 
 	fuzz("SanitizeStat", Formulas.SanitizeStat, 1)
-	fuzz("MultiplierValue", Formulas.MultiplierValue, 1)
-	fuzz("MultiplierCost", Formulas.MultiplierCost, 1)
 	fuzz("MaxHealth", Formulas.MaxHealth, 1)
 	fuzz("AttackDamage", Formulas.AttackDamage, 1)
 	fuzz("WalkSpeed", Formulas.WalkSpeed, 1)
 	fuzz("FlightSpeed", Formulas.FlightSpeed, 1)
 	fuzz("MuscleScale", Formulas.MuscleScale, 2)
+	fuzz("MuscleScaleForProgress", Formulas.MuscleScaleForProgress, 2)
 	fuzz("GainPerRep", Formulas.GainPerRep, 2)
 	fuzz("MachineTrainingRate", Formulas.MachineTrainingRate, 2)
 	fuzz("DamageResistance", Formulas.DamageResistance, 2)
-	fuzz("RetaliationRate", Formulas.RetaliationRate, 1)
-	fuzz("Retaliation", Formulas.Retaliation, 2)
-	fuzz("PowerGapFalloff", Formulas.PowerGapFalloff, 2)
+	fuzz("ReflectionRate", Formulas.ReflectionRate, 2)
+	fuzz("Retaliation", Formulas.Retaliation, 3)
 
 	check("sanitize rejects NaN", Formulas.SanitizeStat(0 / 0) == 0)
 	-- Infinity becomes 0, not the cap. Clamping it to MAX_STAT would hand an exploit
@@ -417,8 +568,8 @@ function Formulas.RunSelfTest(): { string }
 	check("sanitize passes ordinary values", Formulas.SanitizeStat(1234.5) == 1234.5)
 	check("gain never exceeds the cap", Formulas.GainPerRep(1e60, 1e60) <= Formulas.MAX_STAT)
 	check("manual training starts at one per second", Formulas.BASE_TRAINING_PER_SECOND == 1)
-	check("x1 machine adds to base", Formulas.MachineTrainingRate(1, 1) == 2)
-	check("x4 machine adds to base", Formulas.MachineTrainingRate(1, 4) == 5)
+	check("x1 machine pays exactly one", Formulas.MachineTrainingRate(1, 1) == 1)
+	check("x4 machine pays exactly four", Formulas.MachineTrainingRate(1, 4) == 4)
 	check("five capped stats stay finite", Formulas.TotalPower({
 		a = Formulas.MAX_STAT,
 		b = Formulas.MAX_STAT,
@@ -426,31 +577,35 @@ function Formulas.RunSelfTest(): { string }
 		d = Formulas.MAX_STAT,
 		e = Formulas.MAX_STAT,
 	}) < math.huge)
-
-	check("level 0 multiplier is 1x", Formulas.MultiplierValue(0) == 1)
-	check("multiplier doubles each level", Formulas.MultiplierValue(5) == 2 * Formulas.MultiplierValue(4))
+	check("fresh physique is visually lean", Formulas.MuscleScaleForProgress(0, 1) == 1)
 	check(
-		"multiplier stays finite at cap",
-		Formulas.MultiplierValue(Formulas.MULTIPLIER_LEVEL_CAP) < math.huge
+		"full physique reaches the visual cap",
+		Formulas.MuscleScaleForProgress(1, 1) == Formulas.MAX_MUSCLE_SCALE
 	)
-	check("multiplier cost grows", Formulas.MultiplierCost(10) > Formulas.MultiplierCost(9))
-	check("first upgrade is affordable", Formulas.MultiplierCost(0) <= 10)
+	check(
+		"overtraining cannot exceed the visual cap",
+		Formulas.MuscleScaleForProgress(99, 1) == Formulas.MAX_MUSCLE_SCALE
+	)
 
 	check("health has a 100-point base", Formulas.MaxHealth(0) == Formulas.BASE_HEALTH)
-	check("one Chest is one health", Formulas.MaxHealth(1) - Formulas.MaxHealth(0) == 1)
-	check("five Chest is five health", Formulas.MaxHealth(5) - Formulas.MaxHealth(0) == 5)
-	check("Chest stays one-to-one at scale", Formulas.MaxHealth(1e12) - Formulas.BASE_HEALTH == 1e12)
+	check("one Chest is ten health", Formulas.MaxHealth(1) - Formulas.MaxHealth(0) == 10)
+	check("five Chest is fifty health", Formulas.MaxHealth(5) - Formulas.MaxHealth(0) == 50)
+	check("Chest stays ten-to-one at scale", Formulas.MaxHealth(1e12) - Formulas.BASE_HEALTH == 1e13)
 
-	check("damage has a 1-point base", Formulas.AttackDamage(0) == Formulas.BASE_ATTACK_DAMAGE)
-	check("one Arms is one damage", Formulas.AttackDamage(1) - Formulas.AttackDamage(0) == 1)
-	check("five Arms is five damage", Formulas.AttackDamage(5) - Formulas.AttackDamage(0) == 5)
-	check("Arms stays one-to-one at scale", Formulas.AttackDamage(1e12) - Formulas.BASE_ATTACK_DAMAGE == 1e12)
+	-- The floor lifts an untrained punch off zero and touches nothing else: from one
+	-- Arms upward the damage IS the stat, with nothing added. Written as absolute
+	-- values rather than differences precisely so a base creeping back in would fail.
+	check("an untrained punch still lands", Formulas.AttackDamage(0) == Formulas.MIN_ATTACK_DAMAGE)
+	check("one Arms is one damage", Formulas.AttackDamage(1) == 1)
+	check("five Arms is five damage", Formulas.AttackDamage(5) == 5)
+	check("Arms stays one-to-one at scale", Formulas.AttackDamage(1e12) == 1e12)
+	check("nothing is added on top of Arms", Formulas.AttackDamage(1e12) == 1e12)
 
-	-- The griefing invariant. Direct trillion-scale damage is safe only once the
-	-- proportional power-gap falloff is applied.
-	local bullyDamage = Formulas.AttackDamage(1e12) * Formulas.PowerGapFalloff(3e12, 0)
-	check("a maxed player cannot one-shot a beginner", bullyDamage < Formulas.MaxHealth(0))
-	check("a maxed player still kills a beginner in a few hits", bullyDamage * 6 > Formulas.MaxHealth(0))
+	-- There is deliberately no griefing invariant here any more. Damage used to pass
+	-- through a power-gap falloff so a maxed player could not one-shot a beginner;
+	-- that was removed on purpose, in favour of a punch always dealing exactly the
+	-- strength the attacker trained. A maxed player now kills a fresh one instantly,
+	-- and the safe zone and the immortality potions are what a beginner has instead.
 
 	-- Equal-stat fights should take a similar number of hits at every scale, or combat
 	-- gets faster or slower as the server ages.
@@ -470,54 +625,96 @@ function Formulas.RunSelfTest(): { string }
 	check("one Legs is one sprint speed", Formulas.SprintSpeed(1) - Formulas.SprintSpeed(0) == 1)
 	check("sprint is capped", Formulas.SprintSpeed(1e30) <= 64)
 
-	-- Back is a counter to Arms, not a tax on everyone. If equal investment ever
-	-- stops cancelling, every balance number above it silently changes meaning.
-	check("back does nothing against equal arms", Formulas.DamageResistance(1e9, 1e9) == 0)
-	check("back does nothing against stronger arms", Formulas.DamageResistance(1e6, 1e12) == 0)
-	check("100 Back is not immunity", Formulas.DamageResistance(100, 0) < Formulas.MAX_BACK_RESISTANCE)
-	check("back reduces a weaker attacker", Formulas.DamageResistance(1e12, 1e6) > 0.4)
-	check(
-		"back grows with the gap",
-		Formulas.DamageResistance(1e12, 1e3) > Formulas.DamageResistance(1e12, 1e9)
-	)
-	check(
-		"back never reaches full immunity",
-		Formulas.DamageResistance(1e30, 0) <= Formulas.MAX_BACK_RESISTANCE
-			and Formulas.MAX_BACK_RESISTANCE < 1
-	)
-	-- Resistance stacks with falloff, so the two together must still leave a hit
-	-- that lands. A defensive build should be expensive to kill, never impossible.
-	local vsTank = Formulas.AttackDamage(1e12)
-		* Formulas.PowerGapFalloff(1e12, 1e30)
-		* (1 - Formulas.DamageResistance(1e30, 1e12))
-	check("nothing is immune", vsTank > 0)
+	-- Documented SPTS bands. Boundary tests keep a future tune from accidentally
+	-- turning the two readable thresholds back into an invented smooth curve.
+	check("lower back blocks nothing", Formulas.DamageResistance(999, 1000) == 0)
+	check("equal back blocks nothing", Formulas.DamageResistance(1000, 1000) == 0)
+	check("greater back blocks ten percent", Formulas.DamageResistance(1001, 1000) == 0.1)
+	check("nine-times back still blocks ten percent", Formulas.DamageResistance(9999, 1000) == 0.1)
+	check("ten-times back fully blocks", Formulas.DamageResistance(10000, 1000) == 1)
 
-	check("no core, no retaliation", Formulas.Retaliation(0, 100) == 0)
-	check("100 Core is not full reflection", Formulas.RetaliationRate(100) < Formulas.MAX_CORE_REFLECTION)
-	check("retaliation grows with core", Formulas.Retaliation(1e9, 100) > Formulas.Retaliation(1e3, 100))
-	check(
-		"core never reaches full reflection",
-		Formulas.RetaliationRate(1e30) <= Formulas.MAX_CORE_REFLECTION and Formulas.MAX_CORE_REFLECTION < 1
-	)
-	check(
-		"retaliation uses the named cap",
-		Formulas.Retaliation(1e30, 100) <= 100 * Formulas.MAX_CORE_REFLECTION
-	)
-	check("retaliation never exceeds the hit", Formulas.Retaliation(1e30, 100) < 100)
-	-- Thorns must not invert a fair fight: winning an even duel should cost the
-	-- attacker a chunk of health, never more than they have.
-	for _, stat in { 1e3, 1e6, 1e12 } do
-		local damage = Formulas.AttackDamage(stat)
-		local hits = Formulas.MaxHealth(stat) / damage
-		local cost = Formulas.Retaliation(stat, damage) * hits
-		check(`retaliation cannot win an even fight at {stat}`, cost < Formulas.MaxHealth(stat))
-		check(`retaliation still hurts at {stat}`, cost > 0)
-	end
+	check("core below equal reflects nothing", Formulas.ReflectionRate(999, 1000) == 0)
+	check("equal core reflects nothing", Formulas.ReflectionRate(1000, 1000) == 0)
+	check("greater core reflects ten percent", Formulas.ReflectionRate(1001, 1000) == 0.1)
+	check("nine-times core still reflects ten percent", Formulas.ReflectionRate(9999, 1000) == 0.1)
+	check("ten-times core fully reflects", Formulas.ReflectionRate(10000, 1000) == 1)
+	check("no core, no retaliation", Formulas.Retaliation(0, 1000, 100) == 0)
+	check("partial retaliation returns ten percent", Formulas.Retaliation(2000, 1000, 100) == 10)
+	check("full retaliation uses the Core counter floor", Formulas.Retaliation(10000, 1000, 100) == 10100)
+	local equalFight = Formulas.ResolveDamage(1000, 1000, 1000, 1000)
+	check("equal fight does not reflect", equalFight.Reflected == 0)
+	check("equal fight does not block", equalFight.Blocked == 0)
+	check("equal fight lands raw damage", equalFight.Damage == 1000)
+	local partialDefense = Formulas.ResolveDamage(1000, 2000, 2000, 1000)
+	check("partial defense reflects ten percent first", partialDefense.Reflected == 100)
+	check("partial defense blocks ten percent of the remainder", partialDefense.Blocked == 90)
+	check("partial defense lands eighty-one percent", partialDefense.Damage == 810)
+	local fullCore = Formulas.ResolveDamage(1000, 1e30, 10000, 1000)
+	check("full reflection leaves nothing for Back", fullCore.Reflected == 10100 and fullCore.Blocked == 0)
+	check("full reflection deals no direct damage", fullCore.Damage == 0)
+	local zeroAttacker = Formulas.ResolveDamage(1, 200, 200, 0)
+	check("zero-power attacker receives a lethal Core counter", zeroAttacker.Reflected == 300)
+	check("zero-power punch cannot hurt the stronger defender", zeroAttacker.Damage == 0)
+	local fullBack = Formulas.ResolveDamage(1000, 10000, 0, 1000)
+	check("full Back blocks the whole unreflected hit", fullBack.Blocked == 1000 and fullBack.Damage == 0)
+	check("invalid raw damage resolves safely", Formulas.ResolveDamage(0 / 0, 1, 1, 1).Damage == 0)
 
-	check("no falloff when weaker", Formulas.PowerGapFalloff(100, 1000) == 1)
-	check("no falloff when equal", Formulas.PowerGapFalloff(1000, 1000) == 1)
-	check("falloff when far stronger", Formulas.PowerGapFalloff(1e12, 1e3) < 0.5)
-	check("falloff never fully blocks", Formulas.PowerGapFalloff(1e30, 1) > 0)
+	-- Ability curves. The slam and the heavy are both meant to beat a single punch
+	-- contact and lose to a full punch combo, which is what makes them cooldown moves
+	-- rather than strictly better attacks.
+	check("slam beats one punch contact", Formulas.SlamDamage(1000) > Formulas.AttackDamage(1000))
+	check("slam scales with Arms", Formulas.SlamDamage(1e12) / Formulas.SlamDamage(1e6) == 1e6)
+	check("slam radius has a floor", Formulas.SlamRadius(0) == Formulas.BASE_SLAM_RADIUS)
+	check(
+		"slam radius is capped",
+		Formulas.SlamRadius(1e30) <= Formulas.BASE_SLAM_RADIUS + Formulas.MAX_SLAM_RADIUS_BONUS
+	)
+	check("slam is full strength at the epicentre", Formulas.SlamFalloff(0, 20) == 1)
+	check("slam misses past the rim", Formulas.SlamFalloff(21, 20) == 0)
+	check("slam is weakest at the rim", Formulas.SlamFalloff(19.99, 20) < 0.4)
+	check("slam falloff never inverts", Formulas.SlamFalloff(5, 20) > Formulas.SlamFalloff(15, 20))
+	check("slam falloff survives bad input", Formulas.SlamFalloff(0 / 0, 20) == 0)
+
+	-- Knockback is bounded at both ends at every scale. This is the invariant that
+	-- keeps a maxed player from launching somebody out of the world.
+	check("even fight knocks back mid-range", math.abs(Formulas.KnockbackSpeed(1000, 1000) - 90) < 1e-6)
+	check(
+		"stronger arms knock back harder",
+		Formulas.KnockbackSpeed(10000, 1000) > Formulas.KnockbackSpeed(1000, 1000)
+	)
+	check("knockback is capped", Formulas.KnockbackSpeed(1e30, 1) == Formulas.MAX_KNOCKBACK_SPEED)
+	check("knockback has a floor", Formulas.KnockbackSpeed(1, 1e30) == Formulas.MIN_KNOCKBACK_SPEED)
+
+	-- An active block always does something, and never everything.
+	check(
+		"even block eats the base share",
+		math.abs(Formulas.BlockReduction(1000, 1000) - Formulas.BASE_BLOCK_REDUCTION) < 1e-6
+	)
+	check(
+		"block still works when outmatched",
+		Formulas.BlockReduction(1, 1e30) >= Formulas.MIN_BLOCK_REDUCTION
+	)
+	check("block is never total immunity", Formulas.BlockReduction(1e30, 1) <= Formulas.MAX_BLOCK_REDUCTION)
+	check("more back blocks more", Formulas.BlockReduction(10000, 1000) > Formulas.BlockReduction(1000, 1000))
+
+	check("fresh block holds for the base seconds", Formulas.BlockMeter(0) == Formulas.BASE_BLOCK_SECONDS)
+	check("core lengthens the guard", Formulas.BlockMeter(1e6) > Formulas.BlockMeter(0))
+	check(
+		"guard length is capped",
+		Formulas.BlockMeter(1e30) <= Formulas.BASE_BLOCK_SECONDS + Formulas.MAX_BLOCK_SECONDS_BONUS
+	)
+	-- Absorbing costs the same share of the meter at every scale, so a guard survives
+	-- the same number of hits for a fresh player and a maxed one.
+	local freshDrain = Formulas.BlockDrainForAbsorbed(Formulas.MaxHealth(10) * 0.25, Formulas.MaxHealth(10))
+	local maxedDrain =
+		Formulas.BlockDrainForAbsorbed(Formulas.MaxHealth(1e12) * 0.25, Formulas.MaxHealth(1e12))
+	check("block drain is scale-free", math.abs(freshDrain - maxedDrain) < 1e-6)
+	check(
+		"one full bar empties the guard",
+		Formulas.BlockDrainForAbsorbed(100, 100) == Formulas.BLOCK_DAMAGE_DRAIN_SECONDS
+	)
+	check("no damage costs no meter", Formulas.BlockDrainForAbsorbed(0, 100) == 0)
+	check("block drain survives bad input", Formulas.BlockDrainForAbsorbed(0 / 0, 100) == 0)
 
 	check("total power sums", Formulas.TotalPower({ a = 2, b = 3 }) == 5)
 

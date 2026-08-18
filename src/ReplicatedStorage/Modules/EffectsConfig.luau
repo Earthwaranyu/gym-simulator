@@ -23,7 +23,7 @@ export type SoundSpec = {
 local EffectsConfig = {}
 
 EffectsConfig.Sounds = {
-	-- An exercise motion landing. Plays in time with the pose's RepInterval.
+	-- An exercise motion landing. TrainingGain fires it on the completed-rep beat.
 	Rep = { SoundId = "", Volume = 0.35, Pitch = 1, PitchJitter = 0.08 } :: SoundSpec,
 	-- You landed a punch.
 	Hit = { SoundId = "", Volume = 0.6, Pitch = 1, PitchJitter = 0.1 } :: SoundSpec,
@@ -31,6 +31,20 @@ EffectsConfig.Sounds = {
 	Hurt = { SoundId = "", Volume = 0.7, Pitch = 0.95, PitchJitter = 0.1 } :: SoundSpec,
 	-- Someone was knocked out.
 	Knockout = { SoundId = "", Volume = 0.8, Pitch = 1, PitchJitter = 0 } :: SoundSpec,
+	-- Ground Slam winding up: the crouch and the leap. Quiet and rising, so the
+	-- impact that follows has somewhere to come from.
+	SlamWindup = { SoundId = "", Volume = 0.5, Pitch = 0.9, PitchJitter = 0.05 } :: SoundSpec,
+	-- Ground Slam landing. The loudest thing in the game on purpose.
+	SlamImpact = { SoundId = "", Volume = 1, Pitch = 0.85, PitchJitter = 0.06 } :: SoundSpec,
+	-- Hard Punch connecting. Lower and heavier than Hit, which is the jab.
+	HeavyHit = { SoundId = "", Volume = 0.85, Pitch = 0.8, PitchJitter = 0.08 } :: SoundSpec,
+	-- A guard going up.
+	BlockRaise = { SoundId = "", Volume = 0.55, Pitch = 1.15, PitchJitter = 0.04 } :: SoundSpec,
+	-- A hit stopped by a guard. Jittered because it can happen several times a second.
+	BlockAbsorb = { SoundId = "", Volume = 0.6, Pitch = 1.05, PitchJitter = 0.12 } :: SoundSpec,
+	-- The guard shattering. Distinct from BlockAbsorb because it is the moment the
+	-- player has to react to, and it must not sound like one more absorbed hit.
+	BlockBreak = { SoundId = "", Volume = 0.9, Pitch = 0.95, PitchJitter = 0 } :: SoundSpec,
 	-- Crossed into a new rank.
 	RankUp = { SoundId = "", Volume = 0.9, Pitch = 1, PitchJitter = 0 } :: SoundSpec,
 	-- Bought a multiplier or a shop item.
