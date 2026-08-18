@@ -39,6 +39,21 @@ local EVENT_NAMES: { string } = {
 	-- Client -> server: Shift sprint began/ended. The server resolves the actual
 	-- speed from Legs; the client only reports the held-button intent.
 	"SprintChanged",
+	-- Client -> server: the guard went up / came down. Like SprintChanged, this
+	-- reports a held button and nothing else: BlockService owns the meter, decides
+	-- how much a guard actually stops, and drops it on its own when the meter runs
+	-- out, so a client holding this open forever gets one guard's worth of meter.
+	"BlockChanged",
+	-- Server -> client: this player's guard meter, as a fraction and a state. Sent
+	-- rather than derived because the drain depends on damage the client never sees
+	-- the inputs to.
+	"BlockState",
+	-- Client -> server: "I am dashing" / "I have stopped". The dash itself is the
+	-- client's, like flight; what the server owns is the collision group that stops
+	-- a dasher bulldozing anybody standing in the way. Granting nothing and lasting
+	-- a fraction of a second under a server-side timeout, so holding it open is not
+	-- worth anything.
+	"DashChanged",
 	-- Server -> client: combat feedback (hit landed, staggered, killed).
 	"CombatFeedback",
 	-- Server -> client: transient toast/notification text.
@@ -57,6 +72,10 @@ local EVENT_NAMES: { string } = {
 	"RosterChanged",
 	-- Server -> client: quest list with current progress.
 	"QuestsChanged",
+	-- Server -> client: which tier bosses are alive and how long until the rest return.
+	-- Pushed on every spawn and kill, and on a slow heartbeat, so a countdown on the
+	-- map stays honest without the client having to ask.
+	"BossStateChanged",
 	-- Server -> client: this player's resolved feature-flag values. Outcomes only —
 	-- never the rules, never another player's cohort.
 	"FlagsChanged",
@@ -69,8 +88,8 @@ local EVENT_NAMES: { string } = {
 local FUNCTION_NAMES: { string } = {
 	-- Client -> server: buy one multiplier level for a stat. Returns ok, message.
 	"PurchaseMultiplier",
-	-- Client -> server: buy a catalogue item with cash. Returns ok, message.
-	"PurchaseShopItem",
+	-- Client -> server: transform into the next ordered physique class. Returns ok, message.
+	"SelectPhysiqueClass",
 	-- Client -> server: prompt a Robux purchase by product id. Returns ok, message.
 	"PromptProduct",
 	-- Client -> server: the Robux catalogue for the shop screen. Returns a list of
@@ -90,6 +109,13 @@ local FUNCTION_NAMES: { string } = {
 	-- on. Streaming means most stations are absent from a client's Workspace, so this
 	-- is the only way the Train panel can say whether a machine across town is free.
 	"GetSpotStatus",
+	-- Client -> server: choose an exact stepped kg load for the current machine.
+	-- Returns ok, message. The server validates zone, step and muscle requirement.
+	"SetTrainingWeight",
+	-- Client -> server: opt an Auto Load owner in or out. Returns ok, message.
+	"SetAutoLoad",
+	-- Client -> server: equip one power-unlocked overhead title.
+	"SelectTitle",
 	-- Client -> server: every district's landing pad in world space, for the
 	-- travel map's pins. Streaming means the client cannot measure them itself.
 	"GetDestinations",

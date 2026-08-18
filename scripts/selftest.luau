@@ -20,8 +20,22 @@ local SUITES = {
 	{ Name = "NumberFormat", Module = require("../src/ReplicatedStorage/Modules/NumberFormat") },
 	{ Name = "AnalyticsSchema", Module = require("../src/ReplicatedStorage/Modules/AnalyticsSchema") },
 	{ Name = "FlagConfig", Module = require("../src/ReplicatedStorage/Modules/FlagConfig") },
+	{ Name = "AbilityConfig", Module = require("../src/ReplicatedStorage/Modules/AbilityConfig") },
 	{ Name = "PhysiqueConfig", Module = require("../src/ReplicatedStorage/Modules/PhysiqueConfig") },
+	{ Name = "BodyMeshConfig", Module = require("../src/ReplicatedStorage/Modules/BodyMeshConfig") },
+	{
+		Name = "MuscleDefinitionConfig",
+		Module = require("../src/ReplicatedStorage/Modules/MuscleDefinitionConfig"),
+	},
 	{ Name = "MapViewportMath", Module = require("../src/ReplicatedStorage/Modules/MapViewportMath") },
+	{ Name = "WeightConfig", Module = require("../src/ReplicatedStorage/Modules/WeightConfig") },
+	{ Name = "MuscleClassConfig", Module = require("../src/ReplicatedStorage/Modules/MuscleClassConfig") },
+	{
+		Name = "TokenMultiplierConfig",
+		Module = require("../src/ReplicatedStorage/Modules/TokenMultiplierConfig"),
+	},
+	{ Name = "QuestCycleConfig", Module = require("../src/ReplicatedStorage/Modules/QuestCycleConfig") },
+	{ Name = "Migrations", Module = require("../src/ServerScriptService/Core/_Migrations") },
 }
 
 local total = 0
