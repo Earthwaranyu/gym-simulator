@@ -234,6 +234,14 @@ Formulas.MAX_RUN_LEAN = 18
 Formulas.MIN_GAIT_BOB = 0.06
 Formulas.MAX_GAIT_BOB = 0.22
 
+-- How hard a landed hit reads, in three bands. Stated by the ability rather than derived
+-- from damage, and that is deliberate: for evenly matched players a jab is about two per
+-- cent of a health bar, so a damage-relative weight would put all three contacts of a
+-- combo in the same band and the combo would not escalate at all. Punch passes rising
+-- weights across its three contacts; a heavy passes one.
+Formulas.IMPACT_SOLID_WEIGHT = 0.4
+Formulas.IMPACT_CRUSHING_WEIGHT = 0.7
+
 -- Field-of-view widening at top speed, in degrees over the camera's resting value.
 -- Small on purpose: FOV is the cheapest speed cue there is and also the fastest way to
 -- make somebody motion-sick, and it is being applied for minutes at a time rather than
@@ -685,6 +693,27 @@ function Formulas.GaitBob(blend: number): number
 end
 
 --[[
+	Which of the three impact bands a hit belongs to.
+
+	Bands rather than a continuous scale because the effects differ in *kind* and not
+	only in size — a light hit has no camera shake at all, a crushing one has a hit-stop
+	and an impact frame — and "does this hit shake the screen" is not a thing to
+	interpolate. Kept here rather than as comparisons inside the effect controller so the
+	thresholds are one place.
+]]
+function Formulas.ImpactTier(weight: number): string
+	if not Formulas.IsFinite(weight) then
+		return "Light"
+	end
+	if weight >= Formulas.IMPACT_CRUSHING_WEIGHT then
+		return "Crushing"
+	elseif weight >= Formulas.IMPACT_SOLID_WEIGHT then
+		return "Solid"
+	end
+	return "Light"
+end
+
+--[[
 	Total power, the single number shown in the tab bar. Plain sum: it should climb
 	visibly with every rep, which a log or average would flatten.
 ]]
@@ -1003,6 +1032,18 @@ function Formulas.RunSelfTest(): { string }
 	-- against geometry still reports a fraction of a stud per second.
 	check("a standstill has no gait", Formulas.MIN_GAIT_SPEED > 0)
 	check("walking clears the gait threshold", Formulas.WalkSpeed(0) > Formulas.MIN_GAIT_SPEED)
+
+	-- The three impact bands, and the combo weights that have to land in them. Punch's
+	-- 0.3 / 0.45 / 0.8 is the whole of the escalation the player sees, so it is asserted
+	-- here rather than left to the ability file: a retune of either the thresholds or the
+	-- shares that flattened the combo would otherwise be silent.
+	check("a jab reads light", Formulas.ImpactTier(0.3) == "Light")
+	check("a cross reads solid", Formulas.ImpactTier(0.45) == "Solid")
+	check("a finisher reads crushing", Formulas.ImpactTier(0.8) == "Crushing")
+	check("a heavy reads crushing", Formulas.ImpactTier(1) == "Crushing")
+	check("a grazing hit reads light", Formulas.ImpactTier(0) == "Light")
+	check("the bands are ordered", Formulas.IMPACT_SOLID_WEIGHT < Formulas.IMPACT_CRUSHING_WEIGHT)
+	check("impact tiers survive bad input", Formulas.ImpactTier(0 / 0) == "Light")
 
 	check("total power sums", Formulas.TotalPower({ a = 2, b = 3 }) == 5)
 

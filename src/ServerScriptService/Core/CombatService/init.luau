@@ -34,6 +34,7 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local Types = require(ReplicatedStorage.Modules.Types)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local FlinchConfig = require(ReplicatedStorage.Modules.FlinchConfig)
 
 local SAFE_ZONE_TAG = "SafeZone"
 -- Killing the same victim again inside this window still works — griefing is the
@@ -44,6 +45,11 @@ local REPEAT_KILL_WINDOW = 120
 local VITALS_REFRESH_SECONDS = 1
 -- Generosity on the client's claimed range, to absorb latency.
 local RANGE_TOLERANCE = 1.35
+-- What a hit reads as when the ability does not say. Middling on purpose: an ability
+-- that has not been taught about impact weights should feel like a solid hit rather than
+-- like a graze or like a finisher.
+local DEFAULT_IMPACT = 0.5
+
 -- How long a knockback constraint pushes for. Short: this is an impulse, not a shove.
 -- Long enough to clear the ground and let the ragdoll-free Humanoid arc; short enough
 -- that a player is back in control before they have time to be annoyed about it.
@@ -480,21 +486,62 @@ end
 	kinds of combatant exist. Player targets fall straight through to ApplyDamage with
 	its full PvP rule set intact; everything else is routed to the provider that owns it.
 ]]
+--[[
+	Marks a victim as having just been hit, and how hard.
+
+	Stamped on the victim rather than sent to anybody, for the same reason a strike is
+	stamped on the attacker: everybody in the room needs it and nobody needs it
+	privately. Clients read it to play the flinch and the impact effect.
+
+	On the victim rather than the attacker is the important half. An attacker's swing
+	plays whether or not it connects — Punch stamps StrikeAt before it has any idea
+	whether there is a target — so an impact effect driven off the swing fires when
+	somebody punches empty air. A hit is something that happens to a body, so the body
+	that it happened to is what carries it.
+
+	A timestamp rather than a flag, so three contacts of a combo are three events.
+]]
+function CombatService:_markHit(model: Model, impact: number)
+	if not Formulas.IsFinite(impact) then
+		return
+	end
+	model:SetAttribute(FlinchConfig.HURT_IMPACT_ATTRIBUTE, math.clamp(impact, 0, 1))
+	model:SetAttribute(FlinchConfig.HURT_AT_ATTRIBUTE, workspace:GetServerTimeNow())
+end
+
 function CombatService:ApplyDamageToTarget(
 	attacker: Player,
 	target: Types.CombatTarget?,
-	rawDamage: number
+	rawDamage: number,
+	-- How hard this particular contact should read, 0 to 1. Stated by the ability
+	-- because damage cannot say it: a jab is around two per cent of an evenly matched
+	-- player's health, so weighting by damage would put every contact of a combo in the
+	-- same band and there would be no escalation to see. See Formulas.ImpactTier.
+	--
+	-- Optional, and defaulted, so every call site written before this existed still
+	-- compiles and still produces a reasonable hit.
+	impact: number?
 ): number
 	if target == nil then
 		return 0
 	end
+
+	local weight = impact or DEFAULT_IMPACT
 
 	if target.Kind == "Player" then
 		local victim = target.Player
 		if victim == nil then
 			return 0
 		end
-		return self:ApplyDamage(attacker, victim, rawDamage)
+		local dealt = self:ApplyDamage(attacker, victim, rawDamage)
+		local character = victim.Character
+		-- Only a hit that actually landed. A fully blocked or fully reflected hit is a
+		-- successful defence, and a victim who flinched at one would be reporting damage
+		-- they did not take.
+		if dealt > 0 and character ~= nil then
+			self:_markHit(character, weight)
+		end
+		return dealt
 	end
 
 	if not Formulas.IsFinite(rawDamage) or rawDamage <= 0 then
@@ -511,6 +558,9 @@ function CombatService:ApplyDamageToTarget(
 		if provider.Owns(target.Model) then
 			local damage, killed = provider.ApplyDamage(attacker, target.Model, rawDamage)
 			if damage > 0 then
+				-- Mobs flinch too. It costs one attribute write and the alternative is a
+				-- goblin that stands perfectly still while being beaten.
+				self:_markHit(target.Model, weight)
 				Net.Event("CombatFeedback"):FireClient(attacker, {
 					Kind = "Hit",
 					Damage = damage,

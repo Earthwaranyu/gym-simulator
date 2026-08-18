@@ -72,7 +72,14 @@ local Heavy: Types.Ability = {
 				return
 			end
 
-			combatService:ApplyDamageToTarget(attacker, target, baseDamage * Formulas.HARD_PUNCH_MULTIPLIER)
+			-- Full weight: one blow, and meant to be the hardest single thing a player
+			-- can throw without a cooldown measured in seconds.
+			combatService:ApplyDamageToTarget(
+				attacker,
+				target,
+				baseDamage * Formulas.HARD_PUNCH_MULTIPLIER,
+				1
+			)
 
 			-- Straight back, away from the puncher. Knockback lands whether or not the
 			-- damage did, on the same reasoning as the slam: a guard stops the harm,

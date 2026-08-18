@@ -1506,6 +1506,44 @@ punches for a whole phase, so the game had two answers to one question.
       `Formulas.RunLean` exactly, footfall and sprint effects spawning, and the gait
       standing down for flight, training and strikes and releasing to Roblox's idle.
 
+- [ ] 133. **The punch lands on somebody.** `Punch` was the only strike in the game with
+      no VFX at all, and the victim of one showed no sign of being hit — a number
+      appeared on their screen and their body did not move a joint. In a game whose hook
+      is interrupting somebody mid-training, the person being interrupted was the one
+      character in the fight not reacting.
+      The fix is architectural before it is cosmetic. Every effect until now hung off the
+      *actor* — a strike stamp, a guard, a flight state — but an attacker's swing is
+      stamped before the server knows whether it will connect, so anything driven off it
+      fires on a whiff. A Hard Punch thrown at empty air was already flashing a full
+      impact against nothing. `CombatService` now stamps the **victim** with `HurtAt` and
+      `HurtImpact` when damage actually lands, and impacts are driven from there;
+      `HeavyImpact` moved off the swing onto that path, and mobs are stamped too.
+      Escalation is an explicit weight rather than a function of damage, because for
+      evenly matched players a jab is about two per cent of a health bar and every
+      contact of a combo would have landed in the same band. `Punch` states 0.3 / 0.45 /
+      0.8 across its three contacts, a heavy states 1, and a slam states its own falloff.
+      `Formulas.ImpactTier` maps those to Light / Solid / Crushing, and the self-test
+      asserts the combo's mapping so a retune cannot silently flatten it.
+      `FlinchConfig` holds three victim poses, upper body only so a flinch never stops a
+      fleeing player's legs, blended in fast and out slow. `VfxConfig` gains a graded
+      `ImpactLight`/`Solid`/`Crushing` family and a new `Starburst` element — the manga
+      impact frame, a ring of camera-facing neon spikes, on the finisher only. Taking a
+      hit also pulses a screen vignette, deliberately a GUI frame rather than a
+      `Highlight`, because `StationHighlightController` already documents that Roblox
+      stops honouring Highlights past a few dozen and is using fourteen of them.
+      Whether a flinch interrupts your own swing turned out not to be expressible as a
+      controller priority: measured in Studio, a flinch stamped mid-swing won regardless.
+      So it is a stated rule — a crushing hit interrupts, a lighter one does not — which
+      is a better rule anyway, since "the flinch always loses" would have meant two
+      players fighting each other never visibly reacted at all.
+      `Punch` deliberately gains no knockback: contact range is 24 studs and the slowest
+      knockback is 40 studs a second, so shoving on the first contact would carry the
+      target out of reach of the other two and turn the combo into a one-hit move.
+      Verified live: punching air produces the swing and zero impact effects, the three
+      weights map to the three tiers with neck snaps of −6.9°/−16°/−30° and the starburst
+      only on the last, jabs and crosses lose to your own swing while a finisher
+      interrupts it, and a full combo peaks at 14 effect parts.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

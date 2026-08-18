@@ -103,10 +103,13 @@ local Slam: Types.Ability = {
 				-- the damage landed. Being shoved by a slam you fully blocked is
 				-- correct: the shockwave is physical and your guard stopped the harm,
 				-- not the force.
+				-- Falloff doubles as the impact weight, so being clipped by the rim of a
+				-- slam does not read the same as standing under it.
 				combatService:ApplyDamageToTarget(
 					attacker,
 					target,
-					baseDamage * Formulas.SLAM_DAMAGE_MULTIPLIER * falloff
+					baseDamage * Formulas.SLAM_DAMAGE_MULTIPLIER * falloff,
+					falloff
 				)
 
 				local back = if target.Player ~= nil then combatService:GetStat(target.Player, "Back") else 0

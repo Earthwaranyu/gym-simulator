@@ -267,11 +267,36 @@ export type TrailSpec = {
 	Lifetime: number,
 }
 
+--[[
+	The impact frame: a ring of thin spikes in a plane facing the camera, thrown outward
+	and gone in about an eighth of a second.
+
+	The manga starburst, and the one effect here that is purely a drawing rather than a
+	simulation of anything. Built from spikes because the honest alternative is a texture,
+	and a texture is an upload — the same constraint that produced the ForceField dome and
+	the primitive shockwave rings.
+
+	Camera-facing on purpose. A starburst is a 2D idea; laid flat in the world it reads as
+	a dinner plate from every angle except directly above.
+]]
+export type StarburstSpec = {
+	Kind: "Starburst",
+	Delay: number,
+	Seconds: number,
+	Count: number,
+	-- Studs, from the centre outward at full expansion.
+	Length: number,
+	Thickness: number,
+	StartScale: number,
+	Color: { number },
+}
+
 export type Element =
 	RingSpec
 	| FlashSpec
 	| ShardSpec
 	| BurstSpec
+	| StarburstSpec
 	| ShakeSpec
 	| HitStopSpec
 	| ScorchSpec
@@ -904,6 +929,168 @@ local effects: { Effect } = {
 				Color = DUST,
 				Gravity = 12,
 				Lifetime = NumberRange.new(0.35, 0.8),
+			},
+		},
+	},
+
+	--[[
+		A jab landing. Two elements, no shake, no flash, gone in a fifth of a second.
+
+		This is the cheapest effect in the game and it has to be, because it is also the
+		most frequent: the first contact of every combo thrown at anybody on screen. A
+		light hit that shook the camera would make a fistfight unplayable, and one that
+		lingered would eat the concurrency budget before the finisher it is building
+		toward ever got a slot.
+	]]
+	{
+		Id = "ImpactLight",
+		Radius = 2.2,
+		CullDistance = 110,
+		Elements = {
+			{
+				Kind = "Burst" :: "Burst",
+				Delay = 0,
+				Seconds = 0.16,
+				Texture = SPARK,
+				Count = 6,
+				Speed = NumberRange.new(12, 24),
+				Size = NumberRange.new(0.25, 0.55),
+				Spread = 60,
+				Color = IMPACT,
+				Gravity = 18,
+				Lifetime = NumberRange.new(0.12, 0.22),
+			},
+			{
+				Kind = "Flash" :: "Flash",
+				Delay = 0,
+				Seconds = 0.05,
+				StartScale = 0.15,
+				EndScale = 0.6,
+				Color = IMPACT_HOT,
+				Easing = "Snap" :: "Snap",
+			},
+		},
+	},
+
+	--[[
+		A cross landing. The first hit that touches the camera at all — a small, short
+		shake, and a ring so there is something with an edge to it.
+	]]
+	{
+		Id = "ImpactSolid",
+		Radius = 3,
+		CullDistance = 160,
+		Elements = {
+			{
+				Kind = "Shake" :: "Shake",
+				Delay = 0,
+				Seconds = 0.14,
+				Amplitude = 0.28,
+				Roughness = 34,
+				FalloffRadius = 45,
+			},
+			{
+				Kind = "Flash" :: "Flash",
+				Delay = 0,
+				Seconds = 0.07,
+				StartScale = 0.2,
+				EndScale = 0.9,
+				Color = IMPACT_HOT,
+				Easing = "Snap" :: "Snap",
+			},
+			{
+				Kind = "Ring" :: "Ring",
+				Delay = 0.01,
+				Seconds = 0.18,
+				StartScale = 0.15,
+				EndScale = 1.1,
+				Thickness = 0.35,
+				Height = 0.07,
+				Color = IMPACT,
+				StartTransparency = 0.3,
+				Easing = "Out" :: "Out",
+			},
+			{
+				Kind = "Burst" :: "Burst",
+				Delay = 0,
+				Seconds = 0.3,
+				Texture = SPARK,
+				Count = 12,
+				Speed = NumberRange.new(16, 34),
+				Size = NumberRange.new(0.3, 0.7),
+				Spread = 58,
+				Color = IMPACT,
+				Gravity = 22,
+				Lifetime = NumberRange.new(0.16, 0.3),
+			},
+		},
+	},
+
+	--[[
+		The finisher, and anything else that hits like one.
+
+		Everything the lighter two withhold, arriving at once: the impact frame, a beat of
+		hit-stop, a real shake. The escalation is the whole design — a combo where all
+		three contacts looked the same would be three jabs rather than a combo, and the
+		reason the first two are so restrained is so that this one has somewhere to land.
+	]]
+	{
+		Id = "ImpactCrushing",
+		Radius = 4,
+		CullDistance = 220,
+		Elements = {
+			{ Kind = "HitStop" :: "HitStop", Delay = 0, Seconds = 0.045, TimeScale = 0.3 },
+			{
+				Kind = "Shake" :: "Shake",
+				Delay = 0,
+				Seconds = 0.24,
+				Amplitude = 0.62,
+				Roughness = 30,
+				FalloffRadius = 65,
+			},
+			{
+				Kind = "Flash" :: "Flash",
+				Delay = 0,
+				Seconds = 0.08,
+				StartScale = 0.25,
+				EndScale = 1.1,
+				Color = IMPACT_HOT,
+				Easing = "Snap" :: "Snap",
+			},
+			{
+				Kind = "Starburst" :: "Starburst",
+				Delay = 0,
+				Seconds = 0.13,
+				Count = 9,
+				Length = 4.2,
+				Thickness = 0.16,
+				StartScale = 0.25,
+				Color = IMPACT_HOT,
+			},
+			{
+				Kind = "Ring" :: "Ring",
+				Delay = 0.01,
+				Seconds = 0.22,
+				StartScale = 0.15,
+				EndScale = 1.4,
+				Thickness = 0.45,
+				Height = 0.08,
+				Color = HEAVY,
+				StartTransparency = 0.2,
+				Easing = "Out" :: "Out",
+			},
+			{
+				Kind = "Burst" :: "Burst",
+				Delay = 0,
+				Seconds = 0.35,
+				Texture = SPARK,
+				Count = 20,
+				Speed = NumberRange.new(22, 46),
+				Size = NumberRange.new(0.3, 0.8),
+				Spread = 62,
+				Color = IMPACT,
+				Gravity = 24,
+				Lifetime = NumberRange.new(0.18, 0.38),
 			},
 		},
 	},

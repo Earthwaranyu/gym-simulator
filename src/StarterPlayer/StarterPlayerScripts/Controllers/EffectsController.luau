@@ -6,9 +6,8 @@
 	modified to make noise. Entries with a blank SoundId are skipped, which is why the
 	game is silent but functional until real asset ids are pasted into EffectsConfig.
 
-	Exercise-motion sounds are generated locally from the pose's own RepInterval. The
-	server's stat award is deliberately independent and lands once per second; varied
-	animation pace should sound natural without changing progression cadence.
+	The authoritative TrainingGain event lands on the completed-rep beat. It drives
+	both the popup and rep sound, so neither can drift away from the procedural pose.
 ]]
 
 local Players = game:GetService("Players")
@@ -21,7 +20,6 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
 local EffectsConfig = require(ReplicatedStorage.Modules.EffectsConfig)
-local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local Icons = require(ReplicatedStorage.Modules.Icons)
@@ -35,14 +33,34 @@ local EffectsController = {
 }
 
 local ProfileController: any = nil
-local TrainingController: any = nil
 local CombatController: any = nil
 local ToastController: any = nil
 
-local lastRepSoundAt = 0
 local lastRankId: string? = nil
 local damageLayer: Frame? = nil
-local activeTrainingGain: BillboardGui? = nil
+local hurtVignette: Frame? = nil
+-- Training payouts rise as a short stream rather than one card replacing the last.
+--
+-- Destroying the previous card on every tick meant a fast machine showed a number that
+-- never finished its own animation: the rep landed, the card appeared, and the next rep
+-- deleted it mid-fade. Nothing accumulated on screen, which is exactly the sense of
+-- momentum the number exists to give. Each card now lives out its GAIN_LIFETIME and the
+-- older ones are already well up and half-faded by the time a new one starts, so they
+-- read as a rising column rather than as the overlapping pile the old comment warned
+-- about. The cap is what keeps that true — past four the column is a wall.
+local GAIN_STACK_LIMIT = 4
+local activeTrainingGains: { BillboardGui } = {}
+
+-- How long one card lives, and how that time is spent. Long enough to read at a
+-- glance, and the hold is what makes the fade feel deliberate rather than immediate:
+-- the number is fully opaque while you look at it, then goes.
+local GAIN_LIFETIME = 1.15
+local GAIN_FADE_IN = 0.12
+local GAIN_HOLD = 0.5
+
+-- How long the hurt vignette takes to fade. Short: it is a warning, and one that
+-- outstayed its welcome would be a permanent red frame in any real fight.
+local HURT_FLASH_SECONDS = 0.34
 
 --[[
 	Plays a configured sound, or does nothing if it has no asset id yet.
@@ -82,35 +100,187 @@ end
 	Floating damage number at the centre of the screen. Cheap stand-in for world-space
 	numbers, and readable regardless of where the target is.
 ]]
-function EffectsController:_showDamage(amount: number, color: Color3, dealt: boolean?)
+--[[
+	Pulses the hurt vignette, at a strength set by how much of your health that hit took.
+
+	Scaled against max health rather than against an absolute number, so it means the
+	same thing at every point on the progression curve: a quarter of your bar looks like
+	a quarter of your bar whether that is 25 damage or 25 billion.
+]]
+function EffectsController:_flashHurt(damage: number)
+	local vignette = hurtVignette
+	if vignette == nil then
+		return
+	end
+
+	local humanoid = nil
+	local character = Players.LocalPlayer.Character
+	if character ~= nil then
+		humanoid = character:FindFirstChildOfClass("Humanoid")
+	end
+	local maxHealth = if humanoid ~= nil and humanoid.MaxHealth > 0 then humanoid.MaxHealth else 100
+	local share = math.clamp(damage / maxHealth, 0, 1)
+
+	-- A floor, because a hit that barely scratched you still has to register — the
+	-- number alone is easy to miss when you are looking at the person throwing it.
+	local peak = 0.62 - 0.42 * math.min(1, share * 3)
+	vignette.BackgroundTransparency = peak
+	TweenService:Create(
+		vignette,
+		TweenInfo.new(HURT_FLASH_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ BackgroundTransparency = 1 }
+	):Play()
+end
+
+function EffectsController:_showDamage(amount: number, color: Color3, dealt: boolean?, reflected: boolean?)
 	local layer = damageLayer
 	if layer == nil then
 		return
 	end
 
-	-- Damage you dealt rises on one side of the crosshair, damage you took on the
-	-- other. They used to share the middle, which in a two-way fight produced one
-	-- unreadable pile of numbers with no way to tell whose was whose.
+	-- A large anime-style pop: it overshoots on entry, hangs fully readable, then
+	-- accelerates upward while fading. Direction still separates dealt/taken damage.
 	local side = if dealt then 0.62 else 0.38
-	local label = UI.Label("Damage", layer)
-	label.AnchorPoint = Vector2.new(0.5, 0.5)
-	label.Position = UDim2.fromScale(side + (math.random() - 0.5) * 0.06, 0.44)
-	label.Size = UDim2.fromOffset(160, 34)
+	local group = Instance.new("CanvasGroup")
+	group.Name = "AnimeDamage"
+	group.AnchorPoint = Vector2.new(0.5, 0.5)
+	group.Position = UDim2.fromScale(side + (math.random() - 0.5) * 0.04, 0.43)
+	group.Size = UDim2.fromOffset(340, 112)
+	group.BackgroundTransparency = 1
+	group.GroupTransparency = 1
+	group.Rotation = if dealt then math.random(-7, 2) else math.random(-2, 7)
+	group.Parent = layer
+
+	local scale = Instance.new("UIScale")
+	scale.Scale = 0.42
+	scale.Parent = group
+
+	-- Eight cheap radial speed lines sell the impact without an imported texture.
+	-- They expand during the number's overshoot and disappear before the readable hold.
+	for index = 1, 8 do
+		local streak = Instance.new("Frame")
+		streak.Name = `ImpactLine{index}`
+		streak.AnchorPoint = Vector2.new(0.5, 0.5)
+		streak.Position = UDim2.fromScale(0.5, 0.5)
+		streak.Size = UDim2.fromOffset(if reflected then 150 else 112, if index % 2 == 0 then 4 else 2)
+		streak.BackgroundColor3 = if reflected then UI.Palette.FightToken else color
+		streak.BackgroundTransparency = 0.18
+		streak.BorderSizePixel = 0
+		streak.Rotation = index * 45 + math.random(-7, 7)
+		streak.ZIndex = 1
+		streak.Parent = group
+		TweenService:Create(streak, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+			Size = UDim2.fromOffset(if reflected then 255 else 205, 1),
+			BackgroundTransparency = 1,
+		}):Play()
+	end
+
+	local shadow = UI.Label("Shadow", group)
+	shadow.Position = UDim2.fromOffset(5, 7)
+	shadow.Size = UDim2.fromScale(1, 1)
+	shadow.Font = UI.Font.Numeric
+	shadow.TextSize = if reflected then 58 else 52
+	shadow.TextXAlignment = Enum.TextXAlignment.Center
+	shadow.TextColor3 = UI.Palette.CartoonInk
+	shadow.TextTransparency = 0.1
+	shadow.Text = `-{NumberFormat.Format(amount)}`
+	shadow.ZIndex = 2
+
+	local label = UI.Label("Damage", group)
+	label.Size = UDim2.fromScale(1, 1)
 	label.Font = UI.Font.Numeric
-	label.TextSize = if dealt then 22 else 26
+	label.TextSize = if reflected then 58 else 52
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextColor3 = color
-	label.TextStrokeTransparency = 0.4
+	label.TextStrokeColor3 = UI.Palette.CartoonInk
+	label.TextStrokeTransparency = 0.05
 	label.Text = `-{NumberFormat.Format(amount)}`
+	label.ZIndex = 3
 
-	local info =
-		TweenInfo.new(EffectsConfig.DAMAGE_NUMBER_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	if reflected then
+		local flash = Instance.new("Frame")
+		flash.Name = "ReflectionFlash"
+		flash.Size = UDim2.fromScale(1, 1)
+		flash.BackgroundColor3 = UI.Palette.FightToken
+		flash.BackgroundTransparency = 0.84
+		flash.BorderSizePixel = 0
+		flash.ZIndex = 1
+		flash.Parent = layer
+		local fade = TweenService:Create(flash, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+			BackgroundTransparency = 1,
+		})
+		fade.Completed:Connect(function()
+			flash:Destroy()
+		end)
+		fade:Play()
+	end
+
+	local pop =
+		TweenService:Create(scale, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Scale = 1.18,
+		})
+	local appear = TweenService:Create(group, TweenInfo.new(0.07, Enum.EasingStyle.Quad), {
+		GroupTransparency = 0,
+	})
+	pop:Play()
+	appear:Play()
+
+	task.delay(0.12, function()
+		if group.Parent == nil then
+			return
+		end
+		TweenService:Create(scale, TweenInfo.new(0.11, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Scale = 1,
+		}):Play()
+	end)
+
+	task.delay(0.48, function()
+		if group.Parent == nil then
+			return
+		end
+		local exit = TweenService:Create(
+			group,
+			TweenInfo.new(0.62, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+			{
+				Position = group.Position - UDim2.fromOffset(if dealt then 34 else -34, 112),
+				GroupTransparency = 1,
+				Rotation = group.Rotation + (if dealt then -8 else 8),
+			}
+		)
+		exit.Completed:Connect(function()
+			group:Destroy()
+		end)
+		exit:Play()
+	end)
+end
+
+-- A short combat explanation beneath the damage number. Ratio defenses are
+-- intentionally dramatic, so the player must be told whether Back blocked the hit
+-- or Core returned it instead of seeing a mysterious zero.
+function EffectsController:_showCombatText(text: string, color: Color3, dealt: boolean?)
+	local layer = damageLayer
+	if layer == nil then
+		return
+	end
+
+	local side = if dealt then 0.62 else 0.38
+	local label = UI.Label("CombatBreakdown", layer)
+	label.AnchorPoint = Vector2.new(0.5, 0.5)
+	label.Position = UDim2.fromScale(side, 0.5)
+	label.Size = UDim2.fromOffset(230, 28)
+	label.Font = UI.Font.Heading
+	label.TextSize = 13
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextColor3 = color
+	label.TextStrokeTransparency = 0.35
+	label.Text = text
+
+	local info = TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local rise = TweenService:Create(label, info, {
-		Position = label.Position - UDim2.fromOffset(0, EffectsConfig.DAMAGE_NUMBER_RISE * 10),
+		Position = label.Position - UDim2.fromOffset(0, 24),
 		TextTransparency = 1,
 		TextStrokeTransparency = 1,
 	})
-
 	rise.Completed:Connect(function()
 		label:Destroy()
 	end)
@@ -133,25 +303,28 @@ function EffectsController:_showTrainingGain(payload: Types.TrainingGain)
 	local color = if definition ~= nil then definition.Color else UI.Palette.Accent
 	local iconName = if definition ~= nil then definition.Icon else "Train"
 
-	-- Stat ticks are a status readout, not a combat-number pile. Replace the previous
-	-- card before drawing the next one so Heartbeat jitter can never leave two muscle
-	-- gains occupying the same space.
-	local previous = activeTrainingGain
-	activeTrainingGain = nil
-	if previous ~= nil then
-		previous:Destroy()
+	-- Evict from the front: the oldest card is the one furthest up and faintest, so
+	-- losing it costs the least.
+	while #activeTrainingGains >= GAIN_STACK_LIMIT do
+		local oldest = table.remove(activeTrainingGains, 1)
+		if oldest ~= nil and oldest.Parent ~= nil then
+			oldest:Destroy()
+		end
 	end
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "TrainingGain"
 	billboard.Adornee = head
-	billboard.Size = UDim2.fromOffset(310, 66)
-	billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.25, 0)
+	billboard.Size = UDim2.fromOffset(270, 66)
+	-- Keep the changing payout beside the avatar instead of directly over the head.
+	-- The bottom HUD card owns the persistent total; this is the quick side pop shown
+	-- on each completed rep.
+	billboard.StudsOffsetWorldSpace = Vector3.new(-3.6, 2.35, 0)
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 110
 	billboard.LightInfluence = 0
 	billboard.Parent = head
-	activeTrainingGain = billboard
+	table.insert(activeTrainingGains, billboard)
 
 	local card = Instance.new("CanvasGroup")
 	card.Name = "Card"
@@ -200,9 +373,9 @@ function EffectsController:_showTrainingGain(payload: Types.TrainingGain)
 	amount.Font = UI.Font.Numeric
 	amount.TextSize = 23
 	amount.TextColor3 = color
-	amount.TextStrokeColor3 = Color3.new(0, 0, 0)
+	amount.TextStrokeColor3 = UI.Palette.CartoonInk
 	amount.TextStrokeTransparency = 0.35
-	amount.Text = `+{NumberFormat.Format(payload.Amount)} {displayName}`
+	amount.Text = `+{NumberFormat.FormatGain(payload.Amount)} {displayName}`
 
 	local rate = UI.Label("Rate", card)
 	rate.Position = UDim2.fromOffset(63, 35)
@@ -212,39 +385,88 @@ function EffectsController:_showTrainingGain(payload: Types.TrainingGain)
 	rate.TextColor3 = UI.Palette.TextMuted
 	if payload.ComboGoal > 0 then
 		if payload.ComboMultiplier > 1 then
-			rate.Text = `{NumberFormat.Format(payload.PerSecond)} / SEC  ·  FULL SET ×{NumberFormat.Format(
-				payload.ComboMultiplier
-			)}`
+			rate.Text =
+				`{NumberFormat.FormatGain(payload.PerSecond)} / SEC  ·  FULL SET ×{NumberFormat.Format(
+					payload.ComboMultiplier
+				)}`
 		else
 			rate.Text =
-				`{NumberFormat.Format(payload.PerSecond)} / SEC  ·  SET {payload.Combo}/{payload.ComboGoal}`
+				`{NumberFormat.FormatGain(payload.PerSecond)} / SEC  ·  SET {payload.Combo}/{payload.ComboGoal}`
 		end
 	else
-		rate.Text = `{NumberFormat.Format(payload.PerSecond)} / SEC  ·  BASE TRAINING`
+		rate.Text = `{NumberFormat.FormatGain(payload.PerSecond)} / SEC  ·  BASE TRAINING`
 	end
 
-	-- Finish comfortably before the next one-second server tick. Replacement above is
-	-- still the hard guarantee when network packets arrive unusually close together.
-	local info = TweenInfo.new(0.78, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local rise = TweenService:Create(card, info, {
-		Position = UDim2.fromScale(0.5, 0.18),
-		GroupTransparency = 1,
-	})
+	-- Driven on a clock rather than by TweenService, which is worth the extra lines.
+	--
+	-- The obvious version is three tweens: fade in, rise, then a fade out with a
+	-- DelayTime so the number holds at full opacity before it goes. That does not
+	-- work. A tween reads its start value when it is played, not when it begins
+	-- moving, and playing a second tween on a property cancels the first — so the
+	-- delayed fade-out captured "transparency 1" from the fade-in that had barely
+	-- started, cancelled it, and then spent its whole life interpolating 1 to 1. The
+	-- card never appeared and never cleaned itself up. Measured, not guessed: five
+	-- cards sat at transparency 1.00 above the player's head for as long as I watched.
+	--
+	-- One clock, three curves read off it, and a guaranteed end.
+	local born = os.clock()
+	local fadeInEnd = GAIN_FADE_IN / GAIN_LIFETIME
+	local holdEnd = (GAIN_FADE_IN + GAIN_HOLD) / GAIN_LIFETIME
+	local startY, endY = 0.58, 0.12
 
-	rise.Completed:Connect(function()
-		if activeTrainingGain == billboard then
-			activeTrainingGain = nil
+	local ticking: RBXScriptConnection? = nil
+	local function finish()
+		if ticking ~= nil then
+			ticking:Disconnect()
+			ticking = nil
+		end
+		local index = table.find(activeTrainingGains, billboard)
+		if index ~= nil then
+			table.remove(activeTrainingGains, index)
 		end
 		if billboard.Parent ~= nil then
 			billboard:Destroy()
 		end
+	end
+
+	card.GroupTransparency = 1
+	-- Heartbeat, not RenderStepped. Every other per-frame loop in this codebase runs
+	-- on Heartbeat or PreSimulation, and RenderStepped is refused outright in some
+	-- client contexts — a card whose animation never ticks is a card that never fades
+	-- and never cleans itself up, which is the failure this whole rewrite is fixing.
+	ticking = RunService.Heartbeat:Connect(function()
+		if billboard.Parent == nil then
+			finish()
+			return
+		end
+
+		local progress = (os.clock() - born) / GAIN_LIFETIME
+		if progress >= 1 then
+			finish()
+			return
+		end
+
+		-- Cubic ease-out on the climb: quick off the head, drifting by the end.
+		local eased = 1 - (1 - progress) ^ 3
+		card.Position = UDim2.fromScale(0.5, startY + (endY - startY) * eased)
+
+		if progress < fadeInEnd then
+			-- In.
+			card.GroupTransparency = 1 - progress / fadeInEnd
+		elseif progress < holdEnd then
+			-- Held fully opaque, which is what makes the fade afterwards read as
+			-- deliberate rather than as the card being cut off.
+			card.GroupTransparency = 0
+		else
+			-- Out, linearly. An eased fade spends most of its time nearly invisible,
+			-- which is the abruptness this replaced.
+			card.GroupTransparency = (progress - holdEnd) / (1 - holdEnd)
+		end
 	end)
-	rise:Play()
 end
 
 function EffectsController:Init()
 	ProfileController = Loader.Get("ProfileController")
-	TrainingController = Loader.Get("TrainingController")
 	CombatController = Loader.Get("CombatController")
 	ToastController = Loader.Get("ToastController")
 end
@@ -258,6 +480,42 @@ function EffectsController:_build()
 	screen.IgnoreGuiInset = true
 	screen.DisplayOrder = 20
 	screen.Parent = playerGui
+
+	--[[
+		The red edge that pulses when you take a hit.
+
+		A GUI frame rather than a Highlight on the body, and deliberately.
+		StationHighlightController's header already documents why: Highlight is a real
+		per-instance renderer cost and Roblox stops honouring them past a few dozen, and
+		that controller is already using up to fourteen. A hit flash competing for that
+		budget would silently stop appearing in exactly the crowded fight where it
+		matters most. A frame costs nothing and reads faster than an outline anyway.
+
+		Behind the damage numbers, and never interactive.
+	]]
+	local vignette = Instance.new("Frame")
+	vignette.Name = "HurtVignette"
+	vignette.BackgroundColor3 = EffectsConfig.HurtColor
+	vignette.BackgroundTransparency = 1
+	vignette.BorderSizePixel = 0
+	vignette.Size = UDim2.fromScale(1, 1)
+	vignette.ZIndex = 0
+	vignette.Active = false
+	vignette.Parent = screen
+
+	local gradient = Instance.new("UIGradient")
+	-- Transparent through the middle and solid at both edges, so the colour sits around
+	-- the frame instead of washing the whole screen red — a full-screen tint hides the
+	-- person hitting you, which is the one thing you need to see.
+	gradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.28, 1),
+		NumberSequenceKeypoint.new(0.72, 1),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	gradient.Parent = vignette
+
+	hurtVignette = vignette
 
 	local layer = Instance.new("Frame")
 	layer.Name = "Damage"
@@ -284,6 +542,7 @@ function EffectsController:Start()
 		then
 			return
 		end
+		self:Play("Rep")
 		self:_showTrainingGain(payload)
 	end)
 
@@ -296,12 +555,41 @@ function EffectsController:Start()
 		-- a text log in the top-left corner, which is the one place a player in a fight
 		-- is not looking; the corner is the minimap's, and the number belongs where the
 		-- fight is.
-		if payload.Kind == "Hit" then
-			self:Play("Hit")
-			self:_showDamage(payload.Damage or 0, EffectsConfig.HitColor, true)
-		elseif payload.Kind == "Hurt" then
-			self:Play("Hurt")
-			self:_showDamage(payload.Damage or 0, EffectsConfig.HurtColor, false)
+		local damage = if type(payload.Damage) == "number" then math.max(0, payload.Damage) else 0
+		local blocked = if type(payload.Blocked) == "number" then math.max(0, payload.Blocked) else 0
+		local reflected = if type(payload.Reflected) == "number" then math.max(0, payload.Reflected) else 0
+		local dealt = payload.Kind == "Hit"
+
+		if payload.Kind == "Hit" or payload.Kind == "Hurt" then
+			-- Reflection is intentionally explained with words only. Showing the returned
+			-- amount as a second giant damage number made one punch look like two ordinary
+			-- hits and obscured which player actually threw it.
+			if damage > 0 and payload.IsReflection ~= true then
+				self:Play(if dealt then "Hit" else "Hurt")
+				if not dealt then
+					self:_flashHurt(damage)
+				end
+				self:_showDamage(
+					damage,
+					if dealt then EffectsConfig.HitColor else EffectsConfig.HurtColor,
+					dealt
+				)
+			end
+
+			if payload.IsReflection == true then
+				self:_showCombatText("CORE RETURN", UI.Palette.FightToken, dealt)
+			elseif blocked > 0 or reflected > 0 then
+				local pieces: { string } = {}
+				if blocked > 0 then
+					table.insert(pieces, `{NumberFormat.Format(blocked)} BLOCKED`)
+				end
+				if reflected > 0 then
+					table.insert(pieces, "REFLECTED")
+				end
+				self:_showCombatText(table.concat(pieces, "  ·  "), UI.Palette.FightToken, dealt)
+			elseif damage <= 0 then
+				self:_showCombatText("NO DAMAGE", UI.Palette.TextMuted, dealt)
+			end
 		elseif payload.Kind == "Blocked" or payload.Kind == "Rejected" then
 			-- A refusal is a sentence, not a number: "they are in a safe zone" has to
 			-- be read, so it goes to the toast strip rather than over the crosshair.
@@ -321,25 +609,6 @@ function EffectsController:Start()
 			self:Play("RankUp")
 		end
 		lastRankId = rank.Id
-	end)
-
-	-- Rep ticks, paced locally from the machine's own interval.
-	RunService.Heartbeat:Connect(function()
-		local state = TrainingController:GetState()
-		if state.StationId == nil then
-			return
-		end
-
-		local definition = EquipmentConfig.Get(state.StationId)
-		if definition == nil then
-			return
-		end
-
-		local now = os.clock()
-		if now - lastRepSoundAt >= definition.RepInterval then
-			lastRepSoundAt = now
-			self:Play("Rep")
-		end
 	end)
 end
 

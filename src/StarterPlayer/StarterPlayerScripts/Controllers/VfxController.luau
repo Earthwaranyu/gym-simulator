@@ -20,6 +20,7 @@
 	death cannot leak.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +30,8 @@ local TweenService = game:GetService("TweenService")
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
+local FlinchConfig = require(ReplicatedStorage.Modules.FlinchConfig)
+local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
 local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local VfxConfig = require(ReplicatedStorage.Modules.VfxConfig)
@@ -51,6 +54,9 @@ local BLOCKING_ATTRIBUTE = "Blocking"
 -- Rough drop from a HumanoidRootPart to the floor. The same constant GroundSlam uses
 -- server-side to pick its epicentre, so the crater appears where the damage happened.
 local ROOT_TO_FLOOR = 3
+-- How far above the root an impact sits. Roughly chest height on an R15 rig: a hit
+-- centred on the HumanoidRootPart reads as landing on the hips.
+local IMPACT_CHEST_RISE = 1.2
 
 -- Past this many simultaneous effects, new ones are dropped. A six-player brawl can
 -- ask for a slam, two heavies and three guards inside a second, and the frame that
@@ -179,6 +185,55 @@ local function playFlash(spec: VfxConfig.FlashSpec, origin: CFrame, radius: numb
 	}):Play()
 
 	Debris:AddItem(part, spec.Seconds + 0.1)
+end
+
+--[[
+	The impact frame: spikes thrown outward in a plane facing the camera.
+
+	Oriented against the camera once, at spawn, rather than followed per frame. It lives
+	for an eighth of a second — long enough for a player to turn far enough to notice
+	would be several times that — and a per-frame connection for every spike of every
+	finisher in a brawl is a cost with nothing to show for it.
+]]
+local function playStarburst(spec: VfxConfig.StarburstSpec, origin: CFrame)
+	local camera = workspace.CurrentCamera
+	local facing = if camera ~= nil then CFrame.lookAt(origin.Position, camera.CFrame.Position) else origin
+	local parent = ensureContainer()
+	local tint = color(spec.Color)
+
+	for index = 1, spec.Count do
+		-- Jittered off the even division, so the burst reads as debris rather than as a
+		-- clock face. Alternating lengths give it the ragged silhouette a manga impact
+		-- has; every spike the same length reads as a gear.
+		local angle = (index / spec.Count) * math.pi * 2 + (math.random() - 0.5) * 0.3
+		local length = spec.Length * (if index % 2 == 0 then 0.62 else 1) * (0.8 + math.random() * 0.4)
+
+		local part = effectPart("Starburst")
+		part.Material = Enum.Material.Neon
+		part.Color = tint
+		part.Transparency = 0.1
+		part.Size = Vector3.new(spec.Thickness, length * spec.StartScale, spec.Thickness)
+
+		-- Built along the spike's own axis and pushed out by half its length, so it
+		-- grows outward from the centre instead of through it.
+		local function frameAt(scale: number): CFrame
+			return facing * CFrame.Angles(0, 0, angle) * CFrame.new(0, length * scale * 0.5, 0)
+		end
+		part.CFrame = frameAt(spec.StartScale)
+		part.Parent = parent
+
+		local tween = TweenService:Create(
+			part,
+			TweenInfo.new(spec.Seconds, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+			{
+				Size = Vector3.new(spec.Thickness * 0.3, length, spec.Thickness * 0.3),
+				CFrame = frameAt(1),
+				Transparency = 1,
+			}
+		)
+		tween:Play()
+		Debris:AddItem(part, spec.Seconds + 0.1)
+	end
 end
 
 --[[
@@ -862,6 +917,8 @@ function VfxController:Play(
 				playRing(element, origin, size)
 			elseif element.Kind == "Flash" then
 				playFlash(element, origin, size)
+			elseif element.Kind == "Starburst" then
+				playStarburst(element, origin)
 			elseif element.Kind == "Shards" then
 				playShards(element, origin, size, ignore)
 			elseif element.Kind == "Burst" then
@@ -899,8 +956,11 @@ end
 	character can be mid-rig-swap when a strike lands, and a nil here would silently
 	drop the trail rather than putting it somewhere approximately right.
 ]]
-local function handOf(character: Model): BasePart?
-	for _, name in { "RightHand", "Right Arm", "RightLowerArm" } do
+local function handOf(character: Model, side: string?): BasePart?
+	local names: { string } = if side == "LeftHand"
+		then { "LeftHand", "Left Arm", "LeftLowerArm" }
+		else { "RightHand", "Right Arm", "RightLowerArm" }
+	for _, name in names do
 		local part = character:FindFirstChild(name)
 		if part ~= nil and part:IsA("BasePart") then
 			return part
@@ -939,8 +999,8 @@ function VfxController:_playStrike(character: Model, strikeId: string)
 					if type(radius) == "number" then radius else nil,
 					character
 				)
-			elseif attach == "RightHand" then
-				local hand = handOf(character) or root
+			elseif attach == "RightHand" or attach == "LeftHand" then
+				local hand = handOf(character, attach) or root
 				self:Play(scheduled.Effect, CFrame.new(hand.Position), hand, nil, character)
 			else
 				self:Play(scheduled.Effect, root.CFrame, root, nil, character)
@@ -978,6 +1038,44 @@ function VfxController:_watch(character: Model)
 			end
 		else
 			dropGuard(character)
+		end
+	end)
+
+	--[[
+		Being hit. The one effect in this file driven by something happening *to* a
+		character rather than something they did.
+
+		Every other effect hangs off the actor: a strike stamp, a guard going up, a
+		flight state. Impacts cannot, because an attacker's swing is stamped before the
+		server knows whether it will connect — a heavy thrown at empty air used to
+		produce a full impact flash against nothing. The server stamps the victim
+		instead, only when damage actually lands, and this is where that arrives.
+
+		Placed at the chest rather than at the attacker's fist. The fist has already
+		moved on by the time the attribute replicates, and the hit belongs to the body
+		that took it.
+	]]
+	character:GetAttributeChangedSignal(FlinchConfig.HURT_AT_ATTRIBUTE):Connect(function()
+		if type(character:GetAttribute(FlinchConfig.HURT_AT_ATTRIBUTE)) ~= "number" then
+			return
+		end
+		local root = rootOf(character)
+		if root == nil then
+			return
+		end
+
+		local weight = character:GetAttribute(FlinchConfig.HURT_IMPACT_ATTRIBUTE)
+		local tier = Formulas.ImpactTier(if type(weight) == "number" then weight else 0)
+		self:Play(
+			"Impact" .. tier,
+			CFrame.new(root.Position + Vector3.yAxis * IMPACT_CHEST_RISE),
+			root,
+			nil,
+			character
+		)
+
+		if EffectsController ~= nil then
+			EffectsController:Play(if tier == "Crushing" then "HeavyHit" else "Hit")
 		end
 	end)
 
@@ -1230,6 +1328,19 @@ function VfxController:Start()
 			if EffectsController ~= nil then
 				EffectsController:Play("BlockBreak")
 			end
+		end
+	end)
+
+	-- Mobs get impacts for the same reason they get flinches: CombatService stamps every
+	-- model it damages, and hitting a goblin should look like hitting something.
+	for _, model in CollectionService:GetTagged(MobConfig.MOB_TAG) do
+		if model:IsA("Model") then
+			self:_watch(model)
+		end
+	end
+	CollectionService:GetInstanceAddedSignal(MobConfig.MOB_TAG):Connect(function(instance: Instance)
+		if instance:IsA("Model") then
+			self:_watch(instance)
 		end
 	end)
 

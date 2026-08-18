@@ -44,7 +44,10 @@ export type StrikeStage = {
 export type StrikeVfx = {
 	At: number,
 	Effect: string,
-	Attach: ("Root" | "RightHand" | "Ground")?,
+	-- Which hand matters more than it looks: the middle contact of Punch's combo is a
+	-- *left* cross, and a helper that only ever resolved the right fist would put its
+	-- effect on the wrong arm.
+	Attach: ("Root" | "RightHand" | "LeftHand" | "Ground")?,
 }
 
 export type Strike = {
@@ -428,8 +431,12 @@ local strikes: { Strike } = {
 			transition(0.33, "Recover", HEAVY_FOLLOW, NEUTRAL),
 		},
 		Vfx = {
+			-- Only the wind-up. The impact used to be scheduled here too, which meant a
+			-- heavy swung at empty air produced a full impact flash against nothing —
+			-- the swing is stamped whether or not it connects, so anything driven off it
+			-- fires on a whiff. Impacts are driven from the victim now; see
+			-- FlinchConfig's header.
 			{ At = 0.2, Effect = "HeavyCharge", Attach = "RightHand" :: "RightHand" },
-			{ At = 0.55, Effect = "HeavyImpact", Attach = "RightHand" :: "RightHand" },
 		},
 	},
 }
