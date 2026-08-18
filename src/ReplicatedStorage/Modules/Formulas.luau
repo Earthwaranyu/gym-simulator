@@ -226,6 +226,9 @@ Formulas.MIN_GAIT_SPEED = 2
 -- Forward torso lean, in degrees, at a walk and at a full sprint. A walk leans a little
 -- because a heavy character is always slightly ahead of their feet; a sprint leans hard
 -- because that is what the silhouette is for.
+--
+-- Magnitudes, kept positive here because they read better as "four degrees" than as
+-- "minus four". RunLean applies the sign — see its header for which way is forward.
 Formulas.MIN_RUN_LEAN = 4
 Formulas.MAX_RUN_LEAN = 18
 -- Vertical bob of the whole body, in studs, at a walk and at a sprint. Applied by the
@@ -671,14 +674,25 @@ function Formulas.GaitBlend(speed: number, walkSpeed: number, sprintSpeed: numbe
 end
 
 --[[
-	Forward torso lean, in degrees, for a gait blend of 0 to 1.
+	Forward torso lean for a gait blend of 0 to 1, in degrees, **signed**.
+
+	Negative, because on the Root joint negative X is forward. That is not obvious and it
+	is not what the limb convention suggests — for a limb, +X swings forward — so it is
+	stated here rather than left to the caller to remember. Every other pose in the game
+	already follows it: FlightConfig's glide is -26 and its cruise -62 ("near-horizontal"),
+	and a strike's coil poses are positive while its contact poses are negative, because a
+	coil loads the body back and a contact drives it forward.
+
+	The first version of this returned a positive value and the character sprinted leaning
+	*backwards*, further back the faster it went. GaitConfig's self-test now pins the sign
+	against FlightConfig so the two files cannot disagree about which way forward is.
 ]]
 function Formulas.RunLean(blend: number): number
 	if not Formulas.IsFinite(blend) then
-		return Formulas.MIN_RUN_LEAN
+		return -Formulas.MIN_RUN_LEAN
 	end
 	local t = math.clamp(blend, 0, 1)
-	return Formulas.MIN_RUN_LEAN + (Formulas.MAX_RUN_LEAN - Formulas.MIN_RUN_LEAN) * t
+	return -(Formulas.MIN_RUN_LEAN + (Formulas.MAX_RUN_LEAN - Formulas.MIN_RUN_LEAN) * t)
 end
 
 --[[
@@ -1020,10 +1034,15 @@ function Formulas.RunSelfTest(): { string }
 	check("gait blend survives bad input", Formulas.GaitBlend(0 / 0, 16, 24) == 0)
 
 	-- Lean and bob both grow with the blend and are bounded at both ends.
-	check("a walk already leans a little", Formulas.RunLean(0) == Formulas.MIN_RUN_LEAN)
-	check("a sprint leans hardest", Formulas.RunLean(1) == Formulas.MAX_RUN_LEAN)
-	check("lean is capped", Formulas.RunLean(9) == Formulas.MAX_RUN_LEAN)
-	check("lean grows with speed", Formulas.RunLean(0.6) > Formulas.RunLean(0.2))
+	-- Negative is forward on the Root joint. The shipped build returned a positive lean
+	-- and the character sprinted tipping backwards, so the sign is asserted directly
+	-- rather than inferred from the magnitudes.
+	check("leaning is forward, not backward", Formulas.RunLean(0) < 0 and Formulas.RunLean(1) < 0)
+	check("a walk already leans a little", Formulas.RunLean(0) == -Formulas.MIN_RUN_LEAN)
+	check("a sprint leans hardest", Formulas.RunLean(1) == -Formulas.MAX_RUN_LEAN)
+	check("lean is capped", Formulas.RunLean(9) == -Formulas.MAX_RUN_LEAN)
+	check("lean grows with speed", Formulas.RunLean(0.6) < Formulas.RunLean(0.2))
+	check("bad input still leans forward", Formulas.RunLean(0 / 0) == -Formulas.MIN_RUN_LEAN)
 	check("bob grows with speed", Formulas.GaitBob(1) > Formulas.GaitBob(0))
 	check("bob is capped", Formulas.GaitBob(9) == Formulas.MAX_GAIT_BOB)
 	check("bob survives bad input", Formulas.GaitBob(0 / 0) == Formulas.MIN_GAIT_BOB)

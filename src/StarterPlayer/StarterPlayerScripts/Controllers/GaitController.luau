@@ -266,6 +266,11 @@ end
 	The bob runs at twice the stride frequency, because a body rises and falls once per
 	*step* and a cycle is two steps, and a Pose drives every one of its joints at the
 	same rate.
+
+	RunLean already carries its own sign: negative pitches the torso forward on the Root
+	joint, matching FlightConfig's glide and cruise. Nothing is negated here, and nothing
+	should be — the first build leaned the wrong way precisely because the sign was
+	something a call site had to remember.
 ]]
 function GaitController:_rootExtras(posed: CFrame, entry: Entry, blend: number): CFrame
 	local lean = math.rad(Formulas.RunLean(blend))

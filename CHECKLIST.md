@@ -1582,6 +1582,32 @@ punches for a whole phase, so the game had two answers to one question.
       0.80/Crushing, and a chained click reads 91° → 102° → 94° on the shoulder instead
       of snapping to zero.
 
+- [ ] 135. **The sprint was leaning backwards and windmilling.** #132 was authored blind —
+      Studio's screen capture has been unresponsive all session, so every angle was
+      reasoned from `PoseConfig`'s documented axes and verified only numerically. The
+      numbers were right; two of the conventions behind them were not.
+      **Root X is negative-forward.** That is not what the limb convention suggests, but
+      every pose already in the game follows it: FlightConfig's glide is −26 and its
+      cruise −62, and a strike's coils are positive while its contacts are negative,
+      because a coil loads the body back and a contact drives it forward. `Formulas.RunLean`
+      returned a *positive* value, so the character sprinted tipping backwards, further
+      back the faster it went. The sign now lives in the formula rather than in a caller's
+      memory, which is where it went wrong.
+      **Shoulder Z is arm width**, and the sprint was wider than the walk. PoseConfig's
+      lat pulldown uses 145 for arms straight out and `StairClimber`, the walk cycle this
+      gait was built from, uses 10; the sprint had 16-18 against the walk's 12-14, so it
+      held its arms further out than a stroll while swinging them through a 114 degree
+      arc. Walk drops to 9-10 and sprint tucks to 5-6, with the arc trimmed to 104.
+      The reason a blind mistake survived is that nothing tied the gait to the poses that
+      already had it right, so `GaitConfig.RunSelfTest` now requires `FlightConfig` and
+      asserts the two agree about which way forward is, plus that a sprint tucks its arms
+      closer than a walk. Those encode the relationships rather than the numbers, and the
+      first is the one check that would have failed on the shipped build — no amount of
+      numeric verification could surface it, because every value was internally consistent.
+      Verified live: walk leans -4.00 degrees with shoulder |Z| 9.99, sprint leans -16.82
+      with |Z| 6.33. Screen capture is still unresponsive, so this is confirmed consistent
+      with the working poses rather than confirmed to look right.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

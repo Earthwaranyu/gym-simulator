@@ -36,6 +36,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PoseConfig = require(ReplicatedStorage.Modules.PoseConfig)
+local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 local GaitConfig = {}
 
@@ -121,8 +123,12 @@ local WALK: PoseConfig.Pose = {
 		{ Joint = "Neck", Rest = deg(0, 4, 0), Peak = deg(0, -4, 0) },
 
 		-- Arms oppose the same-side leg, so the right arm carries the left leg's phase.
-		{ Joint = "RightShoulder", Rest = deg(-18, 0, 12), Peak = deg(26, 0, 14), Phase = 0.5 },
-		{ Joint = "LeftShoulder", Rest = deg(-18, 0, -12), Peak = deg(26, 0, -14) },
+		-- Z is how far the arm is held out from the body — PoseConfig's lat pulldown uses
+		-- 145 for arms straight out sideways, and StairClimber, the walk cycle this one
+		-- is built from, uses 10. Matching it keeps the arms swinging past the ribs
+		-- rather than orbiting them.
+		{ Joint = "RightShoulder", Rest = deg(-18, 0, 9), Peak = deg(26, 0, 10), Phase = 0.5 },
+		{ Joint = "LeftShoulder", Rest = deg(-18, 0, -9), Peak = deg(26, 0, -10) },
 		{ Joint = "RightElbow", Rest = deg(14, 0, 0), Peak = deg(32, 0, 0), Phase = 0.5 },
 		{ Joint = "LeftElbow", Rest = deg(14, 0, 0), Peak = deg(32, 0, 0) },
 
@@ -157,8 +163,14 @@ local SPRINT: PoseConfig.Pose = {
 		-- where they are going rather than at the floor.
 		{ Joint = "Neck", Rest = deg(-6, 6, 0), Peak = deg(-6, -6, 0) },
 
-		{ Joint = "RightShoulder", Rest = deg(-52, 0, 16), Peak = deg(62, 0, 18), Phase = 0.5 },
-		{ Joint = "LeftShoulder", Rest = deg(-52, 0, -16), Peak = deg(62, 0, -18) },
+		-- Tucked tighter than the walk, not wider. The first build had this at 16-18
+		-- against the walk's 12-14, so a sprint held its arms further out than a stroll
+		-- while swinging them through a 114 degree arc — which reads as windmilling
+		-- rather than as running. Tucking the elbows in is most of what separates a
+		-- sprint from a jog, and the arc is trimmed a little so the drive lands as power
+		-- rather than as flapping.
+		{ Joint = "RightShoulder", Rest = deg(-46, 0, 5), Peak = deg(58, 0, 6), Phase = 0.5 },
+		{ Joint = "LeftShoulder", Rest = deg(-46, 0, -5), Peak = deg(58, 0, -6) },
 		-- Held near ninety through the whole cycle. A sprinter's elbow angle barely
 		-- changes; it is the shoulder that drives, and a flapping forearm reads as a jog.
 		{ Joint = "RightElbow", Rest = deg(78, 0, 0), Peak = deg(96, 0, 0), Phase = 0.5 },
@@ -317,6 +329,41 @@ function GaitConfig.RunSelfTest(): { string }
 		walkElbow ~= nil and sprintElbow ~= nil and sprintElbow.Rest.X > walkElbow.Rest.X,
 		"sprinting drives from a locked elbow"
 	)
+
+	-- Arms tuck in as speed rises. The shipped build had this backwards — a sprint held
+	-- its arms wider than a walk — which read as windmilling. Asserting the relationship
+	-- rather than the numbers means a future retune can move both and still be caught.
+	local walkShoulder = motionFor(WALK, "RightShoulder")
+	local sprintShoulder = motionFor(SPRINT, "RightShoulder")
+	check(
+		walkShoulder ~= nil
+			and sprintShoulder ~= nil
+			and math.abs(sprintShoulder.Rest.Z) < math.abs(walkShoulder.Rest.Z),
+		"sprinting tucks its arms closer than walking"
+	)
+	check(
+		walkShoulder ~= nil
+			and sprintShoulder ~= nil
+			and math.abs(sprintShoulder.Peak.Z) < math.abs(walkShoulder.Peak.Z),
+		"sprinting keeps them tucked through the swing"
+	)
+
+	--[[
+		Forward means the same thing here as it does in flight.
+
+		This is the check that would have caught the sprint leaning backwards. Root X is
+		negative-forward, which is not what the limb convention suggests, and nothing tied
+		the gait's lean to the poses that already got it right — so a blind mistake in one
+		file could not be contradicted by the other. Requiring FlightConfig for a test is
+		a small price for an invariant that no amount of numeric verification would have
+		surfaced.
+	]]
+	local glide = FlightConfig.Get("Glide")
+	check(glide ~= nil, "FlightConfig still defines the glide pose")
+	if glide ~= nil then
+		check(glide.Angles.Root.X < 0, "flight's forward lean is negative on the root")
+		check(Formulas.RunLean(1) < 0, "a sprint leans the same way flight does, not backwards")
+	end
 
 	-- Blend endpoints must be exact, or a walk sits a fraction away from the pose that
 	-- was actually authored and every silhouette in the file is slightly wrong.
