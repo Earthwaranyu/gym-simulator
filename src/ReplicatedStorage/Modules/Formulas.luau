@@ -206,6 +206,34 @@ Formulas.MAX_FLIGHT_BANK_DEGREES = 34
 -- barely roll the body; only a hard turn should lay it over.
 Formulas.FLIGHT_BANK_FULL_TURN_RATE = 2.4
 
+-- Gait. Stride length in studs per full cycle — one cycle is both feet, so a character
+-- covering this much ground has taken two steps. Distance-based rather than a fixed
+-- cadence, because a cadence that ignored speed is what makes a character look like it
+-- is moon-walking when it slows down: the feet keep their rhythm while the body
+-- decelerates out from under them.
+Formulas.STRIDE_STUDS = 14
+-- Both ends clamped. The floor stops a maxed sprinter's legs becoming a blur that reads
+-- as a glitch; the ceiling stops somebody creeping forward from stalling mid-step with
+-- one foot hanging in the air.
+Formulas.MIN_STRIDE_SECONDS = 0.26
+Formulas.MAX_STRIDE_SECONDS = 0.9
+-- Below this the gait fades out entirely and Roblox's own idle animation plays. Not
+-- zero, because a character resting against a wall still reports a few hundredths of a
+-- stud per second and a gait that flickered on and off at a standstill is worse than
+-- no gait at all.
+Formulas.MIN_GAIT_SPEED = 2
+
+-- Forward torso lean, in degrees, at a walk and at a full sprint. A walk leans a little
+-- because a heavy character is always slightly ahead of their feet; a sprint leans hard
+-- because that is what the silhouette is for.
+Formulas.MIN_RUN_LEAN = 4
+Formulas.MAX_RUN_LEAN = 18
+-- Vertical bob of the whole body, in studs, at a walk and at a sprint. Applied by the
+-- controller at twice the stride frequency, because a body rises and falls once per
+-- *step* and a stride is two steps.
+Formulas.MIN_GAIT_BOB = 0.06
+Formulas.MAX_GAIT_BOB = 0.22
+
 -- Field-of-view widening at top speed, in degrees over the camera's resting value.
 -- Small on purpose: FOV is the cheapest speed cue there is and also the fastest way to
 -- make somebody motion-sick, and it is being applied for minutes at a time rather than
@@ -596,6 +624,67 @@ function Formulas.FlightFovGain(blend: number): number
 end
 
 --[[
+	Seconds for one full stride cycle — both feet — at a given ground speed.
+
+	Derived from distance rather than from a cadence table: the stride covers a fixed
+	length of ground, so going faster takes the same steps sooner rather than taking
+	different steps. That is the property that keeps the feet planted-looking when a
+	character accelerates or slows, and it is why the gait controller advances its phase
+	by distance covered rather than by wall clock.
+]]
+function Formulas.StrideInterval(speed: number): number
+	if not Formulas.IsFinite(speed) or speed <= 0 then
+		return Formulas.MAX_STRIDE_SECONDS
+	end
+	return math.clamp(Formulas.STRIDE_STUDS / speed, Formulas.MIN_STRIDE_SECONDS, Formulas.MAX_STRIDE_SECONDS)
+end
+
+--[[
+	How far between a walk and a sprint a speed sits, as 0 to 1.
+
+	Taken against this character's own walk and sprint speeds rather than against
+	absolute numbers, so a fresh player and one with forty Legs both reach the full
+	sprint silhouette when they are running as fast as they personally can. The same
+	reasoning as FlightBand's fractions.
+]]
+function Formulas.GaitBlend(speed: number, walkSpeed: number, sprintSpeed: number): number
+	if
+		not Formulas.IsFinite(speed)
+		or not Formulas.IsFinite(walkSpeed)
+		or not Formulas.IsFinite(sprintSpeed)
+	then
+		return 0
+	end
+	local span = sprintSpeed - walkSpeed
+	if span <= 1e-3 then
+		return 0
+	end
+	return math.clamp((speed - walkSpeed) / span, 0, 1)
+end
+
+--[[
+	Forward torso lean, in degrees, for a gait blend of 0 to 1.
+]]
+function Formulas.RunLean(blend: number): number
+	if not Formulas.IsFinite(blend) then
+		return Formulas.MIN_RUN_LEAN
+	end
+	local t = math.clamp(blend, 0, 1)
+	return Formulas.MIN_RUN_LEAN + (Formulas.MAX_RUN_LEAN - Formulas.MIN_RUN_LEAN) * t
+end
+
+--[[
+	Vertical bob amplitude, in studs, for a gait blend of 0 to 1.
+]]
+function Formulas.GaitBob(blend: number): number
+	if not Formulas.IsFinite(blend) then
+		return Formulas.MIN_GAIT_BOB
+	end
+	local t = math.clamp(blend, 0, 1)
+	return Formulas.MIN_GAIT_BOB + (Formulas.MAX_GAIT_BOB - Formulas.MIN_GAIT_BOB) * t
+end
+
+--[[
 	Total power, the single number shown in the tab bar. Plain sum: it should climb
 	visibly with every rep, which a log or average would flatten.
 ]]
@@ -870,6 +959,50 @@ function Formulas.RunSelfTest(): { string }
 	check("top speed widens it fully", Formulas.FlightFovGain(1) == Formulas.MAX_FLIGHT_FOV_GAIN)
 	check("the widening arrives late", Formulas.FlightFovGain(0.5) < Formulas.MAX_FLIGHT_FOV_GAIN * 0.5)
 	check("fov gain is capped", Formulas.FlightFovGain(9) == Formulas.MAX_FLIGHT_FOV_GAIN)
+
+	-- The stride covers ground rather than keeping a cadence. Going twice as fast has
+	-- to take the same steps twice as often, or the feet slide: this is the invariant
+	-- that stops a decelerating character moon-walking.
+	check(
+		"twice the speed is half the stride time",
+		math.abs(Formulas.StrideInterval(20) - Formulas.StrideInterval(40) * 2) < 1e-6
+	)
+	check("faster is never slower to step", Formulas.StrideInterval(40) < Formulas.StrideInterval(20))
+	check("stride time has a floor", Formulas.StrideInterval(1e9) == Formulas.MIN_STRIDE_SECONDS)
+	check("stride time has a ceiling", Formulas.StrideInterval(0.001) == Formulas.MAX_STRIDE_SECONDS)
+	check("a standstill does not divide by zero", Formulas.StrideInterval(0) == Formulas.MAX_STRIDE_SECONDS)
+	check("stride time survives bad input", Formulas.StrideInterval(0 / 0) == Formulas.MAX_STRIDE_SECONDS)
+
+	-- The blend is taken against this character's own speeds, so everybody reaches the
+	-- sprint silhouette at their own top speed rather than at an absolute number a
+	-- fresh player could never reach.
+	local freshWalk, freshSprint = Formulas.WalkSpeed(0), Formulas.SprintSpeed(0)
+	local fastWalk, fastSprint = Formulas.WalkSpeed(40), Formulas.SprintSpeed(40)
+	check("walking is not a sprint", Formulas.GaitBlend(freshWalk, freshWalk, freshSprint) == 0)
+	check("sprinting is a full sprint", Formulas.GaitBlend(freshSprint, freshWalk, freshSprint) == 1)
+	check(
+		"the blend is scale-free",
+		Formulas.GaitBlend((freshWalk + freshSprint) / 2, freshWalk, freshSprint)
+			== Formulas.GaitBlend((fastWalk + fastSprint) / 2, fastWalk, fastSprint)
+	)
+	check("standing still is not a sprint", Formulas.GaitBlend(0, freshWalk, freshSprint) == 0)
+	check("overspeed is clamped", Formulas.GaitBlend(1e6, freshWalk, freshSprint) == 1)
+	check("a zero span does not divide by zero", Formulas.GaitBlend(20, 16, 16) == 0)
+	check("gait blend survives bad input", Formulas.GaitBlend(0 / 0, 16, 24) == 0)
+
+	-- Lean and bob both grow with the blend and are bounded at both ends.
+	check("a walk already leans a little", Formulas.RunLean(0) == Formulas.MIN_RUN_LEAN)
+	check("a sprint leans hardest", Formulas.RunLean(1) == Formulas.MAX_RUN_LEAN)
+	check("lean is capped", Formulas.RunLean(9) == Formulas.MAX_RUN_LEAN)
+	check("lean grows with speed", Formulas.RunLean(0.6) > Formulas.RunLean(0.2))
+	check("bob grows with speed", Formulas.GaitBob(1) > Formulas.GaitBob(0))
+	check("bob is capped", Formulas.GaitBob(9) == Formulas.MAX_GAIT_BOB)
+	check("bob survives bad input", Formulas.GaitBob(0 / 0) == Formulas.MIN_GAIT_BOB)
+
+	-- The gait must not switch on while a player is standing still. A character resting
+	-- against geometry still reports a fraction of a stud per second.
+	check("a standstill has no gait", Formulas.MIN_GAIT_SPEED > 0)
+	check("walking clears the gait threshold", Formulas.WalkSpeed(0) > Formulas.MIN_GAIT_SPEED)
 
 	check("total power sums", Formulas.TotalPower({ a = 2, b = 3 }) == 5)
 

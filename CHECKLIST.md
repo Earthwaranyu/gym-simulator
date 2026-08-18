@@ -1470,6 +1470,42 @@ punches for a whole phase, so the game had two answers to one question.
       eases back upright, landing releases every joint and every trail, and contrails
       sit disabled at rest and near-maximum at speed.
 
+- [ ] 132. **Walking and running stop being Roblox's.** Locomotion was the last
+      animation in the game that was not ours — the stock Animate script playing
+      Roblox's uploaded walk and run clips — and it is the animation players see most:
+      training is a pose at a machine, flying is occasional, fighting is bursts, and
+      running is every other second of the session. `GaitConfig` holds a heavy
+      gym-bruiser walk and sprint as `PoseConfig.Pose`-shaped cycles, so
+      `PosePlayback.AlphaAt` drives them unchanged. Almost nothing new was needed:
+      `JointMotion.Phase` already existed for limb opposition and its own comment cited
+      "a running stride", and `StairClimber` was already a walk cycle in all but name,
+      so its phase structure (hips half a cycle apart, knees lagging by a fifth, arms
+      opposite the same-side leg) is what these are built on. Ankles are included, which
+      `FlightConfig` omits — a flier's feet trail and nobody looks, a runner's feet are
+      what touch the ground.
+      Unlike flight, **no replication was needed at all**: `AssemblyLinearVelocity` and
+      `Humanoid.WalkSpeed` already replicate, so every client derives every other
+      character's gait from what it can already see. No remote, no attribute.
+      The one thing `GaitController` could not copy from `TrainingPoseController` is its
+      driver. That controller resets `startedAt` when the rep interval changes, which is
+      right for a machine and catastrophic here, because the interval changes every
+      frame as speed varies — it would restart the cycle sixty times a second and the
+      legs would stand still while the body slid. The phase is accumulated instead, and
+      accumulated from distance covered, so slowing down shortens the steps rather than
+      moon-walking. Lean and vertical bob live in the controller rather than the poses:
+      lean has to grow smoothly with speed instead of switching on with the sprint
+      silhouette, and the bob runs at twice the stride frequency because a body rises
+      once per step and a stride is two steps.
+      Priority 7 makes it the weakest of the four pose controllers — it writes first, so
+      training, strikes and flight all overwrite it — with explicit guards doing the
+      same job directly. VFX: footfall dust fired on the cycle's own footfall phases,
+      which is only possible because the cycle is ours, plus a sprint kick with
+      `FlightBoom`'s hysteresis and ground speed lines turned well down from flight's.
+      Verified live: hips in opposition, knees lagging, arms opposing legs, sprint
+      driving to −107° knees against a walk's −52°, measured root lean matching
+      `Formulas.RunLean` exactly, footfall and sprint effects spawning, and the gait
+      standing down for flight, training and strikes and releasing to Roblox's idle.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game

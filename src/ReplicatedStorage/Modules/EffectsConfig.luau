@@ -48,6 +48,12 @@ EffectsConfig.Sounds = {
 	FlightLanding = { SoundId = "", Volume = 0.5, Pitch = 0.95, PitchJitter = 0.06 } :: SoundSpec,
 	-- Crossing into top speed. Fires once per flight, so it can afford to be loud.
 	FlightBoom = { SoundId = "", Volume = 0.9, Pitch = 0.9, PitchJitter = 0 } :: SoundSpec,
+	-- A foot landing. By far the most frequently played sound in the game once ids are
+	-- filled in, so it is quiet and heavily jittered — an unjittered footstep four times
+	-- a second is the fastest way to make a game unbearable.
+	Footfall = { SoundId = "", Volume = 0.22, Pitch = 1, PitchJitter = 0.18 } :: SoundSpec,
+	-- Committing to a sprint.
+	SprintBurst = { SoundId = "", Volume = 0.45, Pitch = 1, PitchJitter = 0.08 } :: SoundSpec,
 	-- The guard shattering. Distinct from BlockAbsorb because it is the moment the
 	-- player has to react to, and it must not sound like one more absorbed hit.
 	BlockBreak = { SoundId = "", Volume = 0.9, Pitch = 0.95, PitchJitter = 0 } :: SoundSpec,

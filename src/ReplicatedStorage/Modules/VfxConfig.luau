@@ -824,12 +824,91 @@ local effects: { Effect } = {
 			},
 		},
 	},
+
+	--[[
+		A foot landing. Deliberately the cheapest effect in this file.
+
+		Everything else here fires a handful of times a minute; this fires up to four
+		times a second for every visible character, so it is two elements, a tight cull,
+		and nothing that tweens a part for long. The scuff is a flat disc rather than a
+		wide ring because a ring at ankle scale reads as a bug.
+
+		It exists at all because the gait cycle is ours: GaitConfig knows the exact phase
+		at which each foot plants, so the dust lands on the frame of the footfall rather
+		than on a timer drifting against a stock clip.
+	]]
+	{
+		Id = "Footfall",
+		Radius = 1.6,
+		CullDistance = 120,
+		Elements = {
+			{
+				Kind = "Burst" :: "Burst",
+				Delay = 0,
+				Seconds = 0.35,
+				Texture = SMOKE,
+				Count = 5,
+				Speed = NumberRange.new(2, 7),
+				Size = NumberRange.new(0.5, 1.2),
+				Spread = 55,
+				Color = DUST,
+				Gravity = 6,
+				Lifetime = NumberRange.new(0.2, 0.45),
+			},
+			{
+				Kind = "Ring" :: "Ring",
+				Delay = 0,
+				Seconds = 0.22,
+				StartScale = 0.2,
+				EndScale = 1,
+				Thickness = 0.22,
+				Height = 0.06,
+				Color = DUST,
+				StartTransparency = 0.6,
+				Easing = "Out" :: "Out",
+			},
+		},
+	},
+
+	--[[
+		Hitting a full sprint. One kick as the character commits, re-armed only after
+		dropping back out — the same hysteresis FlightBoom uses, and for the same reason:
+		without it, sitting on the threshold retriggers it every other frame.
+	]]
+	{
+		Id = "SprintBurst",
+		Radius = 5,
+		CullDistance = 180,
+		Elements = {
+			{
+				Kind = "Ring" :: "Ring",
+				Delay = 0,
+				Seconds = 0.34,
+				StartScale = 0.2,
+				EndScale = 1.3,
+				Thickness = 0.4,
+				Height = 0.1,
+				Color = DUST,
+				StartTransparency = 0.4,
+				Easing = "Out" :: "Out",
+			},
+			{
+				Kind = "Burst" :: "Burst",
+				Delay = 0,
+				Seconds = 0.6,
+				Texture = SMOKE,
+				Count = 16,
+				Speed = NumberRange.new(10, 26),
+				Size = NumberRange.new(1, 2.4),
+				Spread = 60,
+				Color = DUST,
+				Gravity = 12,
+				Lifetime = NumberRange.new(0.35, 0.8),
+			},
+		},
+	},
 }
 
---[[
-	The guard dome, which VfxController raises and drops off the Blocking attribute
-	rather than firing as an effect. See GuardSpec above for why it is not one.
-]]
 --[[
 	Flight contrails and speed lines. Raised and dropped off the FlightState attribute
 	by VfxController rather than fired as effects — see ContrailSpec above for why.
@@ -857,6 +936,28 @@ VfxConfig.SpeedLines = {
 	Color = SKY_HOT,
 } :: SpeedLineSpec
 
+--[[
+	Speed lines while sprinting on the ground.
+
+	Flight's treatment, turned well down. Running fast is not flying fast, and reusing
+	the flight numbers made a sprint across the gym look like a takeoff — so it gets its
+	own table even though the controller code is shared.
+]]
+VfxConfig.SprintLines = {
+	MaxCount = 10,
+	MinBlend = 0.75,
+	Length = 9,
+	Thickness = 0.09,
+	MinDistance = 10,
+	MaxDistance = 28,
+	Seconds = 0.28,
+	Color = rgb(226, 220, 208),
+} :: SpeedLineSpec
+
+--[[
+	The guard dome, raised and dropped off the Blocking attribute rather than fired as an
+	effect. See GuardSpec above for why it is not one.
+]]
 VfxConfig.Guard = {
 	Radius = 3.6,
 	Color = GUARD,

@@ -604,11 +604,18 @@ end
 	the next batch is being made.
 ]]
 local nextSpeedLineAt = 0
+-- Below a jog a footfall is a scuff nobody sees, and this is the one effect frequent
+-- enough for "nobody sees it" to still cost a frame.
+local FOOTFALL_MIN_BLEND = 0.12
+-- Where the sprint kick fires. Below flight's boom threshold because a ground sprint
+-- tops out sooner and the moment worth marking is committing to it, not maxing it.
+local SPRINT_BURST_BLEND = 0.85
+-- True while the sprint kick has already fired for this run.
+local sprintArmed = false
 -- True while the sonic boom has already fired for this run at top speed.
 local boomArmed = false
 
-local function emitSpeedLines(blend: number, travel: Vector3)
-	local spec = VfxConfig.SpeedLines
+local function emitSpeedLines(spec: VfxConfig.SpeedLineSpec, blend: number, travel: Vector3)
 	if blend < spec.MinBlend or travel.Magnitude < 1e-3 then
 		return
 	end
@@ -1078,7 +1085,7 @@ function VfxController:_updateFlight()
 	end
 
 	setFlightFov(Formulas.FlightFovGain(blend))
-	emitSpeedLines(blend, travel)
+	emitSpeedLines(VfxConfig.SpeedLines, blend, travel)
 
 	-- The boom, once per flight. Re-armed only after dropping back out of the band, so
 	-- holding full throttle fires it on the way in rather than machine-gunning it for as
@@ -1099,6 +1106,86 @@ function VfxController:_updateFlight()
 		-- Re-armed with hysteresis. Dropping out at exactly the same threshold it fires
 		-- at means hovering on the boundary retriggers it every other frame.
 		boomArmed = false
+	end
+end
+
+--[[
+	One foot landing, at the point the gait says it landed.
+
+	Called by GaitController rather than driven from an attribute, because a footfall is
+	not a state anybody publishes — it is a moment inside a cycle that only the gait
+	knows the shape of. Blend is passed through so a walk scuffs and a sprint kicks.
+
+	Cheap on purpose. This is the highest-frequency effect in the game: up to four a
+	second for every visible character, where a slam is one every six seconds for one
+	player. It is skipped outright below a jog, and Play's own cull distance on the
+	Footfall effect is the tightest in VfxConfig.
+]]
+function VfxController:PlayFootfall(character: Model, root: BasePart, blend: number)
+	if blend < FOOTFALL_MIN_BLEND then
+		return
+	end
+	-- On the floor, not on the hips. The dust belongs where the foot is.
+	self:Play("Footfall", CFrame.new(root.Position - Vector3.yAxis * ROOT_TO_FLOOR), root, nil, character)
+end
+
+--[[
+	Rides the sprint effects on how fast the local player is running.
+
+	Local player only, exactly as the flight speed lines are: streaks are a camera
+	effect, and drawing somebody else's around your own view would be nonsense. Remote
+	sprinters still get their footfall dust, which is the part that reads from outside.
+]]
+function VfxController:_updateSprint()
+	local character = Players.LocalPlayer.Character
+	if character == nil then
+		sprintArmed = false
+		return
+	end
+
+	local root = rootOf(character)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if root == nil or humanoid == nil or humanoid.Health <= 0 then
+		sprintArmed = false
+		return
+	end
+
+	-- Airborne, mounted or flying: not sprinting, whatever the velocity says.
+	if
+		character:GetAttribute(FlightConfig.STATE_ATTRIBUTE) ~= nil
+		or humanoid:GetState() ~= Enum.HumanoidStateType.Running
+	then
+		sprintArmed = false
+		return
+	end
+
+	local travel = root.AssemblyLinearVelocity
+	local flat = Vector3.new(travel.X, 0, travel.Z)
+	local walkSpeed = Formulas.WalkSpeed(0)
+	local topSpeed = math.max(humanoid.WalkSpeed, walkSpeed)
+	if topSpeed <= walkSpeed + 1e-3 then
+		topSpeed = Formulas.SprintSpeed(0)
+	end
+	local blend = Formulas.GaitBlend(flat.Magnitude, walkSpeed, topSpeed)
+
+	emitSpeedLines(VfxConfig.SprintLines, blend, flat)
+
+	if blend >= SPRINT_BURST_BLEND then
+		if not sprintArmed then
+			sprintArmed = true
+			self:Play(
+				"SprintBurst",
+				CFrame.new(root.Position - Vector3.yAxis * ROOT_TO_FLOOR),
+				root,
+				nil,
+				character
+			)
+			if EffectsController ~= nil then
+				EffectsController:Play("SprintBurst")
+			end
+		end
+	elseif blend < SPRINT_BURST_BLEND * 0.85 then
+		sprintArmed = false
 	end
 end
 
@@ -1160,6 +1247,7 @@ function VfxController:Start()
 	-- camera write itself, is the BindToRenderStep hook above.
 	RunService.Heartbeat:Connect(function()
 		self:_updateFlight()
+		self:_updateSprint()
 	end)
 end
 

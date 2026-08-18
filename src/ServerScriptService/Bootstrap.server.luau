@@ -16,6 +16,7 @@ local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
 local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
+local GaitConfig = require(ReplicatedStorage.Modules.GaitConfig)
 
 require(ReplicatedStorage.Modules.Net)
 
@@ -38,6 +39,7 @@ if RunService:IsStudio() then
 			-- StrikeConfig.RunSelfTest was written and then never called from anywhere.
 			{ Name = "StrikeConfig", Failures = StrikeConfig.RunSelfTest() },
 			{ Name = "FlightConfig", Failures = FlightConfig.RunSelfTest() },
+			{ Name = "GaitConfig", Failures = GaitConfig.RunSelfTest() },
 		}
 	do
 		if #suite.Failures > 0 then
