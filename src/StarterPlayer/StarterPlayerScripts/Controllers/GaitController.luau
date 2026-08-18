@@ -152,23 +152,20 @@ local function groundSpeedFor(character: Model): number?
 end
 
 --[[
-	The speeds this particular character walks and sprints at.
+	The speed range the gait is measured against — absolute, not per character.
 
-	Read from the humanoid rather than from the profile, because WalkSpeed is what the
-	server actually set and it replicates — which is the whole reason no new remote was
-	needed. A character sprinting has WalkSpeed at their sprint value, so the blend has
-	its own top end without anybody publishing a sprint flag.
+	This used to read the character's own WalkSpeed as the top of the range, which is
+	wrong the moment there are three silhouettes: relative to themselves, every player is
+	at 100% as soon as they hold Shift, so a fresh player jogging at 24 studs a second
+	got exactly the same flat-out ninja run as somebody with forty Legs doing 64.
+
+	Measured against the global ceiling instead, speed means the same thing for everybody
+	and the dash becomes something Legs earns. A fresh sprint sits a little past the
+	walk-to-sprint split and reads as a shonen run; only genuine top speed reaches the
+	ninja one.
 ]]
-local function speedRangeFor(character: Model): (number, number)
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local walk = Formulas.WalkSpeed(0)
-	local top = if humanoid ~= nil then math.max(humanoid.WalkSpeed, walk) else walk
-	-- A character whose WalkSpeed is still the base has no sprint range of their own, so
-	-- fall back to the fresh sprint speed and let the blend simply never reach 1.
-	if top <= walk + 1e-3 then
-		top = Formulas.SprintSpeed(0)
-	end
-	return walk, top
+local function speedRange(): (number, number)
+	return Formulas.WalkSpeed(0), Formulas.SPRINT_CEILING
 end
 
 function GaitController:_apply(delta: number)
@@ -205,7 +202,7 @@ function GaitController:_apply(delta: number)
 			entry.releasing = false
 			entry.weight = math.min(1, entry.weight + delta / GaitConfig.BLEND_IN_SECONDS)
 
-			local walkSpeed, topSpeed = speedRangeFor(character)
+			local walkSpeed, topSpeed = speedRange()
 			local target = Formulas.GaitBlend(speed, walkSpeed, topSpeed)
 			entry.blend += (target - entry.blend) * math.min(1, GaitConfig.BLEND_RESPONSIVENESS * delta)
 
@@ -232,6 +229,9 @@ function GaitController:_apply(delta: number)
 		local blend = entry.blend
 		-- Alpha is per joint, because each one carries its own Phase offset — that
 		-- single field is the whole of limb opposition.
+		-- Only the MotionStyle and Cycles are read off this, and all three gaits share
+		-- both, so which one is handed in does not matter — the walk is simply the one
+		-- that always exists.
 		local shaped = GaitConfig.Walk
 		local elapsed = entry.phase * 1
 		for _, bound in entry.joints do
@@ -250,6 +250,14 @@ function GaitController:_apply(delta: number)
 
 			if bound.name == "Root" then
 				posed = self:_rootExtras(posed, entry, blend)
+			elseif bound.name == "Neck" then
+				-- Head pitch cancels the lean, so the character always looks where they
+				-- are going rather than at the floor. Derived from the same number the
+				-- root leans by rather than hand-written into each pose, which is how the
+				-- sprint previously ended up with its head tipped further down than its
+				-- body. The poses carry only the Y counter-rotation that keeps the head
+				-- steady while the shoulders roll.
+				posed *= CFrame.Angles(-math.rad(Formulas.RunLean(blend)), 0, 0)
 			end
 
 			bound.joint.Transform = IDENTITY:Lerp(posed, weight)

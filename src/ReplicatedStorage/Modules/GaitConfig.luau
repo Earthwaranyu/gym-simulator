@@ -103,96 +103,161 @@ local function deg(x: number, y: number, z: number): Vector3
 end
 
 --[[
-	Walk — unhurried, wide-stanced, and heavier than the default.
+	Walk — light, bouncy and upright.
 
-	The width is in the Z on the hips: a bruiser does not walk with their feet in line.
+	An anime walk is not a real one. The arms swing further than a person's actually do,
+	the knees lift higher, the toes point, and the whole body rises and falls more than
+	physics would justify — GaitController supplies that bob, and it is deliberately the
+	largest of the three gaits.
+
 	The waist counter-rotates against the hips and the neck counter-rotates against the
-	waist, which is what keeps the head facing forward while the shoulders roll — the
-	single detail that separates a walk with weight from a marionette.
+	waist on Y, which is what keeps the head facing forward while the shoulders roll.
+	Neck X is left at zero in all three poses on purpose: the head's *pitch* is the
+	controller's job, cancelling the lean so the character always looks where they are
+	going. Hand-writing it here is what previously had the sprint staring at the floor.
 ]]
 local WALK: PoseConfig.Pose = {
 	Id = "GaitWalk",
 	Cycles = 1,
-	MotionStyle = "Continuous",
+	MotionStyle = "Snapped",
 	Joints = {
 		-- Rolls side to side. The vertical bob is not here: a body rises and falls once
 		-- per *step* and a cycle is two steps, and one pose cannot run a single joint at
 		-- double frequency. GaitController applies it.
-		{ Joint = "Root", Rest = deg(0, 0, -2), Peak = deg(0, 0, 2) },
-		{ Joint = "Waist", Rest = deg(2, -7, 0), Peak = deg(2, 7, 0) },
-		{ Joint = "Neck", Rest = deg(0, 4, 0), Peak = deg(0, -4, 0) },
+		{ Joint = "Root", Rest = deg(0, 0, -3), Peak = deg(0, 0, 3) },
+		{ Joint = "Waist", Rest = deg(0, -9, 0), Peak = deg(0, 9, 0) },
+		{ Joint = "Neck", Rest = deg(0, 6, 0), Peak = deg(0, -6, 0) },
 
 		-- Arms oppose the same-side leg, so the right arm carries the left leg's phase.
 		-- Z is how far the arm is held out from the body — PoseConfig's lat pulldown uses
-		-- 145 for arms straight out sideways, and StairClimber, the walk cycle this one
-		-- is built from, uses 10. Matching it keeps the arms swinging past the ribs
-		-- rather than orbiting them.
-		{ Joint = "RightShoulder", Rest = deg(-18, 0, 9), Peak = deg(26, 0, 10), Phase = 0.5 },
-		{ Joint = "LeftShoulder", Rest = deg(-18, 0, -9), Peak = deg(26, 0, -10) },
-		{ Joint = "RightElbow", Rest = deg(14, 0, 0), Peak = deg(32, 0, 0), Phase = 0.5 },
-		{ Joint = "LeftElbow", Rest = deg(14, 0, 0), Peak = deg(32, 0, 0) },
+		-- 145 for arms straight out sideways, and StairClimber uses 10. A bigger *swing*
+		-- than a real walk, still held close to the ribs.
+		{ Joint = "RightShoulder", Rest = deg(-30, 0, 8), Peak = deg(34, 0, 9), Phase = 0.5 },
+		{ Joint = "LeftShoulder", Rest = deg(-30, 0, -8), Peak = deg(34, 0, -9) },
+		{ Joint = "RightElbow", Rest = deg(20, 0, 0), Peak = deg(42, 0, 0), Phase = 0.5 },
+		{ Joint = "LeftElbow", Rest = deg(20, 0, 0), Peak = deg(42, 0, 0) },
 
-		{ Joint = "RightHip", Rest = deg(-22, 0, 6), Peak = deg(30, 0, 6) },
-		{ Joint = "LeftHip", Rest = deg(-22, 0, -6), Peak = deg(30, 0, -6), Phase = 0.5 },
+		{ Joint = "RightHip", Rest = deg(-26, 0, 5), Peak = deg(40, 0, 5) },
+		{ Joint = "LeftHip", Rest = deg(-26, 0, -5), Peak = deg(40, 0, -5), Phase = 0.5 },
 		-- Knees lag the hips by a fifth of a cycle: the thigh swings, then the shin
 		-- follows. Leading or matching the hip is what makes a leg look like a plank.
-		{ Joint = "RightKnee", Rest = deg(-8, 0, 0), Peak = deg(-52, 0, 0), Phase = 0.2 },
-		{ Joint = "LeftKnee", Rest = deg(-8, 0, 0), Peak = deg(-52, 0, 0), Phase = 0.7 },
-		{ Joint = "RightAnkle", Rest = deg(-6, 0, 0), Peak = deg(10, 0, 0), Phase = 0.15 },
-		{ Joint = "LeftAnkle", Rest = deg(-6, 0, 0), Peak = deg(10, 0, 0), Phase = 0.65 },
+		{ Joint = "RightKnee", Rest = deg(-6, 0, 0), Peak = deg(-68, 0, 0), Phase = 0.2 },
+		{ Joint = "LeftKnee", Rest = deg(-6, 0, 0), Peak = deg(-68, 0, 0), Phase = 0.7 },
+		-- Pointed toes. Small, but it is most of what separates a drawn walk from a
+		-- simulated one.
+		{ Joint = "RightAnkle", Rest = deg(-12, 0, 0), Peak = deg(16, 0, 0), Phase = 0.15 },
+		{ Joint = "LeftAnkle", Rest = deg(-12, 0, 0), Peak = deg(16, 0, 0), Phase = 0.65 },
 	},
 }
 
 --[[
-	Sprint — the same skeleton driven much harder.
+	Sprint — the shonen run.
 
-	Same phases, bigger angles: the stride opens up, the knees come high, the arms drive
-	from a locked near-ninety elbow instead of swinging loose, and the waist rotation
-	roughly doubles. The forward lean is not here either — GaitController applies it to
-	the root, because it has to grow smoothly with speed rather than switch on when the
-	sprint pose takes over.
+	Long strides, knees high, and arms driving hard and tight from a locked elbow. The
+	forward lean is the controller's, growing quadratically with speed, so this pose is
+	authored as if upright and the lean is added on top.
 ]]
 local SPRINT: PoseConfig.Pose = {
 	Id = "GaitSprint",
 	Cycles = 1,
-	MotionStyle = "Continuous",
+	MotionStyle = "Snapped",
 	Joints = {
-		{ Joint = "Root", Rest = deg(0, 0, -3), Peak = deg(0, 0, 3) },
-		{ Joint = "Waist", Rest = deg(6, -13, 0), Peak = deg(6, 13, 0) },
-		-- Head held up against a body that is leaning hard, so the character is looking
-		-- where they are going rather than at the floor.
-		{ Joint = "Neck", Rest = deg(-6, 6, 0), Peak = deg(-6, -6, 0) },
+		{ Joint = "Root", Rest = deg(0, 0, -4), Peak = deg(0, 0, 4) },
+		{ Joint = "Waist", Rest = deg(0, -14, 0), Peak = deg(0, 14, 0) },
+		{ Joint = "Neck", Rest = deg(0, 7, 0), Peak = deg(0, -7, 0) },
 
-		-- Tucked tighter than the walk, not wider. The first build had this at 16-18
-		-- against the walk's 12-14, so a sprint held its arms further out than a stroll
-		-- while swinging them through a 114 degree arc — which reads as windmilling
-		-- rather than as running. Tucking the elbows in is most of what separates a
-		-- sprint from a jog, and the arc is trimmed a little so the drive lands as power
-		-- rather than as flapping.
-		{ Joint = "RightShoulder", Rest = deg(-46, 0, 5), Peak = deg(58, 0, 6), Phase = 0.5 },
-		{ Joint = "LeftShoulder", Rest = deg(-46, 0, -5), Peak = deg(58, 0, -6) },
+		-- Tucked tighter than the walk. Tucking the elbows in is most of what separates
+		-- a sprint from a jog; an earlier build had these held wider than the walk and
+		-- it read as windmilling.
+		{ Joint = "RightShoulder", Rest = deg(-58, 0, 4), Peak = deg(56, 0, 5), Phase = 0.5 },
+		{ Joint = "LeftShoulder", Rest = deg(-58, 0, -4), Peak = deg(56, 0, -5) },
 		-- Held near ninety through the whole cycle. A sprinter's elbow angle barely
 		-- changes; it is the shoulder that drives, and a flapping forearm reads as a jog.
-		{ Joint = "RightElbow", Rest = deg(78, 0, 0), Peak = deg(96, 0, 0), Phase = 0.5 },
-		{ Joint = "LeftElbow", Rest = deg(78, 0, 0), Peak = deg(96, 0, 0) },
+		{ Joint = "RightElbow", Rest = deg(88, 0, 0), Peak = deg(104, 0, 0), Phase = 0.5 },
+		{ Joint = "LeftElbow", Rest = deg(88, 0, 0), Peak = deg(104, 0, 0) },
 
-		{ Joint = "RightHip", Rest = deg(-42, 0, 5), Peak = deg(58, 0, 5) },
-		{ Joint = "LeftHip", Rest = deg(-42, 0, -5), Peak = deg(58, 0, -5), Phase = 0.5 },
-		{ Joint = "RightKnee", Rest = deg(-18, 0, 0), Peak = deg(-112, 0, 0), Phase = 0.2 },
-		{ Joint = "LeftKnee", Rest = deg(-18, 0, 0), Peak = deg(-112, 0, 0), Phase = 0.7 },
-		{ Joint = "RightAnkle", Rest = deg(-14, 0, 0), Peak = deg(22, 0, 0), Phase = 0.15 },
-		{ Joint = "LeftAnkle", Rest = deg(-14, 0, 0), Peak = deg(22, 0, 0), Phase = 0.65 },
+		{ Joint = "RightHip", Rest = deg(-48, 0, 4), Peak = deg(66, 0, 4) },
+		{ Joint = "LeftHip", Rest = deg(-48, 0, -4), Peak = deg(66, 0, -4), Phase = 0.5 },
+		{ Joint = "RightKnee", Rest = deg(-14, 0, 0), Peak = deg(-118, 0, 0), Phase = 0.2 },
+		{ Joint = "LeftKnee", Rest = deg(-14, 0, 0), Peak = deg(-118, 0, 0), Phase = 0.7 },
+		{ Joint = "RightAnkle", Rest = deg(-18, 0, 0), Peak = deg(26, 0, 0), Phase = 0.15 },
+		{ Joint = "LeftAnkle", Rest = deg(-18, 0, 0), Peak = deg(26, 0, 0), Phase = 0.65 },
+	},
+}
+
+--[[
+	Dash — the ninja run, for flat out only.
+
+	The whole silhouette is the arms: straight, locked, and trailing behind the body,
+	which is why they barely cycle at all. Everything else follows from committing to
+	that — the strides go long and low rather than high, the waist stops rotating because
+	the shoulders are pinned back, and the controller's lean reaches its deepest here.
+
+	The shoulders stay negative at both ends of the cycle, unlike the other two gaits
+	which swing through zero. That is the difference between arms that trail and arms
+	that pump, and GaitConfig's self-test asserts it so a retune cannot quietly turn this
+	back into a sprint.
+]]
+local DASH: PoseConfig.Pose = {
+	Id = "GaitDash",
+	Cycles = 1,
+	MotionStyle = "Snapped",
+	Joints = {
+		{ Joint = "Root", Rest = deg(0, 0, -2), Peak = deg(0, 0, 2) },
+		-- Barely rotates. A body committed this far forward with its arms pinned back
+		-- has nothing left to counter-rotate with, and a waist swinging under trailing
+		-- arms reads as a stumble.
+		{ Joint = "Waist", Rest = deg(0, -5, 0), Peak = deg(0, 5, 0) },
+		{ Joint = "Neck", Rest = deg(0, 3, 0), Peak = deg(0, -3, 0) },
+
+		-- Swept back and held there. The small swing is the arms reacting to the stride
+		-- rather than driving it.
+		{ Joint = "RightShoulder", Rest = deg(-76, 0, 12), Peak = deg(-62, 0, 14), Phase = 0.5 },
+		{ Joint = "LeftShoulder", Rest = deg(-76, 0, -12), Peak = deg(-62, 0, -14) },
+		-- Nearly locked straight, which is the read: the arms are a pair of lines behind
+		-- the body, not a pair of angles.
+		{ Joint = "RightElbow", Rest = deg(4, 0, 0), Peak = deg(10, 0, 0), Phase = 0.5 },
+		{ Joint = "LeftElbow", Rest = deg(4, 0, 0), Peak = deg(10, 0, 0) },
+
+		-- Longer than the sprint's and lower: the legs reach rather than climb.
+		{ Joint = "RightHip", Rest = deg(-56, 0, 3), Peak = deg(72, 0, 3) },
+		{ Joint = "LeftHip", Rest = deg(-56, 0, -3), Peak = deg(72, 0, -3), Phase = 0.5 },
+		{ Joint = "RightKnee", Rest = deg(-8, 0, 0), Peak = deg(-92, 0, 0), Phase = 0.2 },
+		{ Joint = "LeftKnee", Rest = deg(-8, 0, 0), Peak = deg(-92, 0, 0), Phase = 0.7 },
+		{ Joint = "RightAnkle", Rest = deg(-24, 0, 0), Peak = deg(30, 0, 0), Phase = 0.15 },
+		{ Joint = "LeftAnkle", Rest = deg(-24, 0, 0), Peak = deg(30, 0, 0), Phase = 0.65 },
 	},
 }
 
 local gaits: { Gait } = {
 	{ Id = "Walk", Pose = WALK },
 	{ Id = "Sprint", Pose = SPRINT },
+	{ Id = "Dash", Pose = DASH },
 }
 
 GaitConfig.List = gaits
 GaitConfig.Walk = WALK
 GaitConfig.Sprint = SPRINT
+GaitConfig.Dash = DASH
+
+--[[
+	Where the walk finishes becoming the sprint, as a fraction of the gait blend — and
+	therefore where the sprint starts becoming the dash.
+
+	Low, because the blend is measured against the *global* speed ceiling of 64 rather
+	than against each character's own top speed. A fresh player's sprint is 24 studs a
+	second, which is only (24-16)/(64-16) = 0.167 of that range, so the walk has to be
+	fully behind them by then or holding Shift would still look like walking.
+
+	Everything above it is the long climb to the ninja run, which is the point: the dash
+	is something forty Legs earns rather than something every player gets for free the
+	moment they hold a key.
+
+	Lives here rather than in Formulas, unlike flight's equivalent: nothing about this
+	crosses the wire, so it is a pose-blending detail rather than a shared protocol
+	constant.
+]]
+GaitConfig.SPRINT_FRACTION = 0.15
 
 local byId: { [string]: Gait } = {}
 for _, gait in gaits do
@@ -215,31 +280,52 @@ end
 	structure by design, and interpolating between two phases would slide the whole
 	stride sideways as a player accelerated.
 ]]
+local function motionIn(pose: PoseConfig.Pose, jointName: string): PoseConfig.JointMotion?
+	for _, motion in pose.Joints do
+		if motion.Joint == jointName then
+			return motion
+		end
+	end
+	return nil
+end
+
+--[[
+	The two silhouettes a blend sits between, and how far between them it is.
+
+	Walk to Sprint occupies the lower part of the range and Sprint to Dash the upper,
+	split at SPRINT_FRACTION — the same shape as FlightPoseController's hover/glide/cruise
+	pairing, so both places blend three poses the same way.
+]]
+local function pairAt(alpha: number): (PoseConfig.Pose, PoseConfig.Pose, number)
+	local t = math.clamp(alpha, 0, 1)
+	local split = GaitConfig.SPRINT_FRACTION
+	if t <= split then
+		return WALK, SPRINT, if split > 1e-4 then t / split else 0
+	end
+	return SPRINT, DASH, math.clamp((t - split) / math.max(1e-4, 1 - split), 0, 1)
+end
+
+--[[
+	One joint, blended across the three gaits into a single JointMotion.
+
+	Returned as a JointMotion so the result flows through the same PosePlayback.PoseAt and
+	AlphaAt everything else uses. Phase is taken from the first of the pair rather than
+	interpolated: the three cycles share a phase structure by design, and sliding a phase
+	as a player accelerated would drag the whole stride sideways.
+]]
 function GaitConfig.BlendJoint(jointName: string, alpha: number): PoseConfig.JointMotion?
-	local walk: PoseConfig.JointMotion? = nil
-	local sprint: PoseConfig.JointMotion? = nil
-	for _, motion in WALK.Joints do
-		if motion.Joint == jointName then
-			walk = motion
-			break
-		end
-	end
-	for _, motion in SPRINT.Joints do
-		if motion.Joint == jointName then
-			sprint = motion
-			break
-		end
-	end
-	if walk == nil or sprint == nil then
+	local from, to, t = pairAt(alpha)
+	local a = motionIn(from, jointName)
+	local b = motionIn(to, jointName)
+	if a == nil or b == nil then
 		return nil
 	end
 
-	local t = math.clamp(alpha, 0, 1)
 	return {
 		Joint = jointName,
-		Rest = walk.Rest:Lerp(sprint.Rest, t),
-		Peak = walk.Peak:Lerp(sprint.Peak, t),
-		Phase = walk.Phase,
+		Rest = a.Rest:Lerp(b.Rest, t),
+		Peak = a.Peak:Lerp(b.Peak, t),
+		Phase = a.Phase,
 	}
 end
 
@@ -367,15 +453,21 @@ function GaitConfig.RunSelfTest(): { string }
 
 	-- Blend endpoints must be exact, or a walk sits a fraction away from the pose that
 	-- was actually authored and every silhouette in the file is slightly wrong.
+	local dashHip = motionFor(DASH, "RightHip")
 	local atWalk = GaitConfig.BlendJoint("RightHip", 0)
-	local atSprint = GaitConfig.BlendJoint("RightHip", 1)
+	local atSprint = GaitConfig.BlendJoint("RightHip", GaitConfig.SPRINT_FRACTION)
+	local atDash = GaitConfig.BlendJoint("RightHip", 1)
 	check(
 		atWalk ~= nil and walkHip ~= nil and atWalk.Peak == walkHip.Peak,
 		"a zero blend is exactly the walk"
 	)
 	check(
 		atSprint ~= nil and sprintHip ~= nil and atSprint.Peak == sprintHip.Peak,
-		"a full blend is exactly the sprint"
+		"the split lands exactly on the sprint"
+	)
+	check(
+		atDash ~= nil and dashHip ~= nil and atDash.Peak == dashHip.Peak,
+		"a full blend is exactly the dash"
 	)
 	check(GaitConfig.BlendJoint("NotAJoint", 0) == nil, "an unknown joint blends to nothing")
 	-- Phase must survive the blend untouched. Interpolating it would slide the whole
@@ -384,6 +476,64 @@ function GaitConfig.RunSelfTest(): { string }
 		atSprint ~= nil and walkHip ~= nil and (atSprint.Phase or 0) == (walkHip.Phase or 0),
 		"blending does not shift the stride's phase"
 	)
+
+	--[[
+		The dash is a ninja run, and these are the three things that make it one rather
+		than a faster sprint.
+	]]
+	local walkShoulderRest = motionFor(WALK, "RightShoulder")
+	local sprintShoulderRest = motionFor(SPRINT, "RightShoulder")
+	local dashShoulder = motionFor(DASH, "RightShoulder")
+	local dashElbow = motionFor(DASH, "RightElbow")
+	-- Arms behind the body at *both* ends of the cycle. The walk and sprint swing
+	-- through zero — forward and back — and a dash that did the same would just be a
+	-- sprint with a deeper lean.
+	check(
+		dashShoulder ~= nil and dashShoulder.Rest.X < 0 and dashShoulder.Peak.X < 0,
+		"the dash trails its arms behind it"
+	)
+	check(
+		walkShoulderRest ~= nil and walkShoulderRest.Rest.X < 0 and walkShoulderRest.Peak.X > 0,
+		"the walk swings its arms through"
+	)
+	-- And they barely move. Trailing arms that pumped would read as flailing.
+	local function swingOf(motion: PoseConfig.JointMotion?): number
+		return if motion ~= nil then math.abs(motion.Peak.X - motion.Rest.X) else 0
+	end
+	check(
+		swingOf(dashShoulder) < swingOf(walkShoulderRest)
+			and swingOf(dashShoulder) < swingOf(sprintShoulderRest),
+		"the dash swings its arms least of the three"
+	)
+	-- Straight, not bent. A pair of lines behind the body rather than a pair of angles.
+	local sprintElbowRest = motionFor(SPRINT, "RightElbow")
+	check(
+		dashElbow ~= nil and sprintElbowRest ~= nil and dashElbow.Rest.X < sprintElbowRest.Rest.X,
+		"the dash locks its elbows straighter than the sprint drives them"
+	)
+
+	--[[
+		Head pitch is the controller's, not the poses'.
+
+		Neck X must be zero in every gait: GaitController cancels the lean on the neck so
+		the character looks where they are going at any speed. A hand-written pitch here
+		would fight it, which is exactly how the sprint ended up staring at the floor —
+		Neck -6 against a -18 lean.
+	]]
+	for _, gait in gaits do
+		local neck = motionFor(gait.Pose, "Neck")
+		check(
+			neck ~= nil and neck.Rest.X == 0 and neck.Peak.X == 0,
+			`{gait.Id} leaves head pitch to the controller`
+		)
+	end
+
+	-- Every gait runs the snappy curve. A pure cosine is the most symmetric, most
+	-- realistic timing available, and anime poses played on it still read as realistic —
+	-- see PosePlayback.AlphaAt.
+	for _, gait in gaits do
+		check(gait.Pose.MotionStyle == "Snapped", `{gait.Id} uses the snapped timing`)
+	end
 
 	check(#GaitConfig.FOOTFALL_PHASES == 2, "a stride plants two feet")
 	for _, footfall in GaitConfig.FOOTFALL_PHASES do

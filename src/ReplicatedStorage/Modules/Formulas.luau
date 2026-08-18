@@ -184,6 +184,12 @@ Formulas.MAX_CORE_REFLECTION = 1
 -- skipping through the map. These are bonus caps, not hidden conversion curves: every
 -- Legs point before a cap is exactly +1 stud/second and the Info row shows both bonuses.
 Formulas.MAX_SPRINT_BONUS = 40
+-- The fastest anybody can run on the ground, at forty Legs. The gait is measured against
+-- this rather than against each character's own top speed: relative to themselves,
+-- everybody is at 100% the moment they hold Shift, so a fresh player would get the same
+-- flat-out silhouette as a maxed one. Measured absolutely, the ninja run is something
+-- Legs earns.
+Formulas.SPRINT_CEILING = 24 + 40
 Formulas.MAX_FLIGHT_BONUS = 80
 
 -- Flight silhouettes, as fractions of the flier's own top speed rather than as stud
@@ -230,12 +236,19 @@ Formulas.MIN_GAIT_SPEED = 2
 -- Magnitudes, kept positive here because they read better as "four degrees" than as
 -- "minus four". RunLean applies the sign — see its header for which way is forward.
 Formulas.MIN_RUN_LEAN = 4
-Formulas.MAX_RUN_LEAN = 18
--- Vertical bob of the whole body, in studs, at a walk and at a sprint. Applied by the
--- controller at twice the stride frequency, because a body rises and falls once per
--- *step* and a stride is two steps.
-Formulas.MIN_GAIT_BOB = 0.06
-Formulas.MAX_GAIT_BOB = 0.22
+-- Deep, because the top of the range is a Naruto run and that silhouette is mostly the
+-- lean. Reached quadratically rather than linearly — see RunLean — so a jog does not
+-- lean like a sprinter on the way there.
+Formulas.MAX_RUN_LEAN = 40
+-- Vertical bob of the whole body, in studs. Applied by the controller at twice the
+-- stride frequency, because a body rises and falls once per *step* and a stride is two
+-- steps.
+--
+-- Named for the two ends rather than MIN and MAX, because the walk is the *larger* of
+-- them: an anime walk is bouncy and a flat-out dash is low and gliding, which is the
+-- opposite of how a real gait behaves. MIN/MAX would now be lies.
+Formulas.GAIT_BOB_WALK = 0.15
+Formulas.GAIT_BOB_DASH = 0.07
 
 -- How hard a landed hit reads, in three bands. Stated by the ability rather than derived
 -- from damage, and that is deliberate: for evenly matched players a jab is about two per
@@ -691,19 +704,26 @@ function Formulas.RunLean(blend: number): number
 	if not Formulas.IsFinite(blend) then
 		return -Formulas.MIN_RUN_LEAN
 	end
+	-- Quadratic, so the deep end arrives late. The lean now reaches forty degrees for the
+	-- flat-out dash, and growing to that linearly would have an ordinary jog already
+	-- pitched over like a sprinter.
 	local t = math.clamp(blend, 0, 1)
-	return -(Formulas.MIN_RUN_LEAN + (Formulas.MAX_RUN_LEAN - Formulas.MIN_RUN_LEAN) * t)
+	return -(Formulas.MIN_RUN_LEAN + (Formulas.MAX_RUN_LEAN - Formulas.MIN_RUN_LEAN) * t * t)
 end
 
 --[[
 	Vertical bob amplitude, in studs, for a gait blend of 0 to 1.
+
+	Falls as speed rises. A bouncy walk and a low gliding dash is the anime read; a real
+	gait does the opposite, which is why the constants are named for their ends rather
+	than as a minimum and a maximum.
 ]]
 function Formulas.GaitBob(blend: number): number
 	if not Formulas.IsFinite(blend) then
-		return Formulas.MIN_GAIT_BOB
+		return Formulas.GAIT_BOB_WALK
 	end
 	local t = math.clamp(blend, 0, 1)
-	return Formulas.MIN_GAIT_BOB + (Formulas.MAX_GAIT_BOB - Formulas.MIN_GAIT_BOB) * t
+	return Formulas.GAIT_BOB_WALK + (Formulas.GAIT_BOB_DASH - Formulas.GAIT_BOB_WALK) * t
 end
 
 --[[
@@ -1042,10 +1062,14 @@ function Formulas.RunSelfTest(): { string }
 	check("a sprint leans hardest", Formulas.RunLean(1) == -Formulas.MAX_RUN_LEAN)
 	check("lean is capped", Formulas.RunLean(9) == -Formulas.MAX_RUN_LEAN)
 	check("lean grows with speed", Formulas.RunLean(0.6) < Formulas.RunLean(0.2))
+	-- The deep end arrives late. Half speed must stay far shallower than half the full
+	-- lean, or an ordinary jog is already pitched over like a flat-out dash.
+	check("a jog does not lean like a dash", math.abs(Formulas.RunLean(0.5)) < Formulas.MAX_RUN_LEAN * 0.4)
 	check("bad input still leans forward", Formulas.RunLean(0 / 0) == -Formulas.MIN_RUN_LEAN)
-	check("bob grows with speed", Formulas.GaitBob(1) > Formulas.GaitBob(0))
-	check("bob is capped", Formulas.GaitBob(9) == Formulas.MAX_GAIT_BOB)
-	check("bob survives bad input", Formulas.GaitBob(0 / 0) == Formulas.MIN_GAIT_BOB)
+	-- Bouncy walk, gliding dash — the anime read, and the reverse of a real gait.
+	check("a walk bounces more than a dash", Formulas.GaitBob(0) > Formulas.GaitBob(1))
+	check("bob is capped", Formulas.GaitBob(9) == Formulas.GAIT_BOB_DASH)
+	check("bob survives bad input", Formulas.GaitBob(0 / 0) == Formulas.GAIT_BOB_WALK)
 
 	-- The gait must not switch on while a player is standing still. A character resting
 	-- against geometry still reports a fraction of a stud per second.

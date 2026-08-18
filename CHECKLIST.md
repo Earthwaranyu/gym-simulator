@@ -1608,6 +1608,42 @@ punches for a whole phase, so the game had two answers to one question.
       with |Z| 6.33. Screen capture is still unresponsive, so this is confirmed consistent
       with the working poses rather than confirmed to look right.
 
+- [ ] 136. **The gait becomes anime.** Re-authored from "heavy gym-bruiser" to an anime
+      walk and run, in three parts.
+      **Timing first.** `StrikeConfig`'s header already says "the anime read comes from
+      the timing far more than the angles" — a cartoon motion holds at full extension and
+      crosses between poses in two frames — and the gait was running on a pure cosine, the
+      most symmetric and most *realistic* curve available. Anime poses on that curve still
+      read as realistic. A third `MotionStyle`, `Snapped`, runs the cosine through the
+      `smootherstep` helper already local to `PosePlayback`, so limbs dwell near their
+      extremes and transit fast. Deliberately not a literal hold, which would read as
+      dropped frames.
+      **Three silhouettes instead of two.** A light bouncy upright walk, a shonen sprint
+      with long strides and high knees, and a Naruto dash whose whole identity is the arms
+      — swept back, elbows locked, barely cycling. `GaitConfig` asserts the dash keeps its
+      shoulders negative at *both* ends of the cycle where the walk swings through zero,
+      which is the difference between arms that trail and arms that pump.
+      **The blend is now absolute, not per character.** It used to measure against each
+      character's own `WalkSpeed`, which meant everybody sat at 100% the moment they held
+      Shift — a fresh player jogging at 24 studs a second got the identical flat-out ninja
+      run as somebody with forty Legs doing 64. Measured against the global 64-stud
+      ceiling, speed means the same thing for everyone and **the dash is something Legs
+      earns**. The lean also went quadratic and deepened to 40 degrees so the deep end
+      arrives late, and the bob inverted — bouncy walk, gliding dash — which is the
+      reverse of a real gait and required renaming its constants, since MIN/MAX had become
+      lies.
+      **A third convention bug, fixed structurally.** `FlightConfig` pairs Root -26 with
+      Neck +20 and -62 with +46: the neck cancels the lean so the head stays level. The
+      sprint had Neck -6 against a -18 lean, so it stared at the floor. Rather than
+      hand-tune it again — hand-tuning is what produced all three of these bugs — the
+      controller now derives the neck counter-rotation from the same number it leans the
+      root by, and the self-test asserts no gait pose writes a head pitch at all.
+      Verified live: walk leans -4.0 with the shoulder swinging -30..+33; a fresh sprint
+      leans -5.0 with -58..+54 and -117 knees; top speed leans -37.1 with the shoulder at
+      -75..-56, both ends behind the body. The neck cancels the lean to within 0.05
+      degrees at every speed. Screen capture is still unresponsive, so this is verified
+      numerically and against the conventions rather than visually.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
