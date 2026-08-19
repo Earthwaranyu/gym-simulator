@@ -2907,6 +2907,23 @@ CITY_PROPS = {
 }
 
 
+def parked_car(x, z, facing, rng):
+    """Six parts. Cars exist to give the kerb a scale and the street a life."""
+    body = [rng.uniform(0.15, 0.75) for _ in range(3)]
+    frame = mul(cf(x, FLOOR_TOP, z), rot_y(facing))
+    out = [
+        part("CarBody", [7.4, 3.2, 16], mul(frame, cf(0, 2.6, 0)), body, "Metal"),
+        part("CarCabin", [6.6, 2.8, 7.6], mul(frame, cf(0, 5.6, -0.6)),
+             [0.11, 0.12, 0.15], "Glass", Reflectance=0.25),
+    ]
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            out.append(cylinder("CarWheel", 1.2, 3.0,
+                                mul(frame, mul(cf(sx * 3.6, 1.5, sz * 5.2), rot_y(90))),
+                                [0.06, 0.06, 0.07], "Rubber"))
+    return out
+
+
 def palm(x, z, rng):
     """Trunk and fronds. The one plant in a city of concrete."""
     height = rng.uniform(16, 26)
@@ -4133,6 +4150,9 @@ def city_block_shell(rect, index):
 
     # The buildable interior, inset again so nothing overhangs the pavement.
     character = character_at(x, z)
+    out.extend(street_furniture(x, z, inner_w, inner_d, index,
+                                character["skins"][0]["trim"], SIDEWALK))
+
     build_w, build_d = inner_w - 30, inner_d - 30
     if build_w > 90 and build_d > 90:
         for lot in subdivide(x, z, build_w, build_d, rng):
@@ -4150,27 +4170,27 @@ CITY_CHARACTER = {
     "Park": {
         "skins": [BUILDING_SKINS[1], BUILDING_SKINS[2]],
         "heights": {"tower": (40, 70), "midrise": (26, 46), "shophouse": (14, 24)},
-        "weights": (("shophouse", 5), ("midrise", 4), ("yard", 3), ("tower", 1)),
+        "weights": (("shophouse", 5), ("midrise", 4), ("yard", 3), ("parking", 2), ("tower", 1)),
     },
     "Beach": {
         "skins": [BUILDING_SKINS[2], BUILDING_SKINS[0]],
         "heights": {"tower": (48, 84), "midrise": (28, 50), "shophouse": (14, 26)},
-        "weights": (("shophouse", 4), ("midrise", 5), ("yard", 2), ("tower", 2)),
+        "weights": (("shophouse", 4), ("midrise", 5), ("yard", 2), ("parking", 2), ("tower", 2)),
     },
     "Dock": {
         "skins": [BUILDING_SKINS[3], BUILDING_SKINS[0]],
         "heights": {"tower": (44, 72), "midrise": (22, 40), "shophouse": (12, 22)},
-        "weights": (("shophouse", 3), ("midrise", 4), ("yard", 5), ("tower", 1)),
+        "weights": (("shophouse", 3), ("midrise", 4), ("yard", 4), ("parking", 3), ("tower", 1)),
     },
     "City": {
         "skins": [BUILDING_SKINS[0], BUILDING_SKINS[3]],
         "heights": {"tower": (110, 210), "midrise": (48, 92), "shophouse": (18, 30)},
-        "weights": (("tower", 5), ("midrise", 5), ("shophouse", 2), ("yard", 1)),
+        "weights": (("tower", 5), ("midrise", 5), ("shophouse", 2), ("yard", 1), ("parking", 1)),
     },
     "Office": {
         "skins": [BUILDING_SKINS[3], BUILDING_SKINS[0]],
         "heights": {"tower": (140, 250), "midrise": (60, 110), "shophouse": (20, 32)},
-        "weights": (("tower", 6), ("midrise", 4), ("shophouse", 1), ("yard", 1)),
+        "weights": (("tower", 6), ("midrise", 4), ("shophouse", 1), ("yard", 1), ("parking", 1)),
     },
 }
 
@@ -4336,6 +4356,9 @@ def city_lot(lot, kind, character, rng):
     if width < 34 or depth < 34:
         return []
 
+    if kind == "parking":
+        return parking_lot(x, z, width, depth, rng)
+
     if kind == "yard":
         # Deliberately empty ground, but finished: a yard reads as a place, a
         # gap in the lattice reads as unfinished.
@@ -4354,6 +4377,97 @@ def city_lot(lot, kind, character, rng):
     # validator hold a single building to a part budget, and it gives streaming a
     # unit to load a building as, instead of forty unrelated slabs.
     return [group("Building", procedural_building(x, z, width, depth, height, skin, rng))]
+
+
+# How far apart kerbside furniture stations sit. Fixed stations with a random
+# choice at each, rather than random positions: scattering by position clumps and
+# leaves gaps, and a street reads as a street precisely because its lamps and
+# benches are evenly spaced.
+FURNITURE_PITCH = 215
+
+
+def _scenery(pieces, x, z):
+    """Places a prop kit at a point and strips its collision.
+
+    SOLID_CITY_PROPS is empty on purpose -- nothing scattered on a pavement is
+    cover -- so a crate the player can run through is the rule rather than the
+    exception, and the validator enforces it.
+    """
+    out = []
+    for piece in pieces:
+        node = place(cf(x, 0, z), piece)
+        node["properties"]["CanCollide"] = False
+        out.append(node)
+    return out
+
+
+def street_furniture(x, z, width, depth, index, accent, ground):
+    """What stands along a block's kerb: lamps, trees, props, cars.
+
+    Draws from its own stream rather than the block's. Sharing one meant every
+    tweak to the furniture pitch consumed a different number of rolls and
+    reshuffled every building in the city behind it -- so tuning the street
+    silently redesigned the skyline, and no change could be judged on its own.
+    """
+    rng = random.Random(f"city-v3:furniture:{index}")
+    out = []
+    half_w, half_d = width / 2, depth / 2
+
+    # Walk the two long kerbs. One side per axis is enough -- both sides of every
+    # block would double the cost to say the same thing.
+    stations = []
+    steps = max(1, int(width // FURNITURE_PITCH))
+    for step in range(steps):
+        px = -half_w + width * (step + 0.5) / steps
+        stations.append((x + px, z + half_d, 0))
+        stations.append((x + px, z - half_d, 180))
+    steps = max(1, int(depth // FURNITURE_PITCH))
+    for step in range(steps):
+        pz = -half_d + depth * (step + 0.5) / steps
+        stations.append((x + half_w, z + pz, 90))
+        stations.append((x - half_w, z + pz, -90))
+
+    for sx, sz, facing in stations:
+        roll = rng.random()
+        if roll < 0.22:
+            out.extend(street_light(sx, sz, facing))
+        elif roll < 0.44:
+            out.extend(city_tree(sx, sz, rng))
+        elif roll < 0.50:
+            out.extend(_scenery(CITY_PROPS["crate"](rng, accent, ground), sx, sz))
+        elif roll < 0.56:
+            out.extend(_scenery(CITY_PROPS["barrel"](rng, accent, ground), sx, sz))
+        elif roll < 0.64:
+            out.append(part("Bollard", [1.1, 3.2, 1.1], cf(sx, FLOOR_TOP + 1.6, sz),
+                            [0.22, 0.22, 0.24], "Metal", CanCollide=False))
+        elif roll < 0.72:
+            # Kerbside parking. Cars are the cheapest thing that gives a street
+            # its scale -- a road with nothing on it could be any width.
+            out.extend(parked_car(sx, sz, facing + 90, rng))
+        # The remainder is deliberately nothing: furniture at every station is
+        # as wrong as furniture at none.
+    return out
+
+
+def parking_lot(x, z, width, depth, rng):
+    """An asphalt lot with bay markings and a few cars.
+
+    One stripe per row rather than per bay: at the distance a lot is read from,
+    the rows are the pattern and the individual bays are not.
+    """
+    out = [part("Parking", [width, 0.3, depth], cf(x, FLOOR_TOP + 0.14, z),
+                ROAD, "Asphalt", CanCollide=False, CastShadow=False)]
+    rows = max(1, int(depth // 46))
+    for row in range(rows):
+        rz = z - depth / 2 + depth * (row + 0.5) / rows
+        out.append(part("BayLine", [width - 8, 0.12, 0.6], cf(x, FLOOR_TOP + 0.32, rz),
+                        [0.72, 0.70, 0.62], "SmoothPlastic",
+                        CanCollide=False, CastShadow=False))
+        for slot in range(max(1, int(width // 34))):
+            if rng.random() < 0.28:
+                sx = x - width / 2 + width * (slot + 0.5) / max(1, int(width // 34))
+                out.extend(parked_car(sx, rz + 8, 0, rng))
+    return out
 
 
 def city_grid(locations):
