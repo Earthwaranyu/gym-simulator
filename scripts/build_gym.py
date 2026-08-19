@@ -299,8 +299,8 @@ def padded_slab(name, size, frame, color, caps=False):
     return out
 
 
-def pulley(name, centre, diameter, accent, axis_length=0.5):
-    """A cable wheel in its housing.
+def pulley(name, centre, diameter, accent, axis_length=0.5, mount=None):
+    """A cable wheel in its housing, on the bracket that carries it.
 
     Selectorised machines currently route their cable past nothing at all, so the
     line changes direction in mid-air. A wheel at the corner is what makes the
@@ -308,19 +308,28 @@ def pulley(name, centre, diameter, accent, axis_length=0.5):
 
     The wheel's axle runs along X, so the wheel itself lies in the machine's
     YZ plane, which is the plane every cable in the gym runs in.
+
+    `mount` is where the bracket is bolted; without one the wheel hangs in the
+    air, which is the exact problem it was added to solve. The cheeks are kept
+    well under the wheel diameter so the rim the cable actually rides on still
+    shows between them.
     """
-    return [
+    cheek = diameter * 0.62
+    out = [
         cylinder(f"{name}Wheel", 0.22, diameter,
                  mul(cf(*centre), rot_z(90)), CHROME, "Metal", Reflectance=0.3),
-        cylinder(f"{name}Axle", axis_length, 0.16,
+        cylinder(f"{name}Axle", axis_length + 0.24, 0.16,
                  cf(*centre), STEEL_LIGHT, "Metal"),
-        part(f"{name}Cheek", [0.12, diameter * 0.95, diameter * 0.95],
-             cf(centre[0] - axis_length / 2, centre[1], centre[2]),
-             accent, "Metal"),
-        part(f"{name}Cheek", [0.12, diameter * 0.95, diameter * 0.95],
-             cf(centre[0] + axis_length / 2, centre[1], centre[2]),
-             accent, "Metal"),
     ]
+    for side in (-1, 1):
+        out.append(part(f"{name}Cheek", [0.12, cheek, cheek],
+                        cf(centre[0] + side * axis_length / 2, centre[1], centre[2]),
+                        accent, "Metal"))
+    if mount is not None:
+        out.append(tube(f"{name}Bracket", mount, centre, 0.3, STEEL_LIGHT))
+        out.append(hardware(f"{name}BracketBolt",
+                            mul(cf(*mount), rot_z(90)), 0.34))
+    return out
 
 
 def console(name, frame, accent, size=(2.6, 1.5, 0.18)):
@@ -1830,32 +1839,95 @@ def leg_extension(pad_color, accent):
     out = [floor_mat(10, 11)]
     out.extend([
         part("Base", [7.5, 0.65, 8.5], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
-        part("Seat", [4.5, 0.7, 4.0], cf(0, FLOOR_TOP + 2.4, 1.8), pad_color, "Fabric"),
-        part("BackPad", [4.5, 5.5, 0.7], cf(0, FLOOR_TOP + 5.1, 3.4), pad_color, "Fabric"),
         cylinder("AnkleRoller", 5.5, 1.2, cf(0, FLOOR_TOP + 1.6, -2.2), RUBBER, "Pebble"),
         part("Pivot", [1.0, 4.0, 1.0], cf(0, FLOOR_TOP + 2.0, -0.5), accent, "Metal"),
         part("WeightStack", [2.2, 6.0, 2.4],
              cf(-3.3, FLOOR_TOP + 3.0, -2.8), STEEL_LIGHT, "Metal"),
+    ])
+
+    # The seat and back are what the lifter is actually touching, so they are the
+    # two surfaces worth spending a rolled edge on.
+    out.extend(padded_slab("Seat", [4.5, 0.7, 4.0],
+                           cf(0, FLOOR_TOP + 2.4, 1.8), pad_color, caps=True))
+    out.extend(padded_slab("BackPad", [4.5, 5.5, 0.7],
+                           cf(0, FLOOR_TOP + 5.1, 3.4), pad_color))
+
+    # Tubular frame. The seat used to float over its base with nothing carrying it.
+    for side in (-1, 1):
+        out.append(tube("SeatPost", (side * 1.8, FLOOR_TOP + 0.65, 1.8),
+                        (side * 1.8, FLOOR_TOP + 2.1, 1.8), 0.34, STEEL_LIGHT))
+        out.append(tube("BackPost", (side * 2.0, FLOOR_TOP + 0.65, 3.8),
+                        (side * 2.0, FLOOR_TOP + 7.4, 3.8), 0.38, STEEL))
+        out.append(tube("RollerArm", (side * 0.45, FLOOR_TOP + 3.6, -0.5),
+                        (side * 0.45, FLOOR_TOP + 1.6, -2.2), 0.3, STEEL_LIGHT))
+        out.append(hardware("PivotBolt",
+                            mul(cf(side * 0.5, FLOOR_TOP + 3.6, -0.5), rot_z(90)), 0.4))
+        out.append(cylinder("RollerCap", 0.2, 1.25,
+                            cf(side * 2.75, FLOOR_TOP + 1.6, -2.2), accent, "Metal"))
+    out.append(tube("BackBrace", (-2.0, FLOOR_TOP + 7.4, 3.8),
+                    (2.0, FLOOR_TOP + 7.4, 3.8), 0.34, STEEL))
+
+    # The stack now pulls on something: over the wheel, down to the lifting arm.
+    out.extend(pulley("Lift", (-3.3, FLOOR_TOP + 7.0, -2.8), 1.1, accent,
+                      mount=(-3.3, FLOOR_TOP + 6.3, -2.8)))
+    out.extend(cable_run([(-3.3, FLOOR_TOP + 6.05, -2.8),
+                          (-3.3, FLOOR_TOP + 7.0, -2.8),
+                          (-0.5, FLOOR_TOP + 3.7, -0.5)]))
+    out.extend(stack_shroud("Stack", (-3.3, FLOOR_TOP + 6.0, -2.8), 2.5, 6.0, 2.4, accent))
+
+    for fx in (-3.4, 3.4):
+        for fz in (-3.9, 3.9):
+            out.append(foot_pad("Foot", cf(fx, FLOOR_TOP + 0.11, fz)))
+
+    out.extend([
         marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.5, 1.8)),
         marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.6)),
     ])
     return out
 
-
 def hamstring_curl(pad_color, accent):
     """Prone leg-curl bench with heel roller and selector stack."""
     out = [floor_mat(10, 13)]
     out.extend([
-        part("Base", [4.8, 0.7, 10.0], cf(0, FLOOR_TOP + 1.7, 0), pad_color, "Fabric"),
         part("Frame", [1.0, 1.5, 11.0], cf(0, FLOOR_TOP + 0.8, 0), STEEL, "DiamondPlate"),
         part("WeightStack", [3.5, 6.0, 2.5], cf(0, FLOOR_TOP + 3.0, -5.0), STEEL_LIGHT, "Metal"),
         cylinder("HeelRoller", 6.0, 1.25, cf(0, FLOOR_TOP + 2.8, 4.2), RUBBER, "Pebble"),
         part("StackStripe", [3.7, 0.4, 2.7], cf(0, FLOOR_TOP + 5.5, -5.0), accent, "Neon"),
+    ])
+
+    # The bench the lifter lies face-down on: the anchor sits at 2.9, so the pad
+    # surface it rests against must stay exactly where it was.
+    out.extend(padded_slab("Base", [4.8, 0.7, 10.0],
+                           cf(0, FLOOR_TOP + 1.7, 0), pad_color, caps=True))
+
+    for side in (-1, 1):
+        out.append(tube("Leg", (side * 0.0, FLOOR_TOP + 0.06, side * 4.6),
+                        (side * 0.0, FLOOR_TOP + 1.4, side * 4.6), 0.5, STEEL))
+        out.append(tube("RollerArm", (side * 0.4, FLOOR_TOP + 1.5, 3.0),
+                        (side * 0.4, FLOOR_TOP + 2.8, 4.2), 0.3, STEEL_LIGHT))
+        out.append(cylinder("RollerCap", 0.2, 1.3,
+                            cf(side * 3.0, FLOOR_TOP + 2.8, 4.2), accent, "Metal"))
+        out.append(tube("ChestRail", (side * 1.9, FLOOR_TOP + 2.1, 2.6),
+                        (side * 1.9, FLOOR_TOP + 2.1, 4.0), 0.28, CHROME))
+        out.append(hardware("FrameBolt",
+                            mul(cf(side * 0.55, FLOOR_TOP + 1.5, 2.4), rot_z(90))))
+
+    out.extend(pulley("Lift", (0, FLOOR_TOP + 6.6, -5.0), 1.0, accent,
+                      mount=(0, FLOOR_TOP + 6.0, -5.0)))
+    out.extend(cable_run([(0, FLOOR_TOP + 6.05, -5.0),
+                          (0, FLOOR_TOP + 6.6, -5.0),
+                          (0, FLOOR_TOP + 2.1, -1.0),
+                          (0.4, FLOOR_TOP + 2.6, 3.0)]))
+    out.extend(stack_shroud("Stack", (0, FLOOR_TOP + 6.0, -5.0), 3.8, 6.0, 2.5, accent))
+
+    for fz in (-5.2, 5.2):
+        out.append(foot_pad("Foot", cf(0, FLOOR_TOP + 0.11, fz), (1.6, 0.22, 1.0)))
+
+    out.extend([
         anchor_prone((0, FLOOR_TOP + 2.9, 0)),
         marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
 
 def calf_raise(pad_color, accent):
     """Standing calf block with shoulder pads and safety rails."""
@@ -1868,19 +1940,46 @@ def calf_raise(pad_color, accent):
         # avatar's head 0.61 studs inside it at the top of the raise -- measured. A real
         # calf-raise yoke is two pads that sit on the shoulders either side of the neck,
         # which is also the shape that leaves the head somewhere to be.
-    ] + [
-        part("ShoulderPads", [2.0, 0.8, 2.0], cf(side * 1.9, FLOOR_TOP + 4.9, -0.2),
-             pad_color, "Fabric")
-        for side in (-1, 1)
-    ] + [
         part("TopStripe", [7.7, 0.4, 1.0], cf(0, FLOOR_TOP + 8.7, -3.0), accent, "Neon"),
         part("WeightStack", [2.2, 6.5, 2.4],
              cf(-3.0, FLOOR_TOP + 3.25, -2.2), STEEL_LIGHT, "Metal"),
+    ])
+
+    for side in (-1, 1):
+        out.extend(padded_slab("ShoulderPads", [2.0, 0.8, 2.0],
+                               cf(side * 1.9, FLOOR_TOP + 4.9, -0.2), pad_color))
+        # The yoke the pads hang from, and the rails the lifter steadies against.
+        out.append(tube("YokeArm", (side * 1.9, FLOOR_TOP + 4.9, -0.2),
+                        (side * 1.9, FLOOR_TOP + 4.9, -2.6), 0.34, STEEL_LIGHT))
+        out.append(tube("YokePost", (side * 1.9, FLOOR_TOP + 4.55, -2.6),
+                        (side * 1.9, FLOOR_TOP + 7.6, -2.6), 0.36, STEEL_LIGHT))
+        out.append(tube("GuideRail", (side * 3.4, FLOOR_TOP + 0.7, -2.6),
+                        (side * 3.4, FLOOR_TOP + 8.4, -2.6), 0.4, CHROME,
+                        Reflectance=0.3))
+        out.append(tube("HandRail", (side * 2.6, FLOOR_TOP + 5.4, 0.6),
+                        (side * 3.4, FLOOR_TOP + 5.4, -1.4), 0.3, CHROME,
+                        Reflectance=0.3))
+        out.append(hardware("YokeBolt",
+                            mul(cf(side * 1.9, FLOOR_TOP + 4.9, -2.78), rot_x(90))))
+        out.append(foot_pad("Foot", cf(side * 3.5, FLOOR_TOP + 0.11, -3.2)))
+        out.append(foot_pad("Foot", cf(side * 3.5, FLOOR_TOP + 0.11, 3.2)))
+
+    # Toe block edge: the one part of this machine the player's feet overhang.
+    out.append(cylinder("ToeEdge", 6.0, 0.5,
+                        mul(cf(0, FLOOR_TOP + 1.25, 2.75), rot_y(90)),
+                        accent, "Rubber"))
+    out.extend(pulley("Lift", (-3.0, FLOOR_TOP + 7.2, -2.2), 1.0, accent,
+                      mount=(-3.0, FLOOR_TOP + 6.6, -2.2)))
+    out.extend(cable_run([(-3.0, FLOOR_TOP + 6.55, -2.2),
+                          (-3.0, FLOOR_TOP + 7.2, -2.2),
+                          (-1.9, FLOOR_TOP + 7.6, -2.6)]))
+    out.extend(stack_shroud("Stack", (-3.0, FLOOR_TOP + 6.5, -2.2), 2.5, 6.5, 2.4, accent))
+
+    out.extend([
         anchor_standing(cf(0, FLOOR_TOP + 0.8, 0.3)),
         marker("TrainExit", [2, 2, 1], cf(4.3, FLOOR_TOP + ROOT_HEIGHT, 2.8)),
     ])
     return out
-
 
 def stair_climber(pad_color, accent):
     """Compact rotating stair machine with hand rails and console."""
@@ -1897,9 +1996,47 @@ def stair_climber(pad_color, accent):
         part("PedalHigh", [5.5, 0.35, 2.6], cf(0, FLOOR_TOP + 2.95, -1.4), pad_color, "Rubber"),
         part("PedalArmLow", [0.4, 0.4, 4.0], cf(-2.4, FLOOR_TOP + 2.0, 0.4), STEEL, "Metal"),
         part("PedalArmHigh", [0.4, 0.4, 4.0], cf(2.4, FLOOR_TOP + 2.74, -0.2), STEEL, "Metal"),
-        part("Console", [5.0, 4.0, 1.0], cf(0, FLOOR_TOP + 6.0, -4.0), STEEL_LIGHT, "Metal"),
-        part("Readout", [4.2, 1.8, 0.2], cf(0, FLOOR_TOP + 6.6, -3.4), accent, "Neon"),
         cylinder("Handlebar", 6.0, 0.45, cf(0, FLOOR_TOP + 5.0, -2.8), CHROME),
+    ])
+
+    # A console with a bezel and a screen that throws light, in place of the flat
+    # Neon slab that used to stand in for one.
+    out.append(part("Console", [5.0, 4.0, 1.0], cf(0, FLOOR_TOP + 6.0, -4.0),
+                    STEEL_LIGHT, "Metal"))
+    out.extend(console("Readout", mul(cf(0, FLOOR_TOP + 6.6, -3.45), rot_x(-8)),
+                       accent, size=(4.2, 1.8, 0.25)))
+
+    # The mast the console and rails are carried on, and the drive housing the
+    # pedal arms disappear into at the back.
+    for side in (-1, 1):
+        out.append(tube("Mast", (side * 2.2, FLOOR_TOP + 0.7, -3.6),
+                        (side * 2.2, FLOOR_TOP + 6.2, -3.6), 0.45, STEEL))
+        out.append(tube("SideRail", (side * 2.6, FLOOR_TOP + 5.0, -2.8),
+                        (side * 2.6, FLOOR_TOP + 5.0, 1.2), 0.4, CHROME,
+                        Reflectance=0.3))
+        out.append(tube("RailDrop", (side * 2.6, FLOOR_TOP + 5.0, 1.2),
+                        (side * 2.6, FLOOR_TOP + 3.4, 2.0), 0.36, CHROME,
+                        Reflectance=0.3))
+        out.append(cylinder("PedalPivot", 0.6, 0.7,
+                            cf(side * 2.4, FLOOR_TOP + 2.4, -2.2), accent, "Metal"))
+        out.append(hardware("MastBolt",
+                            mul(cf(side * 2.2, FLOOR_TOP + 0.95, -3.35), rot_x(90)), 0.36))
+        out.append(foot_pad("Foot", cf(side * 3.0, FLOOR_TOP + 0.11, -4.4)))
+        out.append(foot_pad("Foot", cf(side * 3.0, FLOOR_TOP + 0.11, 4.4)))
+
+    out.append(part("DriveHousing", [6.4, 2.4, 2.2],
+                    cf(0, FLOOR_TOP + 1.9, -3.6), STEEL, "DiamondPlate"))
+    out.append(part("DriveVent", [5.2, 0.25, 0.14],
+                    cf(0, FLOOR_TOP + 2.5, -2.48), accent, "Neon", CanCollide=False))
+    for side in (-1, 1):
+        out.append(cylinder("PedalTread", 0.12, 0.4,
+                            mul(cf(side * 1.6, FLOOR_TOP + 2.4, 1.2), rot_z(90)),
+                            RUBBER, "Rubber", CanCollide=False))
+        out.append(cylinder("PedalTread", 0.12, 0.4,
+                            mul(cf(side * 1.6, FLOOR_TOP + 3.14, -1.4), rot_z(90)),
+                            RUBBER, "Rubber", CanCollide=False))
+
+    out.extend([
         anchor_standing(cf(0, FLOOR_TOP + 2.1, 0.0)),
         marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 3.0)),
     ])
