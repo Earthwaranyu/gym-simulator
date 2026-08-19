@@ -4021,6 +4021,118 @@ def crosswalk(x, z, across_x):
     return out
 
 
+# --------------------------------------------------------------------------
+# City blocks.
+#
+# The street grid was already here; what was missing was anything standing in
+# it. The old lattice put one building on each of 54 hand-picked centres, which
+# on a ~1,650-stud pitch left seven to ten hundred studs of bare ground between
+# every one of them -- the emptiness this whole pass exists to fix.
+#
+# A block is now derived from the roads themselves rather than from a separate
+# table of centres, so a block can never drift out of alignment with the street
+# it fronts: change a road and the blocks follow.
+# --------------------------------------------------------------------------
+
+# Half-widths of the two road classes, plus the gap between kerb and asphalt.
+CROSSTOWN_HALF = 29
+AVENUE_HALF = 27
+KERB_SETBACK = 10
+
+# Heights. Each surface gets its own band so nothing shares a top face with
+# anything else -- coplanar surfaces z-fight, and validate_no_coplanar_floors
+# exists because that shipped once already.
+SIDEWALK_Y = FLOOR_TOP + 0.10
+KERB_Y = FLOOR_TOP + 0.06
+ALLEY_Y = FLOOR_TOP + 0.03
+
+# The city's outer edge. Blocks are clipped to this so none runs off the
+# mainland into the sea.
+CITY_MIN_X, CITY_MAX_X = -200, 15500
+CITY_MIN_Z, CITY_MAX_Z = -8600, -180
+
+
+def _band_edges(centres, half, low, high):
+    """The gaps between consecutive roads, as (near, far) pairs.
+
+    Includes the two outer gaps -- between the map edge and the first road --
+    which is where a third of the bare ground was: the old centre table simply
+    stopped, leaving a margin hundreds of studs deep with nothing in it.
+    """
+    edges = []
+    ordered = sorted(centres)
+    bounds = [low] + [c for c in ordered] + [high]
+    for index in range(len(bounds) - 1):
+        near = bounds[index] + (half if index > 0 else 0)
+        far = bounds[index + 1] - (half if index + 1 < len(bounds) - 1 else 0)
+        if far - near >= 220:
+            edges.append((near, far))
+    return edges
+
+
+def city_block_rects(crosstown_roads, upland_avenues):
+    """Every rectangle the street grid encloses, as (x, z, width, depth).
+
+    Derived from the road centrelines that already exist rather than authored
+    separately, which is what guarantees a block fronts the street beside it.
+    """
+    rects = []
+    for near_x, far_x in _band_edges(upland_avenues, AVENUE_HALF, CITY_MIN_X, CITY_MAX_X):
+        for near_z, far_z in _band_edges(crosstown_roads, CROSSTOWN_HALF, CITY_MIN_Z, CITY_MAX_Z):
+            rects.append((
+                (near_x + far_x) / 2, (near_z + far_z) / 2,
+                far_x - near_x, far_z - near_z,
+            ))
+    return rects
+
+
+def block_seed(index):
+    """A block's own generator, keyed on its index rather than its coordinates.
+
+    Integers, not floats: seeding from an x/z centre would reshuffle every block
+    in the city the first time a road moved by a stud.
+    """
+    return random.Random(f"city-v3:block:{index}")
+
+
+def city_block_shell(rect, index):
+    """The ground a block stands on: pavement, kerb, service alley, map footprint.
+
+    Buildings arrive in a later pass; this is deliberately separable so the
+    rectangles can be checked against the streets before anything expensive is
+    placed on them.
+    """
+    x, z, width, depth = rect
+    rng = block_seed(index)
+    inner_w, inner_d = width - KERB_SETBACK * 2, depth - KERB_SETBACK * 2
+    out = []
+
+    # The kerb is wider than the pavement and deliberately non-colliding: left
+    # solid it is a few hundred ankle-height ledges across the city for a
+    # sprinting player to catch on.
+    out.append(part("Kerb", [inner_w + 5, 0.5, inner_d + 5], cf(x, KERB_Y, z),
+                    [0.30, 0.30, 0.31], "Concrete", CanCollide=False,
+                    CastShadow=False))
+    out.append(part("Sidewalk", [inner_w, 0.6, inner_d], cf(x, SIDEWALK_Y, z),
+                    SIDEWALK, "Concrete", CanCollide=False, CastShadow=False))
+
+    # One service alley across the long axis of the bigger blocks, which is what
+    # gives a block a back as well as a front.
+    if max(inner_w, inner_d) >= 520:
+        if inner_w >= inner_d:
+            out.append(part("Alley", [22, 0.4, inner_d], cf(x + rng.uniform(-0.18, 0.18) * inner_w, ALLEY_Y, z),
+                            ROAD, "Asphalt", CanCollide=False, CastShadow=False))
+        else:
+            out.append(part("Alley", [inner_w, 0.4, 22], cf(x, ALLEY_Y, z + rng.uniform(-0.18, 0.18) * inner_d),
+                            ROAD, "Asphalt", CanCollide=False, CastShadow=False))
+
+    # Exactly one map footprint per block. Per building would put thousands of
+    # features on the wire; the minimap wants city blocks, not window ledges.
+    out.append(map_footprint("CityBlockMap", width, depth,
+                             cf(x, FLOOR_TOP + 0.12, z), SIDEWALK, "Block"))
+    return out
+
+
 def city_grid(locations):
     """A dense but readable street hierarchy with varied, human-scale blocks."""
     out = []
@@ -4036,31 +4148,25 @@ def city_grid(locations):
         for z in crosstown_roads:
             out.extend(crosswalk(x, z, True))
 
-    # Buildings occupy the rectangles between streets.  A radial keep-out around
-    # every training district preserves clear entrances and skyline views.
+    # Blocks fill the rectangles between streets. A radial keep-out around every
+    # training district preserves clear entrances and skyline views.
     keep_out = [(0, 150, 260)] + [
         (area["x"], area["z"], 380 if area["venue_type"] == "Office" else 300)
         for area in AREAS if not area["flight_only"]
     ]
-    rng = random.Random("coastal-city-v2:skyline")
-    x_centres = (1050, 2550, 4100, 5750, 7500, 9250, 11000, 12750, 14350)
-    z_centres = (-1250, -2500, -3850, -5350, -7000, -8250)
-    for row_index, z in enumerate(z_centres):
-        for column_index, x in enumerate(x_centres):
-            if any(math.hypot(x - kx, z - kz) < radius for kx, kz, radius in keep_out):
-                continue
-            width = rng.uniform(440, 760)
-            depth = rng.uniform(470, 820)
-            height = rng.uniform(70, 190) + row_index * 8
-            skin = BUILDING_SKINS[(column_index + row_index) % len(BUILDING_SKINS)]
-            out.append(map_footprint(
-                "CityBlockMap", width + 24, depth + 24,
-                cf(x, FLOOR_TOP + 0.12, z), SIDEWALK, "Block",
-            ))
-            out.extend(building(x, z, width, depth, height, skin, rng))
+    for index, rect in enumerate(city_block_rects(crosstown_roads, upland_avenues)):
+        x, z, width, depth = rect
+        # Measured to the block's nearest corner, not its centre: a 1,400-stud
+        # block whose centre clears a 300-stud keep-out can still have a corner
+        # standing in the middle of a campus approach.
+        reach = math.hypot(width / 2, depth / 2)
+        if any(math.hypot(x - kx, z - kz) < radius + reach for kx, kz, radius in keep_out):
+            continue
+        out.extend(city_block_shell(rect, index))
 
     # Street trees reinforce the main boulevard and make the park district visible
     # from several blocks away without adding random ground clutter.
+    rng = random.Random("coastal-city-v2:boulevard-trees")
     for x in range(-150, 15450, 210):
         if all(math.hypot(x - area["x"], -520 - area["z"]) > 300 for area in AREAS):
             out.extend(city_tree(x, -520, rng))
