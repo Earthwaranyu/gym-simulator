@@ -26,12 +26,14 @@ ROOT = Path(__file__).resolve().parent.parent
 BUILDER_PATH = ROOT / "scripts" / "build_gym.py"
 EQUIPMENT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "EquipmentConfig.luau"
 ZONE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "ZoneConfig.luau"
+POSE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "PoseConfig.luau"
+MOVEMENT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MovementConfig.luau"
 STRUCTURE_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure.model.json"
 MACHINES_PATH = ROOT / "src" / "Workspace" / "Gym" / "Machines.model.json"
 
 FAMILIES = ("Chest", "Arms", "Back", "Core", "Legs")
 ACCESS_KINDS = {"Street", "ThirdFloor", "Sky"}
-HELD_NAMES = {"HeldBoth", "HeldRight", "HeldLeft"}
+HELD_NAMES = {"HeldBoth", "HeldRight", "HeldLeft", "HeldWaist", "HeldBack"}
 REQUIRED_STATION_ATTRIBUTES = {
     "EquipmentId",
     "TravelId",
@@ -49,10 +51,53 @@ EXPECTED_STATIONS = 35
 EXPECTED_ACTIVE_TIERS = 7
 EXPECTED_BUILDERS = 35
 EXPECTED_SKY_STATIONS = 5
+# One connected coastal mainland. Multiplier districts occupy its beach, park,
+# downtown blocks and office building rather than separate progression islands.
+EXPECTED_ISLANDS = 1
+# One destination district per non-starter tier; the starter tier is Muscle Beach.
+EXPECTED_TIER_AREAS = 6
+# A flying yard has to be high enough that walking or jumping to it is plainly
+# impossible, not merely awkward.
+MIN_FLIGHT_ISLAND_ALTITUDE = 120
 MIN_SKY_PIN_SEPARATION = 32.0
+# Joints a pose may drive. TrainingPoseController resolves a joint by name and
+# silently skips one it cannot find, which is how a pose degrades on R6 instead of
+# erroring — and also how a typo becomes a limb that simply never moves.
+POSE_JOINTS = {
+    "Root", "Waist", "Neck",
+    "RightShoulder", "LeftShoulder",
+    "RightElbow", "LeftElbow",
+    "RightHip", "LeftHip",
+    "RightKnee", "LeftKnee",
+    "RightAnkle", "LeftAnkle",
+}
+# The ceiling PoseConfig's own header documents. Rigs carry BallSocketConstraints,
+# and past roughly this angle the achieved rotation stops tracking the requested one
+# and then travels back the way it came — a pose written past it does not clamp, it
+# animates backwards.
+POSE_ANGLE_CEILING = 150.0
 MAX_MAP_FEATURES = 400
-MAX_BASE_PARTS = 7_000
+# Raised from 7,000 when the six city districts gained enclosed gym halls. The halls
+# cost about 31 BaseParts each and the world now sits near 6,950. The number that
+# matters to a client is per-area, not global: StreamingEnabled brings in one district
+# at a time and each hall lives inside its own area environment model.
+MAX_BASE_PARTS = 7_600
 MAX_INSTANCES = 9_000
+
+# Per-machine detail budget. The floor is the real check: twelve machines once sat
+# under 25 parts and read as blockouts standing next to 50-part benches, and nothing
+# here noticed because every existing check is about correctness and layout rather
+# than whether a machine looks finished. The ceiling keeps the global budget above
+# safe by construction instead of discovering it blown after the fact.
+#
+# Both counts include the invisible load-state plates a selectorised machine grows,
+# which is why the ceiling is well clear of the richest machine's visible geometry.
+MIN_MACHINE_PARTS = 26
+MAX_MACHINE_PARTS = 190
+
+# One light per machine, and it must not cast. Thirty-five shadow-casting lights in
+# one room is the difference between the gym running and not.
+MAX_MACHINE_LIGHTS = 1
 
 BASE_PART_CLASSES = {
     "Part",
@@ -172,6 +217,144 @@ def parse_equipment_config() -> dict[str, dict[str, Any]]:
     return rows
 
 
+def parse_pose_config() -> dict[str, dict[str, Any]]:
+    """Extract poses, their joints and their angles without a Luau runtime.
+
+    Same approach as parse_equipment_config, and for the same reason: PoseConfig is
+    plain data, but it is data the `luau` CLI cannot load — it is written in Vector3,
+    which the CLI does not provide. Reading the text is what lets the angles be
+    checked at all.
+    """
+    text = POSE_CONFIG_PATH.read_text(encoding="utf-8")
+    start = text.find("local poses")
+    end = text.find("\nlocal r6Joints", start)
+    if start < 0 or end < 0:
+        raise RuntimeError("could not locate PoseConfig poses table")
+    section = text[start:end]
+
+    number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
+    header = re.compile(r'Id\s*=\s*"(?P<id>[^"]+)",\s*\n\s*Cycles\s*=\s*(?P<cycles>' + number + r")")
+    joint_start = re.compile(r'Joint\s*=\s*"(?P<joint>[^"]+)"')
+    triple = rf"deg\(\s*({number})\s*,\s*({number})\s*,\s*({number})\s*\)"
+
+    headers = list(header.finditer(section))
+    if not headers:
+        raise RuntimeError("could not parse any poses out of PoseConfig")
+
+    poses: dict[str, dict[str, Any]] = {}
+    for index, match in enumerate(headers):
+        pose_id = match.group("id")
+        if pose_id in poses:
+            raise RuntimeError(f'duplicate PoseConfig id "{pose_id}"')
+        body_end = headers[index + 1].start() if index + 1 < len(headers) else len(section)
+        body = section[match.end():body_end]
+
+        joints: list[dict[str, Any]] = []
+        for joint_match in joint_start.finditer(body):
+            # One joint entry runs from its name to the brace that closes it.
+            entry = body[joint_match.end():]
+            closing = re.search(r"\n\s*\},", entry)
+            if closing is not None:
+                entry = entry[: closing.start()]
+            angles: dict[str, tuple[float, float, float]] = {}
+            for field in ("Rest", "Peak"):
+                found = re.search(rf"\b{field}\s*=\s*{triple}", entry)
+                if found is not None:
+                    angles[field] = tuple(float(found.group(axis)) for axis in (1, 2, 3))
+            phase = re.search(rf"\bPhase\s*=\s*({number})", entry)
+            joints.append({
+                "Joint": joint_match.group("joint"),
+                "Angles": angles,
+                "Phase": float(phase.group(1)) if phase else None,
+            })
+
+        style = re.search(r'\bMotionStyle\s*=\s*"(?P<style>[^"]+)"', body)
+        poses[pose_id] = {
+            "Cycles": float(match.group("cycles")),
+            "MotionStyle": style.group("style") if style else "Controlled",
+            "Joints": joints,
+        }
+    return poses
+
+
+def parse_movement_number(name: str) -> float:
+    """Read one numeric MovementConfig constant without needing Roblox globals."""
+    text = MOVEMENT_CONFIG_PATH.read_text(encoding="utf-8")
+    match = re.search(rf"MovementConfig\.{re.escape(name)}\s*=\s*([-+]?\d+(?:\.\d+)?)", text)
+    if match is None:
+        raise RuntimeError(f"could not parse MovementConfig.{name}")
+    return float(match.group(1))
+
+
+def validate_poses(validator: Validator, equipment: dict[str, dict[str, Any]]) -> None:
+    """Everything about an animation that can be checked without looking at it.
+
+    A pose fails quietly in all three of these ways. An unresolvable PoseId, an
+    unknown joint name and an over-ceiling angle all produce a character that is
+    merely standing there or moving oddly, with nothing in the output to say so —
+    which is exactly the kind of thing a check should be holding.
+    """
+    poses = parse_pose_config()
+
+    used = {row["PoseId"] for row in equipment.values()}
+    for equipment_id, row in sorted(equipment.items()):
+        validator.check(
+            row["PoseId"] in poses,
+            f'{equipment_id}: PoseId "{row["PoseId"]}" has no PoseConfig entry',
+        )
+    for pose_id in sorted(set(poses) - used):
+        validator.fail(f'PoseConfig entry "{pose_id}" is not used by any machine')
+
+    for pose_id, pose in sorted(poses.items()):
+        validator.check(
+            pose["Cycles"] == 1,
+            f"{pose_id}: Cycles must be 1 so one visible exercise cycle matches one stat popup",
+        )
+        validator.check(bool(pose["Joints"]), f"{pose_id}: pose drives no joints")
+        validator.check(
+            pose["MotionStyle"] in {"Controlled", "Continuous"},
+            f'{pose_id}: unsupported MotionStyle "{pose["MotionStyle"]}"',
+        )
+        seen_joints: set[str] = set()
+        for joint in pose["Joints"]:
+            name = joint["Joint"]
+            validator.check(
+                name not in seen_joints,
+                f'{pose_id}: joint "{name}" is driven twice in the same pose',
+            )
+            seen_joints.add(name)
+            validator.check(
+                name in POSE_JOINTS,
+                f'{pose_id}: unknown joint "{name}" is silently skipped at runtime',
+            )
+            phase = joint["Phase"]
+            validator.check(
+                phase is None or 0.0 <= phase <= 1.0,
+                f"{pose_id}/{name}: Phase {phase} is outside 0-1",
+            )
+            for field, angles in sorted(joint["Angles"].items()):
+                worst = max(abs(value) for value in angles)
+                validator.check(
+                    worst <= POSE_ANGLE_CEILING,
+                    f"{pose_id}/{name}: {field} reaches {worst:.0f} degrees, "
+                    f"past the {POSE_ANGLE_CEILING:.0f} ceiling where joints reverse",
+                )
+
+    # Loaded strength movements need readable turnarounds; locomotor and alternating
+    # conditioning patterns must keep flowing. These are easy to accidentally invert
+    # because an omitted MotionStyle intentionally defaults to Controlled in Luau.
+    for pose_id in ("BenchPress", "InclinePress", "PecDeck", "GobletSquat", "SquatRack", "Deadlift"):
+        validator.check(
+            poses.get(pose_id, {}).get("MotionStyle") == "Controlled",
+            f"{pose_id}: compound lift must use Controlled timing",
+        )
+    for pose_id in ("BattleRopes", "RopeClimb", "StairClimber"):
+        validator.check(
+            poses.get(pose_id, {}).get("MotionStyle") == "Continuous",
+            f"{pose_id}: cyclical movement must use Continuous timing",
+        )
+
+
 def parse_zone_progression() -> list[tuple[str, float, float]]:
     """Read zone id, power gate and multiplier from the simple config rows."""
     text = ZONE_CONFIG_PATH.read_text(encoding="utf-8")
@@ -274,6 +457,11 @@ def validate_equipment_tables(validator: Validator, builder: ModuleType) -> dict
             validator.check(
                 row.get("BaseGain") == row.get("RepInterval"),
                 f"{equipment_id}: BaseGain must equal RepInterval for exactly +1/s equipment rate",
+            )
+            rep_interval = row.get("RepInterval")
+            validator.check(
+                isinstance(rep_interval, (int, float)) and 1.25 <= rep_interval <= 2.5,
+                f"{equipment_id}: RepInterval must stay in the readable 1.25-2.5s exercise range",
             )
 
     return family_by_equipment
@@ -378,9 +566,7 @@ def validate_locations(
             f"{travel_id}: LocationTagline differs from layout",
         )
 
-        expected_access = "Sky" if location.get("style") == "sky" else (
-            "ThirdFloor" if location.get("style") == "tower" else "Street"
-        )
+        expected_access = "Sky" if location.get("style") == "sky" else "Street"
         validator.check(access_kind == expected_access, f"{travel_id}: AccessKind should be {expected_access}")
         validator.check(
             requires_flight == bool(location.get("requires_flight")),
@@ -389,10 +575,9 @@ def validate_locations(
         if access_kind == "Sky":
             sky_ids.append(travel_id)
             validator.check(requires_flight is True, f"{travel_id}: Sky station must require flight")
-        if access_kind == "ThirdFloor":
-            validator.check(floor_index == 3, f"{travel_id}: ThirdFloor station must use FloorIndex 3")
-        else:
-            validator.check(floor_index == 1, f"{travel_id}: {access_kind} station must use FloorIndex 1")
+        # Every station stands on its island's own floor now; a Sky station is one
+        # whose whole island flies, not one up a shaft.
+        validator.check(floor_index == 1, f"{travel_id}: {access_kind} station must use FloorIndex 1")
 
         family_counts[family] += 1
         equipment_counts[equipment_id] += 1
@@ -404,9 +589,66 @@ def validate_locations(
         base_parts = named_parts(station, "Base")
         anchors = named_parts(station, "TrainAnchor")
         exits = named_parts(station, "TrainExit")
-        validator.check(bool(base_parts), f"{travel_id}: machine has no Base part")
-        validator.check(bool(anchors), f"{travel_id}: machine has no TrainAnchor part")
-        validator.check(bool(exits), f"{travel_id}: machine has no TrainExit part")
+        expected_copies = getattr(builder, "STATION_COPIES", 1)
+        validator.check(
+            len(base_parts) >= expected_copies,
+            f"{travel_id}: expected at least {expected_copies} Base parts, found {len(base_parts)}",
+        )
+        validator.check(
+            len(anchors) == expected_copies,
+            f"{travel_id}: expected exactly {expected_copies} TrainAnchor parts, found {len(anchors)}",
+        )
+        validator.check(
+            len(exits) == expected_copies,
+            f"{travel_id}: expected {expected_copies} TrainExit parts, found {len(exits)}",
+        )
+        for copy_index in range(1, expected_copies + 1):
+            copy_name = f"Spot{copy_index:02d}"
+            copy_models = [
+                node for node in station.get("children", [])
+                if node.get("name") == copy_name and node.get("className") == "Model"
+            ]
+            validator.check(
+                len(copy_models) == 1,
+                f"{travel_id}: expected one self-contained {copy_name} model",
+            )
+            if len(copy_models) == 1:
+                validator.check(
+                    len(named_parts(copy_models[0], "TrainAnchor")) == 1
+                    and len(named_parts(copy_models[0], "TrainExit")) == 1,
+                    f"{travel_id}: {copy_name} must own exactly one TrainAnchor and one TrainExit",
+                )
+
+        load_visuals = [
+            node for node in descendants(station)
+            if node.get("attributes", {}).get("LoadVisualKind") is not None
+        ]
+        load_kinds = {
+            node.get("attributes", {}).get("LoadVisualKind")
+            for node in load_visuals
+        }
+        if equipment_id in getattr(builder, "FREE_WEIGHT_EQUIPMENT", set()):
+            validator.check(
+                bool(load_kinds & {"FreePlate", "DumbbellHead"}),
+                f"{travel_id}: free-weight station has no responsive load visual",
+            )
+        if equipment_id in getattr(builder, "SELECTORISED_EQUIPMENT", set()):
+            validator.check(
+                "StackPlate" in load_kinds,
+                f"{travel_id}: selectorised station has no sliced weight stack",
+            )
+        for visual in load_visuals:
+            visual_attributes = visual.get("attributes", {})
+            index = visual_attributes.get("LoadVisualIndex")
+            count = visual_attributes.get("LoadVisualCount")
+            validator.check(
+                isinstance(index, int) and isinstance(count, int) and 1 <= index <= count,
+                f"{travel_id}: invalid load visual index {index!r}/{count!r}",
+            )
+            validator.check(
+                visual.get("properties", {}).get("CanCollide", True) is False,
+                f"{travel_id}: load visual {visual.get('name')} must not collide",
+            )
 
         for held in (node for node in descendants(station) if node.get("name") in HELD_NAMES):
             held_parts = [node for node in descendants(held) if is_base_part(node)]
@@ -421,11 +663,9 @@ def validate_locations(
     validator.check(set(station_by_id) == set(location_by_id), "station and location TravelId sets differ")
     for family in FAMILIES:
         validator.check(family_counts[family] == 7, f"{family}: expected seven stations, found {family_counts[family]}")
+        # One per family, and all five on the same flying island: the top tier is
+        # the flight-gated one.
         validator.check(family_access_counts[(family, "Sky")] == 1, f"{family}: expected one Sky destination")
-        validator.check(
-            family_access_counts[(family, "ThirdFloor")] == 1,
-            f"{family}: expected one ThirdFloor destination",
-        )
 
     zone_order = [row.get("zone") for row in getattr(builder, "DISTRICTS", [])]
     validator.check(len(zone_order) == 11, f"expected 11 DISTRICTS, found {len(zone_order)}")
@@ -463,10 +703,127 @@ def validate_locations(
         len(sky_ids) == EXPECTED_SKY_STATIONS,
         f"expected {EXPECTED_SKY_STATIONS} Sky stations, found {len(sky_ids)}",
     )
-    validator.check(access_counts["ThirdFloor"] == 5, "expected five third-floor training locations")
-    validator.check(access_counts["Street"] == 25, "expected 25 street/interior training locations")
+    validator.check(access_counts["ThirdFloor"] == 0, "third-floor lofts were removed; none should remain")
+    validator.check(access_counts["Street"] == 30, "expected 30 street/interior training locations")
+
+    validate_one_tier_per_area(validator, builder, location_by_id)
 
     return station_by_id
+
+
+def validate_flight_only_areas(
+    validator: Validator, builder: ModuleType, structure: Any
+) -> None:
+    """A yard advertised as flight-only must actually be unreachable on foot."""
+    areas = [area for area in getattr(builder, "AREAS", [])
+             if area.get("flight_only")]
+    validator.check(bool(areas), "no flight-only yard: nothing gates flight")
+
+    for area in areas:
+        validator.check(
+            area.get("altitude", 0) >= MIN_FLIGHT_ISLAND_ALTITUDE,
+            f"{area['id']} flies at only {area.get('altitude', 0)} studs, "
+            f"under the {MIN_FLIGHT_ISLAND_ALTITUDE} needed to be genuinely flight-only",
+        )
+        environment = next(
+            (node for node in walk(structure)
+             if node.get("attributes", {}).get("EnvironmentId") == area["id"]),
+            None,
+        )
+        if environment is None:
+            validator.fail(f"{area['id']}: no environment model in the payload")
+            continue
+        validator.check(
+            environment.get("attributes", {}).get("RequiresFlight") is True,
+            f"{area['id']}: environment must be marked RequiresFlight",
+        )
+        # Nothing may bridge the gap: no stairs, no ramp, no shore steps.
+        ramps = [node for node in walk(environment)
+                 if str(node.get("name", "")).startswith(("ShoreStep_", "Stair", "Ramp"))]
+        validator.check(
+            not ramps,
+            f"{area['id']} is flight-only but has {len(ramps)} walk-up parts",
+        )
+        # An overshot landing here costs the whole climb back up, so both open
+        # ends of the deck have to be railed.
+        rails = [node for node in walk(environment)
+                 if node.get("name") == "IslandRail"]
+        validator.check(
+            len(rails) >= 2,
+            f"{area['id']} needs catch rails on its open ends, found {len(rails)}",
+        )
+        # The walkable deck must clear the ground by enough that no jump reaches it.
+        # Measured on the paving rather than on everything: the beacon mast runs all
+        # the way down to the sand on purpose, so the deck is findable from below.
+        decks = [box for node in walk(environment)
+                 if node.get("name") in ("YardPaving", "DeckUnderside")
+                 and (box := _obb_bounds(node)) is not None]
+        lowest = min((box[2] for box in decks), default=0.0)
+        validator.check(
+            decks and lowest >= MIN_FLIGHT_ISLAND_ALTITUDE / 2,
+            f"{area['id']}: its deck sits at y={lowest:.0f}, low enough to reach "
+            "without flying",
+        )
+
+
+def validate_one_tier_per_area(
+    validator: Validator, builder: ModuleType, location_by_id: dict[str, Any]
+) -> None:
+    """The whole point of the layout: a city destination IS a multiplier tier.
+
+    A player reads progression through landmarks, so a Storm machine standing in
+    the beginner park would be a lie told by the geography.
+    """
+    areas = {area["id"]: area for area in getattr(builder, "AREAS", [])}
+    validator.check(
+        len(areas) == EXPECTED_TIER_AREAS,
+        f"expected {EXPECTED_TIER_AREAS} tier areas, found {len(areas)}",
+    )
+
+    by_area: dict[str, list[Any]] = {}
+    for location in location_by_id.values():
+        if location.get("starter"):
+            continue
+        by_area.setdefault(location.get("area_id"), []).append(location)
+
+    for area_id, area in areas.items():
+        here = by_area.get(area_id, [])
+        validator.check(
+            len(here) == len(FAMILIES),
+            f"{area_id}: expected {len(FAMILIES)} stations, found {len(here)}",
+        )
+        zones = {location.get("zone") for location in here}
+        validator.check(
+            zones == {area["zone"]},
+            f"{area_id} is the {area['zone']} yard but carries {sorted(zones)}; "
+            "a yard must hold exactly one tier",
+        )
+        validator.check(
+            sorted(location.get("family") for location in here) == sorted(FAMILIES),
+            f"{area_id}: must hold one station per muscle",
+        )
+        # A flying yard has no walk-up, so every station on it requires flight —
+        # and conversely nothing reachable on foot may claim to.
+        for location in here:
+            validator.check(
+                bool(location.get("requires_flight")) == bool(area["flight_only"]),
+                f"{location.get('id')}: RequiresFlight must match its yard",
+            )
+
+    # The authored route must raise the multiplier even though it turns inland and
+    # back toward the coast. Sequence is the navigation spine; x alone is not.
+    ordered = sorted(areas.values(), key=lambda area: area.get("sequence", math.inf))
+    gains = [
+        next(row for row in builder.DISTRICTS if row["zone"] == area["zone"])
+        for area in ordered
+    ]
+    zone_order = [row["zone"] for row in builder.DISTRICTS[:EXPECTED_ACTIVE_TIERS]]
+    indices = [zone_order.index(row["zone"]) for row in gains]
+    validator.check(
+        indices == sorted(indices),
+        f"city districts are out of progression order: "
+        f"{[area['zone'] for area in ordered]}",
+    )
 
 
 def rotated_aabb(node: Node) -> tuple[float, float, float, float] | None:
@@ -538,6 +895,64 @@ def footprints_overlap(a: Any, b: Any, slack: float) -> bool:
     return True
 
 
+def validate_gym_halls(validator: Validator, structure: Any) -> None:
+    """Every city district is enclosed, and the starter beach is not.
+
+    Two regressions this locks down. The first is scope: the halls exist so the
+    multiplier areas read as gyms rather than as open slabs, and the Muscle Beach
+    starter is deliberately left outdoors so the first real gym feels like progress --
+    that distinction is one dict lookup in campus_shell and would be easy to lose. The
+    second is containment: the hall has to enclose its own courts without swallowing
+    the shop and monument that belong in the forecourt outside it.
+    """
+    halls_by_environment: dict[str, int] = {}
+    for node in walk(structure):
+        if node.get("name") != "GymHall":
+            continue
+        environment = "?"
+        for ancestor in walk(structure):
+            if node in ancestor.get("children", []):
+                environment = ancestor.get("name", "?")
+                break
+        halls_by_environment[environment] = halls_by_environment.get(environment, 0) + 1
+
+    total = sum(halls_by_environment.values())
+    validator.check(
+        total == 6,
+        f"expected one gym hall per city district (6), found {total}",
+    )
+
+    for node in walk(structure):
+        if node.get("name") != "Environment_Hub":
+            continue
+        hub_halls = sum(1 for child in walk(node) if child.get("name") == "GymHall")
+        validator.check(
+            hub_halls == 0,
+            "the Muscle Beach starter campus must stay outdoors, but it has a GymHall",
+        )
+
+
+def validate_no_emissive_floor_markings(validator: Validator, structure: Any) -> None:
+    """Floor markings are paint, not light.
+
+    The districts used to be lit by Neon strips laid on the ground -- a court stripe
+    per bay and an accent line down each concourse -- which is what made the areas look
+    like they were lit by lasers rather than by anything in the world. They are still
+    there as markings; they must never go back to being emissive.
+    """
+    lit = []
+    for node in walk(structure):
+        name = node.get("name", "")
+        if name not in ("MuscleStripe", "ConcourseLine", "MuscleCourtEdge"):
+            continue
+        if node.get("properties", {}).get("Material") == "Neon":
+            lit.append(name)
+    validator.check(
+        not lit,
+        f"floor markings must not be Neon: {sorted(set(lit))}",
+    )
+
+
 def validate_no_coplanar_floors(validator: Validator, payloads: Iterable[Any]) -> None:
     """Two floors at exactly the same height tear into a flickering checkerboard.
 
@@ -575,6 +990,66 @@ def validate_no_coplanar_floors(validator: Validator, payloads: Iterable[Any]) -
     )
 
 
+def validate_monster_grounds(
+    validator: Validator,
+    builder: ModuleType,
+    structure: Any,
+    station_by_id: dict[str, Node],
+) -> None:
+    """Every tier gets one mob field and one boss arena, and neither touches a court.
+
+    The overlap check is the one that matters. A hostile site drawn over a training
+    court would put monsters on top of players who are anchored to a machine and
+    cannot dodge — the exact situation safe zones exist to prevent — and it is an easy
+    mistake to make by nudging one offset constant.
+    """
+    tier_zones = {row["zone"] for row in getattr(builder, "DISTRICTS", [])[:7]}
+
+    for tag, radius_attr in (("MobField", "MOB_FIELD_RADIUS"), ("BossArena", "BOSS_ARENA_RADIUS")):
+        markers = [node for node in walk(structure) if tag in tags(node)]
+        validator.check(
+            len(markers) == len(tier_zones),
+            f"expected one {tag} per tier ({len(tier_zones)}), found {len(markers)}",
+        )
+
+        seen: set[str] = set()
+        expected_radius = getattr(builder, radius_attr, None)
+        for marker in markers:
+            attributes = marker.get("attributes", {})
+            zone_id = attributes.get("ZoneId")
+            validator.check(
+                zone_id in tier_zones,
+                f"{tag} marker carries unknown ZoneId {zone_id!r}",
+            )
+            validator.check(zone_id not in seen, f"{tag} placed twice for zone {zone_id!r}")
+            seen.add(zone_id)
+            validator.check(
+                attributes.get("Radius") == expected_radius,
+                f"{tag} for {zone_id!r} has radius {attributes.get('Radius')!r},"
+                f" expected {expected_radius!r}",
+            )
+
+            centre = position(marker)
+            if centre is None or expected_radius is None:
+                continue
+            for station_id, station in station_by_id.items():
+                station_centre = position(station) or (
+                    position(named_parts(station, "Base")[0])
+                    if named_parts(station, "Base")
+                    else None
+                )
+                if station_centre is None:
+                    continue
+                gap = math.hypot(
+                    centre[0] - station_centre[0], centre[2] - station_centre[2]
+                )
+                validator.check(
+                    gap > expected_radius,
+                    f"{tag} for {zone_id!r} overlaps training station {station_id}"
+                    f" ({gap:.0f} studs from a {expected_radius}-stud site)",
+                )
+
+
 def validate_irregular_map(
     validator: Validator,
     builder: ModuleType,
@@ -586,12 +1061,25 @@ def validate_irregular_map(
     water = [node for node in features if node.get("attributes", {}).get("MapKind") == "Water"]
     roads = [node for node in features if node.get("attributes", {}).get("MapKind") == "Road"]
     validator.check(len(features) <= MAX_MAP_FEATURES, f"MapFeature budget exceeded: {len(features)} > {MAX_MAP_FEATURES}")
-    validator.check(len(land) >= 10, f"irregular map needs at least ten Land features, found {len(land)}")
-    validator.check(len(roads) == 0, f"bridge-free archipelago still has {len(roads)} Road features")
+    validator.check(len(land) >= 6, f"the city needs at least six Land features, found {len(land)}")
+    validator.check(
+        len(roads) >= 20,
+        f"the connected city needs a visible road network, found {len(roads)} Road features",
+    )
+    validate_monster_grounds(validator, builder, structure, station_by_id)
+
     connector_names = {"RoadNetwork", "LandCorridor"}
     connectors = [node for node in walk(structure) if node.get("name") in connector_names]
-    validator.check(len(connectors) == 0, f"bridge-free archipelago still has {len(connectors)} connector nodes")
-    validator.check(len(water) == 25, f"walkable ocean must contain 25 map/collision tiles, found {len(water)}")
+    validator.check(len(connectors) == 0, f"the coast still has {len(connectors)} connector nodes")
+    water_size = getattr(builder, "WORLD_WATER_SIZE", (0, 0))
+    expected_water_tiles = (
+        math.ceil(water_size[0] / 1800) * math.ceil(water_size[1] / 1800)
+        if len(water_size) == 2 else 0
+    )
+    validator.check(
+        len(water) == expected_water_tiles,
+        f"walkable ocean must contain {expected_water_tiles} safe-sized tiles, found {len(water)}",
+    )
     for node in water:
         validator.check(
             node.get("properties", {}).get("CanCollide", True) is True,
@@ -599,33 +1087,62 @@ def validate_irregular_map(
         )
 
     regions = getattr(builder, "REGIONS", [])
-    centers = [region.get("center") for region in regions if isinstance(region, dict)]
-    validator.check(len(centers) == 10, f"expected ten scattered island centers, found {len(centers)}")
-    if len(centers) == 10:
-        radii = [math.hypot(center[0], center[1]) for center in centers]
-        mean_radius = sum(radii) / len(radii)
-        radius_variance = sum((radius - mean_radius) ** 2 for radius in radii) / len(radii)
-        radius_cv = math.sqrt(radius_variance) / mean_radius
-        validator.check(radius_cv >= 0.22, f"islands still form a predictable ring (radius CV {radius_cv:.3f})")
-        for index, center in enumerate(centers):
-            validator.check(
-                math.hypot(center[0], center[1]) >= 1350,
-                f"island {index + 1} is too close to the central hub",
-            )
-            for other in centers[index + 1:]:
-                separation = math.hypot(center[0] - other[0], center[1] - other[1])
-                validator.check(
-                    separation >= 1750,
-                    f"island centers are only {separation:.1f} studs apart",
-                )
+    validator.check(
+        len(regions) == EXPECTED_ISLANDS,
+        f"expected {EXPECTED_ISLANDS} landmass, found {len(regions)}",
+    )
 
+    venue_types = {area.get("venue_type") for area in getattr(builder, "AREAS", [])}
+    expected_venues = {"Park", "Beach", "Dock", "City", "Office", "Sky"}
+    validator.check(
+        venue_types == expected_venues,
+        f"city multiplier districts should be {sorted(expected_venues)}, found {sorted(venue_types)}",
+    )
+
+    decorative_stones = [
+        node for node in walk(structure)
+        if node.get("name") in {"Rock", "Boulder", "RockTip"}
+    ]
+    validator.check(
+        not decorative_stones,
+        f"decorative stones remain beside city training areas: {len(decorative_stones)} parts",
+    )
+
+    plate_trees = [node for node in walk(structure) if node.get("name") == "PlateTreeBase"]
+    validator.check(
+        len(plate_trees) == EXPECTED_ACTIVE_TIERS * 2,
+        f"each active district needs two organized plate trees; found {len(plate_trees)}",
+    )
+
+    # Spawn must stand on the landmass. default.project.json pins the SpawnLocation
+    # at the world origin, so the mainland has to be positioned around it rather
+    # than the other way round — get this wrong and players spawn over open water.
+    for region in regions:
+        centre_x, centre_z = region.get("center", (0, 0))
+        width, depth = region.get("size", (0, 0))
+        validator.check(
+            abs(0 - centre_x) <= width / 2 and abs(0 - centre_z) <= depth / 2,
+            f"{region['id']} does not cover the world origin, where players spawn",
+        )
+
+    # Ten steps per flight, and a coast this long needs more than one way up out of
+    # the sea or a player knocked in at the far end swims the length of the map.
+    expected_steps = sum(
+        len(region.get("shore_offsets", (0,))) * 10
+        for region in regions if not region.get("flight_only")
+    )
     shore_steps = [node for node in walk(structure) if str(node.get("name", "")).startswith("ShoreStep_")]
-    validator.check(len(shore_steps) == 110, f"eleven islands need ten shore steps each, found {len(shore_steps)}")
+    validator.check(
+        len(shore_steps) == expected_steps,
+        f"the coast needs {expected_steps} shore steps, found {len(shore_steps)}",
+    )
     for node in shore_steps:
         validator.check(
             node.get("properties", {}).get("CanCollide", True) is True,
             f"{node.get('name', '<step>')}: shore access must be walkable",
         )
+
+    validate_flight_only_areas(validator, builder, structure)
 
     water_models = [node for node in walk(structure) if node.get("attributes", {}).get("WalkableWater") is True]
     validator.check(len(water_models) == 1, f"expected one persistent walkable-water model, found {len(water_models)}")
@@ -639,7 +1156,15 @@ def validate_irregular_map(
     validator.check(len(boundaries) == 1, f"expected one persistent world boundary, found {len(boundaries)}")
     if len(boundaries) == 1:
         boundary_parts = [node for node in descendants(boundaries[0]) if is_base_part(node)]
-        validator.check(len(boundary_parts) == 20, f"world boundary needs 20 tiled walls, found {len(boundary_parts)}")
+        boundary_attributes = boundaries[0].get("attributes", {})
+        expected_boundary_parts = 2 * (
+            int(boundary_attributes.get("XSegments", 0))
+            + int(boundary_attributes.get("ZSegments", 0))
+        )
+        validator.check(
+            len(boundary_parts) == expected_boundary_parts,
+            f"world boundary needs {expected_boundary_parts} safe-sized walls, found {len(boundary_parts)}",
+        )
         validator.check(
             boundaries[0].get("properties", {}).get("ModelStreamingMode") == "Persistent",
             "world boundary must stream persistently",
@@ -659,21 +1184,36 @@ def validate_irregular_map(
         global_max_z = max(bounds[3] for bounds in land_bounds)
         global_width = max(global_max_x - global_min_x, 1)
         global_depth = max(global_max_z - global_min_z, 1)
-        validator.check(global_width >= 7500, f"world is only {global_width:.0f} studs wide")
-        validator.check(global_depth >= 6000, f"world is only {global_depth:.0f} studs deep")
-        for node, bounds in zip(land, land_bounds):
-            shape = node.get("attributes", {}).get("MapShape", "Rect")
-            if shape != "Rect":
-                continue
-            width = bounds[1] - bounds[0]
-            depth = bounds[3] - bounds[2]
-            validator.check(
-                not (width >= global_width * 0.95 and depth >= global_depth * 0.95),
-                f"{node.get('name', '<land>')}: rectangular Land feature covers the whole map",
-            )
+        # The city is deliberately coastal: wide enough for a real waterfront and
+        # deep enough to hold inland blocks, a park and the office district.
+        validator.check(global_width >= 15000, f"the expanded coast is only {global_width:.0f} studs long")
+        validator.check(global_depth >= 8500, f"the expanded city is only {global_depth:.0f} studs deep")
+        validator.check(
+            global_width >= global_depth * 1.5,
+            "the landmass should read as a coastal city, not a square continent",
+        )
 
     shapes = {node.get("attributes", {}).get("MapShape") for node in land}
     validator.check("Circle" in shapes and "Rect" in shapes, "Land silhouette must mix circular and rectangular features")
+
+    areas = sorted(getattr(builder, "AREAS", []), key=lambda area: area.get("sequence", math.inf))
+    if areas:
+        area_x = [float(area.get("x", 0)) for area in areas]
+        area_z = [float(area.get("z", 0)) for area in areas]
+        validator.check(
+            max(area_x) - min(area_x) >= 12000,
+            "multiplier districts do not use enough of the enlarged city's width",
+        )
+        validator.check(
+            max(area_z) - min(area_z) >= 5500,
+            "multiplier districts still occupy a shallow line instead of the city's depth",
+        )
+        z_directions = [math.copysign(1, b - a) for a, b in zip(area_z, area_z[1:]) if b != a]
+        turns = sum(a != b for a, b in zip(z_directions, z_directions[1:]))
+        validator.check(
+            turns >= 2,
+            "progression route needs at least two inland/coastward turns; it is still visually linear",
+        )
 
     station_positions: dict[str, tuple[float, float, float]] = {}
     for travel_id, station in station_by_id.items():
@@ -755,9 +1295,9 @@ def validate_world_foundation(
     validator.check(
         isinstance(width, (int, float))
         and isinstance(depth, (int, float))
-        and width >= 9800
-        and depth >= 8800,
-        "WorldFoundation must be at least 9,800 x 8,800 studs",
+        and width >= 17800
+        and depth >= 11800,
+        "WorldFoundation must be at least 17,800 x 11,800 studs for the expanded city",
     )
     validator.check(
         isinstance(center_x, (int, float)) and isinstance(center_z, (int, float)),
@@ -773,9 +1313,14 @@ def validate_world_foundation(
     tiles = [node for node in descendants(foundation) if is_base_part(node)]
     columns = attributes.get("TileColumns")
     rows = attributes.get("TileRows")
+    expected_columns = math.ceil(width / 1800)
+    expected_rows = math.ceil(depth / 1800)
     validator.check(
-        columns == 5 and rows == 5 and len(tiles) == 25,
-        f"WorldFoundation must contain a 5 x 5 tile grid, found {len(tiles)} tiles",
+        columns == expected_columns
+        and rows == expected_rows
+        and len(tiles) == expected_columns * expected_rows,
+        f"WorldFoundation must contain a {expected_columns} x {expected_rows} safe-sized tile grid, "
+        f"found {len(tiles)} tiles",
     )
     tile_bounds = [bounds for tile in tiles if (bounds := rotated_aabb(tile)) is not None]
     validator.check(len(tile_bounds) == len(tiles), "every foundation tile needs valid geometry")
@@ -789,8 +1334,15 @@ def validate_world_foundation(
         )
         tile_area = sum((bounds[1] - bounds[0]) * (bounds[3] - bounds[2]) for bounds in tile_bounds)
         validator.check(
-            abs(tile_area - width * depth) <= 1,
+            abs(tile_area - width * depth) <= max(1, width * depth * 1e-6),
             "foundation tiles contain gaps or overlap in their declared footprint",
+        )
+
+    for tile in tiles:
+        size = tile.get("properties", {}).get("Size", [0, 0, 0])
+        validator.check(
+            max(float(size[0]), float(size[1]), float(size[2])) <= 2048,
+            f"{tile.get('name', '<foundation tile>')} exceeds Roblox's 2,048-stud BasePart limit",
         )
 
     for payload in (structure, machines):
@@ -809,6 +1361,25 @@ def validate_world_foundation(
             )
 
 
+def validate_movement_bounds(validator: Validator, builder: ModuleType) -> None:
+    """Keep movement correction aligned with the generator's physical perimeter."""
+    center_x = parse_movement_number("FLIGHT_WORLD_CENTER_X")
+    center_z = parse_movement_number("FLIGHT_WORLD_CENTER_Z")
+    half_width = parse_movement_number("FLIGHT_WORLD_HALF_WIDTH")
+    half_depth = parse_movement_number("FLIGHT_WORLD_HALF_DEPTH")
+    world_center_x, world_center_z = builder.WORLD_CENTER
+    water_width, water_depth = builder.WORLD_WATER_SIZE
+
+    validator.check(
+        center_x == world_center_x and center_z == world_center_z,
+        "MovementConfig flight bounds must use the generated WorldBoundary center",
+    )
+    validator.check(
+        half_width == water_width / 2 - 10 and half_depth == water_depth / 2 - 10,
+        "MovementConfig flight bounds must stay ten studs inside the generated WorldBoundary",
+    )
+
+
 def validate_instance_budgets(validator: Validator, payloads: Iterable[Any]) -> tuple[int, int]:
     instance_count = 0
     base_part_count = 0
@@ -822,6 +1393,87 @@ def validate_instance_budgets(validator: Validator, payloads: Iterable[Any]) -> 
     validator.check(instance_count <= MAX_INSTANCES, f"instance budget exceeded: {instance_count} > {MAX_INSTANCES}")
     validator.check(base_part_count <= MAX_BASE_PARTS, f"BasePart budget exceeded: {base_part_count} > {MAX_BASE_PARTS}")
     return instance_count, base_part_count
+
+
+def validate_machine_detail(validator: Validator, machines: Any) -> None:
+    """Every machine carries enough geometry to read as finished, and not so much
+    that the global budget is at risk -- plus exactly the lighting it is allowed."""
+    seen = 0
+    for node in walk(machines):
+        attributes = node.get("attributes") or {}
+        equipment_id = attributes.get("EquipmentId")
+        if not isinstance(equipment_id, str):
+            continue
+        seen += 1
+
+        parts = 0
+        lights = 0
+        shadowing = []
+        for child in descendants(node):
+            if is_base_part(child):
+                parts += 1
+            class_name = child.get("className")
+            if class_name in ("PointLight", "SpotLight", "SurfaceLight"):
+                lights += 1
+                if child.get("properties", {}).get("Shadows"):
+                    shadowing.append(child.get("name"))
+
+        validator.check(
+            parts >= MIN_MACHINE_PARTS,
+            f"{equipment_id}: {parts} parts is below the detail floor of {MIN_MACHINE_PARTS}",
+        )
+        validator.check(
+            parts <= MAX_MACHINE_PARTS,
+            f"{equipment_id}: {parts} parts exceeds the per-machine cap of {MAX_MACHINE_PARTS}",
+        )
+        validator.check(
+            lights <= MAX_MACHINE_LIGHTS,
+            f"{equipment_id}: {lights} lights exceeds the per-machine cap of {MAX_MACHINE_LIGHTS}",
+        )
+        validator.check(
+            not shadowing,
+            f"{equipment_id}: shadow-casting machine light(s) {shadowing}",
+        )
+
+    validator.check(seen > 0, "no machines found to check detail budgets against")
+
+
+def validate_compact_campus_shops(
+    validator: Validator, builder: ModuleType, structure: Any
+) -> None:
+    """Every active campus stays compact and exposes the real Shop through an NPC."""
+    validator.check(
+        builder.CITY_CAMPUS_WIDTH <= 370 and builder.CITY_CAMPUS_DEPTH <= 270,
+        "training campuses regressed to the oversized layout",
+    )
+
+    environment_ids = ["Hub"] + [area["id"] for area in builder.AREAS]
+    for environment_id in environment_ids:
+        environment_name = f"Environment_{environment_id}"
+        environments = [
+            node for node in walk(structure)
+            if node.get("name") == environment_name
+        ]
+        validator.check(
+            len(environments) == 1,
+            f"expected one {environment_name}, found {len(environments)}",
+        )
+        if len(environments) != 1:
+            continue
+        environment = environments[0]
+        shops = [node for node in walk(environment) if node.get("name") == "CampusShop"]
+        keepers = [
+            node for node in walk(environment)
+            if node.get("attributes", {}).get("NpcId") == "Shopkeeper"
+        ]
+        validator.check(
+            len(shops) == 1,
+            f"{environment_name}: expected one rear CampusShop, found {len(shops)}",
+        )
+        validator.check(
+            len(keepers) == 1 and "Npc" in tags(keepers[0]),
+            f"{environment_name}: shop must have one tagged Shopkeeper NPC",
+        )
 
 
 def validate_committed_payload(
@@ -844,6 +1496,267 @@ def validate_committed_payload(
         )
 
 
+# Solid props are cover, and cover is short. Anything taller becomes a ladder: the
+# lofts sit at 24 and a stack of climbable scenery beside a hall wall is a way onto
+# a roof the layout never meant to be standing room.
+SOLID_PROP_HEIGHT_CAP = 20.0
+# Nothing collidable may crowd the spot a player is teleported onto and locked into.
+# TrainingService pivots the character to the TrainAnchor; a block intersecting that
+# is a character wedged inside geometry with WalkSpeed zeroed.
+MIN_ANCHOR_PROP_CLEARANCE = 10.0
+# Deliberately solid non-structural geometry. Kept as an explicit list so adding a
+# collidable prop is a decision recorded here, not a silent obstacle.
+INTENTIONAL_SOLID_PROPS = {
+    "VenueCover",
+    "RackUpright", "LockerBank", "GymBenchPad", "GymBenchFrame", "FountainBody",
+}
+
+
+def clutter_part_names(builder: ModuleType) -> set[str]:
+    """Every part name the clutter builders can emit, by running them."""
+    import random
+
+    names: set[str] = set()
+    rng = random.Random("validator:clutter-names")
+    for factory in builder.CLUTTER.values():
+        for _attempt in range(12):
+            for piece in factory(rng, [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]):
+                names.update(node.get("name") for node in walk(piece))
+    return {name for name in names if isinstance(name, str)}
+
+
+def validate_scenery_collision(
+    validator: Validator,
+    builder: ModuleType,
+    structure: Any,
+    machines: Any,
+    stations: list[Node],
+) -> None:
+    """Collision is opt-in for scenery, and what opts in has to stay usable cover."""
+    solid_scenery = set(builder.SOLID_SCENERY)
+    clutter_names = clutter_part_names(builder)
+
+    # Whether a part collides is decided by its name, so a name shared between a
+    # scenery builder and a machine builder makes the policy ambiguous — and a
+    # machine's own frame legitimately stands right on its TrainAnchor, which is
+    # exactly what the clearance check below forbids for props.
+    machine_names = {
+        node.get("name") for node in walk(machines) if is_base_part(node)
+    }
+    shared = (solid_scenery | INTENTIONAL_SOLID_PROPS | clutter_names) & machine_names
+    validator.check(
+        not shared,
+        f"scenery/furniture names collide with machine part names: {sorted(shared)}; "
+        "rename the scenery side",
+    )
+
+    unknown = solid_scenery - clutter_names
+    validator.check(
+        not unknown,
+        f"SOLID_SCENERY names no clutter builder emits: {sorted(unknown)}",
+    )
+
+    collidable: list[Node] = []
+    seen_solid: set[str] = set()
+    must_not_collide = clutter_names - solid_scenery
+    for node in walk(structure):
+        if not is_base_part(node):
+            continue
+        if node.get("properties", {}).get("CanCollide", True) is not True:
+            continue
+        name = node.get("name")
+        validator.check(
+            name not in must_not_collide,
+            f"scenery {name} must not collide: only {sorted(solid_scenery)} are cover",
+        )
+        if name in solid_scenery or name in INTENTIONAL_SOLID_PROPS:
+            collidable.append(node)
+            seen_solid.add(name)
+
+    missing = solid_scenery - seen_solid
+    validator.check(
+        not missing,
+        f"SOLID_SCENERY entries never reach the world as collidable: {sorted(missing)}",
+    )
+
+    for node in collidable:
+        size = node.get("properties", {}).get("Size")
+        if not isinstance(size, list) or len(size) != 3:
+            continue
+        validator.check(
+            float(size[1]) <= SOLID_PROP_HEIGHT_CAP,
+            f"solid prop {node.get('name')} is {size[1]} tall, over the "
+            f"{SOLID_PROP_HEIGHT_CAP} cap that keeps cover from becoming a ladder",
+        )
+
+    anchors = [
+        anchor_position
+        for station in stations
+        for anchor in named_parts(station, "TrainAnchor")
+        if (anchor_position := position(anchor)) is not None
+    ]
+    for node in collidable:
+        spot = position(node)
+        size = node.get("properties", {}).get("Size")
+        if spot is None or not isinstance(size, list) or len(size) != 3:
+            continue
+        radius = max(float(size[0]), float(size[2])) / 2
+        for anchor_x, _anchor_y, anchor_z in anchors:
+            validator.check(
+                math.hypot(spot[0] - anchor_x, spot[2] - anchor_z)
+                >= MIN_ANCHOR_PROP_CLEARANCE + radius,
+                f"solid prop {node.get('name')} at {spot[0]:.1f},{spot[2]:.1f} is "
+                f"inside the {MIN_ANCHOR_PROP_CLEARANCE}-stud clearance around a "
+                "TrainAnchor",
+            )
+
+
+# A held prop is only moved onto the player's hands while a set is running;
+# the rest of the time it sits where the machine builder authored it, in full view.
+# So it has to be authored somewhere that reads as storage — in the rack hooks, on
+# a shelf, at the end of its own cable — and not hanging in mid-air. This is the
+# separation still counted as the prop touching the machine.
+MAX_HELD_PROP_DETACHMENT = 0.4
+
+
+def _obb_bounds(node: Node) -> tuple[float, ...] | None:
+    """Axis-aligned bounds of a rotated box."""
+    frame = node.get("properties", {}).get("CFrame")
+    size = node.get("properties", {}).get("Size")
+    if not isinstance(frame, list) or len(frame) != 12:
+        return None
+    if not isinstance(size, list) or len(size) != 3:
+        return None
+    rot = frame[3:12]
+    half = [
+        sum(abs(float(rot[row * 3 + col])) * float(size[col]) / 2 for col in range(3))
+        for row in range(3)
+    ]
+    return (
+        frame[0] - half[0], frame[0] + half[0],
+        frame[1] - half[1], frame[1] + half[1],
+        frame[2] - half[2], frame[2] + half[2],
+    )
+
+
+def _box_separation(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    """Distance between two boxes; zero when they overlap or touch."""
+    worst = 0.0
+    for lo_a, hi_a, lo_b, hi_b in (
+        (a[0], a[1], b[0], b[1]), (a[2], a[3], b[2], b[3]), (a[4], a[5], b[4], b[5])
+    ):
+        if hi_a < lo_b:
+            worst = max(worst, lo_b - hi_a)
+        elif hi_b < lo_a:
+            worst = max(worst, lo_a - hi_b)
+    return worst
+
+
+def validate_held_props_rest_on_machine(
+    validator: Validator, stations: list[Node]
+) -> None:
+    """No barbell, handle or dumbbell may hang in the air attached to nothing."""
+    for station in stations:
+        held_groups: list[Node] = []
+        statics: list[tuple[float, ...]] = []
+
+        def sort_node(node: Node, inside_held: bool) -> None:
+            name = node.get("name")
+            if not inside_held and name in HELD_NAMES:
+                held_groups.append(node)
+                inside_held = True
+            elif not inside_held and is_base_part(node) and name not in (
+                "TrainAnchor", "TrainExit"
+            ):
+                box = _obb_bounds(node)
+                if box is not None:
+                    statics.append(box)
+            for child in node.get("children", []):
+                sort_node(child, inside_held)
+
+        sort_node(station, False)
+        if not statics:
+            continue
+
+        for group in held_groups:
+            boxes = [
+                box for node in walk(group)
+                if is_base_part(node) and (box := _obb_bounds(node)) is not None
+            ]
+            if not boxes:
+                continue
+            merged = (
+                min(b[0] for b in boxes), max(b[1] for b in boxes),
+                min(b[2] for b in boxes), max(b[3] for b in boxes),
+                min(b[4] for b in boxes), max(b[5] for b in boxes),
+            )
+            nearest = min(_box_separation(merged, box) for box in statics)
+            validator.check(
+                nearest <= MAX_HELD_PROP_DETACHMENT,
+                f"{station.get('name')}: {group.get('name')} rests "
+                f"{nearest:.2f} studs from the nearest part of its own machine; "
+                "a held prop must sit in a hook, on a shelf, or on its cable",
+            )
+
+
+def validate_load_visual_steps(validator: Validator, stations: list[Node]) -> None:
+    """Every selectable kg step must have a deterministic physical visual state."""
+    stepped_kinds = {"BodyPlate", "FreePlate", "StackPlate"}
+    for station in stations:
+        indexes: dict[str, set[int]] = {}
+        for node in walk(station):
+            attributes = node.get("attributes", {})
+            kind = attributes.get("LoadVisualKind")
+            if not isinstance(kind, str):
+                continue
+            index = attributes.get("LoadVisualIndex")
+            count = attributes.get("LoadVisualCount")
+            validator.check(
+                isinstance(index, int) and isinstance(count, int),
+                f"{station.get('name')}/{node.get('name')}: load visual index/count must be integers",
+            )
+            if not isinstance(index, int) or not isinstance(count, int):
+                continue
+            validator.check(
+                1 <= index <= count,
+                f"{station.get('name')}/{node.get('name')}: load visual {index}/{count} is invalid",
+            )
+            if kind in stepped_kinds:
+                validator.check(
+                    count == 10,
+                    f"{station.get('name')}/{kind}: expected ten visible load steps, got {count}",
+                )
+                indexes.setdefault(kind, set()).add(index)
+        for kind, found in indexes.items():
+            validator.check(
+                found == set(range(1, 11)),
+                f"{station.get('name')}/{kind}: visible steps are {sorted(found)}, expected 1-10",
+            )
+
+        # State 10 is the maximum selected load. Every held body stack and every
+        # free-weight implement must show multiple real discs there; one enlarged
+        # red cylinder is not a valid substitute for a two-plate configuration.
+        for held in (node for node in walk(station) if node.get("name") in HELD_NAMES):
+            by_kind: dict[str, list[Node]] = {}
+            for visual in walk(held):
+                attributes = visual.get("attributes", {})
+                if attributes.get("LoadVisualIndex") != 10:
+                    continue
+                kind = attributes.get("LoadVisualKind")
+                if kind in {"BodyPlate", "FreePlate"}:
+                    by_kind.setdefault(kind, []).append(visual)
+                    validator.check(
+                        isinstance(attributes.get("PlateKg"), (int, float)),
+                        f"{station.get('name')}/{visual.get('name')}: Olympic disc is missing PlateKg",
+                    )
+            for kind, maximum in by_kind.items():
+                validator.check(
+                    len(maximum) >= 2,
+                    f"{station.get('name')}/{held.get('name')}/{kind}: "
+                    f"maximum load shows {len(maximum)} disc(s), expected at least two",
+                )
+
+
 def run() -> int:
     validator = Validator()
     try:
@@ -861,11 +1774,22 @@ def run() -> int:
         validate_committed_payload(validator, first_machines, MACHINES_PATH, "Machines.model.json")
         validate_finite_geometry(validator, (first_structure, first_machines))
         family_by_equipment = validate_equipment_tables(validator, builder)
+        validate_poses(validator, parse_equipment_config())
         stations = [node for node in walk(first_machines) if "TrainingStation" in tags(node)]
         station_by_id = validate_locations(validator, builder, stations, family_by_equipment)
+        validate_held_props_rest_on_machine(validator, stations)
+        validate_load_visual_steps(validator, stations)
         validate_irregular_map(validator, builder, first_structure, station_by_id)
         validate_world_foundation(validator, first_structure, first_machines)
+        validate_movement_bounds(validator, builder)
+        validate_compact_campus_shops(validator, builder, first_structure)
         validate_no_coplanar_floors(validator, (first_structure, first_machines))
+        validate_gym_halls(validator, first_structure)
+        validate_no_emissive_floor_markings(validator, first_structure)
+        validate_scenery_collision(
+            validator, builder, first_structure, first_machines, stations
+        )
+        validate_machine_detail(validator, first_machines)
         instance_count, base_part_count = validate_instance_budgets(
             validator,
             (first_structure, first_machines),
@@ -884,7 +1808,9 @@ def run() -> int:
 
     print(
         "Gym validation passed: "
-        f"35 stations, 7 tiers x 5 muscles / 35 unique exercises, {instance_count} instances, "
+        f"35 destinations / {35 * getattr(builder, 'STATION_COPIES', 1)} usable stations, "
+        f"7 tiers x 5 muscles / 35 unique exercises, "
+        f"{instance_count} instances, "
         f"{base_part_count} BaseParts, build {short_hash(first_canonical)}"
     )
     return 0

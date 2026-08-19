@@ -708,7 +708,18 @@ def machine(name, equipment_id, origin, children, travel_id=None,
     if location_tagline is not None:
         attributes["LocationTagline"] = location_tagline
     add_load_visuals(equipment_id, children)
-    children = list(children) + [machine_light(accent or ACCENT_IRON)]
+
+    # Only if the machine does not already light itself. A console carries its own
+    # glow, and hanging the generic fixture over it as well would put two lights on
+    # one machine for no visible gain.
+    def emits(node):
+        if node.get("className") in ("PointLight", "SpotLight", "SurfaceLight"):
+            return True
+        return any(emits(child) for child in node.get("children", []))
+
+    children = list(children)
+    if not any(emits(child) for child in children):
+        children.append(machine_light(accent or ACCENT_IRON))
     return {
         "name": name,
         "className": "Model",
@@ -1989,6 +2000,9 @@ def ab_wheel_runway(pad_color, accent):
                             (side * 3.0, FLOOR_TOP + 1.05, end), 0.42, STEEL))
         out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, -5.4)))
         out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, 5.4)))
+        for end in (-5.4, 5.4):
+            out.append(hardware("RailCap",
+                                mul(cf(side * 3.0, FLOOR_TOP + 1.05, end), rot_x(90)), 0.46))
     for index, z in enumerate((-3.0, -1.5, 0.0, 1.5)):
         out.append(part("DistanceTick", [4.6 - index * 0.3, 0.14, 0.22],
                         cf(0, FLOOR_TOP + 0.95, z), STEEL_LIGHT, "SmoothPlastic",

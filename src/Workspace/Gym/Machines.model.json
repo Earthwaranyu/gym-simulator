@@ -37697,59 +37697,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "MachineLight",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              6680.8708,
-              7.72,
-              -986.8738,
-              -0.987688,
-              0.0,
-              -0.156434,
-              0.0,
-              1.0,
-              0.0,
-              0.156434,
-              0.0,
-              -0.987688
-            ],
-            "Size": [
-              0.4,
-              0.4,
-              0.4
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          },
-          "children": [
-            {
-              "name": "Glow",
-              "className": "PointLight",
-              "properties": {
-                "Brightness": 0.85,
-                "Range": 17,
-                "Shadows": false,
-                "Color": [
-                  0.26,
-                  0.65,
-                  0.96
-                ]
-              }
-            }
-          ]
         }
       ]
     },
@@ -54829,6 +54776,80 @@
               }
             },
             {
+              "name": "RailCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12133.4791,
+                  2.27,
+                  -1980.5421,
+                  -0.990268,
+                  -0.139173,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.139173,
+                  -0.990268,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.46,
+                  0.46
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "RailCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12131.976,
+                  2.27,
+                  -1991.237,
+                  -0.990268,
+                  -0.139173,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.139173,
+                  -0.990268,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.46,
+                  0.46
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
               "name": "LaneRail",
               "className": "Part",
               "properties": {
@@ -54999,6 +55020,80 @@
                 "Material": "Rubber",
                 "TopSurface": "Smooth",
                 "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "RailCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12127.5375,
+                  2.27,
+                  -1979.707,
+                  -0.990268,
+                  -0.139173,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.139173,
+                  -0.990268,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.46,
+                  0.46
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "RailCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12126.0344,
+                  2.27,
+                  -1990.4019,
+                  -0.990268,
+                  -0.139173,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.139173,
+                  -0.990268,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.46,
+                  0.46
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
               }
             },
             {
@@ -65294,59 +65389,6 @@
                 "Transparency": 1,
                 "CanCollide": false,
                 "CastShadow": false
-              }
-            }
-          ]
-        },
-        {
-          "name": "MachineLight",
-          "className": "Part",
-          "properties": {
-            "Anchored": true,
-            "CFrame": [
-              14623.6497,
-              307.72,
-              -6174.4027,
-              0.956305,
-              0.0,
-              0.292372,
-              0.0,
-              1.0,
-              0.0,
-              -0.292372,
-              0.0,
-              0.956305
-            ],
-            "Size": [
-              0.4,
-              0.4,
-              0.4
-            ],
-            "Color": [
-              1,
-              1,
-              1
-            ],
-            "Material": "SmoothPlastic",
-            "TopSurface": "Smooth",
-            "BottomSurface": "Smooth",
-            "Transparency": 1,
-            "CanCollide": false,
-            "CastShadow": false
-          },
-          "children": [
-            {
-              "name": "Glow",
-              "className": "PointLight",
-              "properties": {
-                "Brightness": 0.85,
-                "Range": 17,
-                "Shadows": false,
-                "Color": [
-                  0.26,
-                  0.65,
-                  0.96
-                ]
               }
             }
           ]
