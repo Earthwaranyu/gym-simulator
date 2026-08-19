@@ -77,13 +77,22 @@ POSE_JOINTS = {
 # and then travels back the way it came — a pose written past it does not clamp, it
 # animates backwards.
 POSE_ANGLE_CEILING = 150.0
-MAX_MAP_FEATURES = 400
+# Minimap footprints. Every feature crosses the wire in one GetDestinations call,
+# so this is a payload budget as much as a rendering one. The rule that keeps it
+# affordable while the city fills: one footprint per city block, never per
+# building.
+MAX_MAP_FEATURES = 600
 # Raised from 7,000 when the six city districts gained enclosed gym halls. The halls
 # cost about 31 BaseParts each and the world now sits near 6,950. The number that
 # matters to a client is per-area, not global: StreamingEnabled brings in one district
 # at a time and each hall lives inside its own area environment model.
-MAX_BASE_PARTS = 7_600
-MAX_INSTANCES = 9_000
+# Global ceilings. These are authoring budgets, not engine limits: with
+# StreamingEnabled only a radius around the player is ever resident, so what a
+# client pays is MAX_PARTS_PER_STREAM_CELL below, and these exist to stop the
+# generator producing a world nobody meant to make. Raised from 7,600/9,000 to
+# fill sixteen thousand studs of city that was previously bare ground.
+MAX_BASE_PARTS = 25_000
+MAX_INSTANCES = 28_000
 
 # What a client actually pays for. StreamingEnabled keeps only a radius around the
 # player resident (StreamingTargetRadius 512 in default.project.json), so the global
@@ -112,6 +121,11 @@ MAX_MACHINE_PARTS = 190
 # One light per machine, and it must not cast. Thirty-five shadow-casting lights in
 # one room is the difference between the gym running and not.
 MAX_MACHINE_LIGHTS = 1
+
+# A single building may not run away with the budget. A shophouse is around 12
+# parts, a midrise 22 and a tower 34; anything past this is a generator bug, not
+# a design decision.
+MAX_BUILDING_PARTS = 48
 
 BASE_PART_CLASSES = {
     "Part",
