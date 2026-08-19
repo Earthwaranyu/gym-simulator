@@ -1602,12 +1602,12 @@ INTENTIONAL_SOLID_PROPS = {
 
 
 def clutter_part_names(builder: ModuleType) -> set[str]:
-    """Every part name the clutter builders can emit, by running them."""
+    """Every part name the city prop builders can emit, by running them."""
     import random
 
     names: set[str] = set()
     rng = random.Random("validator:clutter-names")
-    for factory in builder.CLUTTER.values():
+    for factory in builder.CITY_PROPS.values():
         for _attempt in range(12):
             for piece in factory(rng, [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]):
                 names.update(node.get("name") for node in walk(piece))
@@ -1622,7 +1622,7 @@ def validate_scenery_collision(
     stations: list[Node],
 ) -> None:
     """Collision is opt-in for scenery, and what opts in has to stay usable cover."""
-    solid_scenery = set(builder.SOLID_SCENERY)
+    solid_scenery = set(builder.SOLID_CITY_PROPS)
     clutter_names = clutter_part_names(builder)
 
     # Whether a part collides is decided by its name, so a name shared between a
@@ -1642,7 +1642,7 @@ def validate_scenery_collision(
     unknown = solid_scenery - clutter_names
     validator.check(
         not unknown,
-        f"SOLID_SCENERY names no clutter builder emits: {sorted(unknown)}",
+        f"SOLID_CITY_PROPS names no city prop builder emits: {sorted(unknown)}",
     )
 
     collidable: list[Node] = []
@@ -1665,7 +1665,7 @@ def validate_scenery_collision(
     missing = solid_scenery - seen_solid
     validator.check(
         not missing,
-        f"SOLID_SCENERY entries never reach the world as collidable: {sorted(missing)}",
+        f"SOLID_CITY_PROPS entries never reach the world as collidable: {sorted(missing)}",
     )
 
     for node in collidable:

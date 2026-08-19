@@ -3154,7 +3154,7 @@ PROPS = {
 #
 # Clutter is the other half: small, cheap, repeated pieces scattered across the
 # whole surface so the ground between two gyms is somewhere rather than nothing.
-# One function per kind, registered in CLUTTER, and a per-theme recipe in
+# One function per kind, registered in CITY_PROPS, and a per-theme recipe in
 # CLUTTER_KITS naming which kinds an island uses and how often — so a new piece of
 # scenery is a new function and a new dict key, never an edit to the scatter pass.
 #
@@ -3162,138 +3162,7 @@ PROPS = {
 # places, filters and strips collision from them; none of that belongs here.
 
 
-def clutter_rock(rng, accent, ground):
-    scale = rng.uniform(1.6, 4.2)
-    return [part("Rock", [scale * 1.7, scale * 1.3, scale * 1.5],
-                 mul(rot_y(rng.uniform(0, 360)),
-                     cf(0, FLOOR_TOP + scale * 0.5, 0)),
-                 [c * rng.uniform(0.72, 0.95) for c in ground], "Rock")]
 
-
-def clutter_shrub(rng, accent, ground):
-    height = rng.uniform(2.4, 4.6)
-    green = [0.16 + rng.uniform(0, 0.09), 0.30 + rng.uniform(0, 0.14), 0.15]
-    return [
-        cylinder("ShrubStem", height, 0.5, cf(0, FLOOR_TOP + height / 2, 0),
-                 [0.24, 0.17, 0.11], "Wood"),
-        part("ShrubCanopy", [height * 1.1, height * 0.8, height * 1.1],
-             mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height, 0)),
-             green, "Grass"),
-    ]
-
-
-def clutter_grass(rng, accent, ground):
-    out = []
-    for _index in range(rng.randint(2, 4)):
-        blade = rng.uniform(1.0, 2.2)
-        out.append(part("GrassTuft", [rng.uniform(1.4, 2.6), blade, rng.uniform(1.4, 2.6)],
-                        mul(rot_y(rng.uniform(0, 360)),
-                            cf(rng.uniform(-3, 3), FLOOR_TOP + blade / 2, rng.uniform(-3, 3))),
-                        [0.18, 0.28 + rng.uniform(0, 0.12), 0.14], "Grass"))
-    return out
-
-
-def clutter_crate(rng, accent, ground):
-    out = []
-    for level in range(rng.randint(1, 3)):
-        side = rng.uniform(3.0, 4.4)
-        out.append(part("Crate", [side, side, side],
-                        mul(rot_y(rng.uniform(0, 360)),
-                            cf(rng.uniform(-1, 1), FLOOR_TOP + side * (level + 0.5),
-                               rng.uniform(-1, 1))),
-                        [c * rng.uniform(0.85, 1.15) for c in WOOD], "WoodPlanks"))
-    return out
-
-
-def clutter_barrel(rng, accent, ground):
-    height = rng.uniform(3.2, 4.2)
-    return [cylinder("Barrel", height, rng.uniform(2.4, 3.2),
-                     cf(0, FLOOR_TOP + height / 2, 0),
-                     rng.choice([[0.42, 0.16, 0.12], [0.16, 0.28, 0.34],
-                                 [0.36, 0.34, 0.14]]), "CorrodedMetal")]
-
-
-def clutter_lamp(rng, accent, ground):
-    height = rng.uniform(14, 20)
-    return [
-        cylinder("LampPost", height, 0.9, cf(0, FLOOR_TOP + height / 2, 0),
-                 [0.14, 0.15, 0.17], "Metal"),
-        part("LampHead", [2.6, 1.0, 2.6], cf(0, FLOOR_TOP + height, 0),
-             accent, "Neon"),
-    ]
-
-
-def clutter_sign(rng, accent, ground):
-    height = rng.uniform(8, 13)
-    return [
-        cylinder("SignPost", height, 0.7, cf(0, FLOOR_TOP + height / 2, 0),
-                 [0.17, 0.18, 0.20], "Metal"),
-        # Not "SignBoard": gym_hall's own signage owns that name, and collision here
-        # is decided by name, so a scenery part that shares one with a structural
-        # part cannot be told apart from it.
-        part("SignPanel", [rng.uniform(5, 8), rng.uniform(2.4, 3.6), 0.4],
-             mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height, 0)),
-             accent, "SmoothPlastic"),
-    ]
-
-
-def clutter_pillar(rng, accent, ground):
-    height = rng.uniform(9, 18)
-    return [part("Pillar", [rng.uniform(2.4, 4.0), height, rng.uniform(2.4, 4.0)],
-                 mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height / 2, 0)),
-                 [c * 0.85 for c in ground], "Slate")]
-
-
-def clutter_palm(rng, accent, ground):
-    height = rng.uniform(16, 24)
-    lean = rng.uniform(-9, 9)
-    out = [cylinder("PalmTrunk", height, 1.5,
-                    mul(rot_z(lean), cf(0, FLOOR_TOP + height / 2, 0)),
-                    [0.34, 0.25, 0.16], "Wood")]
-    for index in range(6):
-        out.append(part("PalmFrond", [11, 0.5, 2.6],
-                        mul(mul(rot_y(index * 60 + rng.uniform(-10, 10)),
-                                cf(5, FLOOR_TOP + height, 0)), rot_z(-16)),
-                        [0.18, 0.36, 0.18], "Grass"))
-    return out
-
-
-def clutter_debris(rng, accent, ground):
-    out = []
-    for _index in range(rng.randint(2, 5)):
-        out.append(part("Debris", [rng.uniform(2, 5), rng.uniform(0.4, 1.1), rng.uniform(2, 5)],
-                        mul(rot_y(rng.uniform(0, 360)),
-                            cf(rng.uniform(-4, 4), FLOOR_TOP + 0.4, rng.uniform(-4, 4))),
-                        [c * rng.uniform(0.6, 0.9) for c in ground], "Rock"))
-    return out
-
-
-# Scenery that keeps its collision because its shape is cover: waist-to-chest,
-# compact footprint, sitting flat on the ground with nothing overhanging. These are
-# the only non-structural parts in the world you can hide behind, and a punch is
-# range 12, so a 4-stud crate is enough to break a line.
-#
-# Names, not kinds, because _decorate walks parts: clutter_shrub returns a stem and
-# a canopy and neither is cover, while clutter_crate returns one to three stacked
-# Crate parts and all of them are. Anything not named here is stripped exactly as
-# before, which is every landmark prop in PROPS and every thin or overhanging piece.
-# The mixed-use city authors cover deliberately as architecture.  Random clutter is
-# decorative and non-colliding; in particular, Rock/Boulder props are intentionally
-# absent so machines no longer look as though a stone was dropped beside every mat.
-SOLID_SCENERY = frozenset()
-
-CLUTTER = {
-    "rock": clutter_rock,
-    "shrub": clutter_shrub,
-    "grass": clutter_grass,
-    "crate": clutter_crate,
-    "barrel": clutter_barrel,
-    "lamp": clutter_lamp,
-    "sign": clutter_sign,
-    "pillar": clutter_pillar,
-    "palm": clutter_palm,
-    "debris": clutter_debris,
-}
 
 # Which kinds each themed island uses, and how heavily. The None entry is the
 # fallback for a district whose row names no prop kit — which is how Iron/OldTown
@@ -3310,7 +3179,7 @@ CLUTTER_KITS = {
     "celestial": (("pillar", 5), ("lamp", 3), ("shrub", 2), ("grass", 2)),
     None: (("rock", 3), ("shrub", 3), ("grass", 4), ("debris", 2), ("crate", 2)),
     # The one coast. Beach planting for the look, plus the crates, barrels and
-    # bollards that are the only cover a fight outside a yard has — SOLID_SCENERY
+    # bollards that are the only cover a fight outside a yard has — SOLID_CITY_PROPS
     # names exactly these, and a purely botanical kit would leave the whole map
     # without a single thing to break line of sight behind.
     "coast": (("palm", 4), ("grass", 4), ("rock", 3), ("shrub", 2),
@@ -3674,6 +3543,203 @@ def street_light(x, z, facing):
         part("LightHead", [2.2, 0.7, 3.4], mul(arm, cf(0, -0.6, 6.6)),
              [1.0, 0.90, 0.68], "Neon", CanCollide=False),
     ]
+
+
+def city_tree(x, z, rng):
+    """A compact street/park tree made from original primitive geometry."""
+    height = rng.uniform(18, 27)
+    out = [cylinder(
+        "TreeTrunk", height, 2.0,
+        mul(cf(x, FLOOR_TOP + height / 2, z), rot_z(90)),
+        [0.27, 0.20, 0.14], "Wood", CanCollide=False,
+    )]
+    for ox, oy, oz, scale in ((0, 0, 0, 1), (-4, -1, 1, 0.72), (4, -2, -1, 0.68)):
+        out.append(part(
+            "TreeCanopy", [13 * scale, 10 * scale, 13 * scale],
+            cf(x + ox, FLOOR_TOP + height + oy, z + oz),
+            [0.12, rng.uniform(0.30, 0.39), 0.16], "Grass", Shape="Ball",
+            CanCollide=False, CanTouch=False, CanQuery=False,
+        ))
+    return out
+
+
+def coastal_public_realm():
+    """Beach, boardwalk and seawall: the continuous public edge of the city."""
+    out = []
+    surface_columns = max(1, math.ceil(CITY_MAINLAND_SIZE[0] / 1800))
+    city_min_x = CITY_MAINLAND_CENTER[0] - CITY_MAINLAND_SIZE[0] / 2
+    city_max_x = CITY_MAINLAND_CENTER[0] + CITY_MAINLAND_SIZE[0] / 2
+    # Visible sand stops before the seawall; the underlying mainland remains the
+    # collision surface, so the thin finish can never trap a player at its edge.
+    out.extend(place(cf(CITY_MAINLAND_CENTER[0], 0, 178), node)
+               for node in tiled_surface(
+                   "BeachSand", CITY_MAINLAND_SIZE[0], 344, 0.08,
+                   FLOOR_TOP, [0.66, 0.57, 0.40], "Sand",
+                   columns=surface_columns, rows=1, map_kind="Park", CanCollide=False,
+               ))
+    out.extend(place(cf(CITY_MAINLAND_CENTER[0], 0, 24), node)
+               for node in tiled_surface(
+                   "Boardwalk", CITY_MAINLAND_SIZE[0], 42, 0.12,
+                   FLOOR_TOP + 0.02, [0.34, 0.25, 0.17], "WoodPlanks",
+                   columns=surface_columns, rows=1, map_kind="Plaza", CanCollide=False,
+               ))
+    out.extend(city_road("CoastalBoulevard", CITY_MAINLAND_SIZE[0], 64,
+                         CITY_MAINLAND_CENTER[0], -86))
+    # No sea-facing rail. A 120-stud near-black bar repeated the length of the coast
+    # read as a barrier cutting the promenade off from the beach rather than as trim,
+    # and it sat directly across the benches.
+    for x in range(int(city_min_x + 150), int(city_max_x - 140), 190):
+        out.extend(street_light(x, -50, 180))
+    return out
+
+
+# --------------------------------------------------------------------------
+# City props.
+#
+# Small, cheap, repeated pieces. One function per kind, registered in CITY_PROPS,
+# so a new piece of scenery is a new function and a new dict key rather than an
+# edit to whatever scatters them.
+#
+# Every function returns nodes in local space around the origin; the caller places
+# them and decides what they collide with. These were written for an island world
+# that no longer exists and were never placed anywhere -- they are moved here,
+# ahead of that dead builder being deleted, because the shapes are sound and the
+# city needs exactly this kit.
+# --------------------------------------------------------------------------
+
+
+def clutter_rock(rng, accent, ground):
+    scale = rng.uniform(1.6, 4.2)
+    return [part("Rock", [scale * 1.7, scale * 1.3, scale * 1.5],
+                 mul(rot_y(rng.uniform(0, 360)),
+                     cf(0, FLOOR_TOP + scale * 0.5, 0)),
+                 [c * rng.uniform(0.72, 0.95) for c in ground], "Rock")]
+
+
+def clutter_shrub(rng, accent, ground):
+    height = rng.uniform(2.4, 4.6)
+    green = [0.16 + rng.uniform(0, 0.09), 0.30 + rng.uniform(0, 0.14), 0.15]
+    return [
+        cylinder("ShrubStem", height, 0.5, cf(0, FLOOR_TOP + height / 2, 0),
+                 [0.24, 0.17, 0.11], "Wood"),
+        part("ShrubCanopy", [height * 1.1, height * 0.8, height * 1.1],
+             mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height, 0)),
+             green, "Grass"),
+    ]
+
+
+def clutter_grass(rng, accent, ground):
+    out = []
+    for _index in range(rng.randint(2, 4)):
+        blade = rng.uniform(1.0, 2.2)
+        out.append(part("GrassTuft", [rng.uniform(1.4, 2.6), blade, rng.uniform(1.4, 2.6)],
+                        mul(rot_y(rng.uniform(0, 360)),
+                            cf(rng.uniform(-3, 3), FLOOR_TOP + blade / 2, rng.uniform(-3, 3))),
+                        [0.18, 0.28 + rng.uniform(0, 0.12), 0.14], "Grass"))
+    return out
+
+
+def clutter_crate(rng, accent, ground):
+    out = []
+    for level in range(rng.randint(1, 3)):
+        side = rng.uniform(3.0, 4.4)
+        out.append(part("Crate", [side, side, side],
+                        mul(rot_y(rng.uniform(0, 360)),
+                            cf(rng.uniform(-1, 1), FLOOR_TOP + side * (level + 0.5),
+                               rng.uniform(-1, 1))),
+                        [c * rng.uniform(0.85, 1.15) for c in WOOD], "WoodPlanks"))
+    return out
+
+
+def clutter_barrel(rng, accent, ground):
+    height = rng.uniform(3.2, 4.2)
+    return [cylinder("Barrel", height, rng.uniform(2.4, 3.2),
+                     cf(0, FLOOR_TOP + height / 2, 0),
+                     rng.choice([[0.42, 0.16, 0.12], [0.16, 0.28, 0.34],
+                                 [0.36, 0.34, 0.14]]), "CorrodedMetal")]
+
+
+def clutter_lamp(rng, accent, ground):
+    height = rng.uniform(14, 20)
+    return [
+        cylinder("LampPost", height, 0.9, cf(0, FLOOR_TOP + height / 2, 0),
+                 [0.14, 0.15, 0.17], "Metal"),
+        part("LampHead", [2.6, 1.0, 2.6], cf(0, FLOOR_TOP + height, 0),
+             accent, "Neon"),
+    ]
+
+
+def clutter_sign(rng, accent, ground):
+    height = rng.uniform(8, 13)
+    return [
+        cylinder("SignPost", height, 0.7, cf(0, FLOOR_TOP + height / 2, 0),
+                 [0.17, 0.18, 0.20], "Metal"),
+        # Not "SignBoard": gym_hall's own signage owns that name, and collision here
+        # is decided by name, so a scenery part that shares one with a structural
+        # part cannot be told apart from it.
+        part("SignPanel", [rng.uniform(5, 8), rng.uniform(2.4, 3.6), 0.4],
+             mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height, 0)),
+             accent, "SmoothPlastic"),
+    ]
+
+
+def clutter_pillar(rng, accent, ground):
+    height = rng.uniform(9, 18)
+    return [part("Pillar", [rng.uniform(2.4, 4.0), height, rng.uniform(2.4, 4.0)],
+                 mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height / 2, 0)),
+                 [c * 0.85 for c in ground], "Slate")]
+
+
+def clutter_palm(rng, accent, ground):
+    height = rng.uniform(16, 24)
+    lean = rng.uniform(-9, 9)
+    out = [cylinder("PalmTrunk", height, 1.5,
+                    mul(rot_z(lean), cf(0, FLOOR_TOP + height / 2, 0)),
+                    [0.34, 0.25, 0.16], "Wood")]
+    for index in range(6):
+        out.append(part("PalmFrond", [11, 0.5, 2.6],
+                        mul(mul(rot_y(index * 60 + rng.uniform(-10, 10)),
+                                cf(5, FLOOR_TOP + height, 0)), rot_z(-16)),
+                        [0.18, 0.36, 0.18], "Grass"))
+    return out
+
+
+def clutter_debris(rng, accent, ground):
+    out = []
+    for _index in range(rng.randint(2, 5)):
+        out.append(part("Debris", [rng.uniform(2, 5), rng.uniform(0.4, 1.1), rng.uniform(2, 5)],
+                        mul(rot_y(rng.uniform(0, 360)),
+                            cf(rng.uniform(-4, 4), FLOOR_TOP + 0.4, rng.uniform(-4, 4))),
+                        [c * rng.uniform(0.6, 0.9) for c in ground], "Rock"))
+    return out
+
+
+# Scenery that keeps its collision because its shape is cover: waist-to-chest,
+# compact footprint, sitting flat on the ground with nothing overhanging. These are
+# the only non-structural parts in the world you can hide behind, and a punch is
+# range 12, so a 4-stud crate is enough to break a line.
+#
+# Names, not kinds, because _decorate walks parts: clutter_shrub returns a stem and
+# a canopy and neither is cover, while clutter_crate returns one to three stacked
+# Crate parts and all of them are. Anything not named here is stripped exactly as
+# before, which is every landmark prop in PROPS and every thin or overhanging piece.
+# The mixed-use city authors cover deliberately as architecture.  Random clutter is
+# decorative and non-colliding; in particular, Rock/Boulder props are intentionally
+# absent so machines no longer look as though a stone was dropped beside every mat.
+SOLID_CITY_PROPS = frozenset()
+
+CITY_PROPS = {
+    "rock": clutter_rock,
+    "shrub": clutter_shrub,
+    "grass": clutter_grass,
+    "crate": clutter_crate,
+    "barrel": clutter_barrel,
+    "lamp": clutter_lamp,
+    "sign": clutter_sign,
+    "pillar": clutter_pillar,
+    "palm": clutter_palm,
+    "debris": clutter_debris,
+}
 
 
 def parked_car(x, z, facing, rng):
@@ -4914,7 +4980,7 @@ def _decorate(node):
     running a hundred studs between machines or flying between districts — a
     shipping container is 26 studs deep and a crane leg is 62 tall.
 
-    The exceptions are named in SOLID_SCENERY: crates, barrels, rocks and pillars
+    The exceptions are named in SOLID_CITY_PROPS: crates, barrels, rocks and pillars
     keep their collision, because this is a PvP game and a fight on ground with
     nothing to break line of sight is two players standing still trading hits. Those
     four are short, compact and flush to the floor, so they read as cover rather than
@@ -4931,7 +4997,7 @@ def _decorate(node):
         # these parts already exists in the place as non-colliding scenery. Stating
         # the solid case is what actually turns it back on. CanQuery matters as much
         # as CanCollide: cover that raycasts pass straight through is not cover.
-        solid = node.get("name") in SOLID_SCENERY
+        solid = node.get("name") in SOLID_CITY_PROPS
         properties["CanCollide"] = solid
         properties["CanTouch"] = solid
         properties["CanQuery"] = solid
@@ -5061,7 +5127,7 @@ def region_clutter(region, locations):
                 continue
 
             spot = mul(frame, cf(local_x, 0, local_z))
-            pieces = CLUTTER[rng.choice(kinds)](rng, visual["accent"], visual["ground"])
+            pieces = CITY_PROPS[rng.choice(kinds)](rng, visual["accent"], visual["ground"])
             for piece in pieces:
                 placed = place(spot, piece)
                 if _node_hits_sites(placed, keep_out):
@@ -5519,54 +5585,6 @@ def crosswalk(x, z, across_x):
             "CrosswalkStripe", size, frame, [0.76, 0.76, 0.72], "SmoothPlastic",
             CanCollide=False, CastShadow=False,
         ))
-    return out
-
-
-def city_tree(x, z, rng):
-    """A compact street/park tree made from original primitive geometry."""
-    height = rng.uniform(18, 27)
-    out = [cylinder(
-        "TreeTrunk", height, 2.0,
-        mul(cf(x, FLOOR_TOP + height / 2, z), rot_z(90)),
-        [0.27, 0.20, 0.14], "Wood", CanCollide=False,
-    )]
-    for ox, oy, oz, scale in ((0, 0, 0, 1), (-4, -1, 1, 0.72), (4, -2, -1, 0.68)):
-        out.append(part(
-            "TreeCanopy", [13 * scale, 10 * scale, 13 * scale],
-            cf(x + ox, FLOOR_TOP + height + oy, z + oz),
-            [0.12, rng.uniform(0.30, 0.39), 0.16], "Grass", Shape="Ball",
-            CanCollide=False, CanTouch=False, CanQuery=False,
-        ))
-    return out
-
-
-def coastal_public_realm():
-    """Beach, boardwalk and seawall: the continuous public edge of the city."""
-    out = []
-    surface_columns = max(1, math.ceil(CITY_MAINLAND_SIZE[0] / 1800))
-    city_min_x = CITY_MAINLAND_CENTER[0] - CITY_MAINLAND_SIZE[0] / 2
-    city_max_x = CITY_MAINLAND_CENTER[0] + CITY_MAINLAND_SIZE[0] / 2
-    # Visible sand stops before the seawall; the underlying mainland remains the
-    # collision surface, so the thin finish can never trap a player at its edge.
-    out.extend(place(cf(CITY_MAINLAND_CENTER[0], 0, 178), node)
-               for node in tiled_surface(
-                   "BeachSand", CITY_MAINLAND_SIZE[0], 344, 0.08,
-                   FLOOR_TOP, [0.66, 0.57, 0.40], "Sand",
-                   columns=surface_columns, rows=1, map_kind="Park", CanCollide=False,
-               ))
-    out.extend(place(cf(CITY_MAINLAND_CENTER[0], 0, 24), node)
-               for node in tiled_surface(
-                   "Boardwalk", CITY_MAINLAND_SIZE[0], 42, 0.12,
-                   FLOOR_TOP + 0.02, [0.34, 0.25, 0.17], "WoodPlanks",
-                   columns=surface_columns, rows=1, map_kind="Plaza", CanCollide=False,
-               ))
-    out.extend(city_road("CoastalBoulevard", CITY_MAINLAND_SIZE[0], 64,
-                         CITY_MAINLAND_CENTER[0], -86))
-    # No sea-facing rail. A 120-stud near-black bar repeated the length of the coast
-    # read as a barrier cutting the promenade off from the beach rather than as trim,
-    # and it sat directly across the benches.
-    for x in range(int(city_min_x + 150), int(city_max_x - 140), 190):
-        out.extend(street_light(x, -50, 180))
     return out
 
 
