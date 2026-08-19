@@ -1492,6 +1492,28 @@ def validate_machine_detail(validator: Validator, machines: Any) -> None:
     validator.check(seen > 0, "no machines found to check detail budgets against")
 
 
+def validate_building_budget(validator: Validator, payloads: Iterable[Any]) -> None:
+    """No single building may run away with the world budget.
+
+    Cheap to check and worth checking: the generator picks heights and setback
+    counts at random, and a bad interaction between those two is the kind of bug
+    that shows up as one 400-part tower somewhere in sixteen thousand studs of
+    city rather than as anything obviously wrong.
+    """
+    worst_name, worst_count = "", 0
+    for payload in payloads:
+        for node in walk(payload):
+            if node.get("name") != "Building" or node.get("className") != "Model":
+                continue
+            count = sum(1 for child in descendants(node) if is_base_part(child))
+            if count > worst_count:
+                worst_name, worst_count = node.get("name", "?"), count
+    validator.check(
+        worst_count <= MAX_BUILDING_PARTS,
+        f"a building holds {worst_count} parts, over the {MAX_BUILDING_PARTS} cap ({worst_name})",
+    )
+
+
 def validate_streaming_density(validator: Validator, payloads: Iterable[Any]) -> None:
     """No single streaming bubble may carry too much.
 
@@ -1901,6 +1923,7 @@ def run() -> int:
         )
         validate_machine_detail(validator, first_machines)
         validate_streaming_density(validator, (first_structure, first_machines))
+        validate_building_budget(validator, (first_structure,))
         instance_count, base_part_count = validate_instance_budgets(
             validator,
             (first_structure, first_machines),

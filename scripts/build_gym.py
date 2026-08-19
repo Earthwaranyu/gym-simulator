@@ -4130,7 +4130,230 @@ def city_block_shell(rect, index):
     # features on the wire; the minimap wants city blocks, not window ledges.
     out.append(map_footprint("CityBlockMap", width, depth,
                              cf(x, FLOOR_TOP + 0.12, z), SIDEWALK, "Block"))
+
+    # The buildable interior, inset again so nothing overhangs the pavement.
+    character = character_at(x, z)
+    build_w, build_d = inner_w - 30, inner_d - 30
+    if build_w > 90 and build_d > 90:
+        for lot in subdivide(x, z, build_w, build_d, rng):
+            out.extend(city_lot(lot, weighted_kind(character["weights"], rng), character, rng))
     return out
+
+
+# Architectural character, keyed on the venue_type of the nearest campus. A city
+# where every block is the same is a texture, not a place; this is what makes the
+# walk from the park to the docks to the office towers read as going somewhere.
+#
+# Resolved by nearest campus with a blend band (see character_at), so the change
+# is gradual rather than a line ruled across the map.
+CITY_CHARACTER = {
+    "Park": {
+        "skins": [BUILDING_SKINS[1], BUILDING_SKINS[2]],
+        "heights": {"tower": (40, 70), "midrise": (26, 46), "shophouse": (14, 24)},
+        "weights": (("shophouse", 5), ("midrise", 4), ("yard", 3), ("tower", 1)),
+    },
+    "Beach": {
+        "skins": [BUILDING_SKINS[2], BUILDING_SKINS[0]],
+        "heights": {"tower": (48, 84), "midrise": (28, 50), "shophouse": (14, 26)},
+        "weights": (("shophouse", 4), ("midrise", 5), ("yard", 2), ("tower", 2)),
+    },
+    "Dock": {
+        "skins": [BUILDING_SKINS[3], BUILDING_SKINS[0]],
+        "heights": {"tower": (44, 72), "midrise": (22, 40), "shophouse": (12, 22)},
+        "weights": (("shophouse", 3), ("midrise", 4), ("yard", 5), ("tower", 1)),
+    },
+    "City": {
+        "skins": [BUILDING_SKINS[0], BUILDING_SKINS[3]],
+        "heights": {"tower": (110, 210), "midrise": (48, 92), "shophouse": (18, 30)},
+        "weights": (("tower", 5), ("midrise", 5), ("shophouse", 2), ("yard", 1)),
+    },
+    "Office": {
+        "skins": [BUILDING_SKINS[3], BUILDING_SKINS[0]],
+        "heights": {"tower": (140, 250), "midrise": (60, 110), "shophouse": (20, 32)},
+        "weights": (("tower", 6), ("midrise", 4), ("shophouse", 1), ("yard", 1)),
+    },
+}
+
+# The coast between campuses belongs to nobody in particular.
+DEFAULT_CHARACTER = CITY_CHARACTER["Beach"]
+
+
+def character_at(x, z):
+    """The architectural character governing a point, by nearest campus."""
+    best, best_distance = None, math.inf
+    for area in AREAS:
+        if area["flight_only"]:
+            continue
+        distance = math.hypot(x - area["x"], z - area["z"])
+        if distance < best_distance:
+            best, best_distance = area, distance
+    if best is None:
+        return DEFAULT_CHARACTER
+    return CITY_CHARACTER.get(best["venue_type"], DEFAULT_CHARACTER)
+
+
+def weighted_kind(weights, rng):
+    total = sum(weight for _, weight in weights)
+    roll = rng.uniform(0, total)
+    for kind, weight in weights:
+        roll -= weight
+        if roll <= 0:
+            return kind
+    return weights[-1][0]
+
+
+def subdivide(x, z, width, depth, rng, min_side=150, depth_limit=3):
+    """A block's interior cut into lots by recursive binary splitting.
+
+    Always splits the longer axis, which is what keeps lots roughly square
+    instead of degenerating into strips, and stops on size rather than on a
+    fixed count so a small edge block gets two lots and a full interior block
+    gets a dozen.
+    """
+    if depth_limit <= 0 or max(width, depth) < min_side * 2:
+        return [(x, z, width, depth)]
+
+    if width >= depth:
+        cut = width * rng.uniform(0.38, 0.62)
+        return (
+            subdivide(x - (width - cut) / 2, z, cut, depth, rng, min_side, depth_limit - 1)
+            + subdivide(x + cut / 2, z, width - cut, depth, rng, min_side, depth_limit - 1)
+        )
+    cut = depth * rng.uniform(0.38, 0.62)
+    return (
+        subdivide(x, z - (depth - cut) / 2, width, cut, rng, min_side, depth_limit - 1)
+        + subdivide(x, z + cut / 2, width, depth - cut, rng, min_side, depth_limit - 1)
+    )
+
+
+# What a lot can be. Weights are per district character; "yard" and "parking" are
+# how a city gets to breathe -- a block where every lot is built solid reads as a
+# wall, and the gaps are where the alleys and skyline gaps come from.
+LOT_KINDS = ("tower", "midrise", "shophouse", "yard")
+
+
+def procedural_building(x, z, width, depth, height, skin, rng):
+    """One building: a setback mass, a bay-rhythm facade, and a used roof.
+
+    The old generator spent its parts on a single extruded box with a window
+    strip per face. That instinct was right about windows -- a per-floor grid is
+    invisible at the distance these are seen from -- but wrong about the mass:
+    what actually reads at range is the silhouette, so the parts go there.
+
+    Everything here is capped by MAX_BUILDING_PARTS in the validator.
+    """
+    out = []
+    ground_y = FLOOR_TOP
+
+    # Podium: the two-storey base a street actually meets.
+    podium = min(height * 0.35, 11)
+    out.append(part("Podium", [width, podium, depth],
+                    cf(x, ground_y + podium / 2, z), skin["trim"], skin["material"]))
+
+    # A setback stack rather than one extrusion. Each volume steps in, so the
+    # skyline reads as stepped rather than as a row of cuboids.
+    volumes = 1 if height < 45 else (2 if height < 110 else 3)
+    remaining = height - podium
+    base_y = ground_y + podium
+    w, d = width - 3, depth - 3
+    for level in range(volumes):
+        share = remaining if level == volumes - 1 else remaining * rng.uniform(0.45, 0.65)
+        out.append(part("Shaft", [w, share, d],
+                        cf(x, base_y + share / 2, z), skin["wall"], skin["material"]))
+        # A cornice at every setback: the line that stops two stacked boxes
+        # reading as one badly-proportioned box.
+        out.append(part("Cornice", [w + 2.2, 1.6, d + 2.2],
+                        cf(x, base_y + share, z), skin["trim"], skin["material"],
+                        CanCollide=False))
+
+        # Bay rhythm, not a window grid. A glazing band sits *on* each of the four
+        # faces rather than spanning the mass: two crossed slabs would intersect
+        # through the corners, which is real interpenetration and z-fights there.
+        # Bands carry a facade at streaming distance for four parts, where a
+        # per-floor grid would cost hundreds and read identically.
+        bands = 2 if (level == 0 and share >= 30) else 1
+        for band in range(bands):
+            band_y = base_y + share * (band + 0.5) / bands
+            band_h = max(3.5, min(share / bands - 6, 9))
+            for face in (-1, 1):
+                out.append(part("Glazing", [w - 8, band_h, 0.7],
+                                cf(x, band_y, z + face * d / 2),
+                                skin["glass"], "Glass", Transparency=0.3,
+                                CanCollide=False, CastShadow=False))
+                out.append(part("Glazing", [0.7, band_h, d - 8],
+                                cf(x + face * w / 2, band_y, z),
+                                skin["glass"], "Glass", Transparency=0.3,
+                                CanCollide=False, CastShadow=False))
+        # Piers only on the volume the street sees; higher setbacks are read as
+        # silhouette, not as facade.
+        if level == 0:
+            for side in (-1, 1):
+                out.append(part("Pier", [2.4, share, d * 0.62],
+                                cf(x + side * (w / 2 - 1.2), base_y + share / 2, z),
+                                skin["trim"], skin["material"], CanCollide=False))
+
+        base_y += share
+        remaining -= share
+        w, d = w - rng.uniform(7, 15), d - rng.uniform(7, 15)
+        if w < 24 or d < 24:
+            break
+
+    # A used roof. Flight means players look down at these constantly, and a
+    # bare slab reads as a lid; a stair head and a tank are the cheapest things
+    # that say the building has an inside.
+    roof_y = base_y
+    out.append(part("RoofDeck", [w + 3, 0.8, d + 3], cf(x, roof_y, z),
+                    skin["trim"], skin["material"], CanCollide=False))
+    out.append(part("RoofHouse", [w * 0.3, 6, d * 0.3],
+                    cf(x + w * 0.18, roof_y + 3, z - d * 0.16),
+                    skin["trim"], skin["material"], CanCollide=False))
+    if height > 60:
+        out.append(cylinder("RoofTank", 7, min(w, d) * 0.22,
+                            mul(cf(x - w * 0.2, roof_y + 5.5, z + d * 0.14), rot_z(90)),
+                            [0.32, 0.28, 0.24], "Metal", CanCollide=False))
+    for vent in (-1, 1):
+        out.append(tube("RoofVent",
+                        (x + vent * w * 0.12, roof_y, z + d * 0.28),
+                        (x + vent * w * 0.12, roof_y + 3.2, z + d * 0.28),
+                        1.5, [0.34, 0.34, 0.36], CanCollide=False))
+
+    # The shopfront the street sees, and the awning over it.
+    out.append(part("ShopGlass", [width - 14, 5, 0.5],
+                    cf(x, ground_y + 4.5, z + depth / 2 - 0.2),
+                    [0.85, 0.72, 0.38], "Neon", CanCollide=False, CastShadow=False))
+    out.append(part("Awning", [width - 10, 0.5, 3.4],
+                    cf(x, ground_y + 8.2, z + depth / 2 + 1.2),
+                    skin["glass"], "Fabric", CanCollide=False))
+    return out
+
+
+def city_lot(lot, kind, character, rng):
+    """One subdivided lot, built according to what it was zoned."""
+    x, z, width, depth = lot
+    # Inset off the lot boundary so neighbours do not share walls and the alley
+    # and pavement stay walkable between them.
+    width, depth = width - 26, depth - 26
+    if width < 34 or depth < 34:
+        return []
+
+    if kind == "yard":
+        # Deliberately empty ground, but finished: a yard reads as a place, a
+        # gap in the lattice reads as unfinished.
+        out = [part("Yard", [width, 0.35, depth], cf(x, FLOOR_TOP + 0.16, z),
+                    [0.29, 0.31, 0.27], "Slate", CanCollide=False, CastShadow=False)]
+        for corner in (-1, 1):
+            out.append(part("YardFence", [width, 3.2, 0.6],
+                            cf(x, FLOOR_TOP + 1.6, z + corner * depth / 2),
+                            [0.26, 0.26, 0.28], "Metal", CanCollide=False))
+        return out
+
+    low, high = character["heights"][kind]
+    height = rng.uniform(low, high)
+    skin = rng.choice(character["skins"])
+    # Grouped into a Model rather than left as loose parts: it is what lets the
+    # validator hold a single building to a part budget, and it gives streaming a
+    # unit to load a building as, instead of forty unrelated slabs.
+    return [group("Building", procedural_building(x, z, width, depth, height, skin, rng))]
 
 
 def city_grid(locations):
