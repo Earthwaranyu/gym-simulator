@@ -2465,11 +2465,6 @@ DISTRICTS = [
     },
 ]
 
-# The connected-city starter campus fills its central block. All five x1 training
-# venues sit on this pavement, while a smaller square barrier protects the actual
-# spawn point in the middle. Keeping the machines outside that barrier preserves
-# the game's core risk: somebody can still knock a trainee off a starter machine.
-PLAZA_RADIUS = 90
 SAFE_ZONE_HALF = 34
 
 
@@ -2537,7 +2532,6 @@ STAT_VARIANTS = {
     "Legs": ("GobletSquat", "SquatRack", "LegPress", "LegExtension",
              "HamstringCurl", "CalfRaise", "StairClimber"),
 }
-MACHINE_ORDER = [STAT_VARIANTS[family][0] for family in FAMILY_ORDER]
 EQUIPMENT_FAMILY = {
     equipment_id: family
     for family, variants in STAT_VARIANTS.items()
@@ -2604,66 +2598,6 @@ def training_venue(equipment_id, district_accent):
         for x in (-5, 5):
             out.append(part("LaneLine", [0.35, 0.12, 42], cf(x, FLOOR_TOP + 0.30, 5),
                             color, "SmoothPlastic", CanCollide=False, CastShadow=False))
-
-    return out
-
-
-# Chest-high on purpose. A trainee is anchored and cannot dodge, so cover here is
-# for the attacker's approach and for a defender who dismounts to fight back — not a
-# wall to hide the machine behind. Seven studs is the same height as BayPartition,
-# for the same reason: someone training stays visible and shootable from the next bay.
-VENUE_COVER_HEIGHT = 7.0
-# Ring radius, measured from the venue centre. The edge plate is 30 wide, so its
-# corner reaches 15 studs out; 21 puts the blocks clear of the mat on the surrounding
-# floor. It is also outside TrainingService's PROMPT_DISTANCE of 14, so cover can
-# never sit between a player and the prompt they are trying to hold E on.
-VENUE_COVER_RING = 21.0
-# Bearings are drawn away from +Z, which is the side a hall bay is entered from. A
-# venue ringed on all four sides reads as a pen; leaving the approach open keeps it
-# reading as a training floor that happens to have something to duck behind.
-VENUE_COVER_APPROACH_ARC = 55.0
-
-
-def venue_cover(equipment_id, district_accent):
-    """Three solid blocks ringing a venue, so a fight there has geometry.
-
-    Clutter can never supply this: region_keep_out clears a PROP_CLEARANCE circle of
-    72 studs around every station site, which is precisely the ground a fight over
-    that station is contested on. So the cover a venue needs is the venue's own, and
-    it is placed deliberately rather than scattered.
-
-    Seeded off the equipment id so the arrangement is stable across rebuilds and
-    differs between bays — the generator is reproducible end to end and check.sh
-    diffs the payloads.
-    """
-    family = EQUIPMENT_FAMILY[equipment_id]
-    color = FAMILY_COLORS[family]
-    rng = random.Random(f"venue-cover-v1:{equipment_id}")
-
-    out = []
-    span = 360.0 - 2 * VENUE_COVER_APPROACH_ARC
-    for index in range(3):
-        bearing = VENUE_COVER_APPROACH_ARC + span * (index + 0.5) / 3
-        bearing += rng.uniform(-14, 14)
-        spot = mul(rot_y(bearing), cf(0, 0, VENUE_COVER_RING))
-        x, z = spot[0][0], spot[0][2]
-        width = rng.uniform(6.0, 8.0)
-
-        # Turned to face the venue so the broad side is what you actually hide
-        # behind, with a little slop so three blocks do not read as a fence.
-        facing = rot_y(bearing + 180 + rng.uniform(-12, 12))
-        out.append(part(
-            "VenueCover", [width, VENUE_COVER_HEIGHT, 3.0],
-            mul(cf(x, FLOOR_TOP + VENUE_COVER_HEIGHT / 2, z), facing),
-            district_accent, "Concrete",
-        ))
-        # A family-coloured skirt under each block, so cover looks like part of the
-        # venue rather than something that fell there. Flat trim, not structure.
-        out.append(part(
-            "VenueCoverBase", [width + 1.4, 0.4, 4.4],
-            mul(cf(x, FLOOR_TOP + 0.2, z), facing),
-            color, "SmoothPlastic", CanCollide=False, CastShadow=False,
-        ))
 
     return out
 
@@ -2939,46 +2873,6 @@ def palm(x, z, rng):
     return out
 
 
-def building(x, z, sx, sz, height, skin, rng):
-    """A tower: storefront band, shaft, glazing on each face, and a parapet.
-
-    Deliberately few parts. At the distance you actually see these from, a
-    window strip per face carries a building far better than a floor-by-floor
-    grid would, and this map has ten plots of them to pay for.
-    """
-    out = [
-        part("Storefront", [sx, 9, sz], cf(x, FLOOR_TOP + 4.5, z),
-             skin["trim"], skin["material"]),
-        part("Shaft", [sx - 2, height, sz - 2], cf(x, FLOOR_TOP + 9 + height / 2, z),
-             skin["wall"], skin["material"]),
-        part("Parapet", [sx + 1, 3, sz + 1], cf(x, FLOOR_TOP + 10.5 + height, z),
-             skin["trim"], skin["material"]),
-    ]
-
-    lit = rng.random() < 0.4
-    for side, (ox, oz, w, d) in enumerate((
-        (0, sz / 2 - 1, sx - 10, 0.6),
-        (0, -sz / 2 + 1, sx - 10, 0.6),
-        (sx / 2 - 1, 0, 0.6, sz - 10),
-        (-sx / 2 + 1, 0, 0.6, sz - 10),
-    )):
-        if w <= 0 or d <= 0:
-            continue
-        out.append(part("Glazing", [w, height - 6, d],
-                        cf(x + ox, FLOOR_TOP + 9 + height / 2, z + oz),
-                        skin["glass"], "Neon" if lit else "Glass",
-                        Transparency=0 if lit else 0.35, CanCollide=False))
-
-    # Lit shopfront across the street-facing side, at head height.
-    if sx >= sz:
-        shop_size, shop_at = [sx - 12, 5, 0.4], cf(x, FLOOR_TOP + 4.5, z + sz / 2 - 0.2)
-    else:
-        shop_size, shop_at = [0.4, 5, sz - 12], cf(x + sx / 2 - 0.2, FLOOR_TOP + 4.5, z)
-    out.append(part("ShopGlass", shop_size, shop_at, [0.85, 0.72, 0.38], "Neon",
-                    CanCollide=False))
-    return out
-
-
 # --------------------------------------------------------------------------
 # What stands in the plaza.
 #
@@ -3243,44 +3137,6 @@ AREAS = tier_areas()
 # --------------------------------------------------------------------------
 
 
-# One yard per tier, keyed by zone. Each is an open-air fenced lot on the same
-# beach, so what changes down the promenade is the paving, the fence colour and
-# the sign — not the building, because there is no building. tier_yard reads the
-# row and never branches on the zone id, so a new tier stays a one-row change.
-TIER_YARDS = {
-    "Iron": {
-        "name": "Beachfront Iron",
-        "paving": [0.20, 0.21, 0.23], "paving_material": "Asphalt",
-        "fence": [0.24, 0.55, 0.78], "sign": [1.00, 0.84, 0.42],
-    },
-    "Powerhouse": {
-        "name": "Dockside Powerhouse",
-        "paving": [0.24, 0.24, 0.26], "paving_material": "Concrete",
-        "fence": [0.90, 0.45, 0.22], "sign": [0.98, 0.52, 0.22],
-    },
-    "Strongman": {
-        "name": "Sandpit Strongman Yard",
-        "paving": [0.36, 0.31, 0.23], "paving_material": "Sandstone",
-        "fence": [0.78, 0.62, 0.34], "sign": [1.00, 0.79, 0.36],
-    },
-    "Titan": {
-        "name": "Quarryside Titan Lot",
-        "paving": [0.28, 0.26, 0.22], "paving_material": "Slate",
-        "fence": [0.95, 0.74, 0.26], "sign": [1.00, 0.77, 0.24],
-    },
-    "Skydeck": {
-        "name": "Skyline Athletic Deck",
-        "paving": [0.22, 0.25, 0.29], "paving_material": "Concrete",
-        "fence": [0.47, 0.82, 1.00], "sign": [0.62, 0.90, 1.00],
-    },
-    "Storm": {
-        "name": "Stormbreak Platform",
-        "paving": [0.19, 0.21, 0.26], "paving_material": "DiamondPlate",
-        "fence": [0.59, 0.63, 1.00], "sign": [0.70, 0.78, 1.00],
-    },
-}
-
-
 def map_feature(node, kind, shape="Rect"):
     """Marks real geometry as a simplified feature on the in-game plan map."""
     return tagged(node, tags=[MAP_FEATURE_TAG], attributes={
@@ -3400,18 +3256,6 @@ def region_frame(region):
     """
     x, z = region["center"]
     return mul(cf(x, region["altitude"], z), rot_y(region["yaw"]))
-
-
-# Cached per island id rather than per region dict, which is unhashable. The
-# validator builds the world twice in one process and compares the two results
-# byte for byte, so every consumer has to see the same hall both times.
-# Mat positions inside one tier yard. Five machines alternate either side of the
-# promenade — seaward, inland, seaward, inland, seaward — so the path runs between
-# two working rows rather than past a wall of them. The tightest neighbour pair is
-# hypot(60, 84) = 103 studs apart in plan view, comfortably past the 48 the
-# validator requires between two stations.
-AREA_BAY_X = (-120, -60, 0, 60, 120)
-AREA_BAY_Z = 42
 
 
 # A real gym is lit like an office: broad flush panels in a pale ceiling, throwing
@@ -3712,102 +3556,137 @@ def city_areas():
 
 
 AREAS = city_areas()
-AREA_BY_ZONE = {area["zone"]: area for area in AREAS}
 
 COPY_OFFSETS = (0,)
 CITY_CAMPUS_WIDTH = 370
 CITY_CAMPUS_DEPTH = 270
-# Bays stay at the old spread even though the courts are now a third as wide. That gap
-# is the point: each muscle court stands alone on the concourse with open floor around
-# it, rather than five courts abutting into one continuous slab.
-CITY_BAYS = (
-    (-140, -35, 0),
-    (-70, 75, 180),
-    (0, -35, 0),
-    (70, 75, 180),
-    (140, -35, 0),
-)
-
-
-def area_bays(area):
-    return [
-        mul(area["frame"], mul(cf(x, 0, z), rot_y(yaw)))
-        for x, z, yaw in CITY_BAYS
-    ]
 
 
 STARTER_CAMPUS_FRAME = mul(cf(0, 0, 150), rot_y(180))
 
 
-def starter_bays():
-    return [
-        mul(STARTER_CAMPUS_FRAME, mul(cf(x, 0, z), rot_y(yaw)))
-        for x, z, yaw in CITY_BAYS
+# Streaming and file-split units. One environment per machine would be 35 models
+# in the districts file and 35 streaming groups; one for the whole city would be a
+# single 28,000-part model. Six geographic bands is the middle: enough that a
+# player only ever holds a slice of the city, few enough that the tree stays
+# readable.
+SECTOR_COUNT = 6
+
+
+def sector_for(x):
+    """Which sector environment a point belongs to."""
+    span = (CITY_MAX_X - CITY_MIN_X) / SECTOR_COUNT
+    index = int((x - CITY_MIN_X) // span)
+    return f"Sector{min(max(index, 0), SECTOR_COUNT - 1) + 1}"
+
+
+# Stride used to walk the scattered sites when handing out tier/muscle pairs.
+# Coprime with 35, so stepping by it visits every site exactly once and lands each
+# tier's five machines about seven sites apart in distance from spawn. That is
+# what keeps the tiers genuinely interleaved: no band of the map belongs to one
+# multiplier, which is the point of scattering rather than zoning.
+SITE_STRIDE = 13
+
+
+# A fight is somewhere you choose to walk to, so a hostile site must never land
+# on a training court -- being anchored to a machine for minutes at a time is the
+# one thing in this game that has to be safe.
+HOSTILE_STATION_CLEARANCE = 320
+MIN_HOSTILE_SEPARATION = 650
+
+
+def scatter_hostile_sites(station_sites):
+    """Seven mob fields and seven boss arenas, spread across the city.
+
+    Drawn from the same ground pool as the machines and picked with the same
+    farthest-point routine, so fighting grounds are destinations in their own
+    right rather than a disc parked behind whatever campus owned them.
+    """
+    taken = list(station_sites)
+    free = [
+        candidate for candidate in site_candidates()
+        if candidate["kind"] == "ground"
+        and all(math.hypot(candidate["x"] - site["x"], candidate["z"] - site["z"])
+                > HOSTILE_STATION_CLEARANCE for site in station_sites)
     ]
+    # Spread against the stations as well as against each other: a boss arena
+    # equidistant from two machines is more useful than one tucked in a corner.
+    picked = _spread_pick(free, len(taken) + 14, taken)
+    return picked[len(taken):]
 
 
 def connected_locations():
-    """Seven coherent multiplier destinations, each containing all five muscles."""
+    """Thirty-five machines, each its own destination somewhere in the city."""
     tier_rows = DISTRICTS[:7]
-    zone_index = {row["zone"]: index for index, row in enumerate(tier_rows)}
-    out = []
+    # Nearest the spawn plaza first, which is the only ordering a player can
+    # perceive, and the one the stride below is meant to interleave.
+    sites = sorted(scatter_sites(),
+                   key=lambda site: math.hypot(site["x"], site["z"] - 150))
 
-    for family, equipment_id, origin in zip(
-            FAMILY_ORDER, MACHINE_ORDER, starter_bays()):
-        site_x, _, site_z = origin[0]
+    pairs = [(row["zone"], family) for row in tier_rows for family in FAMILY_ORDER]
+    out = []
+    for pair_index, (zone, family) in enumerate(pairs):
+        site = sites[(pair_index * SITE_STRIDE) % len(sites)]
+        tier_index = next(i for i, row in enumerate(tier_rows) if row["zone"] == zone)
+        equipment_id = STAT_VARIANTS[family][tier_index]
+
+        # Roof sites lift the whole court by the height of the roof they stand on;
+        # every builder places its geometry against FLOOR_TOP, so the offset goes
+        # on the origin rather than into 35 builders.
+        lift = site["top"] - FLOOR_TOP
+        origin = mul(cf(site["x"], lift, site["z"]), rot_y(site.get("yaw", 0)))
+
+        travel_id = f"{zone}-{family}"
         out.append({
-            "id": f"Garage-{family}",
-            "zone": "Garage",
+            "id": travel_id,
+            "zone": zone,
             "family": family,
             "slot": equipment_id,
             "equipment": equipment_id,
-            "site_x": site_x,
-            "site_z": site_z,
+            "site_x": site["x"],
+            "site_z": site["z"],
+            "site_kind": site["kind"],
+            "site_top": site["top"],
+            "site_width": site["width"],
+            "site_depth": site["depth"],
+            "site_base_depth": site["base_depth"],
             "ground_origin": origin,
             "origin": origin,
             "style": "street",
-            "seed": f"coastal-city-v2:Garage:{family}",
-            "starter": True,
-            "landmark": family == "Back",
-            "region_id": "Hub",
-            "environment_id": "Hub",
-            "neighborhood": "Beach",
+            "seed": f"scattered-city-v1:{travel_id}",
+            "starter": zone == "Garage",
+            "landmark": False,
+            "region_id": MAINLAND["id"],
+            "environment_id": sector_for(site["x"]),
+            "neighborhood": character_name_at(site["x"], site["z"]),
             "requires_flight": False,
             "altitude": 0,
-            "location_name": f"Muscle Beach Starter — {family}",
-            "location_tagline": "The x1 starter station beside the lifeguard pavilion.",
+            "location_name": f"{SITE_NAMES[family]} — {zone}",
+            "location_tagline": SITE_TAGLINES[site["kind"]],
         })
-
-    for area in AREAS:
-        index = zone_index[area["zone"]]
-        for family_index, (family, site) in enumerate(zip(FAMILY_ORDER, area_bays(area))):
-            travel_id = f"{area['zone']}-{family}"
-            site_x, _, site_z = site[0]
-            out.append({
-                "id": travel_id,
-                "zone": area["zone"],
-                "family": family,
-                "slot": STAT_VARIANTS[family][index],
-                "equipment": STAT_VARIANTS[family][index],
-                "site_x": site_x,
-                "site_z": site_z,
-                "ground_origin": site,
-                "origin": site,
-                "style": "sky" if area["flight_only"] else "street",
-                "seed": f"coastal-city-v2:{travel_id}",
-                "starter": False,
-                "landmark": family_index == 2,
-                "bay_index": family_index,
-                "region_id": MAINLAND["id"],
-                "area_id": area["id"],
-                "environment_id": area["id"],
-                "neighborhood": area["venue_type"],
-                "requires_flight": area["flight_only"],
-                "altitude": area["altitude"],
-                "location_name": f"{area['display_name']} — {family}",
-                "location_tagline": area["tagline"],
-            })
     return out
+
+
+SITE_NAMES = {
+    "Chest": "Press Point",
+    "Arms": "Curl Corner",
+    "Back": "Pull Yard",
+    "Core": "Core Deck",
+    "Legs": "Squat Stand",
+}
+
+SITE_TAGLINES = {
+    "ground": "A street-level training spot out in the city.",
+    "roof": "A rooftop training spot; take the fire escape up.",
+}
+
+
+def character_name_at(x, z):
+    """The neighbourhood label a site inherits from the architecture around it."""
+    for name, character in CITY_CHARACTER.items():
+        if character is character_at(x, z):
+            return name
+    return "City"
 
 
 def city_road(name, width, depth, x, z, surface_offset=0.0):
@@ -4093,12 +3972,6 @@ def subdivide(x, z, width, depth, rng, min_side=250, depth_limit=3):
     )
 
 
-# What a lot can be. Weights are per district character; "yard" and "parking" are
-# how a city gets to breathe -- a block where every lot is built solid reads as a
-# wall, and the gaps are where the alleys and skyline gaps come from.
-LOT_KINDS = ("tower", "midrise", "shophouse", "yard")
-
-
 def procedural_building(x, z, width, depth, height, skin, rng):
     """One building: a setback mass, a bay-rhythm facade, and a used roof.
 
@@ -4200,7 +4073,12 @@ def procedural_building(x, z, width, depth, height, skin, rng):
     # roof_y, w and d are already known here and nowhere else; a second function
     # deriving them from the finished parts would be a copy of this arithmetic
     # that could quietly drift out of step with it.
-    return out, {"x": x, "z": z, "top": roof_y, "width": w + 3, "depth": d + 3}
+    # base_* is the podium footprint, which is wider than the roof by every
+    # setback the stack took. A fire escape has to clear the *building*, not the
+    # roof: placed off the roof edge it starts life inside the podium.
+    return out, {"x": x, "z": z, "top": roof_y,
+                 "width": w + 3, "depth": d + 3,
+                 "base_width": width, "base_depth": depth}
 
 
 # Nothing may grow into a platform that floats over the city. Storm's slab sits
@@ -4252,7 +4130,12 @@ def city_lot(lot, kind, character, rng, catalogue=None):
     if kind == "yard":
         # Deliberately empty ground, but finished: a yard reads as a place, a
         # gap in the lattice reads as unfinished.
-        out = [part("Yard", [width, 0.35, depth], cf(x, FLOOR_TOP + 0.16, z),
+        # Sat at +0.16 this topped out at exactly the height of a machine's rubber
+        # mat, which never mattered while yards and machines were in different
+        # places. Scattered sites stand on yards, so the two now meet -- and two
+        # surfaces sharing a top face is the z-fighting the coplanar check exists
+        # to catch.
+        out = [part("Yard", [width, 0.35, depth], cf(x, FLOOR_TOP + 0.12, z),
                     [0.29, 0.31, 0.27], "Slate", CanCollide=False, CastShadow=False)]
         for corner in (-1, 1):
             out.append(part("YardFence", [width, 3.2, 0.6],
@@ -4458,11 +4341,35 @@ UPLAND_AVENUES = (350, 1800, 3300, 4900, 6600, 8400, 10100, 11900, 13600, 15100)
 # degrees, which makes a ramp walkable by construction. Treads have to be kept
 # individually under the ~2-stud auto-step or they silently become a wall, and
 # they cost five times the parts to say the same thing.
-FLIGHT_RISE = 11.0
-FLIGHT_RUN = 16.0
-STAIR_WIDTH = 8.0
-LANDING_SIZE = 8.0
+# A comfortable, unambiguous walking pitch, and the width to walk it without
+# aiming. Both matter more than they look: Roblox's navmesh ignores geometry that
+# is too narrow, and a player who has to steer up a ramp will fall off it.
+RAMP_PITCH_DEGREES = 26.0
+RAMP_WIDTH = 16.0
+# The travel of one ramp, measured between the landings it joins -- not between
+# their centres. Spanning centre to centre put the last third of every ramp
+# underneath the landing above it, so a climbing player met the landing's edge as
+# a three-stud vertical face and stopped dead. Measured: the character reached
+# x=563.6 of a 571 target and stayed there.
+RAMP_RUN = 16.0
+# Wide enough to turn around on. At 8 studs a walking player arriving at a
+# switchback carried straight off the edge and fell the height they had just
+# climbed -- measured, not guessed. The run is the one piece of this world a
+# player has to negotiate rather than walk across, so it gets the room.
+STAIR_WIDTH = 12.0
+LANDING_SIZE = 14.0
+# Centre to centre, so the ramp between them is exactly RAMP_RUN long.
+FLIGHT_RUN = LANDING_SIZE + RAMP_RUN
 STAIR_THICKNESS = 0.6
+
+# How far the run stands off the wall it climbs. The landing is only half its own
+# depth clear of the facade otherwise, which puts its inside edge exactly on the
+# podium face -- close enough to catch a walking player on the corner.
+STAIR_STANDOFF = 9.0
+
+# How far below the pavement the ramp's low end is buried, so it surfaces without
+# an edge.
+STAIR_BASE_SINK = 2.5
 
 
 def ramp_between(name, start, end, width, color, material="Concrete", **props):
@@ -4488,53 +4395,56 @@ def ramp_between(name, start, end, width, color, material="Concrete", **props):
 
 
 def roof_access_stair(x, z, roof_y, roof_depth, color, accent):
-    """A switchback fire escape from the pavement to a roof.
+    """A single straight ramp from the pavement to a roof.
 
-    Landings sit at exact multiples of the rise and each ramp is handed the two
-    landings it joins, so every joint closes by construction. The rise is divided
-    to fit the building rather than fixed, so the top landing lands *on* the roof
-    instead of near it.
+    This was a switchback, and it did not work. Roblox's own pathfinder could not
+    find a route between two *adjacent* landings on it while happily pathing forty
+    studs of open pavement, and a walking character oscillated between the first
+    two landings forever: a switchback stacks its up-ramp and its down-ramp at the
+    same two spots, so "toward the next landing" and "back down the way I came"
+    are the same direction. Clever geometry that a player cannot climb is worse
+    than none.
+
+    One straight run has none of that. There is exactly one way to go, it is wide
+    enough to walk without aiming, and it costs four parts instead of twenty-five.
+    Roof sites are capped low enough that a single flight reaches them.
     """
-    height = roof_y - FLOOR_TOP
-    flights = max(1, math.ceil(height / FLIGHT_RISE))
-    rise = height / flights
-    face_z = z + roof_depth / 2 + LANDING_SIZE / 2
-    left, right_x = x - FLIGHT_RUN / 2, x + FLIGHT_RUN / 2
+    # The ramp starts *below* the pavement and rises out of it. Starting on top of
+    # the ground leaves a leading edge, and a leading edge is a lip: the character
+    # walked into it, ragdolled, and sat in GettingUp forever instead of climbing.
+    # Buried, there is no edge to catch -- the walkable surface simply emerges.
+    base = FLOOR_TOP - STAIR_BASE_SINK
+    rise = roof_y - base
+    run = rise / math.tan(math.radians(RAMP_PITCH_DEGREES))
+    face_z = z + roof_depth / 2 + STAIR_STANDOFF
+    start_z = face_z + run
 
-    def landing_x(index):
-        return left if index % 2 == 0 else right_x
-
-    out = []
-    for index in range(flights + 1):
-        top = FLOOR_TOP + rise * index
-        out.append(part("StairLanding",
-                        [LANDING_SIZE, STAIR_THICKNESS, LANDING_SIZE],
-                        cf(landing_x(index), top - STAIR_THICKNESS / 2, face_z),
-                        color, "Concrete"))
-        if index > 0:
-            out.append(ramp_between(
-                "StairFlight",
-                (landing_x(index - 1), FLOOR_TOP + rise * (index - 1), face_z),
-                (landing_x(index), top, face_z),
-                STAIR_WIDTH, color))
-        # A rail on the outer edge, which is also what makes the run read as a
-        # stair from the street rather than as a stack of slabs.
-        out.append(tube("StairRail",
-                        (landing_x(index), top + 0.6, face_z + LANDING_SIZE / 2),
-                        (landing_x(index), top + 3.4, face_z + LANDING_SIZE / 2),
-                        0.3, accent, CanCollide=False))
-
-    # The top landing reaches back onto the roof deck so there is no lip to clear.
-    out.append(part("StairTopLanding",
-                    [LANDING_SIZE, STAIR_THICKNESS, LANDING_SIZE * 1.6],
-                    cf(landing_x(flights), roof_y - STAIR_THICKNESS / 2,
-                       face_z - LANDING_SIZE * 0.8),
-                    color, "Concrete"))
-    # Ground pad, so the bottom of the run meets the pavement squarely.
-    out.append(part("StairFoot", [LANDING_SIZE + 4, 0.3, LANDING_SIZE + 4],
-                    cf(landing_x(0), FLOOR_TOP + 0.15, face_z),
-                    color, "Concrete", CanCollide=False, CastShadow=False))
-    return out
+    return [
+        # A flat pad where the ramp breaks the surface, so the approach reads as a
+        # deliberate entrance rather than a slab sticking out of the pavement. The
+        # roof-access check reads it to prove the climb starts at ground level.
+        part("StairLanding", [RAMP_WIDTH + 4, 0.4, LANDING_SIZE],
+             cf(x, FLOOR_TOP + 0.1, start_z + LANDING_SIZE / 2),
+             color, "Concrete"),
+        ramp_between("StairFlight",
+                     (x, base, start_z), (x, roof_y, face_z),
+                     RAMP_WIDTH, color),
+        # The top landing reaches back onto the roof so there is no lip to clear.
+        part("StairTopLanding",
+             [RAMP_WIDTH + 4, STAIR_THICKNESS, LANDING_SIZE * 2],
+             cf(x, roof_y - STAIR_THICKNESS / 2, face_z - LANDING_SIZE),
+             color, "Concrete"),
+        # Solid kerbs either side, so a player who drifts is turned back onto the
+        # ramp rather than off it.
+        part("StairRail", [0.8, 3.0, run + LANDING_SIZE],
+             mul(cf(x - RAMP_WIDTH / 2, base + rise / 2 + 1.5, face_z + run / 2),
+                 rot_x(0)),
+             accent, "Metal"),
+        part("StairRail", [0.8, 3.0, run + LANDING_SIZE],
+             mul(cf(x + RAMP_WIDTH / 2, base + rise / 2 + 1.5, face_z + run / 2),
+                 rot_x(0)),
+             accent, "Metal"),
+    ]
 
 
 # --------------------------------------------------------------------------
@@ -4558,7 +4468,10 @@ SITE_CLEAR_DEPTH = 48
 # Roofs above this are not worth reaching: the ramp to a 376-stud roof costs more
 # parts than the site it serves, and a fire escape taller than its own building
 # stops reading as a fire escape.
-MAX_ROOF_SITE_HEIGHT = 80
+# One straight ramp has to reach it, and a ramp long enough for a tall roof would
+# run across the street. 30 studs is about 55 studs of run -- the depth of a
+# pavement and a front yard -- and 38 roofs still qualify.
+MAX_ROOF_SITE_HEIGHT = 30
 
 # Machines must not sit in the roadway, and must leave the spawn plaza alone.
 ROAD_SITE_CLEARANCE = 70
@@ -4590,14 +4503,18 @@ def site_candidates():
     for lot in catalogue["ground"]:
         if lot["width"] < SITE_CLEAR_WIDTH or lot["depth"] < SITE_CLEAR_DEPTH:
             continue
-        out.append({"kind": "ground", "x": lot["x"], "z": lot["z"], "top": FLOOR_TOP})
+        out.append({"kind": "ground", "x": lot["x"], "z": lot["z"], "top": FLOOR_TOP,
+                    "width": lot["width"], "depth": lot["depth"],
+                    "base_depth": lot["depth"]})
 
     for roof in catalogue["roofs"]:
         if roof["width"] < SITE_CLEAR_WIDTH or roof["depth"] < SITE_CLEAR_DEPTH:
             continue
         if roof["top"] - FLOOR_TOP > MAX_ROOF_SITE_HEIGHT:
             continue
-        out.append({"kind": "roof", "x": roof["x"], "z": roof["z"], "top": roof["top"]})
+        out.append({"kind": "roof", "x": roof["x"], "z": roof["z"], "top": roof["top"],
+                    "width": roof["width"], "depth": roof["depth"],
+                    "base_depth": roof["base_depth"]})
 
     kept = [
         site for site in out
@@ -4704,22 +4621,6 @@ def city_grid(locations=None):
         if all(math.hypot(x - area["x"], -520 - area["z"]) > 300 for area in AREAS):
             out.extend(city_tree(x, -520, rng))
     return out
-
-
-def district_sign(area, width=54):
-    accent = next(row for row in DISTRICTS if row["zone"] == area["zone"])["accent"]
-    return [
-        part("DistrictSignPost", [2.2, 18, 2.2], cf(-width / 2, FLOOR_TOP + 9, 0),
-             [0.12, 0.13, 0.15], "Metal"),
-        part("DistrictSignPost", [2.2, 18, 2.2], cf(width / 2, FLOOR_TOP + 9, 0),
-             [0.12, 0.13, 0.15], "Metal"),
-        # A painted board on posts. As Neon it was a 54-stud bar of pure accent colour
-        # standing directly in the gym's doorway -- the single brightest thing in the
-        # district and the last of the glow the areas were being lit by. The hall
-        # carries its own fascia sign now, so this only has to name the place.
-        part("DistrictSign", [width, 8, 1.2], cf(0, FLOOR_TOP + 16, 0),
-             accent, "SmoothPlastic", CanCollide=False),
-    ]
 
 
 SHOP_X = 140
@@ -5120,134 +5021,6 @@ def campus_shell(area, surface, material, map_kind="Building"):
     return out
 
 
-def park_district(area):
-    row = next(item for item in DISTRICTS if item["zone"] == area["zone"])
-    rng = random.Random("coastal-city-v2:park")
-    out = campus_shell(area, [0.23, 0.32, 0.24], "Pavement", "Park")
-    out.extend([
-        part("ParkLawnNorth", [CITY_CAMPUS_WIDTH - 18, 0.08, 46],
-             cf(0, FLOOR_TOP + 0.15, 98), [0.17, 0.35, 0.19], "Grass",
-             CanCollide=False),
-        part("RunningLane", [CITY_CAMPUS_WIDTH - 36, 0.08, 18],
-             cf(0, FLOOR_TOP + 0.25, 115), [0.47, 0.25, 0.19], "Ground",
-             CanCollide=False),
-    ])
-    for x, z in ((-170, 112), (-95, 114), (95, 114), (170, 112), (-158, -112)):
-        out.extend(city_tree(x, z, rng))
-    out.extend(place(cf(0, 0, 136), piece) for piece in district_sign(area, 62))
-    return out
-
-
-def beach_district(area):
-    accent = next(item for item in DISTRICTS if item["zone"] == area["zone"])["accent"]
-    rng = random.Random("coastal-city-v2:boardwalk-club")
-    out = campus_shell(area, [0.36, 0.25, 0.16], "WoodPlanks")
-    out.append(part("ShadeBeam", [340, 2, 2], cf(0, FLOOR_TOP + 18, 114), accent, "Metal"))
-    for x in (-170, -112, -56, 0, 56, 112, 170):
-        out.append(part("ShadePost", [2, 18, 2], cf(x, FLOOR_TOP + 9, 114),
-                        [0.17, 0.18, 0.20], "Metal"))
-    for x in (-170, 170):
-        out.extend(_decorate(piece) for piece in palm(x, 96, rng))
-    out.extend(place(cf(0, 0, 136), piece) for piece in district_sign(area, 68))
-    return out
-
-
-def dock_district(area):
-    accent = next(item for item in DISTRICTS if item["zone"] == area["zone"])["accent"]
-    out = campus_shell(area, [0.28, 0.28, 0.30], "Concrete")
-    out.append(part("GantryBeam", [350, 5, 5], cf(0, FLOOR_TOP + 42, 116), accent, "Metal"))
-    for x in (-172, 172):
-        out.append(part("GantryLeg", [6, 42, 6], cf(x, FLOOR_TOP + 21, 116),
-                        [0.18, 0.19, 0.21], "Metal"))
-    # Containers sit behind the training line as authored industrial context, never
-    # randomly beside individual machines.
-    for x, color in ((-145, [0.36, 0.16, 0.13]),
-                     (145, [0.15, 0.27, 0.34])):
-        out.append(part("ShippingContainer", [64, 16, 22],
-                        cf(x, FLOOR_TOP + 8, 108), color,
-                        "CorrodedMetal", CanCollide=False))
-    out.extend(place(cf(0, 0, 136), piece) for piece in district_sign(area, 72))
-    return out
-
-
-def city_square_district(area):
-    accent = next(item for item in DISTRICTS if item["zone"] == area["zone"])["accent"]
-    out = campus_shell(area, [0.42, 0.40, 0.37], "Pavement", "Plaza")
-    out.extend([
-        disc("SquareInlay", 0.08, 82, FLOOR_TOP + 0.22, accent, "Marble",
-             CanCollide=False),
-    ])
-    for x in (-172, 172):
-        for z in (-115, 115):
-            out.append(part("PlazaLight", [1.6, 24, 1.6],
-                            cf(x, FLOOR_TOP + 12, z), [0.14, 0.15, 0.17], "Metal"))
-            out.append(part("PlazaLightHead", [4, 1.5, 4],
-                            cf(x, FLOOR_TOP + 24, z), [1.0, 0.91, 0.72], "Neon",
-                            CanCollide=False))
-    out.extend(place(cf(0, 0, 136), piece) for piece in district_sign(area, 74))
-    return out
-
-
-def office_district(area):
-    """A traversable glass office podium with an unmistakably indoor gym floor."""
-    out = campus_shell(area, [0.22, 0.24, 0.27], "Slate")
-    # The walls, glazing, columns and ceiling panels this used to write by hand are
-    # now the shared gym hall, which campus_shell adds for every city district. What
-    # stays is the part that was never generic: the tower behind the podium, which
-    # gives the district a skyline without enclosing anything.
-    out.extend([
-        part("ApexTower", [190, 176, 88], cf(0, FLOOR_TOP + 88, -179),
-             [0.20, 0.24, 0.29], "Metal"),
-        part("ApexGlass", [178, 160, 2], cf(0, FLOOR_TOP + 88, -136),
-             [0.18, 0.34, 0.42], "Glass", Transparency=0.28, CanCollide=False),
-    ])
-    return out
-
-
-def sky_district(area):
-    accent = next(item for item in DISTRICTS if item["zone"] == area["zone"])["accent"]
-    out = campus_shell(area, [0.18, 0.20, 0.25], "DiamondPlate", "SkyPlatform")
-    out.extend([
-        part("YardPaving", [CITY_CAMPUS_WIDTH, 1.2, CITY_CAMPUS_DEPTH],
-                         cf(0, FLOOR_TOP - 0.6 + SURFACE_LIFT, 0),
-                         [0.18, 0.20, 0.25], "DiamondPlate"),
-        part("DeckUnderside", [CITY_CAMPUS_WIDTH + 12, 8, CITY_CAMPUS_DEPTH + 12],
-             cf(0, FLOOR_TOP - 5, 0),
-             [0.10, 0.12, 0.16], "Metal"),
-        disc("HelipadRing", 0.14, 104, FLOOR_TOP + 0.12, accent, "Neon",
-             CanCollide=False),
-        part("BeaconMast", [7, area["altitude"], 7],
-             cf(160, -area["altitude"] / 2, -118), [0.20, 0.22, 0.27],
-             "DiamondPlate"),
-    ])
-    for x in (-185, 185):
-        out.append(part("IslandRail", [3, 12, CITY_CAMPUS_DEPTH],
-                        cf(x, FLOOR_TOP + 6, 0),
-                        accent, "ForceField", Transparency=0.48))
-    for z in (-135, 135):
-        out.append(part("SkyRail", [CITY_CAMPUS_WIDTH, 12, 3],
-                        cf(0, FLOOR_TOP + 6, z),
-                        accent, "ForceField", Transparency=0.48))
-    for x in (-165, 165):
-        for z in (-112, 112):
-            out.append(part("SkyFloodMast", [2, 30, 2],
-                            cf(x, FLOOR_TOP + 15, z), [0.12, 0.14, 0.18], "Metal"))
-            out.append(part("SkyFloodHead", [6, 2, 4],
-                            cf(x, FLOOR_TOP + 30, z), [0.76, 0.82, 1.0], "Neon",
-                            CanCollide=False))
-    return out
-
-
-DISTRICT_BUILDERS = {
-    "Park": park_district,
-    "Beach": beach_district,
-    "Dock": dock_district,
-    "City": city_square_district,
-    "Office": office_district,
-    "Sky": sky_district,
-}
-
-
 def connected_plaza():
     """Muscle Beach spawn: safe pavilion, boardwalk furniture and palms."""
     rng = random.Random("coastal-city-v2:starter-beach")
@@ -5273,28 +5046,57 @@ def connected_plaza():
     return out
 
 
-def starter_training_area(location, zone_row):
-    """A single-machine muscle court on the open starter boardwalk."""
-    origin = location["origin"]
-    out = [place(origin, piece) for piece in training_court(
-        location["equipment"], zone_row["accent"]
-    )]
-    out.append(place(origin, volume(
-        location["zone"], f"{location['id']}Volume", [48, 40, 58], cf(0, 19, 0)
-    )))
-    return out
+def scattered_training_area(location, tier_row):
+    """One machine's site: its court, its tier volume, its sign, and its access.
 
-
-def city_training_area(location, tier_row):
-    """A single-machine district court; scenery never crowds the equipment."""
+    The zone volume is what makes a machine's tier real -- ZoneConfig.AtPosition
+    reads the volume the player is standing in, not the machine -- so it travels
+    with the court wherever the court goes.
+    """
     origin = location["origin"]
+    accent = tier_row["accent"]
     out = [place(origin, piece) for piece in training_court(
-        location["equipment"], tier_row["accent"]
+        location["equipment"], accent
     )]
     out.append(place(origin, volume(
         location["zone"], f"{location['id']}Volume", [48, 28, 58], cf(0, 13, 0)
     )))
+    out.extend(place(origin, piece) for piece in site_marker(location, accent))
+
+    # A rooftop court needs a way up and a floor that holds you. The deck the
+    # building generator lays is CanCollide=False -- fine for scenery nobody
+    # stands on, and a hole to fall through the moment a machine is up there.
+    if location["site_kind"] == "roof":
+        # Sized to the roof it covers rather than to a fixed number: roofs vary,
+        # and a fixed slab either floats past the parapet or leaves the court
+        # standing on the non-collidable deck underneath it.
+        width, depth = location["site_width"], location["site_depth"]
+        out.append(part(f"{location['id']}RoofFloor", [width, 1.0, depth],
+                        cf(location["site_x"], location["site_top"] - 0.5,
+                           location["site_z"]),
+                        [0.30, 0.30, 0.32], "Concrete"))
+        out.extend(roof_access_stair(
+            location["site_x"], location["site_z"], location["site_top"],
+            location["site_base_depth"], [0.34, 0.34, 0.36], accent))
     return out
+
+
+def site_marker(location, accent):
+    """The pylon that says a machine is here, in site-local space.
+
+    Thirty-five destinations scattered over sixteen thousand studs are only worth
+    having if they can be found. The board carries the muscle colour and the
+    beacon is lit, so a site reads from street level and from the air.
+    """
+    family_color = FAMILY_COLORS[location["family"]]
+    return [
+        part("SitePost", [1.6, 26, 1.6], cf(-24, FLOOR_TOP + 13, -20),
+             [0.20, 0.20, 0.22], "Metal"),
+        part("SiteBoard", [12, 6, 0.6], cf(-24, FLOOR_TOP + 23, -20),
+             family_color, "SmoothPlastic", CanCollide=False),
+        part("SiteBeacon", [3, 3, 3], cf(-24, FLOOR_TOP + 27.5, -20),
+             accent, "Neon", CanCollide=False),
+    ]
 
 
 def training_court(equipment_id, district_accent):
@@ -5307,15 +5109,20 @@ def training_court(equipment_id, district_accent):
     family = EQUIPMENT_FAMILY[equipment_id]
     family_color = FAMILY_COLORS[family]
     out = [
+        # Spaced 0.06 apart, not 0.01. A hundredth of a stud z-fights outright at
+        # any distance; it survived review only because the coplanar check buckets
+        # heights to the nearest hundredth and Python rounds halves to even, so
+        # 1.205 and 1.215 landed in different buckets while 23.235 and 23.245 --
+        # the same court lifted onto a roof -- landed in the same one.
         part("MuscleCourtEdge", [44, 0.04, 42], cf(0, FLOOR_TOP + 0.18, 0),
              district_accent, "SmoothPlastic", CanCollide=False, CastShadow=False),
-        part("MuscleCourt", [40, 0.04, 38], cf(0, FLOOR_TOP + 0.19, 0),
+        part("MuscleCourt", [40, 0.04, 38], cf(0, FLOOR_TOP + 0.25, 0),
              [0.17, 0.19, 0.22], "Slate", CanCollide=False),
         # Painted floor marking. This was Neon in the muscle family's colour -- the
         # bright green and orange bars visible from across the map -- and it is what
         # made the areas read as lit by lasers. MuscleCourtEdge above is already
         # SmoothPlastic and stays: it is the painted court boundary.
-        part("MuscleStripe", [36, 0.02, 1.0], cf(0, FLOOR_TOP + 0.215, -17.2),
+        part("MuscleStripe", [36, 0.02, 1.0], cf(0, FLOOR_TOP + 0.32, -17.2),
              family_color, "SmoothPlastic", CanCollide=False, CastShadow=False),
     ]
     for offset in COPY_OFFSETS:
@@ -5324,19 +5131,7 @@ def training_court(equipment_id, district_accent):
     return out
 
 
-# --- Monster grounds ----------------------------------------------------------------
-#
-# Every campus gets two hostile sites, both deliberately outside the training courts.
-# A court is a safe place to be anchored to a machine for minutes at a time; putting
-# monsters on it would mean the game's core activity is never safe, which is what the
-# safe zones exist to prevent. So the fight is somewhere you choose to walk to.
-#
-# The two sites are at different distances on purpose. The mob field is close enough to
-# see from the courts — it advertises itself, and a quest step sends you there. The boss
-# arena is a separate trip you make on the timer, not something you wander into.
-MOB_FIELD_OFFSET_Z = 260
 MOB_FIELD_RADIUS = 90
-BOSS_ARENA_OFFSET_Z = 620
 BOSS_ARENA_RADIUS = 70
 # Sickly green for the field, dried blood for the arena. Both read as "not the gym" at
 # a glance, which is the whole job of the ground colour.
@@ -5378,13 +5173,16 @@ def mob_site(name_prefix, zone_id, offset_z, radius, ground_color, tag, map_kind
     return [place(origin, piece) for piece in pieces]
 
 
-def mob_sites(zone_id):
-    """The mob field and the boss arena for one campus, in campus-local space."""
-    out = mob_site("MobField", zone_id, MOB_FIELD_OFFSET_Z, MOB_FIELD_RADIUS,
-                   MOB_FIELD_COLOR, "MobField", "MobField")
-    out.extend(mob_site("BossArena", zone_id, BOSS_ARENA_OFFSET_Z, BOSS_ARENA_RADIUS,
-                        BOSS_ARENA_COLOR, "BossArena", "BossArena"))
-    return out
+def mob_field(zone_id):
+    """One tier's mob field, in site-local space."""
+    return mob_site("MobField", zone_id, 0, MOB_FIELD_RADIUS,
+                    MOB_FIELD_COLOR, "MobField", "MobField")
+
+
+def boss_arena(zone_id):
+    """One tier's boss arena, in site-local space."""
+    return mob_site("BossArena", zone_id, 0, BOSS_ARENA_RADIUS,
+                    BOSS_ARENA_COLOR, "BossArena", "BossArena")
 
 
 def single_user_equipment(pieces):
@@ -5496,69 +5294,80 @@ def district_plate_storage():
 
 
 def build_connected_world():
-    locations = connected_locations()
     zone_rows = {row["zone"]: row for row in DISTRICTS}
     structure = connected_ground()
     machines = []
+
+    # The city is built before anything is placed in it. Scattered sites are
+    # chosen from what the city generator actually produced -- its yards, its
+    # parking lots, its rooftops -- so the catalogue has to exist before a single
+    # location does. This ordering is the whole reason a machine always stands on
+    # real ground instead of wherever a hand-written coordinate happened to land.
+    mainland_children = region_ground(MAINLAND)
+    mainland_children.extend(coastal_public_realm())
+    mainland_children.extend(city_grid())
+    structure.append(environment_model(
+        MAINLAND["id"], "Ground", mainland_children
+    ))
+
+    locations = connected_locations()
+    hostile = scatter_hostile_sites(scatter_sites())
+
+    # The hub is now the only place with a shop and a coach. Seven campuses each
+    # carrying their own was seven walks to the same conversation.
     hub_children = connected_plaza()
-    hub_children.extend(place(STARTER_CAMPUS_FRAME, piece) for piece in district_plate_storage())
-    # Garage is the one tier that is not in CITY_AREA_SPECS -- it lives on the hub
-    # campus -- so its monster grounds are placed here rather than in the area loop.
-    hub_children.extend(place(STARTER_CAMPUS_FRAME, piece) for piece in mob_sites("Garage"))
-    area_children = {area["id"]: [] for area in AREAS}
+    hub_children.extend(place(STARTER_CAMPUS_FRAME, piece)
+                        for piece in district_plate_storage())
+
+    sector_children = {f"Sector{index + 1}": [] for index in range(SECTOR_COUNT)}
 
     for location in locations:
         row = zone_rows[location["zone"]]
-        if location["starter"]:
-            hub_children.append(folder(location["id"], starter_training_area(location, row)))
-        else:
-            area_children[location["area_id"]].append(folder(
-                location["id"], city_training_area(location, row)
-            ))
-
-        # A machine is flight-only because its island flies, not because the
-        # machine itself is up a shaft — so the whole top tier is one Sky place.
-        access_kind = "Sky" if location["style"] == "sky" else "Street"
+        sector_children[location["environment_id"]].append(
+            folder(location["id"], scattered_training_area(location, row))
+        )
         machines.append(machine(
             location["id"], location["equipment"],
             mul(location["origin"], cf(0, VENUE_PAD_RISE, 0)),
             machine_copies(location["equipment"], row),
             travel_id=location["id"],
-            access_kind=access_kind,
+            # Nothing is flight-gated any more: every rooftop site carries its own
+            # fire escape, so the whole gym is reachable on foot.
+            access_kind="Street",
             floor_index=1,
             exercise_family=location["family"],
             environment_id=location["environment_id"],
-            requires_flight=location["requires_flight"],
+            requires_flight=False,
             location_name=location["location_name"],
             location_tagline=location["location_tagline"],
         ))
 
+    # One mob field and one boss arena per tier, spread like the machines. The
+    # server finds both purely through their tags, so moving them is placement
+    # only -- MobService never learns they used to sit behind a campus.
+    for index, row in enumerate(DISTRICTS[:7]):
+        field_site = hostile[index]
+        arena_site = hostile[index + 7]
+        for site, builder in ((field_site, mob_field), (arena_site, boss_arena)):
+            pieces = [place(cf(site["x"], 0, site["z"]), piece)
+                      for piece in builder(row["zone"])]
+            sector_children[sector_for(site["x"])].append(
+                folder(f"{row['zone']}{'Field' if builder is mob_field else 'Arena'}",
+                       pieces)
+            )
+
     # connected_ground creates Hub first, so extend that environment with its
-    # complete plaza and starter campus while preserving global water/boundary siblings.
+    # complete plaza while preserving global water/boundary siblings.
     for index, node in enumerate(structure):
         if node.get("name") == "Environment_Hub":
             node["children"].extend(hub_children)
             structure[index] = node
             break
 
-    # The mainland owns the shared coast, connected street network and skyline.
-    # District environments stay separate for StreamingEnabled and map clustering.
-    mainland_children = region_ground(MAINLAND)
-    mainland_children.extend(coastal_public_realm())
-    mainland_children.extend(city_grid(locations))
-    structure.append(environment_model(
-        MAINLAND["id"], "Ground", mainland_children
-    ))
-
-    for area in AREAS:
-        district = DISTRICT_BUILDERS[area["venue_type"]](area)
-        district.extend(district_plate_storage())
-        district.extend(mob_sites(area["zone"]))
-        pieces = [place(area["frame"], piece) for piece in district]
-        children = [folder("District", pieces)] + area_children[area["id"]]
+    for index in range(SECTOR_COUNT):
+        sector_id = f"Sector{index + 1}"
         structure.append(environment_model(
-            area["id"], "Sky" if area["flight_only"] else "Ground", children,
-            requires_flight=area["flight_only"],
+            sector_id, "Ground", sector_children[sector_id]
         ))
 
     return (

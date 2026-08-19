@@ -51,12 +51,10 @@ REQUIRED_STATION_ATTRIBUTES = {
 EXPECTED_STATIONS = 35
 EXPECTED_ACTIVE_TIERS = 7
 EXPECTED_BUILDERS = 35
-EXPECTED_SKY_STATIONS = 5
 # One connected coastal mainland. Multiplier districts occupy its beach, park,
 # downtown blocks and office building rather than separate progression islands.
 EXPECTED_ISLANDS = 1
 # One destination district per non-starter tier; the starter tier is Muscle Beach.
-EXPECTED_TIER_AREAS = 6
 # A flying yard has to be high enough that walking or jumping to it is plainly
 # impossible, not merely awkward.
 MIN_FLIGHT_ISLAND_ALTITUDE = 120
@@ -702,9 +700,6 @@ def validate_locations(
     validator.check(set(station_by_id) == set(location_by_id), "station and location TravelId sets differ")
     for family in FAMILIES:
         validator.check(family_counts[family] == 7, f"{family}: expected seven stations, found {family_counts[family]}")
-        # One per family, and all five on the same flying island: the top tier is
-        # the flight-gated one.
-        validator.check(family_access_counts[(family, "Sky")] == 1, f"{family}: expected one Sky destination")
 
     zone_order = [row.get("zone") for row in getattr(builder, "DISTRICTS", [])]
     validator.check(len(zone_order) == 11, f"expected 11 DISTRICTS, found {len(zone_order)}")
@@ -738,131 +733,20 @@ def validate_locations(
     )
     powers = [power for _, power, _ in active_progression]
     validator.check(powers[0] == 0 and all(a < b for a, b in zip(powers, powers[1:])), "active power gates must rise from zero")
+    # Nothing is flight-gated. Every rooftop site carries its own fire escape, so
+    # the whole gym is walkable and every station is a Street station.
     validator.check(
-        len(sky_ids) == EXPECTED_SKY_STATIONS,
-        f"expected {EXPECTED_SKY_STATIONS} Sky stations, found {len(sky_ids)}",
+        len(sky_ids) == 0,
+        f"nothing should be flight-gated any more, found {len(sky_ids)} Sky stations",
     )
     validator.check(access_counts["ThirdFloor"] == 0, "third-floor lofts were removed; none should remain")
-    validator.check(access_counts["Street"] == 30, "expected 30 street/interior training locations")
-
-    validate_one_tier_per_area(validator, builder, location_by_id)
+    validator.check(
+        access_counts["Street"] == EXPECTED_STATIONS,
+        f"expected all {EXPECTED_STATIONS} stations to be reachable on foot, "
+        f"found {access_counts['Street']}",
+    )
 
     return station_by_id
-
-
-def validate_flight_only_areas(
-    validator: Validator, builder: ModuleType, structure: Any
-) -> None:
-    """A yard advertised as flight-only must actually be unreachable on foot."""
-    areas = [area for area in getattr(builder, "AREAS", [])
-             if area.get("flight_only")]
-    validator.check(bool(areas), "no flight-only yard: nothing gates flight")
-
-    for area in areas:
-        validator.check(
-            area.get("altitude", 0) >= MIN_FLIGHT_ISLAND_ALTITUDE,
-            f"{area['id']} flies at only {area.get('altitude', 0)} studs, "
-            f"under the {MIN_FLIGHT_ISLAND_ALTITUDE} needed to be genuinely flight-only",
-        )
-        environment = next(
-            (node for node in walk(structure)
-             if node.get("attributes", {}).get("EnvironmentId") == area["id"]),
-            None,
-        )
-        if environment is None:
-            validator.fail(f"{area['id']}: no environment model in the payload")
-            continue
-        validator.check(
-            environment.get("attributes", {}).get("RequiresFlight") is True,
-            f"{area['id']}: environment must be marked RequiresFlight",
-        )
-        # Nothing may bridge the gap: no stairs, no ramp, no shore steps.
-        ramps = [node for node in walk(environment)
-                 if str(node.get("name", "")).startswith(("ShoreStep_", "Stair", "Ramp"))]
-        validator.check(
-            not ramps,
-            f"{area['id']} is flight-only but has {len(ramps)} walk-up parts",
-        )
-        # An overshot landing here costs the whole climb back up, so both open
-        # ends of the deck have to be railed.
-        rails = [node for node in walk(environment)
-                 if node.get("name") == "IslandRail"]
-        validator.check(
-            len(rails) >= 2,
-            f"{area['id']} needs catch rails on its open ends, found {len(rails)}",
-        )
-        # The walkable deck must clear the ground by enough that no jump reaches it.
-        # Measured on the paving rather than on everything: the beacon mast runs all
-        # the way down to the sand on purpose, so the deck is findable from below.
-        decks = [box for node in walk(environment)
-                 if node.get("name") in ("YardPaving", "DeckUnderside")
-                 and (box := _obb_bounds(node)) is not None]
-        lowest = min((box[2] for box in decks), default=0.0)
-        validator.check(
-            decks and lowest >= MIN_FLIGHT_ISLAND_ALTITUDE / 2,
-            f"{area['id']}: its deck sits at y={lowest:.0f}, low enough to reach "
-            "without flying",
-        )
-
-
-def validate_one_tier_per_area(
-    validator: Validator, builder: ModuleType, location_by_id: dict[str, Any]
-) -> None:
-    """The whole point of the layout: a city destination IS a multiplier tier.
-
-    A player reads progression through landmarks, so a Storm machine standing in
-    the beginner park would be a lie told by the geography.
-    """
-    areas = {area["id"]: area for area in getattr(builder, "AREAS", [])}
-    validator.check(
-        len(areas) == EXPECTED_TIER_AREAS,
-        f"expected {EXPECTED_TIER_AREAS} tier areas, found {len(areas)}",
-    )
-
-    by_area: dict[str, list[Any]] = {}
-    for location in location_by_id.values():
-        if location.get("starter"):
-            continue
-        by_area.setdefault(location.get("area_id"), []).append(location)
-
-    for area_id, area in areas.items():
-        here = by_area.get(area_id, [])
-        validator.check(
-            len(here) == len(FAMILIES),
-            f"{area_id}: expected {len(FAMILIES)} stations, found {len(here)}",
-        )
-        zones = {location.get("zone") for location in here}
-        validator.check(
-            zones == {area["zone"]},
-            f"{area_id} is the {area['zone']} yard but carries {sorted(zones)}; "
-            "a yard must hold exactly one tier",
-        )
-        validator.check(
-            sorted(location.get("family") for location in here) == sorted(FAMILIES),
-            f"{area_id}: must hold one station per muscle",
-        )
-        # A flying yard has no walk-up, so every station on it requires flight —
-        # and conversely nothing reachable on foot may claim to.
-        for location in here:
-            validator.check(
-                bool(location.get("requires_flight")) == bool(area["flight_only"]),
-                f"{location.get('id')}: RequiresFlight must match its yard",
-            )
-
-    # The authored route must raise the multiplier even though it turns inland and
-    # back toward the coast. Sequence is the navigation spine; x alone is not.
-    ordered = sorted(areas.values(), key=lambda area: area.get("sequence", math.inf))
-    gains = [
-        next(row for row in builder.DISTRICTS if row["zone"] == area["zone"])
-        for area in ordered
-    ]
-    zone_order = [row["zone"] for row in builder.DISTRICTS[:EXPECTED_ACTIVE_TIERS]]
-    indices = [zone_order.index(row["zone"]) for row in gains]
-    validator.check(
-        indices == sorted(indices),
-        f"city districts are out of progression order: "
-        f"{[area['zone'] for area in ordered]}",
-    )
 
 
 def rotated_aabb(node: Node) -> tuple[float, float, float, float] | None:
@@ -932,43 +816,6 @@ def footprints_overlap(a: Any, b: Any, slack: float) -> bool:
             if centre_gap >= reach - slack:
                 return False
     return True
-
-
-def validate_gym_halls(validator: Validator, structure: Any) -> None:
-    """Every city district is enclosed, and the starter beach is not.
-
-    Two regressions this locks down. The first is scope: the halls exist so the
-    multiplier areas read as gyms rather than as open slabs, and the Muscle Beach
-    starter is deliberately left outdoors so the first real gym feels like progress --
-    that distinction is one dict lookup in campus_shell and would be easy to lose. The
-    second is containment: the hall has to enclose its own courts without swallowing
-    the shop and monument that belong in the forecourt outside it.
-    """
-    halls_by_environment: dict[str, int] = {}
-    for node in walk(structure):
-        if node.get("name") != "GymHall":
-            continue
-        environment = "?"
-        for ancestor in walk(structure):
-            if node in ancestor.get("children", []):
-                environment = ancestor.get("name", "?")
-                break
-        halls_by_environment[environment] = halls_by_environment.get(environment, 0) + 1
-
-    total = sum(halls_by_environment.values())
-    validator.check(
-        total == 6,
-        f"expected one gym hall per city district (6), found {total}",
-    )
-
-    for node in walk(structure):
-        if node.get("name") != "Environment_Hub":
-            continue
-        hub_halls = sum(1 for child in walk(node) if child.get("name") == "GymHall")
-        validator.check(
-            hub_halls == 0,
-            "the Muscle Beach starter campus must stay outdoors, but it has a GymHall",
-        )
 
 
 def validate_no_emissive_floor_markings(validator: Validator, structure: Any) -> None:
@@ -1175,8 +1022,8 @@ def validate_irregular_map(
 
     plate_trees = [node for node in walk(structure) if node.get("name") == "PlateTreeBase"]
     validator.check(
-        len(plate_trees) == EXPECTED_ACTIVE_TIERS * 2,
-        f"each active district needs two organized plate trees; found {len(plate_trees)}",
+        len(plate_trees) == 2,
+        f"the hub carries the one pair of organized plate trees; found {len(plate_trees)}",
     )
 
     # Spawn must stand on the landmass. default.project.json pins the SpawnLocation
@@ -1207,7 +1054,6 @@ def validate_irregular_map(
             f"{node.get('name', '<step>')}: shore access must be walkable",
         )
 
-    validate_flight_only_areas(validator, builder, structure)
 
     water_models = [node for node in walk(structure) if node.get("attributes", {}).get("WalkableWater") is True]
     validator.check(len(water_models) == 1, f"expected one persistent walkable-water model, found {len(water_models)}")
@@ -1530,6 +1376,14 @@ def validate_building_budget(validator: Validator, payloads: Iterable[Any]) -> N
 # says nothing useful once each machine is its own destination.
 MIN_SITE_SEPARATION = 700
 
+# Ground level, and the tallest a single ramped flight may climb. Both are read
+# off the builder's own constants at check time where possible; these are the
+# fallbacks the checks compare against.
+FLOOR_TOP_GUESS = 1.0
+# Roblox humanoids walk anything under 89 degrees, but a player steering up a
+# ramp at 45 slides off the sides; this is the comfortable-walking limit.
+MAX_RAMP_PITCH = 40.0
+
 
 def validate_scatter_separation(validator: Validator, builder: ModuleType) -> None:
     """The scattered sites are the right number, far enough apart, and off the road.
@@ -1580,6 +1434,193 @@ def validate_scatter_separation(validator: Validator, builder: ModuleType) -> No
     )
 
 
+def validate_station_zone_volumes(
+    validator: Validator, builder: ModuleType, structure: Any, stations: dict[str, Node]
+) -> None:
+    """Every machine stands in exactly one zone volume, and it is the right one.
+
+    This is the check that keeps tier gating honest once machines are scattered.
+    A machine's multiplier is not a property of the machine -- ZoneConfig.AtPosition
+    resolves it from whichever tagged GymZone volume the player is standing in, and
+    when two volumes overlap it takes the one with the *highest* multiplier. While
+    the gym was seven campuses that could not happen. Scattered across a city it
+    can, and the symptom would be a x1 machine quietly paying x64.
+    """
+    zone_order = [row["zone"] for row in builder.DISTRICTS[:EXPECTED_ACTIVE_TIERS]]
+
+    volumes = []
+    for node in walk(structure):
+        if "GymZone" not in tags(node):
+            continue
+        spot = position(node)
+        size = node.get("properties", {}).get("Size")
+        zone_id = (node.get("attributes") or {}).get("ZoneId")
+        if spot is None or not isinstance(size, list):
+            continue
+        volumes.append((node.get("name", "?"), zone_id, spot, size))
+
+    validator.check(
+        len(volumes) == EXPECTED_STATIONS,
+        f"expected one zone volume per station, found {len(volumes)}",
+    )
+
+    # Overlap, tested as axis-aligned boxes. Every volume in this world is axis
+    # aligned in XZ up to the site yaw, and a slightly conservative test is the
+    # right bias: a false positive is a nudge, a false negative is a silent
+    # multiplier upgrade.
+    clashes = []
+    for index, (name_a, zone_a, pos_a, size_a) in enumerate(volumes):
+        for name_b, zone_b, pos_b, size_b in volumes[index + 1:]:
+            if zone_a == zone_b:
+                continue
+            if (abs(pos_a[0] - pos_b[0]) * 2 < size_a[0] + size_b[0]
+                    and abs(pos_a[2] - pos_b[2]) * 2 < size_a[2] + size_b[2]):
+                clashes.append(f"{name_a} ({zone_a}) overlaps {name_b} ({zone_b})")
+    validator.check(
+        not clashes,
+        "zone volumes of different tiers overlap, which silently upgrades a "
+        "machine's multiplier: " + "; ".join(clashes[:4]),
+    )
+
+    # And each station is actually inside the volume carrying its own tier.
+    for travel_id, station in stations.items():
+        zone_id = travel_id.split("-")[0]
+        base = named_parts(station, "Base")
+        if not base:
+            continue
+        spot = position(base[0])
+        if spot is None:
+            continue
+        covering = [
+            (name, vzone) for name, vzone, pos, size in volumes
+            if abs(spot[0] - pos[0]) * 2 <= size[0]
+            and abs(spot[2] - pos[2]) * 2 <= size[2]
+        ]
+        validator.check(
+            any(vzone == zone_id for _, vzone in covering),
+            f"{travel_id}: not inside a {zone_id} zone volume "
+            f"(covered by {[v for _, v in covering] or 'nothing'}) -- "
+            "a machine outside its volume is dropped from the map and refused by Travel",
+        )
+        validator.check(
+            zone_id in zone_order,
+            f"{travel_id}: zone {zone_id} is not one of the active tiers",
+        )
+
+
+def validate_hostile_scatter(validator: Validator, builder: ModuleType) -> None:
+    """Mob fields and boss arenas are spread, and clear of every training court.
+
+    A court is the one place in this game that has to be safe -- a player is
+    anchored to a machine for minutes at a time and cannot dodge. That is why a
+    fight is somewhere you choose to walk to, and why this clearance is a rule
+    rather than a preference.
+    """
+    stations = builder.scatter_sites()
+    sites = builder.scatter_hostile_sites(stations)
+
+    validator.check(len(sites) == 14, f"expected 14 hostile sites, found {len(sites)}")
+
+    worst, pair = math.inf, None
+    for index, a in enumerate(sites):
+        for b in sites[index + 1:]:
+            gap = math.hypot(a["x"] - b["x"], a["z"] - b["z"])
+            if gap < worst:
+                worst, pair = gap, (a, b)
+    if pair is not None:
+        validator.check(
+            worst >= builder.MIN_HOSTILE_SEPARATION,
+            f"two hostile sites are {worst:.0f} studs apart, under the "
+            f"{builder.MIN_HOSTILE_SEPARATION} floor",
+        )
+
+    crowding = [
+        (site, station) for site in sites for station in stations
+        if math.hypot(site["x"] - station["x"], site["z"] - station["z"])
+        < builder.HOSTILE_STATION_CLEARANCE
+    ]
+    validator.check(
+        not crowding,
+        "hostile sites crowding a training court: "
+        + ", ".join(f"({s['x']:.0f}, {s['z']:.0f})" for s, _ in crowding[:4]),
+    )
+
+
+def validate_roof_access(validator: Validator, structure: Any) -> None:
+    """Every elevated training site has a stair a player can actually walk up.
+
+    The whole reason rooftop sites are allowed is that they are reachable on
+    foot. That promise is geometry, and geometry drifts: a stair whose top
+    landing stops short of the roof, or whose flights leave a gap, looks
+    completely correct in a screenshot and is a wall in play.
+
+    Checked per site folder rather than by proximity, because a wide roof puts
+    its stair at the edge -- up to 200 studs from the machine at the centre --
+    and a radius search either misses it or catches a neighbour's.
+    """
+    for node in walk(structure):
+        if node.get("className") != "Folder":
+            continue
+        # Direct children only. Every ancestor folder also *contains* a roof floor
+        # somewhere beneath it, and walking descendants would run this check on the
+        # whole world wrapper and report the same fault under four different names.
+        pieces = list(node.get("children", []))
+        # The court's own floor, not the machine's TrainAnchor: the anchor lives in
+        # the Machines payload and is not reachable from here, and the floor is the
+        # surface the stair actually has to deliver you onto anyway.
+        floors = [p for p in pieces if str(p.get("name", "")).endswith("RoofFloor")]
+        if not floors:
+            continue
+        spot = position(floors[0])
+        if spot is None:
+            continue
+
+        name = node.get("name", "?")
+        landings = []
+        for piece in pieces:
+            if piece.get("name") not in ("StairLanding", "StairTopLanding", "StairFlight"):
+                continue
+            where = position(piece)
+            if where is None:
+                continue
+            if piece.get("properties", {}).get("CanCollide") is False:
+                validator.fail(f"{name}: {piece['name']} is non-collidable; a stair you fall through")
+            if piece.get("name") != "StairFlight":
+                landings.append(where[1])
+
+        validator.check(landings, f"{name}: elevated site with no stair at all")
+        if not landings:
+            continue
+
+        landings.sort()
+        validator.check(
+            landings[0] <= FLOOR_TOP_GUESS + 4,
+            f"{name}: the stair starts {landings[0]:.1f} studs up, not at the pavement",
+        )
+
+        # Pitch, not rise. A single straight ramp climbs the whole height in one
+        # go, so how far it rises says nothing; how steeply it does says
+        # everything. Read off the ramp's own up-axis: its world Y component is
+        # the cosine of the pitch.
+        for piece in pieces:
+            if piece.get("name") != "StairFlight":
+                continue
+            frame = piece.get("properties", {}).get("CFrame")
+            if not isinstance(frame, list) or len(frame) != 12:
+                continue
+            pitch = math.degrees(math.acos(max(-1.0, min(1.0, abs(frame[7])))))
+            validator.check(
+                pitch <= MAX_RAMP_PITCH,
+                f"{name}: a ramp pitches {pitch:.1f} degrees, over the "
+                f"{MAX_RAMP_PITCH} a player can comfortably walk",
+            )
+        validator.check(
+            abs(landings[-1] - spot[1]) <= 10,
+            f"{name}: the stair tops out at {landings[-1]:.1f} but the machine is at "
+            f"{spot[1]:.1f} -- the climb does not reach the court",
+        )
+
+
 def validate_streaming_density(validator: Validator, payloads: Iterable[Any]) -> None:
     """No single streaming bubble may carry too much.
 
@@ -1627,44 +1668,6 @@ def validate_streaming_density(validator: Validator, payloads: Iterable[Any]) ->
         f"streaming density exceeded: {worst_count} parts in one {STREAM_CELL}-stud cell "
         f"near {where} (cap {MAX_PARTS_PER_STREAM_CELL}); densest: {detail}",
     )
-
-
-def validate_compact_campus_shops(
-    validator: Validator, builder: ModuleType, structure: Any
-) -> None:
-    """Every active campus stays compact and exposes the real Shop through an NPC."""
-    validator.check(
-        builder.CITY_CAMPUS_WIDTH <= 370 and builder.CITY_CAMPUS_DEPTH <= 270,
-        "training campuses regressed to the oversized layout",
-    )
-
-    environment_ids = ["Hub"] + [area["id"] for area in builder.AREAS]
-    for environment_id in environment_ids:
-        environment_name = f"Environment_{environment_id}"
-        environments = [
-            node for node in walk(structure)
-            if node.get("name") == environment_name
-        ]
-        validator.check(
-            len(environments) == 1,
-            f"expected one {environment_name}, found {len(environments)}",
-        )
-        if len(environments) != 1:
-            continue
-        environment = environments[0]
-        shops = [node for node in walk(environment) if node.get("name") == "CampusShop"]
-        keepers = [
-            node for node in walk(environment)
-            if node.get("attributes", {}).get("NpcId") == "Shopkeeper"
-        ]
-        validator.check(
-            len(shops) == 1,
-            f"{environment_name}: expected one rear CampusShop, found {len(shops)}",
-        )
-        validator.check(
-            len(keepers) == 1 and "Npc" in tags(keepers[0]),
-            f"{environment_name}: shop must have one tagged Shopkeeper NPC",
-        )
 
 
 def validate_committed_payload(
@@ -1980,9 +1983,7 @@ def run() -> int:
         validate_irregular_map(validator, builder, first_structure, station_by_id)
         validate_world_foundation(validator, first_structure, first_machines)
         validate_movement_bounds(validator, builder)
-        validate_compact_campus_shops(validator, builder, first_structure)
         validate_no_coplanar_floors(validator, (first_structure, first_machines))
-        validate_gym_halls(validator, first_structure)
         validate_no_emissive_floor_markings(validator, first_structure)
         validate_scenery_collision(
             validator, builder, first_structure, first_machines, stations
@@ -1991,6 +1992,9 @@ def run() -> int:
         validate_streaming_density(validator, (first_structure, first_machines))
         validate_building_budget(validator, (first_structure,))
         validate_scatter_separation(validator, builder)
+        validate_station_zone_volumes(validator, builder, first_structure, station_by_id)
+        validate_hostile_scatter(validator, builder)
+        validate_roof_access(validator, first_structure)
         instance_count, base_part_count = validate_instance_budgets(
             validator,
             (first_structure, first_machines),
