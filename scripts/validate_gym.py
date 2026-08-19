@@ -85,6 +85,19 @@ MAX_MAP_FEATURES = 400
 MAX_BASE_PARTS = 7_600
 MAX_INSTANCES = 9_000
 
+# What a client actually pays for. StreamingEnabled keeps only a radius around the
+# player resident (StreamingTargetRadius 512 in default.project.json), so the global
+# budget above says almost nothing about frame time -- a world twice the size costs
+# nothing extra if the extra parts are somewhere else. This is the number that
+# matters, and it is why the global cap can be raised at all.
+#
+# Measured before any city fill: the worst 512-stud cell in the world held 428
+# parts, a campus core. The cap is set a little over twice that, which leaves room
+# for a campus plus the blocks that will surround it while still catching a
+# generator that runs away in one place.
+STREAM_CELL = 512
+MAX_PARTS_PER_STREAM_CELL = 900
+
 # Per-machine detail budget. The floor is the real check: twelve machines once sat
 # under 25 parts and read as blockouts standing next to 50-part benches, and nothing
 # here noticed because every existing check is about correctness and layout rather
@@ -1465,6 +1478,55 @@ def validate_machine_detail(validator: Validator, machines: Any) -> None:
     validator.check(seen > 0, "no machines found to check detail budgets against")
 
 
+def validate_streaming_density(validator: Validator, payloads: Iterable[Any]) -> None:
+    """No single streaming bubble may carry too much.
+
+    Bucketed over four half-cell-offset lattices rather than one: a dense cluster
+    sitting astride a cell boundary splits evenly between two cells and hides from
+    a single grid, which is precisely the hotspot worth finding.
+
+    Y is ignored. The world is a plane -- everything stands on one ground height --
+    so a third axis would only ever divide by one.
+    """
+    placed: list[tuple[float, float, str]] = []
+    for payload in payloads:
+        for node in walk(payload):
+            if not is_base_part(node):
+                continue
+            spot = position(node)
+            if spot is not None:
+                placed.append((spot[0], spot[2], str(node.get("name", "?"))))
+
+    worst_count = 0
+    worst_cell: tuple[float, float] | None = None
+    worst_names: Counter[str] = Counter()
+
+    half = STREAM_CELL // 2
+    for offset_x, offset_z in ((0, 0), (half, 0), (0, half), (half, half)):
+        cells: dict[tuple[int, int], list[str]] = {}
+        for x, z, name in placed:
+            key = (int((x + offset_x) // STREAM_CELL), int((z + offset_z) // STREAM_CELL))
+            cells.setdefault(key, []).append(name)
+        for (cell_x, cell_z), names in cells.items():
+            if len(names) > worst_count:
+                worst_count = len(names)
+                worst_cell = (
+                    (cell_x + 0.5) * STREAM_CELL - offset_x,
+                    (cell_z + 0.5) * STREAM_CELL - offset_z,
+                )
+                worst_names = Counter(names)
+
+    # Name the place and what is in it. "Some cell is too dense" is not something
+    # anyone can act on across a sixteen-thousand-stud map.
+    where = f"({worst_cell[0]:.0f}, {worst_cell[1]:.0f})" if worst_cell else "nowhere"
+    detail = ", ".join(f"{name} x{count}" for name, count in worst_names.most_common(5))
+    validator.check(
+        worst_count <= MAX_PARTS_PER_STREAM_CELL,
+        f"streaming density exceeded: {worst_count} parts in one {STREAM_CELL}-stud cell "
+        f"near {where} (cap {MAX_PARTS_PER_STREAM_CELL}); densest: {detail}",
+    )
+
+
 def validate_compact_campus_shops(
     validator: Validator, builder: ModuleType, structure: Any
 ) -> None:
@@ -1824,6 +1886,7 @@ def run() -> int:
             validator, builder, first_structure, first_machines, stations
         )
         validate_machine_detail(validator, first_machines)
+        validate_streaming_density(validator, (first_structure, first_machines))
         instance_count, base_part_count = validate_instance_budgets(
             validator,
             (first_structure, first_machines),
