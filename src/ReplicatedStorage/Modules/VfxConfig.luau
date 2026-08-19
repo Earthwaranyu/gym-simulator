@@ -339,6 +339,50 @@ local GUARD_HOT = rgb(214, 240, 255)
 
 local effects: { Effect } = {
 	--[[
+		A rep hitting lockout.
+
+		By far the most frequently played effect in the game -- once a second, per
+		lifter, on every machine in sight -- so it is built to the opposite brief from
+		the slam: no flash, no hit-stop, no ring, and a shake an order of magnitude
+		below anything combat fires. A training gym where every rep punched the camera
+		would be unusable within a minute.
+
+		The falloff radius is deliberately short. A lifter across the room should move
+		their own dust and nothing else; only the set you are personally grinding
+		should be felt in the camera at all.
+	]]
+	{
+		Id = "RepPeak",
+		Radius = 3,
+		CullDistance = 90,
+		Elements = {
+			-- A breath of chalk off the hands at the top of the lift.
+			{
+				Kind = "Burst" :: "Burst",
+				Delay = 0,
+				Seconds = 0.18,
+				Texture = SMOKE,
+				Count = 5,
+				Speed = NumberRange.new(1, 3),
+				Size = NumberRange.new(0.25, 0.6),
+				Spread = 40,
+				Color = DUST,
+				Gravity = -2,
+				Lifetime = NumberRange.new(0.25, 0.5),
+			},
+			-- Just enough camera to feel the weight land, and no more.
+			{
+				Kind = "Shake" :: "Shake",
+				Delay = 0,
+				Seconds = 0.12,
+				Amplitude = 0.09,
+				Roughness = 9,
+				FalloffRadius = 14,
+			},
+		},
+	},
+
+	--[[
 		The wind-up. Its whole job is to be fair: the ring on the floor is the exact
 		radius of the blast that is coming, so an opponent who runs out of it is safe
 		and one who stays chose to. A telegraph that lied about its size would be worse

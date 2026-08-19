@@ -78,6 +78,12 @@ local ROLL_AMPLITUDE = 0.008
 -- can express that: every rep it plays is identical to the last.
 local FATIGUE_RAMP = 45
 
+-- Where in the rep the weight is considered to have landed. Read off the pose's
+-- own alpha rather than counting seconds, so it lands on the authored lockout
+-- whatever tempo the pose is using -- and, unlike the server's TrainingGain, it
+-- cannot arrive a network hop after the body already got there.
+local PEAK_ALPHA = 0.92
+
 -- How a single-handed weight sits relative to the hand holding it. A dumbbell is
 -- authored with its handle along its own X, and a hand's X runs across the palm,
 -- so the two already agree; this only lifts it into the grip.
@@ -110,6 +116,9 @@ type HeldProp = {
 
 type Entry = {
 	pose: PoseConfig.Pose,
+	-- Last frame's alpha for the joint the peak is read from, so a crossing can be
+	-- detected rather than a threshold merely being true for several frames.
+	peakAlpha: number,
 	interval: number,
 	joints: { Bound },
 	props: { HeldProp },
@@ -125,6 +134,9 @@ local TrainingPoseController = {
 }
 
 local TrainingController: any = nil
+-- Resolved lazily: both controllers are ignited by the same Loader pass, so
+-- reaching for it at require time races the order they come up in.
+local VfxController: any = nil
 
 local active: { [Model]: Entry } = {}
 
@@ -650,6 +662,7 @@ function TrainingPoseController:_sync(character: Model)
 		spot = activeSpotFromCharacter(character),
 		startedAt = os.clock(),
 		seed = seedFor(character),
+		peakAlpha = 0,
 	}
 end
 
@@ -713,11 +726,44 @@ function TrainingPoseController:_apply()
 			bound.joint.Transform = IDENTITY:Lerp(target, blend)
 		end
 
+		-- The rep beat. Taken from the first bound joint, which shares the pose clock
+		-- with every other joint that has no Lead of its own.
+		local lead = entry.joints[1]
+		if lead ~= nil then
+			local alpha = PosePlayback.AlphaAt(entry.pose, lead.motion, elapsed, entry.interval)
+			if alpha >= PEAK_ALPHA and entry.peakAlpha < PEAK_ALPHA and blend >= 1 then
+				self:_repPeak(character)
+			end
+			entry.peakAlpha = alpha
+		end
+
 		self:_carry(character, entry)
 		if entry.pose.Id == "BattleRopes" then
 			animateBattleRopes(character, elapsed)
 		end
 		animateStack(character, entry.pose, elapsed, entry.interval)
+	end
+end
+
+--[[
+	Fires the lockout beat for one lifter.
+
+	Deliberately routed through VfxController rather than reimplemented: the effect
+	is data in VfxConfig, and this file decides only *when* a rep peaks. Culling,
+	the concurrent-effect cap and the shake falloff all already live there, which
+	matters more here than anywhere else in the game -- a full gym peaks several
+	reps a second between them.
+]]
+function TrainingPoseController:_repPeak(character: Model)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root == nil or not root:IsA("BasePart") then
+		return
+	end
+	if VfxController == nil then
+		VfxController = Loader.Get("VfxController")
+	end
+	if VfxController ~= nil then
+		VfxController:Play("RepPeak", root.CFrame, nil, nil, nil)
 	end
 end
 
