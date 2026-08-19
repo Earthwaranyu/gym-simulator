@@ -1106,10 +1106,27 @@ def triceps_pushdown(pad_color, accent):
         part("StackStripe", [4.0, 0.45, 2.7], cf(0, FLOOR_TOP + 6.8, -3.4), accent, "Neon"),
         part("PulleyPost", [0.8, 10.5, 0.8], cf(0, FLOOR_TOP + 5.25, -2.0), STEEL, "Metal"),
         part("PulleyArm", [0.8, 0.8, 4.0], cf(0, FLOOR_TOP + 10.1, -0.4), STEEL, "Metal"),
-        cylinder("Pulley", 0.8, 1.7, cf(0, FLOOR_TOP + 9.4, 1.2), CHROME, "Metal"),
         part("Cable", [0.12, 5.0, 0.12], cf(0, FLOOR_TOP + 7.0, 1.2), RUBBER,
              "SmoothPlastic", CanCollide=False, CanTouch=False, CanQuery=False),
     ])
+
+    # The wheel the cable turns over, now in a housing bolted to the arm above it
+    # rather than a bare cylinder floating at the end of the boom.
+    out.extend(pulley("Pulley", (0, FLOOR_TOP + 9.4, 1.2), 1.7, accent,
+                      axis_length=0.8, mount=(0, FLOOR_TOP + 10.1, 1.2)))
+    out.extend(stack_shroud("Stack", (0, FLOOR_TOP + 8.0, -3.4), 4.1, 8.0, 2.5, accent))
+
+    # Diagonal braces: a ten-stud mast on a five-stud base needs to look held up.
+    for side in (-1, 1):
+        out.append(tube("Brace", (side * 1.9, FLOOR_TOP + 0.65, -2.6),
+                        (side * 0.3, FLOOR_TOP + 4.2, -2.1), 0.3, STEEL_LIGHT))
+        out.append(hardware("MastBolt",
+                            mul(cf(side * 0.42, FLOOR_TOP + 1.2, -2.0), rot_z(90))))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, -4.6)))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, -1.4)))
+    out.append(tube("ArmStay", (0, FLOOR_TOP + 8.6, -1.9),
+                    (0, FLOOR_TOP + 9.9, -0.2), 0.28, STEEL_LIGHT))
+
     bar = [cylinder("PushBar", 4.0, 0.38, cf(0, FLOOR_TOP + 4.6, 1.2),
                     CHROME, "Metal", CanCollide=False, CanTouch=False,
                     CanQuery=False)]
@@ -1119,8 +1136,6 @@ def triceps_pushdown(pad_color, accent):
     ]))
     out.append(marker("TrainExit", [2, 2, 1], cf(3.8, FLOOR_TOP + ROOT_HEIGHT, 2.5)))
     return out
-
-
 def seated_row(pad_color, accent):
     """Low cable row with a seat, foot plates, stack and close-grip handle."""
     out = [floor_mat(10, 13)]
@@ -1228,12 +1243,17 @@ def torso_twist(pad_color, accent):
         part("SeatPost", [0.9, 1.8, 0.9], cf(0, FLOOR_TOP + 0.9, 0), STEEL, "Metal"),
         # A back rest, so the seat reads as a rotation machine and not a stool. Behind
         # the sitter (they face -Z), clear of the seat top at 2.525.
-        part("BackRest", [4.4, 3.4, 0.7], cf(0, FLOOR_TOP + 3.9, 2.1),
-             pad_color, "Fabric"),
+    ])
+    out.extend(padded_slab("BackRest", [4.4, 3.4, 0.7],
+                           cf(0, FLOOR_TOP + 3.9, 2.1), pad_color))
+    out.extend([
         part("BackPost", [0.8, 2.6, 0.8], cf(0, FLOOR_TOP + 2.4, 2.1), STEEL, "Metal"),
         # Set back behind the knees, same reason as the preacher bench: a 4.2-deep pad
         # centred on the sitter runs forward through the dangling legs and hides them.
-        part("Seat", [4.4, 0.65, 2.4], cf(0, FLOOR_TOP + 2.2, 1.1), pad_color, "Fabric"),
+    ])
+    out.extend(padded_slab("Seat", [4.4, 0.65, 2.4],
+                           cf(0, FLOOR_TOP + 2.2, 1.1), pad_color, caps=True))
+    out.extend([
         # In front, where the feet actually land. The brace used to sit at z +2.3 --
         # behind the lifter, who faces -Z -- so it braced nothing.
         part("FootBrace", [7.0, 0.5, 2.4], cf(0, FLOOR_TOP + 0.55, -1.1), STEEL, "Metal"),
@@ -1247,6 +1267,26 @@ def torso_twist(pad_color, accent):
         part("ArcGaugePost", [0.6, 1.4, 0.6], cf(3.4, FLOOR_TOP + 0.7, -3.0),
              STEEL, "Metal"),
     ])
+    # A rotation machine that visibly rotates: a bearing collar at the top of the
+    # post the seat turns on, kept under the 0.86 the seated feet sit at, and
+    # graduations along the arc gauge so the sweep reads as measured.
+    out.append(cylinder("BearingCollar", 0.32, 1.5,
+                        mul(cf(0, FLOOR_TOP + 1.72, 0), rot_x(90)), CHROME, "Metal",
+                        Reflectance=0.3))
+    for side in (-1, 1):
+        out.append(tube("GaugePost", (side * 3.4, FLOOR_TOP + 0.12, -3.0),
+                        (side * 3.4, FLOOR_TOP + 1.4, -3.0), 0.5, STEEL))
+        out.append(tube("BackBrace", (side * 1.6, FLOOR_TOP + 2.5, 2.45),
+                        (side * 0.3, FLOOR_TOP + 1.5, 2.1), 0.28, STEEL_LIGHT))
+        out.append(hardware("SeatBolt",
+                            mul(cf(side * 0.5, FLOOR_TOP + 1.9, 0), rot_z(90))))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, 0),
+                            (1.1, 0.22, 1.1)))
+    for tick in (-3.2, -1.6, 0.0, 1.6, 3.2):
+        out.append(part("GaugeTick", [0.16, 0.62, 0.9],
+                        cf(tick, FLOOR_TOP + 1.6, -3.0), STEEL_LIGHT,
+                        "SmoothPlastic", CanCollide=False))
+
     # On the mat in front of the machine — radius 1.1 on the 0.12 mat. It used to
     # be parked at chest height over the seat, floating just above the pad the
     # player sits on.
@@ -1429,6 +1469,32 @@ def push_up_deck(pad_color, accent):
         cylinder("RightHandle", 2.2, 0.45, cf(-2.0, FLOOR_TOP + 1.25, -2.2), CHROME),
         cylinder("LeftHandle", 2.2, 0.45, cf(2.0, FLOOR_TOP + 1.25, -2.2), CHROME),
         part("WeightMarker", [5.0, 0.2, 0.7], cf(0, FLOOR_TOP + 1.0, 2.8), accent, "Neon"),
+    ])
+
+    # The handles were parallel bars resting on nothing: their undersides sit at
+    # 1.025 and the deck tops out at 0.95. Uprights at each end close that gap and
+    # turn them into push-up bars rather than floating pipes.
+    for side in (-1, 1):
+        for end in (-1, 1):
+            out.append(tube("HandleLeg", (side * 2.0 + end * 0.95, FLOOR_TOP + 0.95, -2.2),
+                            (side * 2.0 + end * 0.95, FLOOR_TOP + 1.25, -2.2),
+                            0.34, CHROME, Reflectance=0.3))
+        out.append(cylinder("HandleCap", 0.14, 0.5,
+                            cf(side * 2.0, FLOOR_TOP + 1.25, -3.3), accent, "Metal"))
+        out.append(cylinder("HandleCap", 0.14, 0.5,
+                            cf(side * 2.0, FLOOR_TOP + 1.25, -1.1), accent, "Metal"))
+
+    # Deck edging, so the rubber reads as a bonded surface and not a loose sheet.
+    for side in (-1, 1):
+        out.append(cylinder("DeckEdge", 9.0, 0.36,
+                            mul(cf(side * 3.75, FLOOR_TOP + 0.9, 0), rot_y(90)),
+                            STEEL_LIGHT, "Metal"))
+        out.append(foot_pad("Foot", cf(side * 3.7, FLOOR_TOP + 0.11, -4.4)))
+        out.append(foot_pad("Foot", cf(side * 3.7, FLOOR_TOP + 0.11, 4.4)))
+        out.append(hardware("DeckBolt", mul(cf(side * 3.2, FLOOR_TOP + 0.96, 3.9), rot_x(90))))
+        out.append(hardware("DeckBolt", mul(cf(side * 3.2, FLOOR_TOP + 0.96, -3.9), rot_x(90))))
+
+    out.extend([
         group("Spot", [
             anchor_prone((0, FLOOR_TOP + 2.5, 0.5)),
             back_plate_load(0, FLOOR_TOP + 1.25, 3.4),
@@ -1436,8 +1502,6 @@ def push_up_deck(pad_color, accent):
         marker("TrainExit", [2, 2, 1], cf(5.0, FLOOR_TOP + ROOT_HEIGHT, 1.5)),
     ])
     return out
-
-
 def cable_crossover(pad_color, accent):
     """Twin cable towers with independent hand grips."""
     out = [floor_mat(14, 12)]
@@ -1706,10 +1770,35 @@ def back_extension_bench(pad_color, accent):
     slope = mul(cf(0, FLOOR_TOP + 3.5, 0), rot_x(-45))
     out.extend([
         part("Base", [7.0, 0.6, 10.0], cf(0, FLOOR_TOP + 0.3, 0), STEEL, "DiamondPlate"),
-        part("HipPad", [5.0, 1.0, 3.0], slope, pad_color, "Fabric"),
         part("Frame", [1.0, 5.5, 1.0], cf(0, FLOOR_TOP + 2.75, 0), STEEL, "Metal"),
         cylinder("AnkleRoller", 5.0, 1.1, cf(0, FLOOR_TOP + 1.5, 4.0), RUBBER, "Pebble"),
         part("AngleMarker", [5.5, 0.35, 0.8], cf(0, FLOOR_TOP + 5.4, -1.5), accent, "Neon"),
+    ])
+    # The hip pad is the one surface bearing the lifter's weight, on the measured
+    # 45-degree slope the anchor is derived from — same frame, rolled edge.
+    out.extend(padded_slab("HipPad", [5.0, 1.0, 3.0], slope, pad_color, caps=True))
+
+    for side in (-1, 1):
+        # A second roller: ankles go between two pads on a Roman chair, and the
+        # lower one is what actually stops the lifter sliding out.
+        out.append(cylinder("RollerCap", 0.18, 1.15,
+                            cf(side * 2.5, FLOOR_TOP + 1.5, 4.0), accent, "Metal"))
+        out.append(tube("RollerPost", (side * 1.5, FLOOR_TOP + 0.6, 4.0),
+                        (side * 1.5, FLOOR_TOP + 1.5, 4.0), 0.34, STEEL_LIGHT))
+        out.append(tube("FootPlate", (side * 1.4, FLOOR_TOP + 0.9, 4.9),
+                        (side * 1.4, FLOOR_TOP + 1.9, 5.1), 0.5, STEEL))
+        out.append(tube("MastBrace", (side * 1.6, FLOOR_TOP + 0.6, 0.9),
+                        (side * 0.35, FLOOR_TOP + 4.2, 0.2), 0.3, STEEL_LIGHT))
+        out.append(hardware("PadBolt",
+                            mul(cf(side * 0.55, FLOOR_TOP + 4.6, -0.6), rot_z(90))))
+        out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, -4.4)))
+        out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, 4.4)))
+    # Height collar: a Roman chair adjusts, and the pin is what says so.
+    out.append(cylinder("HeightCollar", 0.55, 1.35,
+                        mul(cf(0, FLOOR_TOP + 1.6, 0), rot_x(90)), STEEL_LIGHT, "Metal"))
+    out.append(hardware("HeightPin", cf(0.75, FLOOR_TOP + 1.6, 0), 0.3, 0.5, accent))
+
+    out.extend([
         group("Spot", [
             marker("TrainAnchor", [2, 2, 1], mul(slope, mul(cf(0, 1.1, 0), rot_x(90)))),
             hand_plate_load(0, FLOOR_TOP + 1.3, -3.8),
@@ -1717,8 +1806,6 @@ def back_extension_bench(pad_color, accent):
         marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
-
 def rope_climb(pad_color, accent):
     """Tall rope gantry; the avatar climbs in place under a crash mat."""
     out = [floor_mat(10, 10)]
@@ -1750,7 +1837,30 @@ def plank_deck(pad_color, accent):
         part("Base", [8.0, 0.65, 11.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
         part("Mat", [6.8, 0.25, 9.8], cf(0, FLOOR_TOP + 0.8, 0), pad_color, "Rubber"),
         part("ElbowTargets", [5.0, 0.15, 1.5], cf(0, FLOOR_TOP + 1.0, -3.0), accent, "Neon"),
-        part("TimerArch", [8.0, 4.5, 0.6], cf(0, FLOOR_TOP + 2.3, -5.0), STEEL, "Metal"),
+    ])
+
+    # An arch, not a signboard. It was one 4.5-tall slab standing on the mat with
+    # no legs; a plank timer is a gantry you look up into from the floor.
+    out.append(part("TimerBeam", [8.0, 0.8, 0.6], cf(0, FLOOR_TOP + 4.15, -5.0),
+                    STEEL, "Metal"))
+    out.extend(console("Timer", cf(0, FLOOR_TOP + 3.1, -4.68), accent,
+                       size=(3.4, 1.6, 0.3)))
+    for side in (-1, 1):
+        out.append(tube("TimerLeg", (side * 3.6, FLOOR_TOP + 0.65, -5.0),
+                        (side * 3.6, FLOOR_TOP + 4.15, -5.0), 0.55, STEEL))
+        out.append(hardware("TimerBolt",
+                            mul(cf(side * 3.6, FLOOR_TOP + 0.95, -4.7), rot_x(90)), 0.34))
+        # Deck edging and feet, matching the other floor-level stations.
+        out.append(cylinder("MatEdge", 9.8, 0.34,
+                            mul(cf(side * 3.4, FLOOR_TOP + 0.88, 0), rot_y(90)),
+                            STEEL_LIGHT, "Metal"))
+        out.append(foot_pad("Foot", cf(side * 3.4, FLOOR_TOP + 0.11, -4.9)))
+        out.append(foot_pad("Foot", cf(side * 3.4, FLOOR_TOP + 0.11, 4.9)))
+        out.append(part("LaneStripe", [0.25, 0.14, 9.4],
+                        cf(side * 2.6, FLOOR_TOP + 0.95, 0), STEEL_LIGHT,
+                        "SmoothPlastic", CanCollide=False))
+
+    out.extend([
         group("Spot", [
             anchor_prone((0, FLOOR_TOP + 2.15, 0.5)),
             back_plate_load(0, FLOOR_TOP + 1.25, 3.6),
@@ -1758,8 +1868,6 @@ def plank_deck(pad_color, accent):
         marker("TrainExit", [2, 2, 1], cf(4.5, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
-
 def cable_crunch(pad_color, accent):
     """High pulley with a kneeling pad and rope attachment."""
     out = [floor_mat(10, 11)]
@@ -1767,10 +1875,28 @@ def cable_crunch(pad_color, accent):
         part("Base", [5.0, 0.7, 5.0], cf(0, FLOOR_TOP + 0.35, -3.0), STEEL, "DiamondPlate"),
         part("Tower", [4.0, 10.0, 2.8], cf(0, FLOOR_TOP + 5.0, -3.6), STEEL_LIGHT, "Metal"),
         part("Pulley", [1.0, 1.0, 4.0], cf(0, FLOOR_TOP + 9.5, -1.7), accent, "Metal"),
-        part("KneePad", [5.0, 0.5, 4.0], cf(0, FLOOR_TOP + 0.6, 2.4), pad_color, "Fabric"),
         # The rope hangs off the pulley. Without this the attachment floats over the
         # kneeling pad with the tower three studs behind it.
         _cable((0, FLOOR_TOP + 9.3, -1.7), (0, FLOOR_TOP + 6.4, 0.2), 0.16),
+    ])
+    out.extend(padded_slab("KneePad", [5.0, 0.5, 4.0],
+                           cf(0, FLOOR_TOP + 0.6, 2.4), pad_color, caps=True))
+    out.extend(pulley("Head", (0, FLOOR_TOP + 9.3, -0.4), 1.5, accent,
+                      axis_length=0.7, mount=(0, FLOOR_TOP + 9.5, -1.4)))
+    out.extend(stack_shroud("Tower", (0, FLOOR_TOP + 10.0, -3.6), 4.3, 10.0, 2.8, accent))
+
+    for side in (-1, 1):
+        out.append(tube("TowerBrace", (side * 2.0, FLOOR_TOP + 0.7, -2.0),
+                        (side * 0.5, FLOOR_TOP + 4.4, -2.4), 0.3, STEEL))
+        out.append(hardware("TowerBolt",
+                            mul(cf(side * 2.05, FLOOR_TOP + 1.4, -3.6), rot_z(90))))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, -4.6)))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, -1.4)))
+        # A rail either side of the kneeling pad, to line the lifter up under the rope.
+        out.append(tube("KneeRail", (side * 2.6, FLOOR_TOP + 0.85, 0.6),
+                        (side * 2.6, FLOOR_TOP + 0.85, 4.2), 0.3, STEEL_LIGHT))
+
+    out.extend([
         group("Spot", [
             # Kneeling height: the shins rest on the KneePad rather than the body
             # standing with its feet through the floor, which is what a pose with no
@@ -1781,8 +1907,6 @@ def cable_crunch(pad_color, accent):
         marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
-
 def ab_wheel_runway(pad_color, accent):
     """Kneeling rollout lane with a carried ab wheel."""
     out = [floor_mat(9, 14)]
@@ -1799,6 +1923,26 @@ def ab_wheel_runway(pad_color, accent):
         part("Base", [7.0, 0.65, 12.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
         part("Runway", [5.5, 0.25, 10.8], cf(0, FLOOR_TOP + 0.8, 0), pad_color, "Rubber"),
         part("Finish", [5.7, 0.2, 0.7], cf(0, FLOOR_TOP + 1.0, -4.5), accent, "Neon"),
+    ])
+
+    # A lane, not a strip of paint: side rails to roll between, distance ticks to
+    # roll toward, and a padded kneeling block at the near end to start from.
+    for side in (-1, 1):
+        out.append(tube("LaneRail", (side * 3.0, FLOOR_TOP + 1.05, -5.4),
+                        (side * 3.0, FLOOR_TOP + 1.05, 5.4), 0.4, STEEL_LIGHT))
+        for end in (-5.4, 5.4):
+            out.append(tube("RailPost", (side * 3.0, FLOOR_TOP + 0.65, end),
+                            (side * 3.0, FLOOR_TOP + 1.05, end), 0.42, STEEL))
+        out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, -5.4)))
+        out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, 5.4)))
+    for index, z in enumerate((-3.0, -1.5, 0.0, 1.5)):
+        out.append(part("DistanceTick", [4.6 - index * 0.3, 0.14, 0.22],
+                        cf(0, FLOOR_TOP + 0.95, z), STEEL_LIGHT, "SmoothPlastic",
+                        CanCollide=False))
+    out.extend(padded_slab("StartBlock", [4.6, 0.45, 2.2],
+                           cf(0, FLOOR_TOP + 1.05, 4.2), pad_color))
+
+    out.extend([
         group("Spot", [
             # Measured, not guessed: at FLOOR_TOP + 2.2 the kneeling shins finished
             # 1.53 studs under the runway they are supposed to be kneeling on.
@@ -1810,8 +1954,6 @@ def ab_wheel_runway(pad_color, accent):
         marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
-
 def wood_chop_station(pad_color, accent):
     """Single cable tower with high-to-low diagonal handle path."""
     out = [floor_mat(11, 11)]
@@ -1823,8 +1965,29 @@ def wood_chop_station(pad_color, accent):
         # A pulley head on the tower, and the cable that actually holds the handle
         # up. The diagonal guide is a painted path marker, not structure, so before
         # this the handle hung on nothing.
-        cylinder("Pulley", 0.9, 1.6, cf(-3.0, FLOOR_TOP + 9.6, -1.6), CHROME, "Metal"),
         _cable((-3.0, FLOOR_TOP + 9.6, -1.6), (0, FLOOR_TOP + 7.2, -0.8)),
+    ])
+    out.extend(pulley("Head", (-3.0, FLOOR_TOP + 9.6, -1.6), 1.6, accent,
+                      axis_length=0.9, mount=(-3.0, FLOOR_TOP + 9.6, -2.6)))
+    out.extend(stack_shroud("Tower", (-3.0, FLOOR_TOP + 10.0, -3.0), 3.3, 10.0, 3.0, accent))
+
+    # The mast is carried on braces now, and the painted guide runs between real
+    # posts instead of hanging in the air at one end.
+    for side in (-1, 1):
+        out.append(tube("TowerBrace", (-3.0 + side * 1.9, FLOOR_TOP + 0.7, -1.5),
+                        (-3.0 + side * 0.6, FLOOR_TOP + 4.4, -2.0), 0.3, STEEL))
+        out.append(hardware("TowerBolt",
+                            mul(cf(-3.0 + side * 1.55, FLOOR_TOP + 1.5, -3.0), rot_z(90))))
+        out.append(foot_pad("Foot", cf(-3.0 + side * 1.9, FLOOR_TOP + 0.11, -4.1)))
+        out.append(foot_pad("Foot", cf(-3.0 + side * 1.9, FLOOR_TOP + 0.11, -0.9)))
+    out.append(tube("GuidePost", (0.9, FLOOR_TOP + 0.12, -0.1),
+                    (0.9, FLOOR_TOP + 3.4, -0.1), 0.36, STEEL))
+    out.append(tube("GuideTop", (-2.6, FLOOR_TOP + 9.3, -0.6),
+                    (0.6, FLOOR_TOP + 7.6, -0.2), 0.3, STEEL_LIGHT))
+    out.append(part("StancePad", [4.4, 0.16, 4.4], cf(1.5, FLOOR_TOP + 0.14, 1.8),
+                    RUBBER, "Pebble", CanCollide=False))
+
+    out.extend([
         group("Spot", [
             anchor_standing(cf(1.5, FLOOR_TOP, 1.8)),
             _held_bar("HeldBoth", 2.2, FLOOR_TOP + 7.2, -0.8, CHROME, grip_style="LevelBar"),
@@ -1832,8 +1995,6 @@ def wood_chop_station(pad_color, accent):
         marker("TrainExit", [2, 2, 1], cf(4.8, FLOOR_TOP + ROOT_HEIGHT, 2.8)),
     ])
     return out
-
-
 def leg_extension(pad_color, accent):
     """Seated quad extension with a front ankle roller."""
     out = [floor_mat(10, 11)]

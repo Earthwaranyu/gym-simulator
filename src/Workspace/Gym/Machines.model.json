@@ -21456,41 +21456,6 @@
               }
             },
             {
-              "name": "Pulley",
-              "className": "Part",
-              "properties": {
-                "Anchored": true,
-                "CFrame": [
-                  3771.5278,
-                  10.62,
-                  169.7191,
-                  -0.992546,
-                  0.0,
-                  0.121869,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -0.121869,
-                  0.0,
-                  -0.992546
-                ],
-                "Size": [
-                  0.8,
-                  1.7,
-                  1.7
-                ],
-                "Color": [
-                  0.78,
-                  0.8,
-                  0.84
-                ],
-                "Material": "Metal",
-                "TopSurface": "Smooth",
-                "BottomSurface": "Smooth",
-                "Shape": "Cylinder"
-              }
-            },
-            {
               "name": "Cable",
               "className": "Part",
               "properties": {
@@ -21525,6 +21490,669 @@
                 "CanCollide": false,
                 "CanTouch": false,
                 "CanQuery": false
+              }
+            },
+            {
+              "name": "PulleyWheel",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3771.5278,
+                  10.62,
+                  169.7191,
+                  0.0,
+                  0.992546,
+                  0.121869,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.121869,
+                  -0.992546
+                ],
+                "Size": [
+                  0.22,
+                  1.7,
+                  1.7
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3
+              }
+            },
+            {
+              "name": "PulleyAxle",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3771.5278,
+                  10.62,
+                  169.7191,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  1.04,
+                  0.16,
+                  0.16
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "PulleyCheek",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3771.9248,
+                  10.62,
+                  169.7678,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.12,
+                  1.054,
+                  1.054
+                ],
+                "Color": [
+                  0.94,
+                  0.42,
+                  0.24
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "PulleyCheek",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3771.1308,
+                  10.62,
+                  169.6703,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.12,
+                  1.054,
+                  1.054
+                ],
+                "Color": [
+                  0.94,
+                  0.42,
+                  0.24
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "PulleyBracket",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3771.5278,
+                  10.97,
+                  169.7191,
+                  0.0,
+                  -0.121869,
+                  -0.992546,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.992546,
+                  -0.121869
+                ],
+                "Size": [
+                  0.7,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "PulleyBracketBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3771.5278,
+                  11.32,
+                  169.7191,
+                  0.0,
+                  0.992546,
+                  0.121869,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.121869,
+                  -0.992546
+                ],
+                "Size": [
+                  0.09,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "StackShroud",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3773.0019,
+                  5.22,
+                  174.5346,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.14,
+                  8.0,
+                  2.5
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "StackShroud",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3768.9325,
+                  5.22,
+                  174.0349,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.14,
+                  8.0,
+                  2.5
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "StackCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3770.9672,
+                  9.47,
+                  174.2848,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  4.4,
+                  0.5,
+                  2.7
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "DiamondPlate",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "StackLabel",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3771.1195,
+                  8.67,
+                  173.0441,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  2.05,
+                  0.34,
+                  0.1
+                ],
+                "Color": [
+                  0.94,
+                  0.42,
+                  0.24
+                ],
+                "Material": "Neon",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Brace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3772.187,
+                  3.645,
+                  173.3766,
+                  -0.388993,
+                  0.120678,
+                  -0.913302,
+                  0.904257,
+                  -0.139469,
+                  -0.403569,
+                  -0.176079,
+                  -0.982846,
+                  -0.054872
+                ],
+                "Size": [
+                  3.9259,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "MastBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3771.5547,
+                  2.42,
+                  172.9464,
+                  0.0,
+                  0.992546,
+                  0.121869,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.121869,
+                  -0.992546
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3772.8061,
+                  1.33,
+                  175.7196,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3773.196,
+                  1.33,
+                  172.5434,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Brace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3770.0034,
+                  3.645,
+                  173.1085,
+                  0.420035,
+                  0.120678,
+                  -0.899448,
+                  0.904257,
+                  -0.139469,
+                  0.403569,
+                  -0.076743,
+                  -0.982846,
+                  -0.167706
+                ],
+                "Size": [
+                  3.9259,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "MastBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3770.721,
+                  2.42,
+                  172.844,
+                  0.0,
+                  0.992546,
+                  0.121869,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.121869,
+                  -0.992546
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3768.8359,
+                  1.33,
+                  175.2321,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3769.2259,
+                  1.33,
+                  172.0559,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "ArmStay",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3771.2536,
+                  10.47,
+                  171.9523,
+                  0.096808,
+                  0.07403,
+                  -0.992546,
+                  0.60745,
+                  -0.794358,
+                  0.0,
+                  -0.788437,
+                  -0.602922,
+                  -0.121869
+                ],
+                "Size": [
+                  2.1401,
+                  0.28,
+                  0.28
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
               }
             },
             {
@@ -23925,7 +24553,7 @@
                 "Size": [
                   4.4,
                   3.4,
-                  0.7
+                  0.35
                 ],
                 "Color": [
                   0.42,
@@ -23935,6 +24563,76 @@
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
                 "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "BackRestRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3910.5726,
+                  5.12,
+                  186.0612,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  4.4,
+                  0.35,
+                  0.35
+                ],
+                "Color": [
+                  0.42,
+                  0.16,
+                  0.1
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "BackRestRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3910.6153,
+                  5.12,
+                  185.7138,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  4.4,
+                  0.35,
+                  0.35
+                ],
+                "Color": [
+                  0.42,
+                  0.16,
+                  0.1
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
               }
             },
             {
@@ -23991,9 +24689,9 @@
                   -0.992546
                 ],
                 "Size": [
-                  4.4,
+                  3.75,
                   0.65,
-                  2.4
+                  1.75
                 ],
                 "Color": [
                   0.42,
@@ -24003,6 +24701,146 @@
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
                 "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "SeatRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3910.3655,
+                  3.42,
+                  187.7485,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  3.75,
+                  0.65,
+                  0.65
+                ],
+                "Color": [
+                  0.42,
+                  0.16,
+                  0.1
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "SeatRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3910.5787,
+                  3.42,
+                  186.0115,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  3.75,
+                  0.65,
+                  0.65
+                ],
+                "Color": [
+                  0.42,
+                  0.16,
+                  0.1
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "SeatCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3912.3331,
+                  3.42,
+                  187.1085,
+                  -0.121869,
+                  0.0,
+                  -0.992546,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.992546,
+                  0.0,
+                  -0.121869
+                ],
+                "Size": [
+                  1.75,
+                  0.65,
+                  0.65
+                ],
+                "Color": [
+                  0.42,
+                  0.16,
+                  0.1
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "SeatCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3908.6111,
+                  3.42,
+                  186.6515,
+                  -0.121869,
+                  0.0,
+                  -0.992546,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.992546,
+                  0.0,
+                  -0.121869
+                ],
+                "Size": [
+                  1.75,
+                  0.65,
+                  0.65
+                ],
+                "Color": [
+                  0.42,
+                  0.16,
+                  0.1
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
               }
             },
             {
@@ -24139,6 +24977,499 @@
                 "Material": "Metal",
                 "TopSurface": "Smooth",
                 "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "BearingCollar",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3910.338,
+                  2.94,
+                  187.9718,
+                  -0.992546,
+                  0.121869,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -0.121869,
+                  -0.992546,
+                  0.0
+                ],
+                "Size": [
+                  0.32,
+                  1.5,
+                  1.5
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3
+              }
+            },
+            {
+              "name": "GaugePost",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3913.3471,
+                  1.98,
+                  191.3638,
+                  0.0,
+                  0.121869,
+                  -0.992546,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.992546,
+                  -0.121869
+                ],
+                "Size": [
+                  1.28,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "BackBrace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3911.5582,
+                  3.22,
+                  185.8295,
+                  -0.794826,
+                  -0.115027,
+                  -0.595835,
+                  -0.596285,
+                  0.33035,
+                  0.731651,
+                  0.112675,
+                  0.936823,
+                  -0.33116
+                ],
+                "Size": [
+                  1.6771,
+                  0.28,
+                  0.28
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "SeatBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3910.8343,
+                  3.12,
+                  188.0328,
+                  0.0,
+                  0.992546,
+                  0.121869,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.121869,
+                  -0.992546
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3912.3231,
+                  1.33,
+                  188.2156,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  1.1,
+                  0.22,
+                  1.1
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "GaugePost",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3906.5978,
+                  1.98,
+                  190.5351,
+                  0.0,
+                  0.121869,
+                  -0.992546,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.992546,
+                  -0.121869
+                ],
+                "Size": [
+                  1.28,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "BackBrace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3909.6724,
+                  3.22,
+                  185.598,
+                  0.743958,
+                  -0.115027,
+                  -0.658251,
+                  -0.596285,
+                  0.33035,
+                  -0.731651,
+                  0.301614,
+                  0.936823,
+                  0.177178
+                ],
+                "Size": [
+                  1.6771,
+                  0.28,
+                  0.28
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "SeatBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3909.8418,
+                  3.12,
+                  187.9109,
+                  0.0,
+                  0.992546,
+                  0.121869,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.121869,
+                  -0.992546
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3908.3529,
+                  1.33,
+                  187.7281,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  1.1,
+                  0.22,
+                  1.1
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "GaugeTick",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3913.1486,
+                  2.82,
+                  191.3394,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.16,
+                  0.62,
+                  0.9
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "GaugeTick",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3911.5605,
+                  2.82,
+                  191.1444,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.16,
+                  0.62,
+                  0.9
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "GaugeTick",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3909.9724,
+                  2.82,
+                  190.9495,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.16,
+                  0.62,
+                  0.9
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "GaugeTick",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3908.3843,
+                  2.82,
+                  190.7545,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.16,
+                  0.62,
+                  0.9
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "GaugeTick",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  3906.7963,
+                  2.82,
+                  190.5595,
+                  -0.992546,
+                  0.0,
+                  0.121869,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.121869,
+                  0.0,
+                  -0.992546
+                ],
+                "Size": [
+                  0.16,
+                  0.62,
+                  0.9
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
               }
             },
             {
@@ -25462,6 +26793,644 @@
                 "Material": "Neon",
                 "TopSurface": "Smooth",
                 "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "HandleLeg",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6452.9906,
+                  2.32,
+                  -1064.3797,
+                  0.0,
+                  0.156434,
+                  0.987688,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.987688,
+                  -0.156434
+                ],
+                "Size": [
+                  0.3,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3
+              }
+            },
+            {
+              "name": "HandleLeg",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6454.8672,
+                  2.32,
+                  -1064.6769,
+                  0.0,
+                  0.156434,
+                  0.987688,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.987688,
+                  -0.156434
+                ],
+                "Size": [
+                  0.3,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3
+              }
+            },
+            {
+              "name": "HandleCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6453.7568,
+                  2.47,
+                  -1065.6148,
+                  0.987688,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  0.987688
+                ],
+                "Size": [
+                  0.14,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.75,
+                  0.47,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HandleCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6454.101,
+                  2.47,
+                  -1063.4419,
+                  0.987688,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  0.987688
+                ],
+                "Size": [
+                  0.14,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.75,
+                  0.47,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HandleLeg",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6456.9413,
+                  2.32,
+                  -1065.0054,
+                  0.0,
+                  0.156434,
+                  0.987688,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.987688,
+                  -0.156434
+                ],
+                "Size": [
+                  0.3,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3
+              }
+            },
+            {
+              "name": "HandleLeg",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6458.818,
+                  2.32,
+                  -1065.3027,
+                  0.0,
+                  0.156434,
+                  0.987688,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.987688,
+                  -0.156434
+                ],
+                "Size": [
+                  0.3,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3
+              }
+            },
+            {
+              "name": "HandleCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6457.7076,
+                  2.47,
+                  -1066.2405,
+                  0.987688,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  0.987688
+                ],
+                "Size": [
+                  0.14,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.75,
+                  0.47,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HandleCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6458.0517,
+                  2.47,
+                  -1064.0676,
+                  0.987688,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  0.987688
+                ],
+                "Size": [
+                  0.14,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.75,
+                  0.47,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "DeckEdge",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6452.5446,
+                  2.12,
+                  -1062.0816,
+                  -0.156434,
+                  0.0,
+                  0.987688,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.987688,
+                  0.0,
+                  -0.156434
+                ],
+                "Size": [
+                  9.0,
+                  0.36,
+                  0.36
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6451.9057,
+                  1.33,
+                  -1066.4353,
+                  0.987688,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  0.987688
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6453.2823,
+                  1.33,
+                  -1057.7436,
+                  0.987688,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  0.987688
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "DeckBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6453.6979,
+                  2.18,
+                  -1058.3157,
+                  0.987688,
+                  0.156434,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -0.156434,
+                  0.987688,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "DeckBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6452.4777,
+                  2.18,
+                  -1066.0197,
+                  0.987688,
+                  0.156434,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -0.156434,
+                  0.987688,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "DeckEdge",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6459.9523,
+                  2.12,
+                  -1063.2549,
+                  -0.156434,
+                  0.0,
+                  0.987688,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.987688,
+                  0.0,
+                  -0.156434
+                ],
+                "Size": [
+                  9.0,
+                  0.36,
+                  0.36
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6459.2146,
+                  1.33,
+                  -1067.5929,
+                  0.987688,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  0.987688
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6460.5912,
+                  1.33,
+                  -1058.9012,
+                  0.987688,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  0.987688
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "DeckBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6460.0191,
+                  2.18,
+                  -1059.3169,
+                  0.987688,
+                  0.156434,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -0.156434,
+                  0.987688,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "DeckBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6458.7989,
+                  2.18,
+                  -1067.0208,
+                  0.987688,
+                  0.156434,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -0.156434,
+                  0.987688,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
               }
             },
             {
@@ -31112,13 +33081,13 @@
               }
             },
             {
-              "name": "TimerArch",
+              "name": "TimerBeam",
               "className": "Part",
               "properties": {
                 "Anchored": true,
                 "CFrame": [
                   6681.6529,
-                  3.52,
+                  5.37,
                   -981.9353,
                   -0.987688,
                   0.0,
@@ -31132,7 +33101,7 @@
                 ],
                 "Size": [
                   8.0,
-                  4.5,
+                  0.8,
                   0.6
                 ],
                 "Color": [
@@ -31143,6 +33112,511 @@
                 "Material": "Metal",
                 "TopSurface": "Smooth",
                 "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "TimerBezel",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6681.6029,
+                  4.32,
+                  -982.2514,
+                  -0.987688,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  -0.987688
+                ],
+                "Size": [
+                  3.4,
+                  1.6,
+                  0.3
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "TimerScreen",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6681.5841,
+                  4.32,
+                  -982.3699,
+                  -0.987688,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  -0.987688
+                ],
+                "Size": [
+                  2.788,
+                  1.152,
+                  0.18
+                ],
+                "Color": [
+                  0.75,
+                  0.47,
+                  0.27
+                ],
+                "Material": "Neon",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              },
+              "children": [
+                {
+                  "name": "Glow",
+                  "className": "PointLight",
+                  "properties": {
+                    "Brightness": 1.4,
+                    "Range": 9,
+                    "Shadows": false,
+                    "Color": [
+                      0.75,
+                      0.47,
+                      0.27
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "TimerLeg",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6685.2086,
+                  3.62,
+                  -982.4985,
+                  0.0,
+                  -0.156434,
+                  -0.987688,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.987688,
+                  0.156434
+                ],
+                "Size": [
+                  3.5,
+                  0.55,
+                  0.55
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "TimerBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6685.1617,
+                  2.17,
+                  -982.7948,
+                  -0.987688,
+                  -0.156434,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.156434,
+                  -0.987688,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "MatEdge",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6684.2289,
+                  2.1,
+                  -987.4057,
+                  0.156434,
+                  0.0,
+                  -0.987688,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.987688,
+                  0.0,
+                  0.156434
+                ],
+                "Size": [
+                  9.8,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6684.9954,
+                  1.33,
+                  -982.566,
+                  -0.987688,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  -0.987688
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6683.4624,
+                  1.33,
+                  -992.2453,
+                  -0.987688,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  -0.987688
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "LaneStripe",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6683.4388,
+                  2.17,
+                  -987.2805,
+                  -0.987688,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  -0.987688
+                ],
+                "Size": [
+                  0.25,
+                  0.14,
+                  9.4
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "TimerLeg",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6678.0973,
+                  3.62,
+                  -981.3722,
+                  0.0,
+                  -0.156434,
+                  -0.987688,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.987688,
+                  0.156434
+                ],
+                "Size": [
+                  3.5,
+                  0.55,
+                  0.55
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "TimerBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6678.0503,
+                  2.17,
+                  -981.6685,
+                  -0.987688,
+                  -0.156434,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.156434,
+                  -0.987688,
+                  0.0
+                ],
+                "Size": [
+                  0.09,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "MatEdge",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6677.5126,
+                  2.1,
+                  -986.3419,
+                  0.156434,
+                  0.0,
+                  -0.987688,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.987688,
+                  0.0,
+                  0.156434
+                ],
+                "Size": [
+                  9.8,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6678.2792,
+                  1.33,
+                  -981.5022,
+                  -0.987688,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  -0.987688
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6676.7461,
+                  1.33,
+                  -991.1816,
+                  -0.987688,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  -0.987688
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "LaneStripe",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  6678.3028,
+                  2.17,
+                  -986.4671,
+                  -0.987688,
+                  0.0,
+                  -0.156434,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.156434,
+                  0.0,
+                  -0.987688
+                ],
+                "Size": [
+                  0.25,
+                  0.14,
+                  9.4
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
               }
             },
             {
@@ -39125,40 +41599,6 @@
               }
             },
             {
-              "name": "KneePad",
-              "className": "Part",
-              "properties": {
-                "Anchored": true,
-                "CFrame": [
-                  8700.3572,
-                  1.82,
-                  -4212.622,
-                  -0.970296,
-                  0.0,
-                  0.241922,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -0.241922,
-                  0.0,
-                  -0.970296
-                ],
-                "Size": [
-                  5.0,
-                  0.5,
-                  4.0
-                ],
-                "Color": [
-                  0.4,
-                  0.28,
-                  0.08
-                ],
-                "Material": "Fabric",
-                "TopSurface": "Smooth",
-                "BottomSurface": "Smooth"
-              }
-            },
-            {
               "name": "Cable",
               "className": "Part",
               "properties": {
@@ -39193,6 +41633,878 @@
                 "CanCollide": false,
                 "CanTouch": false,
                 "CanQuery": false
+              }
+            },
+            {
+              "name": "KneePad",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8700.3572,
+                  1.82,
+                  -4212.622,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  4.5,
+                  0.5,
+                  3.5
+                ],
+                "Color": [
+                  0.4,
+                  0.28,
+                  0.08
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "KneePadRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8699.9338,
+                  1.82,
+                  -4210.924,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  4.5,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.4,
+                  0.28,
+                  0.08
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "KneePadRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8700.7805,
+                  1.82,
+                  -4214.32,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  4.5,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.4,
+                  0.28,
+                  0.08
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "KneePadCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8702.5403,
+                  1.82,
+                  -4212.0777,
+                  -0.241922,
+                  0.0,
+                  -0.970296,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.970296,
+                  0.0,
+                  -0.241922
+                ],
+                "Size": [
+                  3.5,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.4,
+                  0.28,
+                  0.08
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "KneePadCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8698.174,
+                  1.82,
+                  -4213.1663,
+                  -0.241922,
+                  0.0,
+                  -0.970296,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.970296,
+                  0.0,
+                  -0.241922
+                ],
+                "Size": [
+                  3.5,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.4,
+                  0.28,
+                  0.08
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HeadWheel",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8699.6798,
+                  10.52,
+                  -4209.9052,
+                  0.0,
+                  0.970296,
+                  0.241922,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.241922,
+                  -0.970296
+                ],
+                "Size": [
+                  0.22,
+                  1.5,
+                  1.5
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3
+              }
+            },
+            {
+              "name": "HeadAxle",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8699.6798,
+                  10.52,
+                  -4209.9052,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  0.94,
+                  0.16,
+                  0.16
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HeadCheek",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8700.0194,
+                  10.52,
+                  -4209.8205,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  0.12,
+                  0.93,
+                  0.93
+                ],
+                "Color": [
+                  1.0,
+                  0.77,
+                  0.24
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "HeadCheek",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8699.3402,
+                  10.52,
+                  -4209.9898,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  0.12,
+                  0.93,
+                  0.93
+                ],
+                "Color": [
+                  1.0,
+                  0.77,
+                  0.24
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "HeadBracket",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8699.5588,
+                  10.62,
+                  -4209.42,
+                  0.237224,
+                  -0.047445,
+                  -0.970296,
+                  -0.196116,
+                  -0.980581,
+                  0.0,
+                  -0.951454,
+                  0.190291,
+                  -0.241922
+                ],
+                "Size": [
+                  1.0198,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HeadBracketBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8699.4379,
+                  10.72,
+                  -4208.9349,
+                  0.0,
+                  0.970296,
+                  0.241922,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.241922,
+                  -0.970296
+                ],
+                "Size": [
+                  0.09,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "TowerShroud",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8700.9918,
+                  6.22,
+                  -4206.2801,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  0.14,
+                  10.0,
+                  2.8
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "TowerShroud",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8696.8195,
+                  6.22,
+                  -4207.3204,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  0.14,
+                  10.0,
+                  2.8
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "TowerCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8698.9056,
+                  11.47,
+                  -4206.8002,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  4.6,
+                  0.5,
+                  3.0
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "DiamondPlate",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "TowerLabel",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8699.2443,
+                  10.67,
+                  -4208.1586,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  2.15,
+                  0.34,
+                  0.1
+                ],
+                "Color": [
+                  1.0,
+                  0.77,
+                  0.24
+                ],
+                "Material": "Neon",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "TowerBrace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8700.4572,
+                  3.77,
+                  -4207.8562,
+                  -0.386846,
+                  0.24052,
+                  -0.890225,
+                  0.922123,
+                  0.107482,
+                  -0.371668,
+                  0.006289,
+                  -0.964675,
+                  -0.263368
+                ],
+                "Size": [
+                  4.0125,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "TowerBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8700.8947,
+                  2.62,
+                  -4206.3043,
+                  0.0,
+                  0.970296,
+                  0.241922,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.241922,
+                  -0.970296
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8700.6043,
+                  1.33,
+                  -4205.3461,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8701.3785,
+                  1.33,
+                  -4208.451,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "KneeRail",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8702.8799,
+                  2.07,
+                  -4211.993,
+                  0.241922,
+                  0.0,
+                  -0.970296,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -0.970296,
+                  0.0,
+                  -0.241922
+                ],
+                "Size": [
+                  3.6,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "TowerBrace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8698.0315,
+                  3.77,
+                  -4208.461,
+                  0.338613,
+                  0.24052,
+                  -0.909666,
+                  0.922123,
+                  0.107482,
+                  0.371668,
+                  0.187166,
+                  -0.964675,
+                  -0.185395
+                ],
+                "Size": [
+                  4.0125,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "TowerBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8696.9165,
+                  2.62,
+                  -4207.2962,
+                  0.0,
+                  0.970296,
+                  0.241922,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.241922,
+                  -0.970296
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8696.7231,
+                  1.33,
+                  -4206.3138,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8697.4973,
+                  1.33,
+                  -4209.4187,
+                  -0.970296,
+                  0.0,
+                  0.241922,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.241922,
+                  0.0,
+                  -0.970296
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "KneeRail",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  8697.8344,
+                  2.07,
+                  -4213.251,
+                  0.241922,
+                  0.0,
+                  -0.970296,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -0.970296,
+                  0.0,
+                  -0.241922
+                ],
+                "Size": [
+                  3.6,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
               }
             },
             {
@@ -45034,40 +48346,6 @@
               }
             },
             {
-              "name": "HipPad",
-              "className": "Part",
-              "properties": {
-                "Anchored": true,
-                "CFrame": [
-                  12045.1289,
-                  4.72,
-                  -2084.6594,
-                  0.990268,
-                  -0.09841,
-                  0.09841,
-                  0.0,
-                  0.707107,
-                  0.707107,
-                  -0.139173,
-                  -0.700225,
-                  0.700225
-                ],
-                "Size": [
-                  5.0,
-                  1.0,
-                  3.0
-                ],
-                "Color": [
-                  0.13,
-                  0.3,
-                  0.42
-                ],
-                "Material": "Fabric",
-                "TopSurface": "Smooth",
-                "BottomSurface": "Smooth"
-              }
-            },
-            {
               "name": "Frame",
               "className": "Part",
               "properties": {
@@ -45168,6 +48446,742 @@
                 "Material": "Neon",
                 "TopSurface": "Smooth",
                 "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "HipPad",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12045.1289,
+                  4.72,
+                  -2084.6594,
+                  0.990268,
+                  -0.09841,
+                  0.09841,
+                  0.0,
+                  0.707107,
+                  0.707107,
+                  -0.139173,
+                  -0.700225,
+                  0.700225
+                ],
+                "Size": [
+                  4.0,
+                  1.0,
+                  2.0
+                ],
+                "Color": [
+                  0.13,
+                  0.3,
+                  0.42
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "HipPadRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12045.0305,
+                  4.0129,
+                  -2085.3596,
+                  0.990268,
+                  -0.09841,
+                  0.09841,
+                  0.0,
+                  0.707107,
+                  0.707107,
+                  -0.139173,
+                  -0.700225,
+                  0.700225
+                ],
+                "Size": [
+                  4.0,
+                  1.0,
+                  1.0
+                ],
+                "Color": [
+                  0.13,
+                  0.3,
+                  0.42
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HipPadRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12045.2274,
+                  5.4271,
+                  -2083.9592,
+                  0.990268,
+                  -0.09841,
+                  0.09841,
+                  0.0,
+                  0.707107,
+                  0.707107,
+                  -0.139173,
+                  -0.700225,
+                  0.700225
+                ],
+                "Size": [
+                  4.0,
+                  1.0,
+                  1.0
+                ],
+                "Color": [
+                  0.13,
+                  0.3,
+                  0.42
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HipPadCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12043.1484,
+                  4.72,
+                  -2084.381,
+                  -0.09841,
+                  -0.09841,
+                  0.990268,
+                  -0.707107,
+                  0.707107,
+                  0.0,
+                  -0.700225,
+                  -0.700225,
+                  -0.139173
+                ],
+                "Size": [
+                  2.0,
+                  1.0,
+                  1.0
+                ],
+                "Color": [
+                  0.13,
+                  0.3,
+                  0.42
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HipPadCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12047.1095,
+                  4.72,
+                  -2084.9377,
+                  -0.09841,
+                  -0.09841,
+                  0.990268,
+                  -0.707107,
+                  0.707107,
+                  0.0,
+                  -0.700225,
+                  -0.700225,
+                  -0.139173
+                ],
+                "Size": [
+                  2.0,
+                  1.0,
+                  1.0
+                ],
+                "Color": [
+                  0.13,
+                  0.3,
+                  0.42
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "RollerCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12043.21,
+                  2.72,
+                  -2080.3504,
+                  0.990268,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  0.990268
+                ],
+                "Size": [
+                  0.18,
+                  1.15,
+                  1.15
+                ],
+                "Color": [
+                  0.47,
+                  0.82,
+                  1.0
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "RollerPost",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12044.2002,
+                  2.27,
+                  -2080.4896,
+                  0.0,
+                  0.139173,
+                  0.990268,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.990268,
+                  -0.139173
+                ],
+                "Size": [
+                  0.9,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "FootPlate",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12044.4384,
+                  2.62,
+                  -2079.5132,
+                  0.027294,
+                  0.13647,
+                  0.990268,
+                  0.980581,
+                  -0.196116,
+                  0.0,
+                  0.194207,
+                  0.971038,
+                  -0.139173
+                ],
+                "Size": [
+                  1.0198,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "MastBrace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12044.24,
+                  3.62,
+                  -2083.979,
+                  0.294331,
+                  0.136614,
+                  0.945889,
+                  0.929129,
+                  0.19087,
+                  -0.316683,
+                  -0.223805,
+                  0.972062,
+                  -0.070754
+                ],
+                "Size": [
+                  3.8746,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "PadBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12044.5008,
+                  5.82,
+                  -2085.177,
+                  0.0,
+                  -0.990268,
+                  0.139173,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.139173,
+                  0.990268
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12041.6448,
+                  1.33,
+                  -2088.613,
+                  0.990268,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  0.990268
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12042.8695,
+                  1.33,
+                  -2079.8986,
+                  0.990268,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  0.990268
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "RollerCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12048.1613,
+                  2.72,
+                  -2081.0462,
+                  0.990268,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  0.990268
+                ],
+                "Size": [
+                  0.18,
+                  1.15,
+                  1.15
+                ],
+                "Color": [
+                  0.47,
+                  0.82,
+                  1.0
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "RollerPost",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12047.171,
+                  2.27,
+                  -2080.9071,
+                  0.0,
+                  0.139173,
+                  0.990268,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.990268,
+                  -0.139173
+                ],
+                "Size": [
+                  0.9,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "FootPlate",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12047.2112,
+                  2.62,
+                  -2079.9029,
+                  0.027294,
+                  0.13647,
+                  0.990268,
+                  0.980581,
+                  -0.196116,
+                  0.0,
+                  0.194207,
+                  0.971038,
+                  -0.139173
+                ],
+                "Size": [
+                  1.0198,
+                  0.5,
+                  0.5
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "MastBrace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12046.171,
+                  3.62,
+                  -2084.2504,
+                  -0.344618,
+                  0.136614,
+                  0.92875,
+                  0.929129,
+                  0.19087,
+                  0.316683,
+                  -0.134007,
+                  0.972062,
+                  -0.192709
+                ],
+                "Size": [
+                  3.8746,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "PadBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12045.5901,
+                  5.82,
+                  -2085.3301,
+                  0.0,
+                  -0.990268,
+                  0.139173,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.139173,
+                  0.990268
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12047.3884,
+                  1.33,
+                  -2089.4202,
+                  0.990268,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  0.990268
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12048.6131,
+                  1.33,
+                  -2080.7058,
+                  0.990268,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  0.990268
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "HeightCollar",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12045.1289,
+                  2.82,
+                  -2084.6594,
+                  0.990268,
+                  0.139173,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -0.139173,
+                  0.990268,
+                  0.0
+                ],
+                "Size": [
+                  0.55,
+                  1.35,
+                  1.35
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HeightPin",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12045.8716,
+                  2.82,
+                  -2084.7638,
+                  0.990268,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  0.990268
+                ],
+                "Size": [
+                  0.5,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.47,
+                  0.82,
+                  1.0
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
               }
             },
             {
@@ -46099,6 +50113,596 @@
                 "Material": "Neon",
                 "TopSurface": "Smooth",
                 "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "LaneRail",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12132.7276,
+                  2.27,
+                  -1985.8895,
+                  -0.139173,
+                  0.0,
+                  -0.990268,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -0.990268,
+                  0.0,
+                  0.139173
+                ],
+                "Size": [
+                  10.8,
+                  0.4,
+                  0.4
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "RailPost",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12133.4791,
+                  2.07,
+                  -1980.5421,
+                  0.0,
+                  -0.139173,
+                  -0.990268,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.990268,
+                  0.139173
+                ],
+                "Size": [
+                  0.4,
+                  0.42,
+                  0.42
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "RailPost",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12131.976,
+                  2.07,
+                  -1991.237,
+                  0.0,
+                  -0.139173,
+                  -0.990268,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.990268,
+                  0.139173
+                ],
+                "Size": [
+                  0.4,
+                  0.42,
+                  0.42
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12133.3801,
+                  1.33,
+                  -1980.5282,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12131.877,
+                  1.33,
+                  -1991.2231,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "LaneRail",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12126.7859,
+                  2.27,
+                  -1985.0545,
+                  -0.139173,
+                  0.0,
+                  -0.990268,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -0.990268,
+                  0.0,
+                  0.139173
+                ],
+                "Size": [
+                  10.8,
+                  0.4,
+                  0.4
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "RailPost",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12127.5375,
+                  2.07,
+                  -1979.707,
+                  0.0,
+                  -0.139173,
+                  -0.990268,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.990268,
+                  0.139173
+                ],
+                "Size": [
+                  0.4,
+                  0.42,
+                  0.42
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "RailPost",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12126.0344,
+                  2.07,
+                  -1990.4019,
+                  0.0,
+                  -0.139173,
+                  -0.990268,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.990268,
+                  0.139173
+                ],
+                "Size": [
+                  0.4,
+                  0.42,
+                  0.42
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12127.6365,
+                  1.33,
+                  -1979.721,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12126.1334,
+                  1.33,
+                  -1990.4159,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "DistanceTick",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12130.1743,
+                  2.17,
+                  -1982.5012,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  4.6,
+                  0.14,
+                  0.22
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "DistanceTick",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12129.9655,
+                  2.17,
+                  -1983.9866,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  4.3,
+                  0.14,
+                  0.22
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "DistanceTick",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12129.7567,
+                  2.17,
+                  -1985.472,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  4.0,
+                  0.14,
+                  0.22
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "DistanceTick",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12129.548,
+                  2.17,
+                  -1986.9574,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  3.7,
+                  0.14,
+                  0.22
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "SmoothPlastic",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "StartBlock",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12129.1722,
+                  2.27,
+                  -1989.6311,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  4.6,
+                  0.45,
+                  1.75
+                ],
+                "Color": [
+                  0.13,
+                  0.3,
+                  0.42
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "StartBlockRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12129.294,
+                  2.27,
+                  -1988.7647,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  4.6,
+                  0.45,
+                  0.45
+                ],
+                "Color": [
+                  0.13,
+                  0.3,
+                  0.42
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "StartBlockRoll",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  12129.0504,
+                  2.27,
+                  -1990.4976,
+                  -0.990268,
+                  0.0,
+                  -0.139173,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.139173,
+                  0.0,
+                  -0.990268
+                ],
+                "Size": [
+                  4.6,
+                  0.45,
+                  0.45
+                ],
+                "Color": [
+                  0.13,
+                  0.3,
+                  0.42
+                ],
+                "Material": "Fabric",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
               }
             },
             {
@@ -53077,41 +57681,6 @@
               }
             },
             {
-              "name": "Pulley",
-              "className": "Part",
-              "properties": {
-                "Anchored": true,
-                "CFrame": [
-                  14592.2059,
-                  310.82,
-                  -6048.0902,
-                  -0.956305,
-                  0.0,
-                  -0.292372,
-                  0.0,
-                  1.0,
-                  0.0,
-                  0.292372,
-                  0.0,
-                  -0.956305
-                ],
-                "Size": [
-                  0.9,
-                  1.6,
-                  1.6
-                ],
-                "Color": [
-                  0.78,
-                  0.8,
-                  0.84
-                ],
-                "Material": "Metal",
-                "TopSurface": "Smooth",
-                "BottomSurface": "Smooth",
-                "Shape": "Cylinder"
-              }
-            },
-            {
               "name": "Cable",
               "className": "Part",
               "properties": {
@@ -53146,6 +57715,739 @@
                 "CanCollide": false,
                 "CanTouch": false,
                 "CanQuery": false
+              }
+            },
+            {
+              "name": "HeadWheel",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14592.2059,
+                  310.82,
+                  -6048.0902,
+                  0.0,
+                  0.956305,
+                  -0.292372,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.292372,
+                  -0.956305
+                ],
+                "Size": [
+                  0.22,
+                  1.6,
+                  1.6
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3
+              }
+            },
+            {
+              "name": "HeadAxle",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14592.2059,
+                  310.82,
+                  -6048.0902,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  1.14,
+                  0.16,
+                  0.16
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HeadCheek",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14592.6363,
+                  310.82,
+                  -6048.2218,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  0.12,
+                  0.992,
+                  0.992
+                ],
+                "Color": [
+                  0.59,
+                  0.63,
+                  1.0
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "HeadCheek",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14591.7756,
+                  310.82,
+                  -6047.9586,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  0.12,
+                  0.992,
+                  0.992
+                ],
+                "Color": [
+                  0.59,
+                  0.63,
+                  1.0
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "HeadBracket",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14592.3521,
+                  310.82,
+                  -6047.612,
+                  -0.292372,
+                  0.0,
+                  -0.956305,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -0.956305,
+                  0.0,
+                  0.292372
+                ],
+                "Size": [
+                  1.0,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "HeadBracketBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14592.4983,
+                  310.82,
+                  -6047.1339,
+                  0.0,
+                  0.956305,
+                  -0.292372,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.292372,
+                  -0.956305
+                ],
+                "Size": [
+                  0.09,
+                  0.34,
+                  0.34
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "TowerShroud",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14594.1931,
+                  306.22,
+                  -6047.2338,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  0.14,
+                  10.0,
+                  3.0
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "TowerShroud",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14591.0373,
+                  306.22,
+                  -6046.269,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  0.14,
+                  10.0,
+                  3.0
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "TowerCap",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14592.6152,
+                  311.47,
+                  -6046.7514,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  3.6,
+                  0.5,
+                  3.2
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "DiamondPlate",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "TowerLabel",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14592.1767,
+                  310.67,
+                  -6048.1858,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  1.65,
+                  0.34,
+                  0.1
+                ],
+                "Color": [
+                  0.59,
+                  0.63,
+                  1.0
+                ],
+                "Material": "Neon",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "TowerBrace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14593.4452,
+                  303.77,
+                  -6048.3122,
+                  -0.277479,
+                  -0.289738,
+                  -0.916,
+                  0.935884,
+                  0.133918,
+                  -0.325862,
+                  0.217084,
+                  -0.94769,
+                  0.234002
+                ],
+                "Size": [
+                  3.9535,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "TowerBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14594.0975,
+                  302.72,
+                  -6047.2045,
+                  0.0,
+                  0.956305,
+                  -0.292372,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.292372,
+                  -0.956305
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14594.7538,
+                  301.33,
+                  -6046.2549,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14593.8182,
+                  301.33,
+                  -6049.3151,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "TowerBrace",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14591.0544,
+                  303.77,
+                  -6047.5813,
+                  0.351432,
+                  -0.289738,
+                  -0.890251,
+                  0.935884,
+                  0.133918,
+                  0.325862,
+                  0.024806,
+                  -0.94769,
+                  0.318224
+                ],
+                "Size": [
+                  3.9535,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "TowerBolt",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14591.133,
+                  302.72,
+                  -6046.2982,
+                  0.0,
+                  0.956305,
+                  -0.292372,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.292372,
+                  -0.956305
+                ],
+                "Size": [
+                  0.09,
+                  0.18,
+                  0.18
+                ],
+                "Color": [
+                  0.78,
+                  0.8,
+                  0.84
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder",
+                "Reflectance": 0.3,
+                "CanCollide": false
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14591.1199,
+                  301.33,
+                  -6045.1439,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "Foot",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14590.1843,
+                  301.33,
+                  -6048.2041,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  0.9,
+                  0.22,
+                  0.9
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Rubber",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth"
+              }
+            },
+            {
+              "name": "GuidePost",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14588.0378,
+                  302.98,
+                  -6048.3844,
+                  0.0,
+                  -0.292372,
+                  -0.956305,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -0.956305,
+                  0.292372
+                ],
+                "Size": [
+                  3.28,
+                  0.36,
+                  0.36
+                ],
+                "Color": [
+                  0.1,
+                  0.11,
+                  0.13
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "GuideTop",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14589.9425,
+                  309.67,
+                  -6048.653,
+                  -0.871509,
+                  0.2846,
+                  -0.399344,
+                  -0.466323,
+                  -0.229039,
+                  0.85445,
+                  0.151711,
+                  0.930883,
+                  0.332325
+                ],
+                "Size": [
+                  3.6455,
+                  0.3,
+                  0.3
+                ],
+                "Color": [
+                  0.22,
+                  0.23,
+                  0.27
+                ],
+                "Material": "Metal",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "Shape": "Cylinder"
+              }
+            },
+            {
+              "name": "StancePad",
+              "className": "Part",
+              "properties": {
+                "Anchored": true,
+                "CFrame": [
+                  14586.9085,
+                  301.36,
+                  -6050.026,
+                  -0.956305,
+                  0.0,
+                  -0.292372,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.292372,
+                  0.0,
+                  -0.956305
+                ],
+                "Size": [
+                  4.4,
+                  0.16,
+                  4.4
+                ],
+                "Color": [
+                  0.07,
+                  0.07,
+                  0.08
+                ],
+                "Material": "Pebble",
+                "TopSurface": "Smooth",
+                "BottomSurface": "Smooth",
+                "CanCollide": false
               }
             },
             {
