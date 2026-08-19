@@ -49,6 +49,21 @@ export type JointMotion = {
 	-- Where in the cycle this joint starts, 0-1. 0.5 puts a limb in opposition,
 	-- which is what makes alternating curls and a running stride read correctly.
 	Phase: number?,
+	-- A third key, halfway through the joint's travel by default. Two states can
+	-- only ever describe a straight line between them, so a bar path that should
+	-- arc — around the chest on a press, in toward the shoulders on a curl — has
+	-- to be faked by compromising both ends. Mid is the point the joint actually
+	-- passes through; MidAt moves it earlier or later in the stroke.
+	Mid: Vector3?,
+	MidAt: number?,
+	MidOffset: Vector3?,
+	-- Shifts this joint's clock against the pose's, in cycles. Small negative
+	-- values make a joint lead and positive ones make it follow, which is the
+	-- cheapest source of overlapping action available: without it every joint in
+	-- the body starts and stops on the same frame, and a body that moves as one
+	-- rigid piece is the single clearest tell that an animation was generated.
+	-- Unlike Phase this is meant to be tiny — 0.02-0.06, not half a cycle.
+	Lead: number?,
 }
 
 export type Pose = {
@@ -60,6 +75,12 @@ export type Pose = {
 	-- Snapped holds near both extremes and crosses fast between them; see
 	-- PosePlayback.AlphaAt. It is what the gait uses, and nothing in this file does.
 	MotionStyle: ("Controlled" | "Continuous" | "Snapped")?,
+	-- The four beats of a Controlled rep as fractions of the cycle: how long the
+	-- lift takes, the squeeze at the top, the eccentric back down, and the settle
+	-- at the bottom. They are normalised, so they need not sum to 1. Omitted, a
+	-- pose gets PosePlayback.DEFAULT_TEMPO. A deadlift and a curl are not the same
+	-- tempo, and before this they were.
+	Tempo: { Lift: number, Squeeze: number, Lower: number, Settle: number }?,
 	Joints: { JointMotion },
 }
 
@@ -342,6 +363,10 @@ local poses: { Pose } = {
 		-- hip and knee flexion keeps the movement compact inside the rack.
 		Id = "SquatRack",
 		Cycles = 1,
+		-- Read against this pose's direction: Rest is standing and Peak is the hole,
+		-- so Lift is the descent and Lower is the drive out of it. The ascent gets
+		-- the longest beat because that is the half a squat grinds through.
+		Tempo = { Lift = 0.34, Squeeze = 0.06, Lower = 0.52, Settle = 0.08 },
 		Joints = {
 			{
 				Joint = "Root",
@@ -364,8 +389,10 @@ local poses: { Pose } = {
 				-- travel with the soles staying exactly on the floor.
 				PeakOffset = Vector3.new(0, -1.13, 0),
 			},
-			{ Joint = "RightShoulder", Rest = deg(-8, 0, 58), Peak = deg(-2, 0, 54) },
-			{ Joint = "LeftShoulder", Rest = deg(-8, 0, -58), Peak = deg(-2, 0, -54) },
+			-- The bar on the back settles a beat behind the legs, same reasoning as
+			-- the deadlift's waist.
+			{ Joint = "RightShoulder", Rest = deg(-8, 0, 58), Peak = deg(-2, 0, 54), Lead = 0.02 },
+			{ Joint = "LeftShoulder", Rest = deg(-8, 0, -58), Peak = deg(-2, 0, -54), Lead = 0.02 },
 			{ Joint = "RightElbow", Rest = deg(95, 0, 0), Peak = deg(100, 0, 0) },
 			{ Joint = "LeftElbow", Rest = deg(95, 0, 0), Peak = deg(100, 0, 0) },
 			{ Joint = "Waist", Rest = deg(0, 0, 0), Peak = deg(0, 0, 0) },
@@ -538,6 +565,10 @@ local poses: { Pose } = {
 	{
 		Id = "Deadlift",
 		Cycles = 1,
+		-- A deadlift is not a curl. The pull is the slow part, the bar comes back
+		-- down faster than it went up, and the rep genuinely ends — the plates rest
+		-- on the floor before the next one starts, which is what the long settle is.
+		Tempo = { Lift = 0.44, Squeeze = 0.10, Lower = 0.30, Settle = 0.16 },
 		Joints = {
 			{
 				Joint = "Root",
@@ -559,7 +590,11 @@ local poses: { Pose } = {
 			--
 			-- Between the trunk pitch and the leg fold the bar now travels roughly
 			-- 2.1 studs, against the 0.7 it had when the hinge was 34 degrees of hip.
-			{ Joint = "Waist", Rest = deg(55, 0, 0), Peak = deg(0, 0, 0) },
+			-- The trunk finishes a hair after the legs do. Everything arriving on the
+			-- same frame is what made the lift look weightless; letting the heaviest
+			-- segment lag slightly is most of the difference between lifting a loaded
+			-- bar and miming one.
+			{ Joint = "Waist", Rest = deg(55, 0, 0), Peak = deg(0, 0, 0), Lead = 0.04 },
 			{ Joint = "RightHip", Rest = deg(65, 0, 8), Peak = deg(0, 0, 6) },
 			{ Joint = "LeftHip", Rest = deg(65, 0, -8), Peak = deg(0, 0, -6) },
 			{ Joint = "RightKnee", Rest = deg(-70, 0, 0), Peak = deg(-3, 0, 0) },
@@ -571,8 +606,8 @@ local poses: { Pose } = {
 			-- -48 hangs the arms all but plumb at the floor. Straight arms throughout:
 			-- a deadlift is not a row, and bending the elbows under load would also
 			-- shorten the bar's travel back toward the arc it used to have.
-			{ Joint = "RightShoulder", Rest = deg(-48, 0, 13), Peak = deg(0, 0, 12) },
-			{ Joint = "LeftShoulder", Rest = deg(-48, 0, -13), Peak = deg(0, 0, -12) },
+			{ Joint = "RightShoulder", Rest = deg(-48, 0, 13), Peak = deg(0, 0, 12), Lead = 0.03 },
+			{ Joint = "LeftShoulder", Rest = deg(-48, 0, -13), Peak = deg(0, 0, -12), Lead = 0.03 },
 			{ Joint = "RightElbow", Rest = deg(4, 0, 0), Peak = deg(4, 0, 0) },
 			{ Joint = "LeftElbow", Rest = deg(4, 0, 0), Peak = deg(4, 0, 0) },
 		},

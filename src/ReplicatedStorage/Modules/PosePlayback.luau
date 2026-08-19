@@ -35,6 +35,10 @@ export type Joint = Instance & { Transform: CFrame }
 
 local PosePlayback = {}
 
+-- The beats a Controlled rep has always used, now named so a pose can override
+-- them one at a time. Fractions of the cycle: lift, squeeze, lower, settle.
+PosePlayback.DEFAULT_TEMPO = { Lift = 0.40, Squeeze = 0.10, Lower = 0.42, Settle = 0.08 }
+
 --[[
 	Finds the joint a motion drives, translating R15 joint names to their R6
 	equivalents on an R6 rig. Joints with no equivalent return nil and are dropped,
@@ -69,18 +73,39 @@ end
 --[[
 	Where a joint sits at a given point through its motion, 0 at Rest and 1 at Peak.
 ]]
+--[[
+	Interpolates Rest -> Mid -> Peak, or Rest -> Peak when the motion has no Mid.
+
+	Splitting the stroke at MidAt and lerping within the half we are in keeps both
+	ends exactly where they were authored: a pose that gains a Mid does not shift
+	its lockout or its bottom, it only stops travelling between them in a straight
+	line. The two halves meet at Mid with a corner rather than a smooth tangent,
+	which is invisible here because AlphaAt has already eased the parameter.
+]]
+local function keyed(rest: Vector3, mid: Vector3?, peak: Vector3, at: number, alpha: number): Vector3
+	if mid == nil then
+		return rest:Lerp(peak, alpha)
+	end
+	if alpha <= at then
+		return rest:Lerp(mid, if at > 0 then alpha / at else 1)
+	end
+	return mid:Lerp(peak, if at < 1 then (alpha - at) / (1 - at) else 0)
+end
+
 function PosePlayback.PoseAt(motion: PoseConfig.JointMotion, alpha: number): CFrame
-	local angles = motion.Rest:Lerp(motion.Peak, alpha)
+	local at = math.clamp(motion.MidAt or 0.5, 0, 1)
+	local angles = keyed(motion.Rest, motion.Mid, motion.Peak, at, alpha)
 	local rotation = CFrame.Angles(math.rad(angles.X), math.rad(angles.Y), math.rad(angles.Z))
 
 	local restOffset = motion.RestOffset
 	local peakOffset = motion.PeakOffset
-	if restOffset == nil and peakOffset == nil then
+	local midOffset = motion.MidOffset
+	if restOffset == nil and peakOffset == nil and midOffset == nil then
 		return rotation
 	end
 
 	local from = restOffset or Vector3.zero
-	local offset = from:Lerp(peakOffset or from, alpha)
+	local offset = keyed(from, midOffset, peakOffset or from, at, alpha)
 	return CFrame.new(offset) * rotation
 end
 
@@ -105,7 +130,10 @@ function PosePlayback.AlphaAt(
 	elapsed: number,
 	interval: number
 ): number
-	local phase = (elapsed / interval * pose.Cycles + (motion.Phase or 0)) % 1
+	-- Lead shifts this joint's clock against the pose's. Applied with Phase and
+	-- before the curve, so a leading joint runs the identical shape a fraction of
+	-- a cycle early rather than a differently-shaped one.
+	local phase = (elapsed / interval * pose.Cycles + (motion.Phase or 0) + (motion.Lead or 0)) % 1
 	if pose.MotionStyle == "Continuous" then
 		return 0.5 - 0.5 * math.cos(phase * math.pi * 2)
 	end
@@ -128,13 +156,26 @@ function PosePlayback.AlphaAt(
 		return smootherstep(0.5 - 0.5 * math.cos(phase * math.pi * 2))
 	end
 
-	-- 40% concentric, 10% squeeze, 42% controlled eccentric, 8% settled reset.
-	if phase < 0.4 then
-		return smootherstep(phase / 0.4)
-	elseif phase < 0.5 then
+	-- 40% concentric, 10% squeeze, 42% controlled eccentric, 8% settled reset --
+	-- unless the pose asks for its own split. A deadlift wants a longer, heavier
+	-- pull and a shorter hold than a curl does, and one shared constant could not
+	-- say so.
+	local tempo = pose.Tempo or PosePlayback.DEFAULT_TEMPO
+	local total = tempo.Lift + tempo.Squeeze + tempo.Lower + tempo.Settle
+	if total <= 0 then
+		return 0
+	end
+
+	local lift = tempo.Lift / total
+	local squeeze = lift + tempo.Squeeze / total
+	local lower = squeeze + tempo.Lower / total
+
+	if phase < lift then
+		return smootherstep(phase / lift)
+	elseif phase < squeeze then
 		return 1
-	elseif phase < 0.92 then
-		return 1 - smootherstep((phase - 0.5) / 0.42)
+	elseif phase < lower then
+		return 1 - smootherstep((phase - squeeze) / (lower - squeeze))
 	end
 	return 0
 end
