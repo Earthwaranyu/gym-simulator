@@ -637,10 +637,55 @@ def add_load_visuals(equipment_id, children):
         add_stack_plates(children)
 
 
+def machine_palette(equipment_id, row):
+    """The upholstery and accent one machine is built in.
+
+    Every machine on a court used to be handed its district's single pad colour, so
+    five machines standing together were the same machine in different shapes. The
+    accent still is the district's -- that is the thing carrying the identity of the
+    room, and the palette comment above is right that a colour per part reads as a
+    prototype -- but the upholstery now shifts a little per machine, which is what a
+    real gym looks like as pads get replaced one at a time.
+
+    Derived from the id rather than randomised, so a machine is the same colour in
+    every build and the output stays byte-for-byte deterministic.
+    """
+    digest = 0
+    for character in equipment_id:
+        digest = (digest * 31 + ord(character)) % 9973
+
+    # +/-12% per channel, on three different digits of the same digest so the
+    # channels do not move together and merely brighten the pad.
+    pad = []
+    for index, channel in enumerate(row["pad"]):
+        step = (digest // (7 ** index)) % 5 - 2
+        pad.append(min(1.0, max(0.0, channel * (1 + step * 0.06))))
+    return pad, row["accent"]
+
+
+def machine_light(accent):
+    """One short-range, shadowless light per machine.
+
+    Machines contributed nothing to the room's own lighting: every lamp in the gym
+    was in the structure, so equipment sat in whatever fell on it. Thirty-five of
+    these is affordable exactly because none of them casts a shadow -- the same
+    count with shadows on would not be.
+    """
+    fixture = marker("MachineLight", [0.4, 0.4, 0.4], cf(0, FLOOR_TOP + 6.5, 0))
+    fixture["children"] = [{
+        "name": "Glow", "className": "PointLight",
+        "properties": {
+            "Brightness": 0.85, "Range": 17, "Shadows": False,
+            "Color": [round(c, 4) for c in accent],
+        },
+    }]
+    return fixture
+
+
 def machine(name, equipment_id, origin, children, travel_id=None,
             access_kind=None, floor_index=None, exercise_family=None,
             environment_id=None, requires_flight=False, location_name=None,
-            location_tagline=None):
+            location_tagline=None, accent=None):
     # Atomic streaming: a machine arrives whole or not at all. Under the default
     # mode Roblox streams a model's parts in one at a time, and a bench press
     # missing its rack — or worse, missing the TrainAnchor the server pivots you
@@ -663,6 +708,7 @@ def machine(name, equipment_id, origin, children, travel_id=None,
     if location_tagline is not None:
         attributes["LocationTagline"] = location_tagline
     add_load_visuals(equipment_id, children)
+    children = list(children) + [machine_light(accent or ACCENT_IRON)]
     return {
         "name": name,
         "className": "Model",
@@ -4014,7 +4060,8 @@ def build_world():
 
         machines.append(folder(row["zone"], [
             machine(f"{row['zone']}{equipment_id}", equipment_id, mul(origin, spot),
-                    BUILDERS[equipment_id](row["pad"], row["accent"]))
+                    BUILDERS[equipment_id](*machine_palette(equipment_id, row)),
+                    accent=row["accent"])
             for equipment_id, spot in zip(MACHINE_ORDER, spots)
         ]))
 
@@ -6301,7 +6348,7 @@ def machine_copies(equipment_id, row):
     copies = []
     for index, offset in enumerate(COPY_OFFSETS, start=1):
         pieces = single_user_equipment(
-            BUILDERS[equipment_id](row["pad"], row["accent"])
+            BUILDERS[equipment_id](*machine_palette(equipment_id, row))
         )
         copies.append(group(
             f"Spot{index:02d}",

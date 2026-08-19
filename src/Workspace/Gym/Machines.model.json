@@ -461,9 +461,9 @@
                   6.05
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.396,
+                  0.12320000000000002,
+                  0.13440000000000002
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -495,9 +495,9 @@
                   0.55
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.396,
+                  0.12320000000000002,
+                  0.13440000000000002
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -530,9 +530,9 @@
                   0.55
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.396,
+                  0.12320000000000002,
+                  0.13440000000000002
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -565,9 +565,9 @@
                   0.55
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.396,
+                  0.12320000000000002,
+                  0.13440000000000002
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -600,9 +600,9 @@
                   0.55
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.396,
+                  0.12320000000000002,
+                  0.13440000000000002
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -635,9 +635,9 @@
                   1.25
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.396,
+                  0.12320000000000002,
+                  0.13440000000000002
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -669,9 +669,9 @@
                   0.35
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.396,
+                  0.12320000000000002,
+                  0.13440000000000002
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -704,9 +704,9 @@
                   0.35
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.396,
+                  0.12320000000000002,
+                  0.13440000000000002
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -2410,6 +2410,59 @@
                 "Transparency": 1,
                 "CanCollide": false,
                 "CastShadow": false
+              }
+            }
+          ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              140.0,
+              7.72,
+              185.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              -0.0,
+              0.0,
+              -1.0
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
               }
             }
           ]
@@ -6298,6 +6351,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              70.0,
+              7.72,
+              75.0,
+              1.0,
+              0.0,
+              -0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -7875,6 +7981,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              -0.0,
+              7.72,
+              185.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              -0.0,
+              0.0,
+              -1.0
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -8066,9 +8225,9 @@
                   6.7
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.423,
+                  0.12320000000000002,
+                  0.1272
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -8100,9 +8259,9 @@
                   0.5
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.423,
+                  0.12320000000000002,
+                  0.1272
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -8135,9 +8294,9 @@
                   0.5
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.423,
+                  0.12320000000000002,
+                  0.1272
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -8170,9 +8329,9 @@
                   0.5
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.423,
+                  0.12320000000000002,
+                  0.1272
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -8205,9 +8364,9 @@
                   0.5
                 ],
                 "Color": [
-                  0.45,
-                  0.11,
-                  0.12
+                  0.423,
+                  0.12320000000000002,
+                  0.1272
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -9084,6 +9243,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              -70.0,
+              7.72,
+              75.0,
+              1.0,
+              0.0,
+              -0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -9209,7 +9421,7 @@
                 "Color": [
                   0.45,
                   0.11,
-                  0.12
+                  0.1272
                 ],
                 "Material": "Rubber",
                 "TopSurface": "Smooth",
@@ -10260,6 +10472,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              -140.0,
+              7.72,
+              185.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              -0.0,
+              0.0,
+              -1.0
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -10383,9 +10648,9 @@
                   4.55
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -10417,9 +10682,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -10452,9 +10717,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -10487,9 +10752,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -10522,9 +10787,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -10557,9 +10822,9 @@
                   1.75
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -10591,9 +10856,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -10626,9 +10891,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -10661,9 +10926,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -10696,9 +10961,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.09,
+                  0.0954,
                   0.22,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -13833,6 +14098,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              1605.7824,
+              7.72,
+              -2255.1275,
+              0.978148,
+              0.0,
+              0.207912,
+              0.0,
+              1.0,
+              0.0,
+              -0.207912,
+              0.0,
+              0.978148
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -15621,6 +15939,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              1697.123,
+              7.72,
+              -2162.0851,
+              -0.978148,
+              0.0,
+              -0.207912,
+              0.0,
+              1.0,
+              0.0,
+              0.207912,
+              0.0,
+              -0.978148
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -15745,8 +16116,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -15779,8 +16150,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -15814,8 +16185,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -15849,8 +16220,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -15884,8 +16255,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -16948,6 +17319,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              1742.7231,
+              7.72,
+              -2284.2352,
+              0.978148,
+              0.0,
+              0.207912,
+              0.0,
+              1.0,
+              0.0,
+              -0.207912,
+              0.0,
+              0.978148
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -17106,8 +17530,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.35200000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -17140,8 +17564,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.35200000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -17175,8 +17599,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.35200000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -17244,8 +17668,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.35200000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -17278,8 +17702,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.35200000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -17313,8 +17737,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.35200000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -17383,8 +17807,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.35200000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -17417,8 +17841,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.35200000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -17452,8 +17876,8 @@
                 ],
                 "Color": [
                   0.09,
-                  0.22,
-                  0.4
+                  0.20679999999999998,
+                  0.35200000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -18588,6 +19012,59 @@
                 "Transparency": 1,
                 "CanCollide": false,
                 "CastShadow": false
+              }
+            }
+          ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              1834.0637,
+              7.72,
+              -2191.1927,
+              -0.978148,
+              0.0,
+              -0.207912,
+              0.0,
+              1.0,
+              0.0,
+              0.207912,
+              0.0,
+              -0.978148
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
               }
             }
           ]
@@ -20697,6 +21174,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              1879.6638,
+              7.72,
+              -2313.3428,
+              0.978148,
+              0.0,
+              0.207912,
+              0.0,
+              1.0,
+              0.0,
+              -0.207912,
+              0.0,
+              0.978148
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -20854,9 +21384,9 @@
                   3.4
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.4452,
+                  0.1504,
+                  0.08800000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -20888,9 +21418,9 @@
                   0.6
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.4452,
+                  0.1504,
+                  0.08800000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -20923,9 +21453,9 @@
                   0.6
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.4452,
+                  0.1504,
+                  0.08800000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -20958,9 +21488,9 @@
                   0.6
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.4452,
+                  0.1504,
+                  0.08800000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -20993,9 +21523,9 @@
                   0.6
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.4452,
+                  0.1504,
+                  0.08800000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -21028,9 +21558,9 @@
                   0.35
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.4452,
+                  0.1504,
+                  0.08800000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -21062,9 +21592,9 @@
                   0.35
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.4452,
+                  0.1504,
+                  0.08800000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -21097,9 +21627,9 @@
                   0.35
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.4452,
+                  0.1504,
+                  0.08800000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -22822,6 +23352,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              3715.309,
+              7.72,
+              53.1992,
+              0.992546,
+              0.0,
+              -0.121869,
+              0.0,
+              1.0,
+              0.0,
+              0.121869,
+              0.0,
+              0.992546
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -24432,6 +25015,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              3771.3816,
+              7.72,
+              170.9101,
+              -0.992546,
+              0.0,
+              0.121869,
+              0.0,
+              1.0,
+              0.0,
+              -0.121869,
+              0.0,
+              -0.992546
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -24555,8 +25191,8 @@
                   3.35
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
+                  0.47040000000000004,
+                  0.17920000000000003,
                   0.1
                 ],
                 "Material": "Fabric",
@@ -24589,8 +25225,8 @@
                   0.65
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
+                  0.47040000000000004,
+                  0.17920000000000003,
                   0.1
                 ],
                 "Material": "Fabric",
@@ -24624,8 +25260,8 @@
                   0.65
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
+                  0.47040000000000004,
+                  0.17920000000000003,
                   0.1
                 ],
                 "Material": "Fabric",
@@ -24659,8 +25295,8 @@
                   0.65
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
+                  0.47040000000000004,
+                  0.17920000000000003,
                   0.1
                 ],
                 "Material": "Fabric",
@@ -24694,8 +25330,8 @@
                   0.65
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
+                  0.47040000000000004,
+                  0.17920000000000003,
                   0.1
                 ],
                 "Material": "Fabric",
@@ -26413,6 +27049,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              3854.2654,
+              7.72,
+              70.2609,
+              0.992546,
+              0.0,
+              -0.121869,
+              0.0,
+              1.0,
+              0.0,
+              0.121869,
+              0.0,
+              0.992546
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -26571,9 +27260,9 @@
                   0.35
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.3948,
+                  0.1504,
+                  0.10600000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -26605,9 +27294,9 @@
                   0.35
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.3948,
+                  0.1504,
+                  0.10600000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -26640,9 +27329,9 @@
                   0.35
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.3948,
+                  0.1504,
+                  0.10600000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -26709,9 +27398,9 @@
                   1.75
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.3948,
+                  0.1504,
+                  0.10600000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -26743,9 +27432,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.3948,
+                  0.1504,
+                  0.10600000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -26778,9 +27467,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.3948,
+                  0.1504,
+                  0.10600000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -26813,9 +27502,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.3948,
+                  0.1504,
+                  0.10600000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -26848,9 +27537,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.42,
-                  0.16,
-                  0.1
+                  0.3948,
+                  0.1504,
+                  0.10600000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -27612,6 +28301,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              3910.338,
+              7.72,
+              187.9718,
+              -0.992546,
+              0.0,
+              0.121869,
+              0.0,
+              1.0,
+              0.0,
+              -0.121869,
+              0.0,
+              -0.992546
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -27736,8 +28478,8 @@
                 ],
                 "Color": [
                   0.42,
-                  0.16,
-                  0.1
+                  0.1504,
+                  0.094
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -27770,8 +28512,8 @@
                 ],
                 "Color": [
                   0.42,
-                  0.16,
-                  0.1
+                  0.1504,
+                  0.094
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -27805,8 +28547,8 @@
                 ],
                 "Color": [
                   0.42,
-                  0.16,
-                  0.1
+                  0.1504,
+                  0.094
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -27840,8 +28582,8 @@
                 ],
                 "Color": [
                   0.42,
-                  0.16,
-                  0.1
+                  0.1504,
+                  0.094
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -27875,8 +28617,8 @@
                 ],
                 "Color": [
                   0.42,
-                  0.16,
-                  0.1
+                  0.1504,
+                  0.094
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -27910,8 +28652,8 @@
                 ],
                 "Color": [
                   0.42,
-                  0.16,
-                  0.1
+                  0.1504,
+                  0.094
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -27944,8 +28686,8 @@
                 ],
                 "Color": [
                   0.42,
-                  0.16,
-                  0.1
+                  0.1504,
+                  0.094
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -27979,8 +28721,8 @@
                 ],
                 "Color": [
                   0.42,
-                  0.16,
-                  0.1
+                  0.1504,
+                  0.094
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -28921,6 +29663,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              3993.2219,
+              7.72,
+              87.3226,
+              0.992546,
+              0.0,
+              -0.121869,
+              0.0,
+              1.0,
+              0.0,
+              0.121869,
+              0.0,
+              0.992546
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -29045,7 +29840,7 @@
                 ],
                 "Color": [
                   0.34,
-                  0.22,
+                  0.1936,
                   0.13
                 ],
                 "Material": "Rubber",
@@ -30554,6 +31349,59 @@
                 "Transparency": 1,
                 "CanCollide": false,
                 "CastShadow": false
+              }
+            }
+          ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              6456.2484,
+              7.72,
+              -1062.6683,
+              0.987688,
+              0.0,
+              0.156434,
+              0.0,
+              1.0,
+              0.0,
+              -0.156434,
+              0.0,
+              0.987688
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
               }
             }
           ]
@@ -33632,6 +34480,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              6542.5944,
+              7.72,
+              -964.973,
+              -0.987688,
+              0.0,
+              -0.156434,
+              0.0,
+              1.0,
+              0.0,
+              0.156434,
+              0.0,
+              -0.987688
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -33755,9 +34656,9 @@
                   8.2
                 ],
                 "Color": [
-                  0.34,
-                  0.22,
-                  0.13
+                  0.3196,
+                  0.20679999999999998,
+                  0.1144
                 ],
                 "Material": "WoodPlanks",
                 "TopSurface": "Smooth",
@@ -35276,6 +36177,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              6594.5248,
+              7.72,
+              -1084.5691,
+              0.987688,
+              0.0,
+              0.156434,
+              0.0,
+              1.0,
+              0.0,
+              -0.156434,
+              0.0,
+              0.987688
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -35400,8 +36354,8 @@
                 ],
                 "Color": [
                   0.34,
-                  0.22,
-                  0.13
+                  0.23320000000000002,
+                  0.1378
                 ],
                 "Material": "Rubber",
                 "TopSurface": "Smooth",
@@ -36743,6 +37697,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              6680.8708,
+              7.72,
+              -986.8738,
+              -0.987688,
+              0.0,
+              -0.156434,
+              0.0,
+              1.0,
+              0.0,
+              0.156434,
+              0.0,
+              -0.987688
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -36969,8 +37976,8 @@
                   3.3
                 ],
                 "Color": [
-                  0.34,
-                  0.22,
+                  0.3196,
+                  0.1936,
                   0.13
                 ],
                 "Material": "Fabric",
@@ -37003,8 +38010,8 @@
                   0.7
                 ],
                 "Color": [
-                  0.34,
-                  0.22,
+                  0.3196,
+                  0.1936,
                   0.13
                 ],
                 "Material": "Fabric",
@@ -37038,8 +38045,8 @@
                   0.7
                 ],
                 "Color": [
-                  0.34,
-                  0.22,
+                  0.3196,
+                  0.1936,
                   0.13
                 ],
                 "Material": "Fabric",
@@ -37073,8 +38080,8 @@
                   0.7
                 ],
                 "Color": [
-                  0.34,
-                  0.22,
+                  0.3196,
+                  0.1936,
                   0.13
                 ],
                 "Material": "Fabric",
@@ -37108,8 +38115,8 @@
                   0.7
                 ],
                 "Color": [
-                  0.34,
-                  0.22,
+                  0.3196,
+                  0.1936,
                   0.13
                 ],
                 "Material": "Fabric",
@@ -37143,8 +38150,8 @@
                   0.35
                 ],
                 "Color": [
-                  0.34,
-                  0.22,
+                  0.3196,
+                  0.1936,
                   0.13
                 ],
                 "Material": "Fabric",
@@ -37177,8 +38184,8 @@
                   0.35
                 ],
                 "Color": [
-                  0.34,
-                  0.22,
+                  0.3196,
+                  0.1936,
                   0.13
                 ],
                 "Material": "Fabric",
@@ -37212,8 +38219,8 @@
                   0.35
                 ],
                 "Color": [
-                  0.34,
-                  0.22,
+                  0.3196,
+                  0.1936,
                   0.13
                 ],
                 "Material": "Fabric",
@@ -38792,6 +39799,59 @@
                 "LoadVisualKind": "StackPin",
                 "LoadVisualIndex": 1,
                 "LoadVisualCount": 10
+              }
+            }
+          ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              6732.8012,
+              7.72,
+              -1106.4699,
+              0.987688,
+              0.0,
+              0.156434,
+              0.0,
+              1.0,
+              0.0,
+              -0.156434,
+              0.0,
+              0.987688
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
               }
             }
           ]
@@ -40678,6 +41738,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              8522.6259,
+              7.72,
+              -4367.8294,
+              0.970296,
+              0.0,
+              -0.241922,
+              0.0,
+              1.0,
+              0.0,
+              0.241922,
+              0.0,
+              0.970296
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -40801,9 +41914,9 @@
                   1.55
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.08960000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -40835,9 +41948,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.08960000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -40870,9 +41983,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.08960000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -40905,9 +42018,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.08960000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -40940,9 +42053,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.08960000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -40975,9 +42088,9 @@
                   3.8
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.08960000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -41009,9 +42122,9 @@
                   0.8
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.08960000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -41044,9 +42157,9 @@
                   0.8
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.08960000000000001
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -42600,6 +43713,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              8563.9352,
+              7.72,
+              -4244.1624,
+              -0.970296,
+              0.0,
+              0.241922,
+              0.0,
+              1.0,
+              0.0,
+              -0.241922,
+              0.0,
+              -0.970296
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -42757,9 +43923,9 @@
                   2.7
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.0704
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -42791,9 +43957,9 @@
                   0.8
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.0704
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -42826,9 +43992,9 @@
                   0.8
                 ],
                 "Color": [
-                  0.4,
+                  0.376,
                   0.28,
-                  0.08
+                  0.0704
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -44348,6 +45514,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              8658.4673,
+              7.72,
+              -4333.9604,
+              0.970296,
+              0.0,
+              -0.241922,
+              0.0,
+              1.0,
+              0.0,
+              0.241922,
+              0.0,
+              0.970296
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -44576,7 +45795,7 @@
                   3.5
                 ],
                 "Color": [
-                  0.4,
+                  0.42400000000000004,
                   0.28,
                   0.08
                 ],
@@ -44610,7 +45829,7 @@
                   0.5
                 ],
                 "Color": [
-                  0.4,
+                  0.42400000000000004,
                   0.28,
                   0.08
                 ],
@@ -44645,7 +45864,7 @@
                   0.5
                 ],
                 "Color": [
-                  0.4,
+                  0.42400000000000004,
                   0.28,
                   0.08
                 ],
@@ -44680,7 +45899,7 @@
                   0.5
                 ],
                 "Color": [
-                  0.4,
+                  0.42400000000000004,
                   0.28,
                   0.08
                 ],
@@ -44715,7 +45934,7 @@
                   0.5
                 ],
                 "Color": [
-                  0.4,
+                  0.42400000000000004,
                   0.28,
                   0.08
                 ],
@@ -46102,6 +47321,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              8699.7766,
+              7.72,
+              -4210.2933,
+              -0.970296,
+              0.0,
+              0.241922,
+              0.0,
+              1.0,
+              0.0,
+              -0.241922,
+              0.0,
+              -0.970296
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -46328,9 +47600,9 @@
                   9.3
                 ],
                 "Color": [
-                  0.4,
+                  0.44800000000000006,
                   0.28,
-                  0.08
+                  0.0848
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -46362,9 +47634,9 @@
                   0.7
                 ],
                 "Color": [
-                  0.4,
+                  0.44800000000000006,
                   0.28,
-                  0.08
+                  0.0848
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -46397,9 +47669,9 @@
                   0.7
                 ],
                 "Color": [
-                  0.4,
+                  0.44800000000000006,
                   0.28,
-                  0.08
+                  0.0848
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -46432,9 +47704,9 @@
                   0.7
                 ],
                 "Color": [
-                  0.4,
+                  0.44800000000000006,
                   0.28,
-                  0.08
+                  0.0848
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -46467,9 +47739,9 @@
                   0.7
                 ],
                 "Color": [
-                  0.4,
+                  0.44800000000000006,
                   0.28,
-                  0.08
+                  0.0848
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -47984,6 +49256,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              8794.3087,
+              7.72,
+              -4300.0913,
+              0.970296,
+              0.0,
+              -0.241922,
+              0.0,
+              1.0,
+              0.0,
+              0.241922,
+              0.0,
+              0.970296
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -48141,9 +49466,9 @@
                   2.0
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1144,
+                  0.336,
+                  0.4452
                 ],
                 "Material": "Rubber",
                 "TopSurface": "Smooth",
@@ -49349,6 +50674,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              11906.4914,
+              7.72,
+              -2065.1751,
+              0.990268,
+              0.0,
+              0.139173,
+              0.0,
+              1.0,
+              0.0,
+              -0.139173,
+              0.0,
+              0.990268
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -49438,9 +50816,9 @@
                   7.35
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1222,
+                  0.264,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -49472,9 +50850,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1222,
+                  0.264,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -49507,9 +50885,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1222,
+                  0.264,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -49542,9 +50920,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1222,
+                  0.264,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -49577,9 +50955,9 @@
                   0.65
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1222,
+                  0.264,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -51303,6 +52681,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              11991.1192,
+              7.72,
+              -1965.9878,
+              -0.990268,
+              0.0,
+              -0.139173,
+              0.0,
+              1.0,
+              0.0,
+              0.139173,
+              0.0,
+              -0.990268
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -51529,9 +52960,9 @@
                   2.0
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1378,
+                  0.318,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -51563,9 +52994,9 @@
                   1.0
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1378,
+                  0.318,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -51598,9 +53029,9 @@
                   1.0
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1378,
+                  0.318,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -51633,9 +53064,9 @@
                   1.0
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1378,
+                  0.318,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -51668,9 +53099,9 @@
                   1.0
                 ],
                 "Color": [
-                  0.13,
-                  0.3,
-                  0.42
+                  0.1378,
+                  0.318,
+                  0.4452
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -53005,6 +54436,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              12045.1289,
+              7.72,
+              -2084.6594,
+              0.990268,
+              0.0,
+              0.139173,
+              0.0,
+              1.0,
+              0.0,
+              -0.139173,
+              0.0,
+              0.990268
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -53129,8 +54613,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.318,
+                  0.3696
                 ],
                 "Material": "Rubber",
                 "TopSurface": "Smooth",
@@ -53683,8 +55167,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.318,
+                  0.3696
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -53717,8 +55201,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.318,
+                  0.3696
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -53752,8 +55236,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.318,
+                  0.3696
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -53924,6 +55408,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              12129.7567,
+              7.72,
+              -1985.472,
+              -0.990268,
+              0.0,
+              -0.139173,
+              0.0,
+              1.0,
+              0.0,
+              0.139173,
+              0.0,
+              -0.990268
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -54048,8 +55585,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.282,
+                  0.3948
                 ],
                 "Material": "Rubber",
                 "TopSurface": "Smooth",
@@ -54184,8 +55721,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.282,
+                  0.3948
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -54218,8 +55755,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.282,
+                  0.3948
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -54253,8 +55790,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.282,
+                  0.3948
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -54535,8 +56072,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.282,
+                  0.3948
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -54569,8 +56106,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.282,
+                  0.3948
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -54604,8 +56141,8 @@
                 ],
                 "Color": [
                   0.13,
-                  0.3,
-                  0.42
+                  0.282,
+                  0.3948
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -55943,6 +57480,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              12183.7665,
+              7.72,
+              -2104.1436,
+              0.990268,
+              0.0,
+              0.139173,
+              0.0,
+              1.0,
+              0.0,
+              -0.139173,
+              0.0,
+              0.990268
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -56033,8 +57623,8 @@
                 ],
                 "Color": [
                   0.18,
-                  0.2,
-                  0.4
+                  0.188,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -56067,8 +57657,8 @@
                 ],
                 "Color": [
                   0.18,
-                  0.2,
-                  0.4
+                  0.188,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -56102,8 +57692,8 @@
                 ],
                 "Color": [
                   0.18,
-                  0.2,
-                  0.4
+                  0.188,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -56137,8 +57727,8 @@
                 ],
                 "Color": [
                   0.18,
-                  0.2,
-                  0.4
+                  0.188,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -56172,8 +57762,8 @@
                 ],
                 "Color": [
                   0.18,
-                  0.2,
-                  0.4
+                  0.188,
+                  0.42400000000000004
                 ],
                 "Material": "Fabric",
                 "TopSurface": "Smooth",
@@ -57932,6 +59522,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              14355.8843,
+              307.72,
+              -6092.5386,
+              0.956305,
+              0.0,
+              0.292372,
+              0.0,
+              1.0,
+              0.0,
+              -0.292372,
+              0.0,
+              0.956305
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -59379,6 +61022,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              14454.9865,
+              307.72,
+              -6007.8111,
+              -0.956305,
+              0.0,
+              -0.292372,
+              0.0,
+              1.0,
+              0.0,
+              0.292372,
+              0.0,
+              -0.956305
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -59468,9 +61164,9 @@
                   8.0
                 ],
                 "Color": [
-                  0.18,
+                  0.1908,
                   0.2,
-                  0.4
+                  0.42400000000000004
                 ],
                 "Material": "Rubber",
                 "TopSurface": "Smooth",
@@ -60707,6 +62403,59 @@
                 "Transparency": 1,
                 "CanCollide": false,
                 "CastShadow": false
+              }
+            }
+          ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              14489.767,
+              307.72,
+              -6133.4707,
+              0.956305,
+              0.0,
+              0.292372,
+              0.0,
+              1.0,
+              0.0,
+              -0.292372,
+              0.0,
+              0.956305
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
               }
             }
           ]
@@ -62325,6 +64074,59 @@
               }
             }
           ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              14588.8692,
+              307.72,
+              -6048.7432,
+              -0.956305,
+              0.0,
+              -0.292372,
+              0.0,
+              1.0,
+              0.0,
+              0.292372,
+              0.0,
+              -0.956305
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -62448,8 +64250,8 @@
                   2.6
                 ],
                 "Color": [
-                  0.18,
-                  0.2,
+                  0.2016,
+                  0.22400000000000003,
                   0.4
                 ],
                 "Material": "Rubber",
@@ -62482,8 +64284,8 @@
                   2.6
                 ],
                 "Color": [
-                  0.18,
-                  0.2,
+                  0.2016,
+                  0.22400000000000003,
                   0.4
                 ],
                 "Material": "Rubber",
@@ -63492,6 +65294,59 @@
                 "Transparency": 1,
                 "CanCollide": false,
                 "CastShadow": false
+              }
+            }
+          ]
+        },
+        {
+          "name": "MachineLight",
+          "className": "Part",
+          "properties": {
+            "Anchored": true,
+            "CFrame": [
+              14623.6497,
+              307.72,
+              -6174.4027,
+              0.956305,
+              0.0,
+              0.292372,
+              0.0,
+              1.0,
+              0.0,
+              -0.292372,
+              0.0,
+              0.956305
+            ],
+            "Size": [
+              0.4,
+              0.4,
+              0.4
+            ],
+            "Color": [
+              1,
+              1,
+              1
+            ],
+            "Material": "SmoothPlastic",
+            "TopSurface": "Smooth",
+            "BottomSurface": "Smooth",
+            "Transparency": 1,
+            "CanCollide": false,
+            "CastShadow": false
+          },
+          "children": [
+            {
+              "name": "Glow",
+              "className": "PointLight",
+              "properties": {
+                "Brightness": 0.85,
+                "Range": 17,
+                "Shadows": false,
+                "Color": [
+                  0.26,
+                  0.65,
+                  0.96
+                ]
               }
             }
           ]
