@@ -787,10 +787,10 @@ def bench_press(pad_color, accent):
     for z in (-2.6, 3.0):
         out.append(part("FrameLeg", [2.6, 1.3, 0.45],
                         cf(0, FLOOR_TOP + 0.65, z), STEEL, "DiamondPlate"))
-    out.append(part("Base", [2.7, 0.55, 6.6],
-                    cf(0, FLOOR_TOP + 1.58, 0.2), pad_color, "Fabric"))
-    out.append(part("HeadPad", [2.7, 0.35, 1.6],
-                    cf(0, FLOOR_TOP + 1.75, -2.9), pad_color, "Fabric"))
+    out.extend(padded_slab("Base", [2.7, 0.55, 6.6],
+                    cf(0, FLOOR_TOP + 1.58, 0.2), pad_color, caps=True))
+    out.extend(padded_slab("HeadPad", [2.7, 0.35, 1.6],
+                    cf(0, FLOOR_TOP + 1.75, -2.9), pad_color))
 
     # The barbell is a held prop rather than scenery: while a set runs it leaves the
     # hooks and tracks the lifter's hands, so a press moves the weight instead of
@@ -928,7 +928,7 @@ def sit_up_bench(pad_color, accent):
                     cf(0, FLOOR_TOP + 1.4, 3.2), STEEL, "DiamondPlate"))
 
     pad = mul(cf(0, FLOOR_TOP + 2.0, 0), rot_x(-slope))
-    out.append(part("Base", [2.6, 0.5, 7.2], pad, pad_color, "Fabric"))
+    out.extend(padded_slab("Base", [2.6, 0.5, 7.2], pad, pad_color, caps=True))
 
     # Rollers the lifter hooks their ankles under, at the low end.
     for offset in (-0.55, 0.55):
@@ -994,9 +994,9 @@ def incline_press(pad_color, accent):
     bench = mul(cf(0, FLOOR_TOP + 2.15, 0.5), rot_x(-32))
     out.extend([
         part("BenchSpine", [0.6, 0.5, 8.0], bench, STEEL, "DiamondPlate"),
-        part("Base", [3.2, 0.65, 5.2], bench, pad_color, "Fabric"),
-        part("SeatPad", [3.2, 0.65, 2.4],
-             mul(cf(0, FLOOR_TOP + 1.45, 3.0), rot_x(8)), pad_color, "Fabric"),
+        *padded_slab("Base", [3.2, 0.65, 5.2], bench, pad_color, caps=True),
+        *padded_slab("SeatPad", [3.2, 0.65, 2.4],
+             mul(cf(0, FLOOR_TOP + 1.45, 3.0), rot_x(8)), pad_color, caps=True),
         part("RearFoot", [4.4, 1.8, 0.55], cf(0, FLOOR_TOP + 0.9, -2.6), STEEL, "Metal"),
         part("FrontFoot", [4.4, 0.55, 1.8], cf(0, FLOOR_TOP + 0.28, 3.0), STEEL, "Metal"),
         part("AngleBrace", [0.55, 3.5, 0.55], cf(0, FLOOR_TOP + 1.75, -1.8), accent, "Metal"),
@@ -1036,14 +1036,16 @@ def pec_deck(pad_color, accent):
     out.extend([
         part("Base", [8.0, 0.55, 8.5], cf(0, FLOOR_TOP + 0.28, -0.2), STEEL, "DiamondPlate"),
         part("SeatPost", [1.2, 2.2, 1.2], cf(0, FLOOR_TOP + 1.1, 1.8), STEEL, "Metal"),
-        part("Seat", [4.0, 0.6, 4.0], cf(0, FLOOR_TOP + 2.35, 1.8), pad_color, "Fabric"),
-        part("BackPad", [4.4, 6.0, 0.7], cf(0, FLOOR_TOP + 5.2, 3.4), pad_color, "Fabric"),
+        *padded_slab("Seat", [4.0, 0.6, 4.0], cf(0, FLOOR_TOP + 2.35, 1.8), pad_color, caps=True),
+        *padded_slab("BackPad", [4.4, 6.0, 0.7], cf(0, FLOOR_TOP + 5.2, 3.4), pad_color),
         part("TopBeam", [11.0, 0.7, 0.8], cf(0, FLOOR_TOP + 9.0, 1.2), STEEL, "Metal"),
     ])
     for side in (-1, 1):
         out.extend([
             part("WeightTower", [2.0, 8.5, 2.4],
                  cf(side * 4.6, FLOOR_TOP + 4.25, 1.2), STEEL_LIGHT, "Metal"),
+            *stack_shroud("Tower", (side * 4.6, FLOOR_TOP + 8.5, 1.2),
+                          2.3, 8.5, 2.4, accent),
             # Hung from the top beam and angled inward so the lower end arrives
             # exactly where the hand grips it. The old sign swung the arm the other
             # way, so its free end travelled outward and finished two studs wide of
@@ -1141,9 +1143,10 @@ def seated_row(pad_color, accent):
     out = [floor_mat(10, 13)]
     out.extend([
         part("Base", [4.5, 0.55, 10.0], cf(0, FLOOR_TOP + 0.28, 0), STEEL, "DiamondPlate"),
-        part("Seat", [4.2, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 2.7), pad_color, "Fabric"),
+        *padded_slab("Seat", [4.2, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 2.7), pad_color, caps=True),
         part("SeatPost", [1.0, 1.8, 1.0], cf(0, FLOOR_TOP + 0.9, 2.7), STEEL, "Metal"),
         part("WeightTower", [4.0, 7.5, 2.4], cf(0, FLOOR_TOP + 3.75, -4.4), STEEL_LIGHT, "Metal"),
+        *stack_shroud("Tower", (0, FLOOR_TOP + 7.5, -4.4), 4.3, 7.5, 2.4, accent),
         part("TowerStripe", [4.2, 0.45, 2.6], cf(0, FLOOR_TOP + 6.3, -4.4), accent, "Neon"),
     ])
     for side in (-1, 1):
@@ -1172,7 +1175,7 @@ def lat_pulldown(pad_color, accent):
     out = [floor_mat(12, 12)]
     out.extend([
         part("Base", [10.0, 0.6, 9.0], cf(0, FLOOR_TOP + 0.3, -0.2), STEEL, "DiamondPlate"),
-        part("Seat", [4.0, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 1.8), pad_color, "Fabric"),
+        *padded_slab("Seat", [4.0, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 1.8), pad_color, caps=True),
         part("SeatPost", [1.0, 1.8, 1.0], cf(0, FLOOR_TOP + 0.9, 1.8), STEEL, "Metal"),
         cylinder("ThighRoller", 5.0, 1.0, cf(0, FLOOR_TOP + 3.5, 0.2), RUBBER, "Pebble"),
         part("TopCrossbar", [10.5, 0.8, 0.8], cf(0, FLOOR_TOP + 11.0, -1.5), STEEL, "Metal"),
@@ -1180,6 +1183,8 @@ def lat_pulldown(pad_color, accent):
     for side in (-1, 1):
         out.append(part("WeightTower", [2.1, 10.5, 2.3],
                         cf(side * 4.4, FLOOR_TOP + 5.25, -1.5), STEEL_LIGHT, "Metal"))
+        out.extend(stack_shroud("Tower", (side * 4.4, FLOOR_TOP + 10.5, -1.5),
+                                2.4, 10.5, 2.3, accent))
     # The bar hangs off the crossbar on a cable. Without one it floats under the
     # frame attached to nothing, and at 8.0 long its ends were buried inside the two
     # weight towers, whose inner faces are 3.35 out.
@@ -1202,13 +1207,13 @@ def knee_raise(pad_color, accent):
     out.extend([
         part("Base", [8.0, 0.65, 6.0], cf(0, FLOOR_TOP + 0.33, -1.0), STEEL, "DiamondPlate"),
         part("BackFrame", [6.0, 9.0, 0.8], cf(0, FLOOR_TOP + 5.0, -3.0), STEEL, "Metal"),
-        part("BackPad", [4.4, 5.5, 0.65], cf(0, FLOOR_TOP + 6.0, -2.45), pad_color, "Fabric"),
+        *padded_slab("BackPad", [4.4, 5.5, 0.65], cf(0, FLOOR_TOP + 6.0, -2.45), pad_color),
         part("TopStripe", [6.2, 0.5, 1.0], cf(0, FLOOR_TOP + 9.7, -2.7), accent, "Neon"),
     ])
     for side in (-1, 1):
         out.extend([
-            part("ArmRest", [2.0, 0.65, 4.5],
-                 cf(side * 2.7, FLOOR_TOP + 6.0, -0.2), pad_color, "Fabric"),
+            *padded_slab("ArmRest", [2.0, 0.65, 4.5],
+                 cf(side * 2.7, FLOOR_TOP + 6.0, -0.2), pad_color),
             cylinder("Handle", 2.3, 0.42,
                      mul(cf(side * 2.7, FLOOR_TOP + 6.35, 1.2), rot_y(90)),
                      CHROME, "Metal"),
@@ -1361,15 +1366,16 @@ def leg_press(pad_color, accent):
     seat_frame = mul(cf(0, FLOOR_TOP + 2.1, 2.4), rot_x(28))
     out.extend([
         part("Base", [7.0, 0.6, 11.0], cf(0, FLOOR_TOP + 0.3, 0), STEEL, "DiamondPlate"),
-        part("Seat", [5.0, 0.7, 4.0], seat_frame, pad_color, "Fabric"),
-        part("BackPad", [5.0, 0.7, 6.0],
-             mul(cf(0, FLOOR_TOP + 3.8, 4.1), rot_x(58)), pad_color, "Fabric"),
+        *padded_slab("Seat", [5.0, 0.7, 4.0], seat_frame, pad_color, caps=True),
+        *padded_slab("BackPad", [5.0, 0.7, 6.0],
+             mul(cf(0, FLOOR_TOP + 3.8, 4.1), rot_x(58)), pad_color),
         part("FootPlate", [7.5, 0.65, 7.5],
              mul(cf(0, FLOOR_TOP + 5.0, -3.7), rot_x(-38)), STEEL_LIGHT, "DiamondPlate"),
         part("SledStripe", [7.7, 0.4, 1.0],
              mul(cf(0, FLOOR_TOP + 5.4, -3.2), rot_x(-38)), accent, "Neon"),
         part("WeightStack", [2.2, 7.0, 2.4],
              cf(-4.7, FLOOR_TOP + 3.5, 2.2), STEEL_LIGHT, "Metal"),
+        *stack_shroud("Stack", (-4.7, FLOOR_TOP + 7.0, 2.2), 2.5, 7.0, 2.4, accent),
     ])
     for side in (-1, 1):
         out.append(part("Rail", [0.55, 0.55, 10.0],
@@ -1509,6 +1515,8 @@ def cable_crossover(pad_color, accent):
         out.extend([
             part("Tower", [2.4, 10.5, 3.0], cf(side * 5.2, FLOOR_TOP + 5.25, -1.5),
                  STEEL_LIGHT, "Metal"),
+            *stack_shroud("Tower", (side * 5.2, FLOOR_TOP + 10.5, -1.5),
+                          2.7, 10.5, 3.0, accent),
             part("PulleyArm", [4.2, 0.65, 0.65], cf(side * 3.7, FLOOR_TOP + 9.8, -1.5),
                  STEEL, "Metal"),
             part("Cable", [0.1, 6.0, 0.1], cf(side * 2.0, FLOOR_TOP + 6.7, -1.5),
@@ -1558,7 +1566,7 @@ def decline_press(pad_color, accent):
     out = [floor_mat(11, 13)]
     pad = mul(cf(0, FLOOR_TOP + 2.1, 0), rot_x(18))
     out.extend([
-        part("Base", [3.2, 0.6, 8.2], pad, pad_color, "Fabric"),
+        *padded_slab("Base", [3.2, 0.6, 8.2], pad, pad_color, caps=True),
         part("Frame", [0.7, 1.0, 9.0], cf(0, FLOOR_TOP + 0.7, 0), STEEL, "DiamondPlate"),
         cylinder("AnkleRoller", 4.0, 1.1, cf(0, FLOOR_TOP + 3.7, 3.6), RUBBER, "Pebble"),
         part("Rack", [8.5, 6.0, 0.7], cf(0, FLOOR_TOP + 3.0, -4.1), STEEL, "Metal"),
@@ -1618,8 +1626,8 @@ def preacher_curl(pad_color, accent):
         # pad reached forward under the legs and, being 4 wide, hid them from any side
         # view; at 2.2 high it also sat a seated lifter's feet 0.9 studs off the floor.
         # Seat top lands at 2.78 so the pelvis rests on it with the soles on the mat.
-        part("Seat", [4.0, 0.65, 2.2], cf(0, FLOOR_TOP + 1.455, 3.4), pad_color, "Fabric"),
-        part("PreacherPad", [5.6, 0.8, 4.6], pad, pad_color, "Fabric"),
+        *padded_slab("Seat", [4.0, 0.65, 2.2], cf(0, FLOOR_TOP + 1.455, 3.4), pad_color, caps=True),
+        *padded_slab("PreacherPad", [5.6, 0.8, 4.6], pad, pad_color),
         part("PadPost", [0.8, 4.0, 0.8], cf(0, FLOOR_TOP + 2.0, -0.4), STEEL, "Metal"),
         part("Cradle", [6.0, 0.4, 1.0], cf(0, FLOOR_TOP + 2.1, -3.1), accent, "Metal"),
         group("Spot", [
@@ -1638,7 +1646,7 @@ def skull_crusher(pad_color, accent):
     """Flat triceps bench with a short EZ bar above the forehead."""
     out = [floor_mat(10, 12)]
     out.extend([
-        part("Base", [3.3, 0.65, 8.0], cf(0, FLOOR_TOP + 1.7, 0), pad_color, "Fabric"),
+        *padded_slab("Base", [3.3, 0.65, 8.0], cf(0, FLOOR_TOP + 1.7, 0), pad_color, caps=True),
         part("BenchFrame", [0.7, 1.2, 9.0], cf(0, FLOOR_TOP + 0.7, 0), STEEL, "DiamondPlate"),
         part("BarStand", [7.0, 4.8, 0.6], cf(0, FLOOR_TOP + 2.4, -4.0), STEEL, "Metal"),
         part("WarningStripe", [7.2, 0.4, 0.8], cf(0, FLOOR_TOP + 4.6, -4.0), accent, "Neon"),
@@ -1750,8 +1758,8 @@ def t_bar_row(pad_color, accent):
     out.extend([
         part("Base", [7.5, 0.65, 11.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
         part("TBarRail", [0.7, 0.7, 10.0], rail, CHROME, "Metal"),
-        part("ChestPad", [4.0, 0.8, 3.5], mul(cf(0, FLOOR_TOP + 4.0, 2.2), rot_x(-35)),
-             pad_color, "Fabric"),
+        *padded_slab("ChestPad", [4.0, 0.8, 3.5], mul(cf(0, FLOOR_TOP + 4.0, 2.2), rot_x(-35)),
+             pad_color),
         part("PlateStop", [5.5, 2.0, 1.0], cf(0, FLOOR_TOP + 1.4, -4.6), accent, "Metal"),
         group("Spot", [
             # PoseConfig already hinges the root 31 degrees. Tilting the anchor too
