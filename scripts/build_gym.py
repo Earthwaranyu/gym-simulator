@@ -4193,28 +4193,28 @@ def city_block_shell(rect, index, keep_out=()):
 CITY_CHARACTER = {
     "Park": {
         "skins": [BUILDING_SKINS[1], BUILDING_SKINS[2]],
-        "heights": {"tower": (40, 70), "midrise": (26, 46), "shophouse": (14, 24)},
-        "weights": (("shophouse", 5), ("midrise", 4), ("yard", 3), ("parking", 2), ("tower", 1)),
+        "heights": {"tower": (95, 155), "midrise": (48, 85), "shophouse": (16, 28)},
+        "weights": (("tower", 6), ("midrise", 4), ("shophouse", 2), ("yard", 1), ("parking", 1)),
     },
     "Beach": {
         "skins": [BUILDING_SKINS[2], BUILDING_SKINS[0]],
-        "heights": {"tower": (48, 84), "midrise": (28, 50), "shophouse": (14, 26)},
-        "weights": (("shophouse", 4), ("midrise", 5), ("yard", 2), ("parking", 2), ("tower", 2)),
+        "heights": {"tower": (115, 190), "midrise": (55, 95), "shophouse": (16, 28)},
+        "weights": (("tower", 7), ("midrise", 4), ("shophouse", 1), ("yard", 1), ("parking", 1)),
     },
     "Dock": {
         "skins": [BUILDING_SKINS[3], BUILDING_SKINS[0]],
-        "heights": {"tower": (44, 72), "midrise": (22, 40), "shophouse": (12, 22)},
-        "weights": (("shophouse", 3), ("midrise", 4), ("yard", 4), ("parking", 3), ("tower", 1)),
+        "heights": {"tower": (105, 170), "midrise": (48, 85), "shophouse": (14, 26)},
+        "weights": (("tower", 6), ("midrise", 4), ("shophouse", 1), ("yard", 2), ("parking", 2)),
     },
     "City": {
         "skins": [BUILDING_SKINS[0], BUILDING_SKINS[3]],
-        "heights": {"tower": (110, 210), "midrise": (48, 92), "shophouse": (18, 30)},
-        "weights": (("tower", 5), ("midrise", 5), ("shophouse", 2), ("yard", 1), ("parking", 1)),
+        "heights": {"tower": (180, 300), "midrise": (85, 150), "shophouse": (20, 34)},
+        "weights": (("tower", 9), ("midrise", 3), ("shophouse", 1), ("yard", 1), ("parking", 1)),
     },
     "Office": {
         "skins": [BUILDING_SKINS[3], BUILDING_SKINS[0]],
-        "heights": {"tower": (140, 250), "midrise": (60, 110), "shophouse": (20, 32)},
-        "weights": (("tower", 6), ("midrise", 4), ("shophouse", 1), ("yard", 1), ("parking", 1)),
+        "heights": {"tower": (230, 380), "midrise": (105, 185), "shophouse": (22, 36)},
+        "weights": (("tower", 10), ("midrise", 3), ("shophouse", 1), ("yard", 1), ("parking", 1)),
     },
 }
 
@@ -4246,7 +4246,7 @@ def weighted_kind(weights, rng):
     return weights[-1][0]
 
 
-def subdivide(x, z, width, depth, rng, min_side=150, depth_limit=3):
+def subdivide(x, z, width, depth, rng, min_side=250, depth_limit=3):
     """A block's interior cut into lots by recursive binary splitting.
 
     Always splits the longer axis, which is what keeps lots roughly square
@@ -4352,7 +4352,11 @@ def procedural_building(x, z, width, depth, height, skin, rng):
                     cf(x + w * 0.18, roof_y + 3, z - d * 0.16),
                     skin["trim"], skin["material"], CanCollide=False))
     if height > 60:
-        out.append(cylinder("RoofTank", 7, min(w, d) * 0.22,
+        # Absolute size, not a fraction of the footprint. Scaled, a tank on a
+        # 250-stud tower came out 54 studs across -- a flying saucer parked on the
+        # roof. Water tanks are the same size on every building; that is what makes
+        # them read as a tank and give the roof its scale.
+        out.append(cylinder("RoofTank", 7, min(13.0, min(w, d) * 0.22),
                             mul(cf(x - w * 0.2, roof_y + 5.5, z + d * 0.14), rot_z(90)),
                             [0.32, 0.28, 0.24], "Metal", CanCollide=False))
     for vent in (-1, 1):
@@ -4369,6 +4373,33 @@ def procedural_building(x, z, width, depth, height, skin, rng):
                     cf(x, ground_y + 8.2, z + depth / 2 + 1.2),
                     skin["glass"], "Fabric", CanCollide=False))
     return out
+
+
+# Nothing may grow into a platform that floats over the city. Storm's slab sits
+# at STORM_ALTITUDE with no ramp and no stairs, and flight being the only way up
+# is the whole reason it is up there -- a tower punched through it would be both
+# a hole in the geometry and a staircase to the top tier.
+FLIGHT_PLATFORM_CLEARANCE = 45
+
+
+def height_ceiling(x, z):
+    """The tallest a building at this point may be."""
+    ceiling = math.inf
+    for area in AREAS:
+        if not area["flight_only"]:
+            continue
+        # Generous horizontally: a tower merely *near* the underside still reads
+        # as scaffolding up to a place you are supposed to have to fly to.
+        if math.hypot(x - area["x"], z - area["z"]) < 1100:
+            ceiling = min(ceiling, area["altitude"] - FLIGHT_PLATFORM_CLEARANCE)
+    return ceiling
+
+
+# A tower is allowed to be slender, but not a needle: past roughly six times its
+# own footprint a building stops reading as a building and starts reading as a
+# post. Small lots therefore get shorter towers rather than being excluded from
+# having one.
+MAX_SLENDERNESS = 6.0
 
 
 def city_lot(lot, kind, character, rng):
@@ -4396,6 +4427,11 @@ def city_lot(lot, kind, character, rng):
 
     low, high = character["heights"][kind]
     height = rng.uniform(low, high)
+    # Rolled first and clamped after, so a lot that happens to sit under the sky
+    # platform or on a small footprint does not reshuffle every building after it.
+    height = min(height, min(width, depth) * MAX_SLENDERNESS, height_ceiling(x, z))
+    if height < 12:
+        return []
     skin = rng.choice(character["skins"])
     # Grouped into a Model rather than left as loose parts: it is what lets the
     # validator hold a single building to a part budget, and it gives streaming a
