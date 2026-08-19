@@ -100,12 +100,17 @@ MAX_INSTANCES = 28_000
 # nothing extra if the extra parts are somewhere else. This is the number that
 # matters, and it is why the global cap can be raised at all.
 #
-# Measured before any city fill: the worst 512-stud cell in the world held 428
-# parts, a campus core. The cap is set a little over twice that, which leaves room
-# for a campus plus the blocks that will surround it while still catching a
-# generator that runs away in one place.
+# Measured with the city built: the worst 512-stud cell holds 444 parts, a campus
+# core with its blocks around it. That is only sixteen more than the same cell
+# held before any of the fill went in, because block content is spread rather than
+# piled -- which is the whole reason a five-fold larger world costs a client
+# nothing extra.
+#
+# The cap sits about 25% above the real worst case. Loose enough that ordinary
+# additions do not trip it, tight enough that a generator piling geometry into one
+# place is caught while it is still one block rather than after it is everywhere.
 STREAM_CELL = 512
-MAX_PARTS_PER_STREAM_CELL = 900
+MAX_PARTS_PER_STREAM_CELL = 560
 
 # Per-machine detail budget. The floor is the real check: twelve machines once sat
 # under 25 parts and read as blockouts standing next to 50-part benches, and nothing
