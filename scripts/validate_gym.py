@@ -28,7 +28,8 @@ EQUIPMENT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "Equipm
 ZONE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "ZoneConfig.luau"
 POSE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "PoseConfig.luau"
 MOVEMENT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MovementConfig.luau"
-STRUCTURE_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure.model.json"
+CITY_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "City.model.json"
+DISTRICTS_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "Districts.model.json"
 MACHINES_PATH = ROOT / "src" / "Workspace" / "Gym" / "Machines.model.json"
 
 FAMILIES = ("Chest", "Arms", "Back", "Core", "Legs")
@@ -1796,7 +1797,14 @@ def run() -> int:
             "build_connected_world is not deterministic across two in-memory builds",
         )
 
-        validate_committed_payload(validator, first_structure, STRUCTURE_PATH, "Structure.model.json")
+        # Split the built world exactly the way the build does, using the build's own
+        # function: a validator that sorted the environments its own way would be
+        # checking a world that is never written.
+        first_city, first_districts = builder.split_structure(first_structure)
+        validate_committed_payload(validator, first_city, CITY_PATH, "Structure/City.model.json")
+        validate_committed_payload(
+            validator, first_districts, DISTRICTS_PATH, "Structure/Districts.model.json"
+        )
         validate_committed_payload(validator, first_machines, MACHINES_PATH, "Machines.model.json")
         validate_finite_geometry(validator, (first_structure, first_machines))
         family_by_equipment = validate_equipment_tables(validator, builder)

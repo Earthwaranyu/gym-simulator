@@ -160,7 +160,7 @@ def part(name, size, frame, color, material="Metal", class_name="Part", **props)
     properties = {
         "Anchored": True,
         "CFrame": serialise_cf(frame),
-        "Size": [round(v, 4) for v in size],
+        "Size": [round(v, 3) for v in size],
         "Color": color,
         "Material": material,
         "TopSurface": "Smooth",
@@ -3343,7 +3343,7 @@ def volume(zone_id, name, size, frame):
             "CanCollide": False,
             "Transparency": 1,
             "CastShadow": False,
-            "Size": [round(v, 4) for v in size],
+            "Size": [round(v, 3) for v in size],
             "CFrame": serialise_cf(frame),
             "Material": "SmoothPlastic",
         },
@@ -6477,11 +6477,49 @@ def build_connected_world():
     )
 
 
+# Which environments belong in which half of the split output. The city is the one
+# that grows without bound as blocks fill in; the districts are seven small, mostly
+# static models, so keeping them in their own file means editing a campus does not
+# rewrite the multi-megabyte city blob next to it.
+CITY_ENVIRONMENTS = ("WorldFoundation", "WorldWater", "WorldBoundary", "Environment_Mainland")
+
+
+def split_structure(payload):
+    """The world's environments, sorted into the two committed files.
+
+    Takes the payload `build_connected_world` returns rather than the raw list, so
+    that function keeps the one shape every validator check already walks. The
+    `CoastTrainingMainland` wrapper it carries existed only to group the
+    environments; the two files do that job now, so the tree ends up the same depth
+    it was.
+
+    Shared with the validator rather than reimplemented there: a validator that
+    sorted the environments its own way would be checking a world that is never
+    written.
+    """
+    environments = []
+    for wrapper in payload["children"]:
+        environments.extend(wrapper["children"])
+
+    city = [node for node in environments if node.get("name") in CITY_ENVIRONMENTS]
+    districts = [node for node in environments if node.get("name") not in CITY_ENVIRONMENTS]
+    missing = [name for name in CITY_ENVIRONMENTS if not any(n.get("name") == name for n in city)]
+    if missing:
+        raise ValueError(f"split_structure: no environment named {missing}")
+    return (
+        {"className": "Folder", "children": city},
+        {"className": "Folder", "children": districts},
+    )
+
+
 def write(name, payload):
     path = os.path.abspath(os.path.join(OUT_DIR, name))
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as handle:
-        json.dump(payload, handle, indent=2)
+        # Compact, not pretty-printed. At three megabytes and a million lines this
+        # file passed the point of human review long ago, and the indentation was
+        # costing roughly half the bytes of every commit that touches the world.
+        json.dump(payload, handle, separators=(",", ":"), sort_keys=False)
         handle.write("\n")
     print(f"wrote {os.path.relpath(path)} ({count_instances(payload)} instances)")
 
@@ -6496,8 +6534,11 @@ def count_instances(node):
 
 def main():
     structure, machines = build_connected_world()
+    city, districts = split_structure(structure)
     write("init.meta.json", {"className": "Model"})
-    write("Structure.model.json", structure)
+    write("Structure/init.meta.json", {"className": "Folder"})
+    write("Structure/City.model.json", city)
+    write("Structure/Districts.model.json", districts)
     write("Machines.model.json", machines)
 
 
