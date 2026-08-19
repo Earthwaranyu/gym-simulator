@@ -4446,6 +4446,98 @@ UPLAND_AVENUES = (350, 1800, 3300, 4900, 6600, 8400, 10100, 11900, 13600, 15100)
 
 
 # --------------------------------------------------------------------------
+# Rooftop access.
+#
+# A machine on a roof has to be reachable on foot. Flight exists, but gating a
+# training machine behind it would strand exactly the players who have not
+# trained Legs yet -- which is to say, the ones who most need a machine.
+# --------------------------------------------------------------------------
+
+# Ramps rather than steps. Nothing in this project sets StepHeight or
+# MaxSlopeAngle, so Roblox defaults apply: a humanoid walks any slope under 89
+# degrees, which makes a ramp walkable by construction. Treads have to be kept
+# individually under the ~2-stud auto-step or they silently become a wall, and
+# they cost five times the parts to say the same thing.
+FLIGHT_RISE = 11.0
+FLIGHT_RUN = 16.0
+STAIR_WIDTH = 8.0
+LANDING_SIZE = 8.0
+STAIR_THICKNESS = 0.6
+
+
+def ramp_between(name, start, end, width, color, material="Concrete", **props):
+    """A walkable slab spanning two points, given as the two *top-face* ends.
+
+    Taking the ends as inputs rather than deriving them from a centre and a pitch
+    is the whole point: a ramp built from an angle and a length has to have its
+    endpoints kept in agreement with the landings it serves by arithmetic done
+    somewhere else, and the failure mode is a gap you only find by walking into
+    it. Here the ends are given, so they cannot drift.
+    """
+    span = tuple(e - s for s, e in zip(start, end))
+    forward, length = _unit(span)
+    # Horizontal and perpendicular to the run. Any ramp with a pitch under 90
+    # degrees has a well-defined one.
+    right, _ = _unit(cross((0.0, 1.0, 0.0), forward))
+    up = cross(forward, right)
+
+    middle = tuple((s + e) / 2 for s, e in zip(start, end))
+    centre = tuple(m - u * STAIR_THICKNESS / 2 for m, u in zip(middle, up))
+    return part(name, [width, STAIR_THICKNESS, length],
+                axes(centre, right, up), color, material, **props)
+
+
+def roof_access_stair(x, z, roof_y, roof_depth, color, accent):
+    """A switchback fire escape from the pavement to a roof.
+
+    Landings sit at exact multiples of the rise and each ramp is handed the two
+    landings it joins, so every joint closes by construction. The rise is divided
+    to fit the building rather than fixed, so the top landing lands *on* the roof
+    instead of near it.
+    """
+    height = roof_y - FLOOR_TOP
+    flights = max(1, math.ceil(height / FLIGHT_RISE))
+    rise = height / flights
+    face_z = z + roof_depth / 2 + LANDING_SIZE / 2
+    left, right_x = x - FLIGHT_RUN / 2, x + FLIGHT_RUN / 2
+
+    def landing_x(index):
+        return left if index % 2 == 0 else right_x
+
+    out = []
+    for index in range(flights + 1):
+        top = FLOOR_TOP + rise * index
+        out.append(part("StairLanding",
+                        [LANDING_SIZE, STAIR_THICKNESS, LANDING_SIZE],
+                        cf(landing_x(index), top - STAIR_THICKNESS / 2, face_z),
+                        color, "Concrete"))
+        if index > 0:
+            out.append(ramp_between(
+                "StairFlight",
+                (landing_x(index - 1), FLOOR_TOP + rise * (index - 1), face_z),
+                (landing_x(index), top, face_z),
+                STAIR_WIDTH, color))
+        # A rail on the outer edge, which is also what makes the run read as a
+        # stair from the street rather than as a stack of slabs.
+        out.append(tube("StairRail",
+                        (landing_x(index), top + 0.6, face_z + LANDING_SIZE / 2),
+                        (landing_x(index), top + 3.4, face_z + LANDING_SIZE / 2),
+                        0.3, accent, CanCollide=False))
+
+    # The top landing reaches back onto the roof deck so there is no lip to clear.
+    out.append(part("StairTopLanding",
+                    [LANDING_SIZE, STAIR_THICKNESS, LANDING_SIZE * 1.6],
+                    cf(landing_x(flights), roof_y - STAIR_THICKNESS / 2,
+                       face_z - LANDING_SIZE * 0.8),
+                    color, "Concrete"))
+    # Ground pad, so the bottom of the run meets the pavement squarely.
+    out.append(part("StairFoot", [LANDING_SIZE + 4, 0.3, LANDING_SIZE + 4],
+                    cf(landing_x(0), FLOOR_TOP + 0.15, face_z),
+                    color, "Concrete", CanCollide=False, CastShadow=False))
+    return out
+
+
+# --------------------------------------------------------------------------
 # Scattered training sites.
 #
 # The gym used to be seven campuses of five machines: a 16,000 x 9,000 stud
