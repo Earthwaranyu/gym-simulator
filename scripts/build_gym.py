@@ -4470,6 +4470,65 @@ def parking_lot(x, z, width, depth, rng):
     return out
 
 
+def district_approach(area):
+    """The paved ring a campus stands in, in world space.
+
+    Every campus sits inside a 300-380 stud keep-out that strips blocks away so
+    the gym stays visible and its entrances stay clear. That radius is right, but
+    it was left as bare ground, so each destination stood in a bald circle -- the
+    one place in the city with neither buildings nor anything else.
+
+    This keeps the clearance and fills it: paving out to the ring, an approach
+    axis pointing back at the street, planters marking the edge, and lamps. The
+    campus still reads as arriving somewhere rather than as a clearing.
+    """
+    radius = 380 if area["venue_type"] == "Office" else 300
+    x, z = area["x"], area["z"]
+    rng = random.Random(f"city-v3:approach:{area['id']}")
+    out = []
+
+    # Paving, as a ring of tiles rather than one disc: a single 760-stud part
+    # would z-fight the campus floor it surrounds and swamp the block beside it.
+    # Heights are picked so no surface here shares a top face with the campus
+    # floor, its running lane or a muscle court edge: paving tops out at +0.15,
+    # the axis at +0.36.
+    out.append(disc("ApproachPaving", 0.24, radius * 2, FLOOR_TOP + 0.03,
+                    [0.34, 0.34, 0.36], "Concrete",
+                    CanCollide=False, CastShadow=False))
+
+    # No map footprint. The campus already puts itself on the minimap, and a
+    # second feature the size of the whole approach would only smear over it --
+    # its square corners also run off the world foundation at the edge campuses.
+
+    # An axis from the street to the front of the campus, so the approach has a
+    # direction rather than being a uniform apron.
+    out.append(part("ApproachAxis", [46, 0.20, radius], cf(0, FLOOR_TOP + 0.26, radius / 2),
+                    [0.28, 0.28, 0.30], "Concrete", CanCollide=False, CastShadow=False))
+
+    # The edge: planters and lamps around the ring, and two banner pylons where
+    # the axis meets it.
+    for step in range(12):
+        angle = math.radians(step * 30 + 15)
+        px, pz = math.sin(angle) * (radius - 26), math.cos(angle) * (radius - 26)
+        if step % 3 == 0:
+            out.extend(street_light(px, pz, math.degrees(angle) + 180))
+        else:
+            out.append(part("Planter", [11, 2.6, 11], cf(px, FLOOR_TOP + 1.3, pz),
+                            [0.30, 0.29, 0.27], "Concrete", CanCollide=False))
+            out.append(part("PlanterShrub", [8, 3.4, 8], cf(px, FLOOR_TOP + 3.6, pz),
+                            [0.20, 0.34, 0.19], "Grass", CanCollide=False))
+    for side in (-1, 1):
+        out.append(part("BannerPylon", [3.2, 26, 3.2],
+                        cf(side * 30, FLOOR_TOP + 13, radius - 40),
+                        [0.20, 0.20, 0.22], "Metal"))
+        out.append(part("Banner", [1.0, 16, 8],
+                        cf(side * 30, FLOOR_TOP + 17, radius - 36),
+                        rng.choice([[0.72, 0.24, 0.22], [0.22, 0.44, 0.72]]),
+                        "Fabric", CanCollide=False))
+    return [place(mul(cf(x, area["altitude"], z), rot_y(area.get("yaw", 0))), piece)
+            for piece in out]
+
+
 def city_grid(locations):
     """A dense but readable street hierarchy with varied, human-scale blocks."""
     out = []
@@ -4503,6 +4562,11 @@ def city_grid(locations):
 
     # Street trees reinforce the main boulevard and make the park district visible
     # from several blocks away without adding random ground clutter.
+    # Each campus keeps its clearance, and now stands in something.
+    for area in AREAS:
+        if not area["flight_only"]:
+            out.extend(district_approach(area))
+
     rng = random.Random("coastal-city-v2:boulevard-trees")
     for x in range(-150, 15450, 210):
         if all(math.hypot(x - area["x"], -520 - area["z"]) > 300 for area in AREAS):
