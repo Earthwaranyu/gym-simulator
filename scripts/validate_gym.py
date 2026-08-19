@@ -1525,6 +1525,61 @@ def validate_building_budget(validator: Validator, payloads: Iterable[Any]) -> N
     )
 
 
+# Scattered sites are landmarks, not bays in a shed. The old 48-stud floor was a
+# cluster-internal figure -- the gap between two machines on one campus -- and it
+# says nothing useful once each machine is its own destination.
+MIN_SITE_SEPARATION = 700
+
+
+def validate_scatter_separation(validator: Validator, builder: ModuleType) -> None:
+    """The scattered sites are the right number, far enough apart, and off the road.
+
+    Checked against the selector directly rather than against the built world, so
+    the placement is provably sound before any geometry is moved onto it.
+    """
+    try:
+        sites = builder.scatter_sites()
+    except Exception as error:  # a selector that cannot run is a failure, not a crash
+        validator.fail(f"scatter_sites() raised {type(error).__name__}: {error}")
+        return
+
+    validator.check(
+        len(sites) == EXPECTED_STATIONS,
+        f"scatter_sites returned {len(sites)} sites, expected {EXPECTED_STATIONS}",
+    )
+
+    worst, worst_pair = math.inf, None
+    for index, a in enumerate(sites):
+        for b in sites[index + 1:]:
+            gap = math.hypot(a["x"] - b["x"], a["z"] - b["z"])
+            if gap < worst:
+                worst, worst_pair = gap, (a, b)
+    if worst_pair is not None:
+        a, b = worst_pair
+        validator.check(
+            worst >= MIN_SITE_SEPARATION,
+            f"two training sites are {worst:.0f} studs apart, under the "
+            f"{MIN_SITE_SEPARATION} floor: ({a['x']:.0f}, {a['z']:.0f}) and "
+            f"({b['x']:.0f}, {b['z']:.0f})",
+        )
+
+    on_road = [s for s in sites if not builder._off_road(s["x"], s["z"])]
+    validator.check(
+        not on_road,
+        "training sites standing in the roadway: "
+        + ", ".join(f"({s['x']:.0f}, {s['z']:.0f})" for s in on_road[:5]),
+    )
+
+    roofs = [s for s in sites if s["kind"] == "roof"]
+    too_high = [s for s in roofs
+                if s["top"] - builder.FLOOR_TOP > builder.MAX_ROOF_SITE_HEIGHT]
+    validator.check(
+        not too_high,
+        f"rooftop sites above the {builder.MAX_ROOF_SITE_HEIGHT}-stud climb limit: "
+        + ", ".join(f"({s['x']:.0f}, {s['z']:.0f}) at {s['top']:.0f}" for s in too_high[:5]),
+    )
+
+
 def validate_streaming_density(validator: Validator, payloads: Iterable[Any]) -> None:
     """No single streaming bubble may carry too much.
 
@@ -1935,6 +1990,7 @@ def run() -> int:
         validate_machine_detail(validator, first_machines)
         validate_streaming_density(validator, (first_structure, first_machines))
         validate_building_budget(validator, (first_structure,))
+        validate_scatter_separation(validator, builder)
         instance_count, base_part_count = validate_instance_budgets(
             validator,
             (first_structure, first_machines),

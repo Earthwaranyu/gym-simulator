@@ -3935,7 +3935,7 @@ def block_seed(index):
     return random.Random(f"city-v3:block:{index}")
 
 
-def city_block_shell(rect, index, keep_out=()):
+def city_block_shell(rect, index, keep_out=(), catalogue=None):
     """The ground a block stands on: pavement, kerb, service alley, map footprint.
 
     Buildings arrive in a later pass; this is deliberately separable so the
@@ -4003,7 +4003,7 @@ def city_block_shell(rect, index, keep_out=()):
             # most-walked ground in the game. Drawing the roll either way keeps
             # the rest of the block identical whether a lot is dropped or not.
             if cleared(lot[0], lot[1], math.hypot(lot[2], lot[3]) / 2):
-                out.extend(city_lot(lot, kind, character, rng))
+                out.extend(city_lot(lot, kind, character, rng, catalogue))
     return out
 
 
@@ -4195,7 +4195,12 @@ def procedural_building(x, z, width, depth, height, skin, rng):
     out.append(part("Awning", [width - 10, 0.5, 3.4],
                     cf(x, ground_y + 8.2, z + depth / 2 + 1.2),
                     skin["glass"], "Fabric", CanCollide=False))
-    return out
+
+    # The roof is reported alongside the geometry rather than recomputed later.
+    # roof_y, w and d are already known here and nowhere else; a second function
+    # deriving them from the finished parts would be a copy of this arithmetic
+    # that could quietly drift out of step with it.
+    return out, {"x": x, "z": z, "top": roof_y, "width": w + 3, "depth": d + 3}
 
 
 # Nothing may grow into a platform that floats over the city. Storm's slab sits
@@ -4225,8 +4230,13 @@ def height_ceiling(x, z):
 MAX_SLENDERNESS = 6.0
 
 
-def city_lot(lot, kind, character, rng):
-    """One subdivided lot, built according to what it was zoned."""
+def city_lot(lot, kind, character, rng, catalogue=None):
+    """One subdivided lot, built according to what it was zoned.
+
+    `catalogue` collects the open ground and the rooftops this lot produces, so a
+    later pass can put a training site on them. Recording only -- nothing here
+    reads it, and passing None builds exactly the same geometry.
+    """
     x, z, width, depth = lot
     # Inset off the lot boundary so neighbours do not share walls and the alley
     # and pavement stay walkable between them.
@@ -4235,6 +4245,8 @@ def city_lot(lot, kind, character, rng):
         return []
 
     if kind == "parking":
+        if catalogue is not None:
+            catalogue["ground"].append({"x": x, "z": z, "width": width, "depth": depth})
         return parking_lot(x, z, width, depth, rng)
 
     if kind == "yard":
@@ -4246,6 +4258,8 @@ def city_lot(lot, kind, character, rng):
             out.append(part("YardFence", [width, 3.2, 0.6],
                             cf(x, FLOOR_TOP + 1.6, z + corner * depth / 2),
                             [0.26, 0.26, 0.28], "Metal", CanCollide=False))
+        if catalogue is not None:
+            catalogue["ground"].append({"x": x, "z": z, "width": width, "depth": depth})
         return out
 
     low, high = character["heights"][kind]
@@ -4259,7 +4273,10 @@ def city_lot(lot, kind, character, rng):
     # Grouped into a Model rather than left as loose parts: it is what lets the
     # validator hold a single building to a part budget, and it gives streaming a
     # unit to load a building as, instead of forty unrelated slabs.
-    return [group("Building", procedural_building(x, z, width, depth, height, skin, rng))]
+    parts, roof = procedural_building(x, z, width, depth, height, skin, rng)
+    if catalogue is not None:
+        catalogue["roofs"].append(roof)
+    return [group("Building", parts)]
 
 
 # How far apart kerbside furniture stations sit. Fixed stations with a random
@@ -4412,11 +4429,151 @@ def district_approach(area):
             for piece in out]
 
 
-def city_grid(locations):
-    """A dense but readable street hierarchy with varied, human-scale blocks."""
+# Every buildable surface the last city build produced: open ground worth
+# standing a machine on, and rooftops wide and low enough to carry one.
+#
+# Rebuilt from scratch on every call to city_grid rather than memoised. The
+# validator builds the whole world twice in one process to prove the output is
+# deterministic, and `place()` rewrites node CFrames in place -- so a cache would
+# hand the second build already-transformed geometry and make the determinism
+# check compare a world against itself.
+CITY_CATALOGUE = {"ground": [], "roofs": []}
+
+# The street grid, hoisted out of city_grid so site selection can keep machines
+# off the roads without a second copy of these numbers drifting from the first.
+CROSSTOWN_ROADS = (-650, -1850, -3150, -4550, -6150, -7850)
+UPLAND_AVENUES = (350, 1800, 3300, 4900, 6600, 8400, 10100, 11900, 13600, 15100)
+
+
+# --------------------------------------------------------------------------
+# Scattered training sites.
+#
+# The gym used to be seven campuses of five machines: a 16,000 x 9,000 stud
+# world with all of its gameplay inside about half a percent of its area. Every
+# machine is now its own destination somewhere in the city.
+#
+# Sites are *chosen from* the city rather than authored beside it, which is why
+# city_grid runs first and records what it built. A machine therefore always
+# stands on ground the city generator actually made -- a yard, a parking lot, a
+# rooftop -- instead of hovering wherever a hand-written coordinate happened to
+# land.
+# --------------------------------------------------------------------------
+
+# A court is 44 x 42. Anything hosting one needs room for it plus a margin.
+SITE_CLEAR_WIDTH = 50
+SITE_CLEAR_DEPTH = 48
+
+# Roofs above this are not worth reaching: the ramp to a 376-stud roof costs more
+# parts than the site it serves, and a fire escape taller than its own building
+# stops reading as a fire escape.
+MAX_ROOF_SITE_HEIGHT = 80
+
+# Machines must not sit in the roadway, and must leave the spawn plaza alone.
+ROAD_SITE_CLEARANCE = 70
+HUB_SITE_CLEARANCE = 460
+
+# Five muscles across seven tiers: one site per machine.
+SCATTERED_SITE_COUNT = len(FAMILY_ORDER) * len(STAT_VARIANTS["Chest"])
+
+# How many of those stand on rooftops. The rest are street and park level.
+ROOF_SITE_QUOTA = 12
+
+
+def _off_road(x, z):
+    """Whether a point clears every road centreline."""
+    if any(abs(z - centre) < CROSSTOWN_HALF + ROAD_SITE_CLEARANCE
+           for centre in CROSSTOWN_ROADS):
+        return False
+    if any(abs(x - centre) < AVENUE_HALF + ROAD_SITE_CLEARANCE
+           for centre in UPLAND_AVENUES):
+        return False
+    return True
+
+
+def site_candidates():
+    """Every place in the built city that could carry a training court."""
+    catalogue = CITY_CATALOGUE
     out = []
-    crosstown_roads = (-650, -1850, -3150, -4550, -6150, -7850)
-    upland_avenues = (350, 1800, 3300, 4900, 6600, 8400, 10100, 11900, 13600, 15100)
+
+    for lot in catalogue["ground"]:
+        if lot["width"] < SITE_CLEAR_WIDTH or lot["depth"] < SITE_CLEAR_DEPTH:
+            continue
+        out.append({"kind": "ground", "x": lot["x"], "z": lot["z"], "top": FLOOR_TOP})
+
+    for roof in catalogue["roofs"]:
+        if roof["width"] < SITE_CLEAR_WIDTH or roof["depth"] < SITE_CLEAR_DEPTH:
+            continue
+        if roof["top"] - FLOOR_TOP > MAX_ROOF_SITE_HEIGHT:
+            continue
+        out.append({"kind": "roof", "x": roof["x"], "z": roof["z"], "top": roof["top"]})
+
+    kept = [
+        site for site in out
+        if _off_road(site["x"], site["z"])
+        and math.hypot(site["x"], site["z"] - 150) > HUB_SITE_CLEARANCE
+    ]
+    # Sorted so selection below is reproducible regardless of the order the city
+    # generator happened to emit blocks in.
+    kept.sort(key=lambda site: (round(site["x"], 3), round(site["z"], 3), site["kind"]))
+    return kept
+
+
+def _spread_pick(candidates, count, chosen=()):
+    """Farthest-point selection: repeatedly take whatever is furthest from the
+    set already taken.
+
+    Deliberately not random. A seeded shuffle gives clumps and voids at these
+    counts and needs tuning to look even; this is the standard greedy
+    maximin construction, is within a factor of two of the optimal spread, and
+    -- being a pure function of a sorted list -- is reproducible with no seed at
+    all.
+    """
+    picked = list(chosen)
+    pool = list(candidates)
+    if not picked and pool:
+        # Start from the candidate nearest the spawn plaza, so the first site is
+        # somewhere a new player will actually walk past.
+        first = min(pool, key=lambda s: math.hypot(s["x"], s["z"] - 150))
+        picked.append(first)
+        pool.remove(first)
+
+    while len(picked) < count and pool:
+        best, best_distance = None, -1.0
+        for site in pool:
+            nearest = min(math.hypot(site["x"] - p["x"], site["z"] - p["z"])
+                          for p in picked)
+            if nearest > best_distance:
+                best, best_distance = site, nearest
+        picked.append(best)
+        pool.remove(best)
+    return picked
+
+
+def scatter_sites():
+    """The 35 places the machines stand, spread across the whole city."""
+    candidates = site_candidates()
+    roofs = [site for site in candidates if site["kind"] == "roof"]
+    ground = [site for site in candidates if site["kind"] == "ground"]
+
+    # Roofs first and ground second against one shared set, so the two pools
+    # spread against each other rather than each spreading only against itself.
+    picked = _spread_pick(roofs, min(ROOF_SITE_QUOTA, len(roofs)))
+    picked = _spread_pick(ground, SCATTERED_SITE_COUNT, picked)
+    if len(picked) < SCATTERED_SITE_COUNT:
+        # Falling back to roofs rather than failing: a short ground pool is a
+        # tuning problem, and a world that refuses to build is a worse way to
+        # find out about it than a validator that names the shortfall.
+        picked = _spread_pick(candidates, SCATTERED_SITE_COUNT, picked)
+    return picked
+
+
+def city_grid(locations=None):
+    """A dense but readable street hierarchy with varied, human-scale blocks."""
+    global CITY_CATALOGUE
+    catalogue = {"ground": [], "roofs": []}
+    CITY_CATALOGUE = catalogue
+    out = []
+    crosstown_roads, upland_avenues = CROSSTOWN_ROADS, UPLAND_AVENUES
     for z in crosstown_roads:
         out.extend(city_road("CrosstownRoad", 15400, 58, 7600, z))
     for x in upland_avenues:
@@ -4441,7 +4598,7 @@ def city_grid(locations):
         # sensible answer.
         if any(math.hypot(x - kx, z - kz) < radius for kx, kz, radius in keep_out):
             continue
-        out.extend(city_block_shell(rect, index, keep_out))
+        out.extend(city_block_shell(rect, index, keep_out, catalogue))
 
     # Street trees reinforce the main boulevard and make the park district visible
     # from several blocks away without adding random ground clutter.
