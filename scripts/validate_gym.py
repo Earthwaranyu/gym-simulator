@@ -89,10 +89,16 @@ MAX_MAP_FEATURES = 600
 # Global ceilings. These are authoring budgets, not engine limits: with
 # StreamingEnabled only a radius around the player is ever resident, so what a
 # client pays is MAX_PARTS_PER_STREAM_CELL below, and these exist to stop the
-# generator producing a world nobody meant to make. Raised from 7,600/9,000 to
-# fill sixteen thousand studs of city that was previously bare ground.
-MAX_BASE_PARTS = 25_000
-MAX_INSTANCES = 28_000
+# generator producing a world nobody meant to make.
+#
+# 28,000 rather than the 25,000 first planned. That estimate was made before the
+# per-lot keep-out fix, which restored roughly a dozen full blocks that a
+# too-coarse test had been deleting whole. Filling the city honestly costs about
+# 27,300 parts, and hitting a rounder number would have meant thinning the street
+# life this pass exists to add. The number that governs client cost is the cell
+# cap below, and that is unchanged at 444 against a 560 ceiling.
+MAX_BASE_PARTS = 28_000
+MAX_INSTANCES = 31_000
 
 # What a client actually pays for. StreamingEnabled keeps only a radius around the
 # player resident (StreamingTargetRadius 512 in default.project.json), so the global

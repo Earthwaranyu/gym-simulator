@@ -4112,7 +4112,7 @@ def block_seed(index):
     return random.Random(f"city-v3:block:{index}")
 
 
-def city_block_shell(rect, index):
+def city_block_shell(rect, index, keep_out=()):
     """The ground a block stands on: pavement, kerb, service alley, map footprint.
 
     Buildings arrive in a later pass; this is deliberately separable so the
@@ -4123,6 +4123,11 @@ def city_block_shell(rect, index):
     rng = block_seed(index)
     inner_w, inner_d = width - KERB_SETBACK * 2, depth - KERB_SETBACK * 2
     out = []
+
+    def cleared(px, pz, reach):
+        """Whether a piece stands clear of every campus keep-out."""
+        return all(math.hypot(px - kx, pz - kz) >= radius + reach
+                   for kx, kz, radius in keep_out)
 
     # The kerb is wider than the pavement and deliberately non-colliding: left
     # solid it is a few hundred ankle-height ledges across the city for a
@@ -4153,10 +4158,29 @@ def city_block_shell(rect, index):
     out.extend(street_furniture(x, z, inner_w, inner_d, index,
                                 character["skins"][0]["trim"], SIDEWALK))
 
+    # A yard costs a whole band when the band is shallow. The coastal strip is
+    # barely 440 studs deep and is also the most-walked ground in the game -- the
+    # promenade every player follows from one tier to the next -- so thin blocks
+    # are built out rather than left to the usual mix, which was leaving stretches
+    # of the seafront with a lamp post and nothing behind it.
+    weights = character["weights"]
+    if min(inner_w, inner_d) < 600:
+        weights = tuple((kind, weight) for kind, weight in weights
+                        if kind not in ("yard", "parking"))
+
     build_w, build_d = inner_w - 30, inner_d - 30
     if build_w > 90 and build_d > 90:
         for lot in subdivide(x, z, build_w, build_d, rng):
-            out.extend(city_lot(lot, weighted_kind(character["weights"], rng), character, rng))
+            kind = weighted_kind(weights, rng)
+            # Tested per lot, not per block. A block is up to 1,650 studs across,
+            # so measuring its own corner reach against a 300-stud campus radius
+            # threw away the whole block -- three quarters of a million square
+            # studs of city to protect one circle. That put the emptiness this
+            # pass exists to remove straight back on the seafront, which is the
+            # most-walked ground in the game. Drawing the roll either way keeps
+            # the rest of the block identical whether a lot is dropped or not.
+            if cleared(lot[0], lot[1], math.hypot(lot[2], lot[3]) / 2):
+                out.extend(city_lot(lot, kind, character, rng))
     return out
 
 
@@ -4383,7 +4407,7 @@ def city_lot(lot, kind, character, rng):
 # choice at each, rather than random positions: scattering by position clumps and
 # leaves gaps, and a street reads as a street precisely because its lamps and
 # benches are evenly spaced.
-FURNITURE_PITCH = 215
+FURNITURE_PITCH = 260
 
 
 def _scenery(pieces, x, z):
@@ -4552,13 +4576,13 @@ def city_grid(locations):
     ]
     for index, rect in enumerate(city_block_rects(crosstown_roads, upland_avenues)):
         x, z, width, depth = rect
-        # Measured to the block's nearest corner, not its centre: a 1,400-stud
-        # block whose centre clears a 300-stud keep-out can still have a corner
-        # standing in the middle of a campus approach.
-        reach = math.hypot(width / 2, depth / 2)
-        if any(math.hypot(x - kx, z - kz) < radius + reach for kx, kz, radius in keep_out):
+        # Only a block whose *centre* is inside a keep-out is dropped outright;
+        # everything else keeps its pavement and hands the clearance decision to
+        # the individual lots, which are small enough for the question to have a
+        # sensible answer.
+        if any(math.hypot(x - kx, z - kz) < radius for kx, kz, radius in keep_out):
             continue
-        out.extend(city_block_shell(rect, index))
+        out.extend(city_block_shell(rect, index, keep_out))
 
     # Street trees reinforce the main boulevard and make the park district visible
     # from several blocks away without adding random ground clutter.
