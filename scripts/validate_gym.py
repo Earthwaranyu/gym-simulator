@@ -977,12 +977,38 @@ def validate_no_coplanar_floors(validator: Validator, payloads: Iterable[Any]) -
     for entry in surfaces:
         by_height.setdefault(round(entry[1][3] * 100), []).append(entry)
 
+    slack = 4.0
+
+    def x_span(footprint: Any) -> tuple[float, float]:
+        """The part's extent along world X, widened by the overlap slack."""
+        centre_x, _, edges, _ = footprint
+        half = sum(abs(edge[0]) for edge in edges) + slack
+        return centre_x - half, centre_x + half
+
     clashes: set[str] = set()
     for group in by_height.values():
-        for index, (name_a, a) in enumerate(group):
-            for name_b, b in group[index + 1 :]:
-                if footprints_overlap(a, b, slack=4.0):
+        # A sweep along X instead of comparing every pair in the bucket.
+        #
+        # Height alone stopped being a useful filter once the city filled in: every
+        # walkable surface is *meant* to top out at the same Y -- that is what the
+        # docstring above is about -- so one bucket holds most of the world's flat
+        # parts and the pair count grows as its square.
+        #
+        # Sorting by the left edge and retiring entries whose right edge is behind
+        # the sweep is exact rather than approximate: two rectangles that do not
+        # overlap along X cannot overlap at all, so no pair this skips could have
+        # been a clash. Slack is folded into the span so a borderline pair is still
+        # compared. Large parts (a 1,750-stud road tile) stay in the active set for
+        # as long as they are genuinely wide, which is the honest cost.
+        ordered = sorted(group, key=lambda entry: x_span(entry[1])[0])
+        active: list[tuple[str, Any, float]] = []
+        for name_b, b in ordered:
+            b_min, b_max = x_span(b)
+            active = [entry for entry in active if entry[2] >= b_min]
+            for name_a, a, _ in active:
+                if footprints_overlap(a, b, slack=slack):
                     clashes.add(f"{name_a} and {name_b} share a top face at y={a[3]:.3f}")
+            active.append((name_b, b, b_max))
 
     validator.check(
         not clashes,
