@@ -48,7 +48,35 @@ PosePlayback.DEFAULT_TEMPO = { Lift = 0.40, Squeeze = 0.10, Lower = 0.42, Settle
 	instances per joint — RightShoulderAttachment, RightShoulderBallSocket — and a
 	plain name search can land on one of those instead.
 ]]
-function PosePlayback.FindJoint(character: Model, rigType: Enum.HumanoidRigType, jointName: string): Joint?
+export type JointIndex = { [string]: Joint }
+
+--[[
+	Every joint on a rig, by name, in one pass.
+
+	FindJoint walks the whole character for each joint it is asked for, so binding a
+	twelve-joint pose walked the rig twelve times. Callers binding a whole pose at
+	once should build this and hand it over instead; the walk is identical, it just
+	happens once.
+]]
+function PosePlayback.BuildJointIndex(character: Model): JointIndex
+	local index: JointIndex = {}
+	for _, descendant in character:GetDescendants() do
+		if descendant:IsA("Motor6D") or descendant:IsA("AnimationConstraint") then
+			-- First wins, matching the search order FindJoint has always used.
+			if index[descendant.Name] == nil then
+				index[descendant.Name] = (descendant :: any) :: Joint
+			end
+		end
+	end
+	return index
+end
+
+function PosePlayback.FindJoint(
+	character: Model,
+	rigType: Enum.HumanoidRigType,
+	jointName: string,
+	index: JointIndex?
+): Joint?
 	local name = jointName
 	if rigType == Enum.HumanoidRigType.R6 then
 		local alias = PoseConfig.R6Joints[jointName]
@@ -56,6 +84,10 @@ function PosePlayback.FindJoint(character: Model, rigType: Enum.HumanoidRigType,
 			return nil
 		end
 		name = alias
+	end
+
+	if index ~= nil then
+		return index[name]
 	end
 
 	for _, descendant in character:GetDescendants() do
