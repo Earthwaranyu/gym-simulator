@@ -3715,10 +3715,40 @@ def connected_locations():
             "neighborhood": character_name_at(site["x"], site["z"]),
             "requires_flight": False,
             "altitude": 0,
-            "location_name": f"{SITE_NAMES[family]} — {zone}",
+            "location_name": street_address(site["x"], site["z"]),
             "location_tagline": SITE_TAGLINES[site["kind"]],
         })
     return out
+
+
+def _ordinal(number):
+    if 10 <= number % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(number % 10, "th")
+    return f"{number}{suffix}"
+
+
+def street_address(x, z):
+    """Where a machine is, as the crossing it stands nearest.
+
+    The map's job is to get a player to the machine, and the one thing it can say
+    that actually helps is an address on the grid they are looking at. This used
+    to name the muscle instead -- all seven Chest machines read "Press Point" --
+    which told them what they already knew from the pin colour and nothing about
+    where to walk.
+
+    Avenues are numbered west to east and streets from the coast inland, matching
+    the order the roads are laid, so the numbers agree with what the map draws.
+    """
+    if math.hypot(x, z) <= 320:
+        return "Spawn Plaza"
+
+    avenue = min(range(len(UPLAND_AVENUES)),
+                 key=lambda index: abs(x - UPLAND_AVENUES[index]))
+    street = min(range(len(CROSSTOWN_ROADS)),
+                 key=lambda index: abs(z - CROSSTOWN_ROADS[index]))
+    return f"{_ordinal(avenue + 1)} Avenue & {_ordinal(street + 1)} Street"
 
 
 SITE_NAMES = {
