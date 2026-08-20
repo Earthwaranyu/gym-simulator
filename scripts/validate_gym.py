@@ -76,10 +76,13 @@ POSE_JOINTS = {
 # animates backwards.
 POSE_ANGLE_CEILING = 150.0
 # Minimap footprints. Every feature crosses the wire in one GetDestinations call,
-# so this is a payload budget as much as a rendering one. The rule that keeps it
-# affordable while the city fills: one footprint per city block, never per
-# building.
-MAX_MAP_FEATURES = 600
+# so this is a payload budget as much as a rendering one.
+#
+# It used to be one footprint per city block and never per building, which kept
+# the count down but meant the map drew solid rectangles where the city has
+# masses, yards and gaps. Buildings are drawn now -- the map should match the
+# place you walk through -- which is what took this from 600 to 900.
+MAX_MAP_FEATURES = 900
 # Raised from 7,000 when the six city districts gained enclosed gym halls. The halls
 # cost about 31 BaseParts each and the world now sits near 6,950. The number that
 # matters to a client is per-area, not global: StreamingEnabled brings in one district

@@ -4828,7 +4828,15 @@ def city_lot(lot, kind, character, rng, catalogue=None):
                                       prefer_flat)
     if catalogue is not None:
         catalogue["roofs"].append(roof)
-    return [group("Building", parts)]
+    # The building's own footprint on the map. Blocks were the finest thing the
+    # map drew, so it showed solid rectangles where the city has masses, yards and
+    # gaps -- it did not match the place you walk through. Tinted with the wall
+    # colour, so the material variety reads on the map too.
+    return [
+        group("Building", parts),
+        map_footprint("BuildingMap", width, depth,
+                      cf(x, FLOOR_TOP + 0.14, z), skin["wall"], "Building"),
+    ]
 
 
 # How far apart kerbside furniture stations sit. Fixed stations with a random
