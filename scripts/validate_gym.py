@@ -1715,6 +1715,85 @@ def validate_garage_ring(validator: Validator, builder: ModuleType) -> None:
             )
 
 
+# What "the buildings all look the same" looks like as a number. Before the
+# archetype work the city had 438 buildings sharing two part-name signatures, 70%
+# of them identical -- and every check passed, because nothing was measuring
+# variety. These are the checks that would have caught it.
+MIN_BUILDING_SIGNATURES = 24
+MAX_SIGNATURE_SHARE = 0.30
+MIN_WALL_MATERIALS = 7
+# The skyline is deliberately tall and a variety change must not quietly flatten
+# it. Measured before this work: 81% of buildings over 100 studs.
+MIN_TALL_BUILDING_SHARE = 0.70
+
+
+def validate_building_variety(validator: Validator, structure: Any) -> None:
+    """The city is built from many kinds of building, not one kind repainted.
+
+    Signature here means the set of part names a building is made of, which is a
+    good proxy for "is this a different building": two buildings with the same
+    parts differ only in size and colour, which is exactly the sameness this
+    measures.
+    """
+    signatures: Counter[tuple[str, ...]] = Counter()
+    materials: Counter[str] = Counter()
+    tall = 0
+    total = 0
+
+    for node in walk(structure):
+        if node.get("className") != "Model" or node.get("name") != "Building":
+            continue
+        total += 1
+        names = set()
+        top = 0.0
+        for child in node.get("children", []):
+            names.add(str(child.get("name")))
+            properties = child.get("properties", {})
+            frame, size = properties.get("CFrame"), properties.get("Size")
+            if child.get("name") in ("Slab", "Shaft", "Prism", "Drum", "Hall",
+                                     "Tier", "Monolith", "Wing"):
+                materials[str(properties.get("Material"))] += 1
+            if isinstance(frame, list) and len(frame) == 12 and isinstance(size, list):
+                half = (abs(frame[4]) * size[0] / 2 + abs(frame[7]) * size[1] / 2
+                        + abs(frame[10]) * size[2] / 2)
+                top = max(top, frame[1] + half)
+        signatures[tuple(sorted(names))] += 1
+        if top >= 100:
+            tall += 1
+
+    validator.check(total > 0, "no buildings found to measure variety against")
+    if total == 0:
+        return
+
+    validator.check(
+        len(signatures) >= MIN_BUILDING_SIGNATURES,
+        f"the city is built from only {len(signatures)} distinct kinds of building, "
+        f"under the {MIN_BUILDING_SIGNATURES} that stops it reading as one repeated",
+    )
+
+    common, count = signatures.most_common(1)[0]
+    share = count / total
+    validator.check(
+        share <= MAX_SIGNATURE_SHARE,
+        f"{share * 100:.0f}% of buildings are the same kind, over the "
+        f"{MAX_SIGNATURE_SHARE * 100:.0f}% cap; the commonest is {sorted(common)[:6]}",
+    )
+
+    validator.check(
+        len(materials) >= MIN_WALL_MATERIALS,
+        f"only {len(materials)} wall materials in the whole city, under "
+        f"{MIN_WALL_MATERIALS}",
+    )
+
+    tall_share = tall / total
+    validator.check(
+        tall_share >= MIN_TALL_BUILDING_SHARE,
+        f"only {tall_share * 100:.0f}% of buildings clear 100 studs, under the "
+        f"{MIN_TALL_BUILDING_SHARE * 100:.0f}% floor -- variety must not flatten "
+        "the skyline",
+    )
+
+
 def validate_streaming_density(validator: Validator, payloads: Iterable[Any]) -> None:
     """No single streaming bubble may carry too much.
 
@@ -2085,6 +2164,7 @@ def run() -> int:
         validate_machine_detail(validator, first_machines)
         validate_streaming_density(validator, (first_structure, first_machines))
         validate_building_budget(validator, (first_structure,))
+        validate_building_variety(validator, first_structure)
         validate_scatter_separation(validator, builder)
         validate_garage_ring(validator, builder)
         validate_station_zone_volumes(validator, builder, first_structure, station_by_id)
