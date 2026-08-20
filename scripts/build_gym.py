@@ -4132,7 +4132,264 @@ def _shopfront(ctx):
     ]
 
 
-def procedural_building(x, z, width, depth, height, skin, rng):
+def _facade_pier_grid(ctx, volume):
+    """Vertical piers with glazing between them: the pre-war office rhythm."""
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    piers = 3 if w < 90 else 5
+    for index in range(piers):
+        px = x - w / 2 + w * (index + 0.5) / piers
+        out.append(part("Pier", [w / piers * 0.34, share, d + 1.2],
+                        cf(px, base_y + share / 2, z),
+                        skin["trim"], skin["material"], CanCollide=False))
+    for face in (-1, 1):
+        out.append(part("Glazing", [w - 4, share - 6, 0.7],
+                        cf(x, base_y + share / 2, z + face * d / 2),
+                        skin["glass"], "Glass", Transparency=0.32,
+                        CanCollide=False, CastShadow=False))
+    return out
+
+
+def _facade_curtain(ctx, volume):
+    """A glass skin on every face, banded by slim mullion courses.
+
+    Cheaper than the band facade and reads as a different building entirely:
+    where bands say masonry with windows punched in it, this says the wall *is*
+    the window.
+    """
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    for face in (-1, 1):
+        out.append(part("Curtain", [w - 1.5, share - 2, 0.6],
+                        cf(x, base_y + share / 2, z + face * d / 2),
+                        skin["glass"], "Glass", Transparency=0.22,
+                        CanCollide=False, CastShadow=False))
+        out.append(part("Curtain", [0.6, share - 2, d - 1.5],
+                        cf(x + face * w / 2, base_y + share / 2, z),
+                        skin["glass"], "Glass", Transparency=0.22,
+                        CanCollide=False, CastShadow=False))
+    for course in range(2):
+        # Mullions are the horizontal lines that stop a glass box reading as one
+        # undivided pane. Kept under 12 studs deep so they never count as floors.
+        my = base_y + share * (course + 1) / 3
+        out.append(part("Mullion", [w + 0.8, 0.9, d + 0.8], cf(x, my, z),
+                        skin["trim"], "Metal", CanCollide=False))
+    return out
+
+
+def _facade_spandrel(ctx, volume):
+    """Rings between drums: the only facade that suits a round building."""
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, base_y, share = volume["width"], volume["base_y"], volume["height"]
+    out = []
+    for course in range(2):
+        ry = base_y + share * (course + 0.5) / 2
+        out.append(cylinder("Spandrel", 3.4, w + 0.6,
+                            mul(cf(x, ry, z), rot_z(90)),
+                            skin["glass"], "Glass", Transparency=0.28,
+                            CanCollide=False, CastShadow=False))
+    return out
+
+
+def _facade_none(ctx, volume):
+    """A blank wall. Warehouses and bunkers have them and they read as such."""
+    return []
+
+
+def _mass_slab(ctx, facade):
+    """One broad block, no taper: the post-war housing slab."""
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    out = [part("Slab", [width, height, depth],
+                cf(x, FLOOR_TOP + height / 2, z), skin["wall"], skin["material"])]
+    out.extend(facade(ctx, {"width": width, "depth": depth, "base_y": FLOOR_TOP,
+                            "height": height, "level": 0}))
+    return out, {"top": FLOOR_TOP + height, "width": width, "depth": depth, "flat": True}
+
+
+def _mass_gable(ctx, facade):
+    """A low hall with a door and a couple of windows: the shophouse."""
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    out = [part("Hall", [width, height, depth],
+                cf(x, FLOOR_TOP + height / 2, z), skin["wall"], skin["material"])]
+    out.append(part("Door", [7, 9, 0.6], cf(x, FLOOR_TOP + 4.5, z + depth / 2),
+                    skin["trim"], skin["material"], CanCollide=False))
+    for side in (-1, 1):
+        out.append(part("Window", [10, 7, 0.6],
+                        cf(x + side * width * 0.28, FLOOR_TOP + 6, z + depth / 2),
+                        skin["glass"], "Glass", Transparency=0.3,
+                        CanCollide=False, CastShadow=False))
+    out.extend(facade(ctx, {"width": width, "depth": depth, "base_y": FLOOR_TOP,
+                            "height": height, "level": 0}))
+    return out, {"top": FLOOR_TOP + height, "width": width, "depth": depth, "flat": True}
+
+
+def _mass_cylinder(ctx, facade):
+    """Stacked drums. A round building is one part per storey where a boxed one
+    is a wall plus four faces of glazing, so this is the cheapest tall mass."""
+    skin, brng = ctx["skin"], ctx["brng"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    diameter = min(width, depth)
+    drums = 2 if height < 90 else 3
+    out = []
+    base_y = FLOOR_TOP
+    for level in range(drums):
+        share = height / drums
+        d_here = diameter * (1 - level * 0.08)
+        out.append(cylinder("Drum", share, d_here,
+                            mul(cf(x, base_y + share / 2, z), rot_z(90)),
+                            skin["wall"], skin["material"]))
+        out.extend(facade(ctx, {"width": d_here, "depth": d_here, "base_y": base_y,
+                                "height": share, "level": level}))
+        base_y += share
+    final = diameter * (1 - (drums - 1) * 0.08)
+    return out, {"top": base_y, "width": final, "depth": final, "flat": True}
+
+
+def _mass_prism(ctx, facade):
+    """A pure prism with no podium: the glass tower that meets the street as glass."""
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    out = [part("Prism", [width, height, depth],
+                cf(x, FLOOR_TOP + height / 2, z), skin["wall"], skin["material"])]
+    out.extend(facade(ctx, {"width": width, "depth": depth, "base_y": FLOOR_TOP,
+                            "height": height, "level": 0}))
+    return out, {"top": FLOOR_TOP + height, "width": width, "depth": depth, "flat": True}
+
+
+def _roof_parapet(ctx, cap):
+    """A flat top with a raised lip, and nothing else on it."""
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, top = cap["width"], cap["depth"], cap["top"]
+    return [part("Parapet", [w + 2, 2.6, d + 2], cf(x, top + 1.3, z),
+                 skin["trim"], skin["material"], CanCollide=False)]
+
+
+def _roof_gable(ctx, cap):
+    return pitched_roof("Roof", ctx["x"], ctx["z"], cap["top"],
+                        cap["width"], cap["depth"],
+                        max(8.0, min(cap["width"], cap["depth"]) * 0.22),
+                        ctx["skin"]["trim"], ctx["skin"]["material"])
+
+
+def _roof_hipped(ctx, cap):
+    return hipped_roof("Roof", ctx["x"], ctx["z"], cap["top"],
+                       cap["width"], cap["depth"],
+                       max(8.0, min(cap["width"], cap["depth"]) * 0.2),
+                       ctx["skin"]["trim"], ctx["skin"]["material"])
+
+
+def _roof_sawtooth(ctx, cap):
+    return sawtooth_roof("Roof", ctx["x"], ctx["z"], cap["top"],
+                         cap["width"], cap["depth"], 3, 7.0,
+                         ctx["skin"]["trim"], ctx["skin"]["material"],
+                         ctx["skin"]["glass"])
+
+
+def _roof_vault(ctx, cap):
+    return barrel_vault("Roof", ctx["x"], ctx["z"], cap["top"],
+                        min(cap["width"], cap["depth"]), max(cap["width"], cap["depth"]),
+                        ctx["skin"]["trim"], ctx["skin"]["material"])
+
+
+def _roof_dome(ctx, cap):
+    diameter = min(cap["width"], cap["depth"])
+    return dome_roof("Roof", ctx["x"], ctx["z"], cap["top"], diameter,
+                     diameter * 0.42, ctx["skin"]["trim"], ctx["skin"]["material"])
+
+
+def _roof_crown(ctx, cap):
+    return stepped_crown("Roof", ctx["x"], ctx["z"], cap["top"],
+                         cap["width"], cap["depth"], 3,
+                         ctx["skin"]["trim"], ctx["skin"]["material"],
+                         spire=ctx["skin"]["glass"])
+
+
+BUILDING_ROOFS = {
+    "deck": (_roof_deck, True),
+    "parapet": (_roof_parapet, True),
+    "gable": (_roof_gable, False),
+    "hipped": (_roof_hipped, False),
+    "sawtooth": (_roof_sawtooth, False),
+    "vault": (_roof_vault, False),
+    "dome": (_roof_dome, False),
+    "crown": (_roof_crown, False),
+}
+
+
+# Which masses accept which roofs and facades, and at what sizes. A dome does not
+# belong on a warehouse, so the combinations are named rather than crossed.
+#
+# `kinds` gates on the lot's zoning, `height` on what the lot can carry, and
+# `weight` biases the mix. Cheap archetypes are weighted up so the fleet average
+# stays near where it was while the range widens.
+BUILDING_ARCHETYPES = (
+    {"id": "setback", "mass": _mass_setback, "weight": 3,
+     "roofs": ("deck",), "facades": ("bands",),
+     "kinds": ("tower", "midrise"), "height": (45, 400)},
+    {"id": "slab", "mass": _mass_slab, "weight": 3,
+     "roofs": ("parapet", "deck"), "facades": ("piers", "bands"),
+     "kinds": ("tower", "midrise"), "height": (40, 260)},
+    {"id": "curtain", "mass": _mass_prism, "weight": 3,
+     "roofs": ("parapet", "crown"), "facades": ("curtain",),
+     "kinds": ("tower", "midrise"), "height": (60, 400)},
+    {"id": "drum", "mass": _mass_cylinder, "weight": 2,
+     "roofs": ("dome", "parapet"), "facades": ("spandrel",),
+     "kinds": ("tower", "midrise"), "height": (40, 300)},
+    {"id": "shophouse", "mass": _mass_gable, "weight": 3,
+     "roofs": ("gable", "hipped"), "facades": ("none",),
+     "kinds": ("shophouse", "midrise"), "height": (12, 46)},
+    {"id": "shed", "mass": _mass_slab, "weight": 2,
+     "roofs": ("sawtooth", "vault"), "facades": ("none",),
+     "kinds": ("shophouse", "midrise"), "height": (12, 44)},
+)
+
+BUILDING_FACADES = {
+    "bands": _facade_bands,
+    "piers": _facade_pier_grid,
+    "curtain": _facade_curtain,
+    "spandrel": _facade_spandrel,
+    "none": _facade_none,
+}
+
+
+def _pick_archetype(kind, height, brng):
+    """The archetypes legal for this lot, weighted."""
+    legal = [
+        entry for entry in BUILDING_ARCHETYPES
+        if kind in entry["kinds"] and entry["height"][0] <= height <= entry["height"][1]
+    ]
+    if not legal:
+        return BUILDING_ARCHETYPES[0]
+    total = sum(entry["weight"] for entry in legal)
+    roll = brng.uniform(0, total)
+    for entry in legal:
+        roll -= entry["weight"]
+        if roll <= 0:
+            return entry
+    return legal[-1]
+
+
+def procedural_building(x, z, width, depth, height, skin, rng, kind="midrise"):
     """One building, composed from a mass, a facade and a roof.
 
     Everything here is capped by MAX_BUILDING_PARTS in the validator.
@@ -4150,9 +4407,17 @@ def procedural_building(x, z, width, depth, height, skin, rng):
         "brng": random.Random(f"city-v4:building:{round(x, 1)}:{round(z, 1)}"),
     }
 
-    out, cap = _mass_setback(ctx, _facade_bands)
-    out.extend(_roof_deck(ctx, cap))
-    out.extend(_shopfront(ctx))
+    archetype = _pick_archetype(kind, height, ctx["brng"])
+    facade = BUILDING_FACADES[ctx["brng"].choice(archetype["facades"])]
+    roof_builder, roof_flat = BUILDING_ROOFS[ctx["brng"].choice(archetype["roofs"])]
+
+    out, cap = archetype["mass"](ctx, facade)
+    out.extend(roof_builder(ctx, cap))
+    # A shopfront belongs on something a pedestrian meets, not on a warehouse or
+    # the base of a glass tower that meets the street as glass.
+    if archetype["id"] in ("setback", "slab", "shophouse"):
+        out.extend(_shopfront(ctx))
+    cap["flat"] = cap["flat"] and roof_flat
 
     # The roof is reported alongside the geometry rather than recomputed later.
     # Its numbers are known here and nowhere else; a second function deriving them
@@ -4245,7 +4510,7 @@ def city_lot(lot, kind, character, rng, catalogue=None):
     # Grouped into a Model rather than left as loose parts: it is what lets the
     # validator hold a single building to a part budget, and it gives streaming a
     # unit to load a building as, instead of forty unrelated slabs.
-    parts, roof = procedural_building(x, z, width, depth, height, skin, rng)
+    parts, roof = procedural_building(x, z, width, depth, height, skin, rng, kind)
     if catalogue is not None:
         catalogue["roofs"].append(roof)
     return [group("Building", parts)]
