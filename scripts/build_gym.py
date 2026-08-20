@@ -3980,34 +3980,85 @@ def subdivide(x, z, width, depth, rng, min_side=250, depth_limit=3):
     )
 
 
-def procedural_building(x, z, width, depth, height, skin, rng):
-    """One building: a setback mass, a bay-rhythm facade, and a used roof.
+# --------------------------------------------------------------------------
+# Buildings, in three layers.
+#
+# A city of one archetype is what 438 buildings sharing two part-name signatures
+# looks like. Rather than a table of whole buildings -- which just moves the
+# problem from one signature to a dozen -- a building is composed:
+#
+#   mass    what it is in plan and bulk, and the volumes it stacks
+#   facade  how each of those volumes is dressed
+#   roof    what sits on top
+#
+# Layers multiply where archetypes only add: a handful of each gives far more
+# distinct buildings than the same amount of code spent on fixed recipes, and a
+# new roof form improves every mass that admits it.
+#
+# The mass drives the loop and asks the facade to dress each volume as it goes,
+# rather than the two running as separate passes. That is deliberate: it keeps
+# the facade able to see the volume's real size and level, and it is why this
+# split reproduces the previous generator exactly.
+# --------------------------------------------------------------------------
 
-    The old generator spent its parts on a single extruded box with a window
-    strip per face. That instinct was right about windows -- a per-floor grid is
-    invisible at the distance these are seen from -- but wrong about the mass:
-    what actually reads at range is the silhouette, so the parts go there.
 
-    Everything here is capped by MAX_BUILDING_PARTS in the validator.
+def _facade_bands(ctx, volume):
+    """Glazing bands on all four faces, plus piers on the volume the street sees.
 
-    Draws from its own stream, seeded on where the building stands rather than on
-    the block's rng. Interior detail and block layout are separate concerns, and
-    while they shared a stream every tweak in here consumed a different number of
-    rolls and reshuffled every building after it -- which is how an earlier pass
-    made a part-*saving* change increase the part count. Seeded on position, not
-    on an index, so the seed survives a lot being subdivided differently.
+    Bay rhythm, not a window grid. A band sits *on* each face rather than
+    spanning the mass: two crossed slabs would intersect through the corners,
+    which is real interpenetration and z-fights there. Bands carry a facade at
+    streaming distance for four parts, where a per-floor grid would cost hundreds
+    and read identically.
     """
-    brng = random.Random(f"city-v4:building:{round(x, 1)}:{round(z, 1)}")
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share, level = (
+        volume["width"], volume["depth"], volume["base_y"],
+        volume["height"], volume["level"],
+    )
     out = []
+    bands = 2 if (level == 0 and share >= 30) else 1
+    for band in range(bands):
+        band_y = base_y + share * (band + 0.5) / bands
+        band_h = max(3.5, min(share / bands - 6, 9))
+        for face in (-1, 1):
+            out.append(part("Glazing", [w - 8, band_h, 0.7],
+                            cf(x, band_y, z + face * d / 2),
+                            skin["glass"], "Glass", Transparency=0.3,
+                            CanCollide=False, CastShadow=False))
+            out.append(part("Glazing", [0.7, band_h, d - 8],
+                            cf(x + face * w / 2, band_y, z),
+                            skin["glass"], "Glass", Transparency=0.3,
+                            CanCollide=False, CastShadow=False))
+    # Piers only on the volume the street sees; higher setbacks are read as
+    # silhouette, not as facade.
+    if level == 0:
+        for side in (-1, 1):
+            out.append(part("Pier", [2.4, share, d * 0.62],
+                            cf(x + side * (w / 2 - 1.2), base_y + share / 2, z),
+                            skin["trim"], skin["material"], CanCollide=False))
+    return out
+
+
+def _mass_setback(ctx, facade):
+    """A podium with one to three tapering volumes stacked on it.
+
+    What actually reads at range is the silhouette, so the parts go there rather
+    than into a window grid nobody can resolve.
+    """
+    skin, brng = ctx["skin"], ctx["brng"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
     ground_y = FLOOR_TOP
+    out = []
 
     # Podium: the two-storey base a street actually meets.
     podium = min(height * 0.35, 11)
     out.append(part("Podium", [width, podium, depth],
                     cf(x, ground_y + podium / 2, z), skin["trim"], skin["material"]))
 
-    # A setback stack rather than one extrusion. Each volume steps in, so the
-    # skyline reads as stepped rather than as a row of cuboids.
     volumes = 1 if height < 45 else (2 if height < 110 else 3)
     remaining = height - podium
     base_y = ground_y + podium
@@ -4021,32 +4072,10 @@ def procedural_building(x, z, width, depth, height, skin, rng):
         out.append(part("Cornice", [w + 2.2, 1.6, d + 2.2],
                         cf(x, base_y + share, z), skin["trim"], skin["material"],
                         CanCollide=False))
-
-        # Bay rhythm, not a window grid. A glazing band sits *on* each of the four
-        # faces rather than spanning the mass: two crossed slabs would intersect
-        # through the corners, which is real interpenetration and z-fights there.
-        # Bands carry a facade at streaming distance for four parts, where a
-        # per-floor grid would cost hundreds and read identically.
-        bands = 2 if (level == 0 and share >= 30) else 1
-        for band in range(bands):
-            band_y = base_y + share * (band + 0.5) / bands
-            band_h = max(3.5, min(share / bands - 6, 9))
-            for face in (-1, 1):
-                out.append(part("Glazing", [w - 8, band_h, 0.7],
-                                cf(x, band_y, z + face * d / 2),
-                                skin["glass"], "Glass", Transparency=0.3,
-                                CanCollide=False, CastShadow=False))
-                out.append(part("Glazing", [0.7, band_h, d - 8],
-                                cf(x + face * w / 2, band_y, z),
-                                skin["glass"], "Glass", Transparency=0.3,
-                                CanCollide=False, CastShadow=False))
-        # Piers only on the volume the street sees; higher setbacks are read as
-        # silhouette, not as facade.
-        if level == 0:
-            for side in (-1, 1):
-                out.append(part("Pier", [2.4, share, d * 0.62],
-                                cf(x + side * (w / 2 - 1.2), base_y + share / 2, z),
-                                skin["trim"], skin["material"], CanCollide=False))
+        out.extend(facade(ctx, {
+            "width": w, "depth": d, "base_y": base_y,
+            "height": share, "level": level,
+        }))
 
         base_y += share
         remaining -= share
@@ -4054,15 +4083,25 @@ def procedural_building(x, z, width, depth, height, skin, rng):
         if w < 24 or d < 24:
             break
 
-    # A used roof. Flight means players look down at these constantly, and a
-    # bare slab reads as a lid; a stair head and a tank are the cheapest things
-    # that say the building has an inside.
-    roof_y = base_y
-    out.append(part("RoofDeck", [w + 3, 0.8, d + 3], cf(x, roof_y, z),
-                    skin["trim"], skin["material"], CanCollide=False))
-    out.append(part("RoofHouse", [w * 0.3, 6, d * 0.3],
-                    cf(x + w * 0.18, roof_y + 3, z - d * 0.16),
-                    skin["trim"], skin["material"], CanCollide=False))
+    return out, {"top": base_y, "width": w, "depth": d, "flat": True}
+
+
+def _roof_deck(ctx, cap):
+    """A flat deck that looks used: a stair head, a tank, vents.
+
+    Flight means players look down at these constantly, and a bare slab reads as
+    a lid.
+    """
+    skin = ctx["skin"]
+    x, z, height = ctx["x"], ctx["z"], ctx["height"]
+    w, d, roof_y = cap["width"], cap["depth"], cap["top"]
+    out = [
+        part("RoofDeck", [w + 3, 0.8, d + 3], cf(x, roof_y, z),
+             skin["trim"], skin["material"], CanCollide=False),
+        part("RoofHouse", [w * 0.3, 6, d * 0.3],
+             cf(x + w * 0.18, roof_y + 3, z - d * 0.16),
+             skin["trim"], skin["material"], CanCollide=False),
+    ]
     if height > 60:
         # Absolute size, not a fraction of the footprint. Scaled, a tank on a
         # 250-stud tower came out 54 studs across -- a flying saucer parked on the
@@ -4076,25 +4115,59 @@ def procedural_building(x, z, width, depth, height, skin, rng):
                         (x + vent * w * 0.12, roof_y, z + d * 0.28),
                         (x + vent * w * 0.12, roof_y + 3.2, z + d * 0.28),
                         1.5, [0.34, 0.34, 0.36], CanCollide=False))
+    return out
 
-    # The shopfront the street sees, and the awning over it.
-    out.append(part("ShopGlass", [width - 14, 5, 0.5],
-                    cf(x, ground_y + 4.5, z + depth / 2 - 0.2),
-                    [0.85, 0.72, 0.38], "Neon", CanCollide=False, CastShadow=False))
-    out.append(part("Awning", [width - 10, 0.5, 3.4],
-                    cf(x, ground_y + 8.2, z + depth / 2 + 1.2),
-                    skin["glass"], "Fabric", CanCollide=False))
+
+def _shopfront(ctx):
+    """The lit window and awning a pedestrian actually meets."""
+    skin = ctx["skin"]
+    x, z, width, depth = ctx["x"], ctx["z"], ctx["width"], ctx["depth"]
+    return [
+        part("ShopGlass", [width - 14, 5, 0.5],
+             cf(x, FLOOR_TOP + 4.5, z + depth / 2 - 0.2),
+             [0.85, 0.72, 0.38], "Neon", CanCollide=False, CastShadow=False),
+        part("Awning", [width - 10, 0.5, 3.4],
+             cf(x, FLOOR_TOP + 8.2, z + depth / 2 + 1.2),
+             skin["glass"], "Fabric", CanCollide=False),
+    ]
+
+
+def procedural_building(x, z, width, depth, height, skin, rng):
+    """One building, composed from a mass, a facade and a roof.
+
+    Everything here is capped by MAX_BUILDING_PARTS in the validator.
+
+    Draws from its own stream, seeded on where the building stands rather than on
+    the block's rng. Interior detail and block layout are separate concerns, and
+    while they shared a stream every tweak in here consumed a different number of
+    rolls and reshuffled every building after it -- which is how an earlier pass
+    made a part-*saving* change increase the part count. Seeded on position, not
+    on an index, so the seed survives a lot being subdivided differently.
+    """
+    ctx = {
+        "x": x, "z": z, "width": width, "depth": depth, "height": height,
+        "skin": skin,
+        "brng": random.Random(f"city-v4:building:{round(x, 1)}:{round(z, 1)}"),
+    }
+
+    out, cap = _mass_setback(ctx, _facade_bands)
+    out.extend(_roof_deck(ctx, cap))
+    out.extend(_shopfront(ctx))
 
     # The roof is reported alongside the geometry rather than recomputed later.
-    # roof_y, w and d are already known here and nowhere else; a second function
-    # deriving them from the finished parts would be a copy of this arithmetic
-    # that could quietly drift out of step with it.
+    # Its numbers are known here and nowhere else; a second function deriving them
+    # from the finished parts would be a copy of this arithmetic free to drift.
+    #
+    # `flat` says whether a training court could stand on it -- a pitched or domed
+    # roof cannot host one, and site_candidates filters on it.
+    #
     # base_* is the podium footprint, which is wider than the roof by every
     # setback the stack took. A fire escape has to clear the *building*, not the
     # roof: placed off the roof edge it starts life inside the podium.
-    return out, {"x": x, "z": z, "top": roof_y,
-                 "width": w + 3, "depth": d + 3,
-                 "base_width": width, "base_depth": depth}
+    return out, {"x": x, "z": z, "top": cap["top"],
+                 "width": cap["width"] + 3, "depth": cap["depth"] + 3,
+                 "base_width": width, "base_depth": depth,
+                 "flat": cap["flat"]}
 
 
 # Nothing may grow into a platform that floats over the city. Storm's slab sits
@@ -4579,6 +4652,10 @@ def site_candidates():
                     "base_depth": lot["depth"]})
 
     for roof in catalogue["roofs"]:
+        # A court needs somewhere flat to stand. Pitched, vaulted and domed roofs
+        # report flat=False and are simply not candidates.
+        if not roof.get("flat", True):
+            continue
         if roof["width"] < SITE_CLEAR_WIDTH or roof["depth"] < SITE_CLEAR_DEPTH:
             continue
         if roof["top"] - FLOOR_TOP > MAX_ROOF_SITE_HEIGHT:
