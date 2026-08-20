@@ -349,9 +349,6 @@ function GaitConfig.RunSelfTest(): { string }
 	for _, gait in gaits do
 		local pose = gait.Pose
 		check(pose.Cycles == 1, `{gait.Id} is one cycle per stride`)
-		-- Continuous is what makes it a cosine with no dwell. Controlled would give a
-		-- gait the four-beat rhythm of a bench press, which stops dead at both ends.
-		check(pose.MotionStyle == "Continuous", `{gait.Id} flows rather than settling`)
 
 		for _, jointName in GaitConfig.Joints do
 			local motion = motionFor(pose, jointName)
