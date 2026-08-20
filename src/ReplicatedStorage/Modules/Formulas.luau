@@ -218,10 +218,17 @@ Formulas.FLIGHT_BANK_FULL_TURN_RATE = 2.4
 -- is moon-walking when it slows down: the feet keep their rhythm while the body
 -- decelerates out from under them.
 Formulas.STRIDE_STUDS = 14
--- Both ends clamped. The floor stops a maxed sprinter's legs becoming a blur that reads
--- as a glitch; the ceiling stops somebody creeping forward from stalling mid-step with
--- one foot hanging in the air.
-Formulas.MIN_STRIDE_SECONDS = 0.26
+-- Both ends clamped, but the floor now sits clear of anything the game can actually
+-- ask for rather than inside it. At the 64-stud sprint ceiling a 14-stud stride takes
+-- 14/64 = 0.219s, so the old 0.26 floor bound every maxed sprinter: the phase advanced
+-- 16% slower than the ground and the feet skated for the whole top of the range --
+-- precisely the failure this module's distance-based phase exists to prevent.
+--
+-- The floor's job is to stop a divide-by-small-number, not to cap cadence. 0.18 is 78
+-- studs a second, comfortably past anything Legs can reach, so it protects the maths
+-- without ever shaping the animation. The ceiling still stops somebody creeping forward
+-- from stalling mid-step with one foot hanging in the air.
+Formulas.MIN_STRIDE_SECONDS = 0.18
 Formulas.MAX_STRIDE_SECONDS = 0.9
 -- Below this the gait fades out entirely and Roblox's own idle animation plays. Not
 -- zero, because a character resting against a wall still reports a few hundredths of a
@@ -1032,6 +1039,12 @@ function Formulas.RunSelfTest(): { string }
 	)
 	check("faster is never slower to step", Formulas.StrideInterval(40) < Formulas.StrideInterval(20))
 	check("stride time has a floor", Formulas.StrideInterval(1e9) == Formulas.MIN_STRIDE_SECONDS)
+	-- The regression pin. This is the check that fails the moment somebody raises the
+	-- floor or the sprint ceiling again and quietly reintroduces skating at top speed.
+	check(
+		"top speed still tracks the ground",
+		Formulas.StrideInterval(Formulas.SPRINT_CEILING) > Formulas.MIN_STRIDE_SECONDS
+	)
 	check("stride time has a ceiling", Formulas.StrideInterval(0.001) == Formulas.MAX_STRIDE_SECONDS)
 	check("a standstill does not divide by zero", Formulas.StrideInterval(0) == Formulas.MAX_STRIDE_SECONDS)
 	check("stride time survives bad input", Formulas.StrideInterval(0 / 0) == Formulas.MAX_STRIDE_SECONDS)
