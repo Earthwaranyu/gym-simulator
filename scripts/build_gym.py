@@ -3989,7 +3989,15 @@ def procedural_building(x, z, width, depth, height, skin, rng):
     what actually reads at range is the silhouette, so the parts go there.
 
     Everything here is capped by MAX_BUILDING_PARTS in the validator.
+
+    Draws from its own stream, seeded on where the building stands rather than on
+    the block's rng. Interior detail and block layout are separate concerns, and
+    while they shared a stream every tweak in here consumed a different number of
+    rolls and reshuffled every building after it -- which is how an earlier pass
+    made a part-*saving* change increase the part count. Seeded on position, not
+    on an index, so the seed survives a lot being subdivided differently.
     """
+    brng = random.Random(f"city-v4:building:{round(x, 1)}:{round(z, 1)}")
     out = []
     ground_y = FLOOR_TOP
 
@@ -4005,7 +4013,7 @@ def procedural_building(x, z, width, depth, height, skin, rng):
     base_y = ground_y + podium
     w, d = width - 3, depth - 3
     for level in range(volumes):
-        share = remaining if level == volumes - 1 else remaining * rng.uniform(0.45, 0.65)
+        share = remaining if level == volumes - 1 else remaining * brng.uniform(0.45, 0.65)
         out.append(part("Shaft", [w, share, d],
                         cf(x, base_y + share / 2, z), skin["wall"], skin["material"]))
         # A cornice at every setback: the line that stops two stacked boxes
@@ -4042,7 +4050,7 @@ def procedural_building(x, z, width, depth, height, skin, rng):
 
         base_y += share
         remaining -= share
-        w, d = w - rng.uniform(7, 15), d - rng.uniform(7, 15)
+        w, d = w - brng.uniform(7, 15), d - brng.uniform(7, 15)
         if w < 24 or d < 24:
             break
 
