@@ -30,7 +30,6 @@ local MapRender = require(ReplicatedStorage.Modules.MapRender)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
-local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MapViewportMath = require(ReplicatedStorage.Modules.MapViewportMath)
 
@@ -55,8 +54,8 @@ local MAP_ASPECT = 1.19
 local MIN_ZOOM = 1
 local MAX_ZOOM = 4
 local ZOOM_STEP = 1.25
-local PIN_SIZE = 30
-local SELECTED_PIN_SIZE = 32
+local PIN_SIZE = 26
+local SELECTED_PIN_SIZE = 30
 
 local MAP_PAPER = MapRender.Paper
 local MAP_INK = MapRender.Ink
@@ -74,8 +73,9 @@ local destinations: { Destination } = {}
 local mapFeatures: { MapRender.Feature } = {}
 local mapZoom = 1
 local mapCenter = Vector2.new(0.5, 0.5)
-local renderedPower = 0
-local currentTrainingMultiplier: number? = nil
+-- Nil is the normal city map. A stat id keeps the same streets and buildings visible
+-- while showing only that muscle's destinations.
+local activeStatFilter: string? = nil
 
 local function toast(message: string?)
 	if ToastController ~= nil and type(message) == "string" and message ~= "" then
@@ -114,20 +114,30 @@ local function destinationLabel(destination: Destination): (string, Color3)
 	return `{equipmentName} · {zoneName}`, color
 end
 
--- Ground venues use their environment id, while skyline venues deliberately have a
--- unique environment id so their barriers can be controlled independently. Their
--- human-facing location name still starts with the neighbourhood, so removing the
--- trailing "<Muscle> Gym" reunites street and skyline pins into one map cluster.
-local function destinationCluster(destination: Destination): string
-	if destination.ZoneId == "Garage" then
-		return "Hub"
-	end
+-- One island is one multiplier tier, and every station on it shares that island's
+-- environment id, so the environment id is already the cluster. This used to have
+--[[
+	Which pins are close enough to collide, in world studs.
 
-	local suffix = ` {destination.StatId} Gym`
-	if string.sub(destination.LocationName, -#suffix) == suffix then
-		return string.sub(destination.LocationName, 1, #destination.LocationName - #suffix)
-	end
-	return destination.EnvironmentId
+	Pins used to be grouped by EnvironmentId, on the premise -- true at the time --
+	that an environment was one compact campus whose five machines stood together.
+	The machines have since been scattered across the city and an environment
+	became a *region* thousands of studs wide, so grouping by it drew every machine
+	at its region's centroid: 34 of 35 pins landed more than 500 studs from their
+	machine, the worst 4,809 studs away, which is about a third of the map.
+
+	Grouping now asks the only question that matters -- would these two pins
+	actually overlap? -- so it cannot go stale when the world is rearranged again.
+
+	A pin is PIN_SIZE pixels on a board roughly MAP_BOARD_WIDTH_PX across, so its
+	footprint in studs is that fraction of the world the map is showing. The margin
+	is wide: the starter ring sits 92 studs apart and genuinely overlaps, while the
+	nearest two scattered machines are 963 apart and never do.
+]]
+local MAP_BOARD_WIDTH_PX = 900
+
+local function overlapDistance(bounds): number
+	return bounds.Width * (PIN_SIZE / MAP_BOARD_WIDTH_PX)
 end
 
 local function statOrder(statId: string): number
@@ -192,12 +202,23 @@ function FullMapController:_teleport(destination: Destination)
 	toast(message)
 end
 
-function FullMapController:_currentMultiplier(power: number): number?
-	-- The map guides progression by Power tier, not by picking a favourite muscle.
-	-- Every muscle in the strongest accessible tier receives the same quiet emphasis.
+local function statValue(data: any?, statId: string): number
+	return if data ~= nil then (data.Stats[statId] or 0) else 0
+end
+
+local function destinationUnlocked(data: any?, destination: Destination): boolean
+	return statValue(data, destination.StatId) >= destination.RequiredStat
+end
+
+function FullMapController:_currentMultiplier(data: any?, statId: string): number?
+	-- Progression is independent: Arms can be in Iron while Legs remain at the beach.
 	local best: number? = nil
 	for _, destination in destinations do
-		if power >= destination.RequiredPower and (best == nil or destination.GainMultiplier > best) then
+		if
+			destination.StatId == statId
+			and destinationUnlocked(data, destination)
+			and (best == nil or destination.GainMultiplier > best)
+		then
 			best = destination.GainMultiplier
 		end
 	end
@@ -237,7 +258,124 @@ function FullMapController:_sideButton(
 	return button
 end
 
-function FullMapController:_renderSidebar(parent: Frame, power: number)
+--[[
+	The tier index: every multiplier for the chosen muscle, weakest to strongest.
+
+	"Select a coloured circle on the map" was the whole of this space until a
+	destination was picked, which made the only way to find the next tier a hunt for
+	the right pin among thirty-five. The muscle filter chips above the map already
+	narrow the pins; this turns that same filter into an ordered list you can read,
+	and picking a row selects the destination, so the detail panel and its Teleport
+	button below are reached without new travel code.
+]]
+function FullMapController:_renderTierList(parent: Frame, data: any?)
+	local rows: { Destination } = {}
+	for _, candidate in destinations do
+		if activeStatFilter == nil or candidate.StatId == activeStatFilter then
+			table.insert(rows, candidate)
+		end
+	end
+
+	table.sort(rows, function(a: Destination, b: Destination): boolean
+		-- Grouped by muscle in StatConfig order when no filter is on, so the unfiltered
+		-- list is still a readable index rather than thirty-five interleaved tiers.
+		local orderA, orderB = statOrder(a.StatId), statOrder(b.StatId)
+		if orderA ~= orderB then
+			return orderA < orderB
+		end
+		if a.GainMultiplier ~= b.GainMultiplier then
+			return a.GainMultiplier < b.GainMultiplier
+		end
+		return a.Id < b.Id
+	end)
+
+	local list = Instance.new("ScrollingFrame")
+	list.Name = "TierList"
+	list.Position = UDim2.fromOffset(10, 36)
+	list.Size = UDim2.new(1, -20, 1, -46)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 4
+	list.CanvasSize = UDim2.new()
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.ZIndex = 3
+	list.Parent = parent
+
+	local layout = Instance.new("UIListLayout")
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, 6)
+	layout.Parent = list
+
+	for order, candidate in rows do
+		local stat = StatConfig.Get(candidate.StatId)
+		local zone = ZoneConfig.Get(candidate.ZoneId)
+		if stat == nil then
+			continue
+		end
+
+		local unlocked = destinationUnlocked(data, candidate)
+
+		local row = Instance.new("TextButton")
+		row.Name = candidate.Id
+		row.LayoutOrder = order
+		row.Size = UDim2.new(1, -6, 0, 56)
+		row.BackgroundColor3 = UI.Palette.Glass
+		row.BackgroundTransparency = if unlocked then 0.12 else 0.4
+		row.BorderSizePixel = 0
+		row.AutoButtonColor = false
+		row.Text = ""
+		row.ZIndex = 4
+		row.Parent = list
+		addCorner(row, 7)
+		addBorder(row, stat.Color, if unlocked then 0.25 else 0.7, 1)
+		UI.Pressable(row, { PressScale = 0.98, HoverScale = 1.01 })
+
+		local icon = Instance.new("Frame")
+		icon.Name = "Icon"
+		icon.AnchorPoint = Vector2.new(0, 0.5)
+		icon.Position = UDim2.new(0, 8, 0.5, 0)
+		icon.Size = UDim2.fromOffset(30, 30)
+		icon.BackgroundTransparency = 1
+		icon.ZIndex = 5
+		icon.Parent = row
+		Icons.Draw(stat.Icon, icon, stat.Color, UI.Palette.CartoonInk)
+
+		local name = UI.Label("Name", row)
+		name.Position = UDim2.fromOffset(46, 6)
+		name.Size = UDim2.new(1, -56, 0, 18)
+		name.Font = UI.Font.Heading
+		name.TextSize = 12
+		name.TextColor3 = if unlocked then UI.Palette.Text else UI.Palette.TextMuted
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		name.ZIndex = 5
+		name.Text = if zone ~= nil then zone.DisplayName else candidate.LocationName
+
+		local detail = UI.Label("Detail", row)
+		detail.Position = UDim2.fromOffset(46, 24)
+		detail.Size = UDim2.new(1, -56, 0, 16)
+		detail.TextSize = 11
+		detail.TextColor3 = stat.Color
+		detail.ZIndex = 5
+		detail.Text = `×{NumberFormat.Format(candidate.GainMultiplier)} Multiplier`
+
+		local requirement = UI.Label("Requires", row)
+		requirement.Position = UDim2.fromOffset(46, 39)
+		requirement.Size = UDim2.new(1, -56, 0, 14)
+		requirement.TextSize = 10
+		requirement.TextColor3 = if unlocked then UI.Palette.TextMuted else UI.Palette.Danger
+		requirement.ZIndex = 5
+		requirement.Text = if candidate.RequiredStat > 0
+			then `REQUIRES {NumberFormat.Format(candidate.RequiredStat)} {stat.DisplayName}`
+			else "OPEN TO EVERYONE"
+
+		row.Activated:Connect(function()
+			selectedDestination = candidate.Id
+			self:_render()
+		end)
+	end
+end
+
+function FullMapController:_renderSidebar(parent: Frame, data: any?)
 	local destination = if selectedDestination ~= nil
 		then MapRender.GetDestination(selectedDestination)
 		else nil
@@ -248,17 +386,15 @@ function FullMapController:_renderSidebar(parent: Frame, power: number)
 	heading.Font = UI.Font.Heading
 	heading.TextSize = 12
 	heading.TextColor3 = UI.Palette.TextMuted
-	heading.Text = if destination ~= nil and destination.GainMultiplier == currentTrainingMultiplier
-		then "CURRENT POWER TIER"
+	heading.Text = if destination == nil
+		then (if activeStatFilter ~= nil then `{string.upper(activeStatFilter)} TIERS` else "ALL TIERS")
+		elseif
+			destination.GainMultiplier == self:_currentMultiplier(data, destination.StatId)
+		then "CURRENT MUSCLE TIER"
 		else "SELECTED LOCATION"
 
 	if destination == nil then
-		local empty = UI.Label("Empty", parent)
-		empty.Position = UDim2.fromOffset(12, 42)
-		empty.Size = UDim2.new(1, -24, 0, 80)
-		empty.TextWrapped = true
-		empty.TextColor3 = UI.Palette.TextMuted
-		empty.Text = "Select a coloured circle on the map."
+		self:_renderTierList(parent, data)
 		return
 	end
 
@@ -335,7 +471,8 @@ function FullMapController:_renderSidebar(parent: Frame, power: number)
 	accessLabel.TextColor3 = UI.Palette.TextMuted
 	accessLabel.Text = access
 
-	local shortfall = destination.RequiredPower - power
+	local relevantStat = statValue(data, destination.StatId)
+	local shortfall = destination.RequiredStat - relevantStat
 	local powerLabel = UI.Label("Power", parent)
 	powerLabel.Position = UDim2.fromOffset(12, 230)
 	powerLabel.Size = UDim2.new(1, -24, 0, 44)
@@ -344,10 +481,13 @@ function FullMapController:_renderSidebar(parent: Frame, power: number)
 	powerLabel.TextWrapped = true
 	if shortfall > 0 then
 		powerLabel.TextColor3 = UI.Palette.Danger
-		powerLabel.Text = `POWER LOCKED\nNEED {NumberFormat.Format(shortfall)} MORE`
+		powerLabel.Text =
+			`{string.upper(stat.DisplayName)} LOCKED\nNEED {NumberFormat.Format(shortfall)} MORE`
 	else
 		powerLabel.TextColor3 = UI.Palette.Vital
-		powerLabel.Text = `POWER UNLOCKED\n{NumberFormat.Format(destination.RequiredPower)} REQUIRED`
+		powerLabel.Text = `{string.upper(stat.DisplayName)} UNLOCKED\n{NumberFormat.Format(
+			destination.RequiredStat
+		)} REQUIRED`
 	end
 
 	local rule = Instance.new("Frame")
@@ -364,7 +504,7 @@ function FullMapController:_renderSidebar(parent: Frame, power: number)
 	actionHint.TextWrapped = true
 	actionHint.TextSize = 11
 	actionHint.TextColor3 = UI.Palette.TextMuted
-	actionHint.Text = "Track is always free. Teleport requires Fast Travel and enough Power."
+	actionHint.Text = `Track is free. Teleport needs Fast Travel and enough {stat.DisplayName}.`
 
 	self:_sideButton(parent, "Track", "TRACK", UDim2.new(0, 10, 1, -108), stat.Color, true, function()
 		self:_track(destination)
@@ -404,11 +544,19 @@ function FullMapController:_render()
 
 	self:_fetchMap()
 	local data = ProfileController:Get()
-	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
-	renderedPower = power
-	currentTrainingMultiplier = self:_currentMultiplier(power)
 	if selectedDestination ~= nil and MapRender.GetDestination(selectedDestination) == nil then
 		selectedDestination = nil
+	end
+	local selected = if selectedDestination ~= nil then MapRender.GetDestination(selectedDestination) else nil
+	if selected ~= nil and activeStatFilter ~= nil and selected.StatId ~= activeStatFilter then
+		selectedDestination = nil
+	end
+
+	local visibleDestinations: { Destination } = {}
+	for _, destination in destinations do
+		if activeStatFilter == nil or destination.StatId == activeStatFilter then
+			table.insert(visibleDestinations, destination)
+		end
 	end
 
 	content:ClearAllChildren()
@@ -417,7 +565,7 @@ function FullMapController:_render()
 	board.Name = "MapBoard"
 	board.ZIndex = 1
 	board.Size = UDim2.new(1, -SIDEBAR_WIDTH - CONTENT_GAP, 1, 0)
-	board.BackgroundColor3 = Color3.fromRGB(20, 24, 25)
+	board.BackgroundColor3 = UI.Palette.Backdrop
 	board.BorderSizePixel = 0
 	board.ClipsDescendants = true
 	board.Parent = content
@@ -430,7 +578,7 @@ function FullMapController:_render()
 	sidebar.Position = UDim2.fromScale(1, 0)
 	sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, 0)
 	sidebar.BackgroundTransparency = 0.02
-	self:_renderSidebar(sidebar, power)
+	self:_renderSidebar(sidebar, data)
 
 	if #destinations == 0 then
 		local loading = UI.Label("Loading", board)
@@ -451,7 +599,7 @@ function FullMapController:_render()
 	viewport.Name = "Viewport"
 	viewport.Active = true
 	viewport.Size = UDim2.fromScale(1, 1)
-	viewport.BackgroundColor3 = Color3.fromRGB(20, 24, 25)
+	viewport.BackgroundColor3 = UI.Palette.Backdrop
 	viewport.BorderSizePixel = 0
 	viewport.ClipsDescendants = true
 	viewport.ScrollingEnabled = false
@@ -509,13 +657,73 @@ function FullMapController:_render()
 	local mapShade = Instance.new("Frame")
 	mapShade.Name = "MapShade"
 	mapShade.Size = UDim2.fromScale(1, 1)
-	mapShade.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
+	mapShade.BackgroundColor3 = UI.Palette.Backdrop
 	mapShade.BackgroundTransparency = 0.18
 	mapShade.BorderSizePixel = 0
 	mapShade.ZIndex = 10
 	mapShade.Parent = viewport
 	mapShade.Position = canvas.Position
 	mapShade.Size = canvas.Size
+
+	-- Muscle tabs filter destinations, not geography. "ALL" restores the ordinary map;
+	-- every filtered view still shows the same roads, buildings and the player's marker.
+	local filterBar = Instance.new("Frame")
+	filterBar.Name = "MuscleFilters"
+	filterBar.Position = UDim2.fromOffset(12, 12)
+	filterBar.Size = UDim2.new(1, -24, 0, 40)
+	filterBar.BackgroundColor3 = UI.Palette.Backdrop
+	filterBar.BackgroundTransparency = 0.05
+	filterBar.BorderSizePixel = 0
+	filterBar.ZIndex = 70
+	filterBar.Parent = board
+	addCorner(filterBar, 8)
+	addBorder(filterBar, UI.Palette.GlassStroke, 0.4, 1)
+
+	local filterGrid = Instance.new("UIGridLayout")
+	filterGrid.CellSize = UDim2.new(1 / (#StatConfig.List + 1), -6, 1, -8)
+	filterGrid.CellPadding = UDim2.fromOffset(5, 0)
+	filterGrid.FillDirection = Enum.FillDirection.Horizontal
+	filterGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	filterGrid.VerticalAlignment = Enum.VerticalAlignment.Center
+	filterGrid.SortOrder = Enum.SortOrder.LayoutOrder
+	filterGrid.Parent = filterBar
+
+	local filterSpecs: { { Id: string?, Name: string, Color: Color3 } } = {
+		{ Id = nil, Name = "ALL", Color = UI.Palette.Accent },
+	}
+	for _, definition in StatConfig.List do
+		table.insert(filterSpecs, {
+			Id = definition.Id,
+			Name = string.upper(definition.DisplayName),
+			Color = definition.Color,
+		})
+	end
+	for order, spec in filterSpecs do
+		local chosen = activeStatFilter == spec.Id
+		local button = Instance.new("TextButton")
+		button.Name = spec.Name
+		button.LayoutOrder = order
+		button.BackgroundColor3 = if chosen then spec.Color else UI.Palette.Glass
+		button.BackgroundTransparency = if chosen then 0.08 else 0.24
+		button.BorderSizePixel = 0
+		button.AutoButtonColor = false
+		button.Font = UI.Font.Heading
+		button.TextSize = 10
+		button.TextColor3 = if chosen then UI.Palette.OnAccent else UI.Palette.TextMuted
+		button.Text = spec.Name
+		button.ZIndex = 71
+		button.Parent = filterBar
+		addCorner(button, 6)
+		UI.Pressable(button, { PressScale = 0.96, HoverScale = 1.02 })
+		button.Activated:Connect(function()
+			if activeStatFilter == spec.Id then
+				return
+			end
+			activeStatFilter = spec.Id
+			selectedDestination = nil
+			self:_render()
+		end)
+	end
 
 	local hub = UI.Label("Hub", viewport)
 	hub.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -524,22 +732,34 @@ function FullMapController:_render()
 	hub.TextXAlignment = Enum.TextXAlignment.Center
 	hub.Font = UI.Font.Heading
 	hub.TextSize = 10
-	hub.TextColor3 = Color3.fromRGB(0, 118, 160)
+	hub.TextColor3 = UI.Palette.Token
 	hub.Text = "◆ SPAWN"
 	hub.ZIndex = 24
 	registerMapItem(hub)
 
 	local unlockedCount = 0
 	local pinRecords: { [string]: { Button: TextButton, Stroke: UIStroke } } = {}
-	local clusterMembers: { [string]: { Destination } } = {}
-	for _, destination in destinations do
-		local key = destinationCluster(destination)
-		local members = clusterMembers[key]
-		if members == nil then
-			members = {}
-			clusterMembers[key] = members
+
+	-- Greedy grouping by actual proximity. A destination joins the first group
+	-- whose anchor it would overlap, otherwise it starts its own -- which is the
+	-- common case now, and means the pin keeps its exact position.
+	local threshold = overlapDistance(bounds)
+	local clusterMembers: { { Destination } } = {}
+	for _, destination in visibleDestinations do
+		local placed = false
+		for _, members in clusterMembers do
+			local anchor = members[1].Position
+			local dx = destination.Position.X - anchor.X
+			local dz = destination.Position.Z - anchor.Z
+			if math.sqrt(dx * dx + dz * dz) <= threshold then
+				table.insert(members, destination)
+				placed = true
+				break
+			end
 		end
-		table.insert(members, destination)
+		if not placed then
+			table.insert(clusterMembers, { destination })
+		end
 	end
 
 	local pinPositions: { [string]: UDim2 } = {}
@@ -556,13 +776,23 @@ function FullMapController:_render()
 			return a.Id < b.Id
 		end)
 
+		-- A pin on its own is drawn exactly where its machine is. Only pins that
+		-- would sit on top of each other are nudged apart, and then around their
+		-- shared centre -- which is honest, because they really are in the same
+		-- place at this scale.
+		if #members == 1 then
+			local at = members[1].Position
+			pinPositions[members[1].Id] = project(at.X, at.Z)
+			continue
+		end
+
 		local sum = Vector3.zero
 		for _, destination in members do
 			sum += destination.Position
 		end
 		local centre = sum / #members
 		local projectedCentre = project(centre.X, centre.Z)
-		local radius = if #members == 1 then 0 else 18 + #members * 2.6
+		local radius = 18 + #members * 2.6
 		for index, destination in members do
 			local angle = math.rad(-90 + (index - 1) * 360 / #members)
 			local offset = Vector2.new(math.cos(angle), math.sin(angle)) * radius
@@ -575,17 +805,17 @@ function FullMapController:_render()
 		end
 	end
 
-	for _, destination in destinations do
+	for _, destination in visibleDestinations do
 		local stat = StatConfig.Get(destination.StatId)
 		if stat == nil then
 			continue
 		end
-		local unlocked = power >= destination.RequiredPower
+		local unlocked = destinationUnlocked(data, destination)
 		if unlocked then
 			unlockedCount += 1
 		end
 		local selected = selectedDestination == destination.Id
-		local currentTier = destination.GainMultiplier == currentTrainingMultiplier
+		local currentTier = destination.GainMultiplier == self:_currentMultiplier(data, destination.StatId)
 		local pin = Instance.new("TextButton")
 		pin.Name = destination.Id
 		pin.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -641,7 +871,7 @@ function FullMapController:_render()
 					child:Destroy()
 				end
 			end
-			self:_renderSidebar(sidebar, power)
+			self:_renderSidebar(sidebar, data)
 		end)
 	end
 
@@ -876,12 +1106,8 @@ function FullMapController:_render()
 	status.TextSize = 10
 	status.TextColor3 = UI.Palette.Text
 	status.TextXAlignment = Enum.TextXAlignment.Center
-	if currentTrainingMultiplier ~= nil then
-		status.Text =
-			`CURRENT TRAINING TIER ×{NumberFormat.Format(currentTrainingMultiplier)}  ·  {unlockedCount}/{#destinations} OPEN`
-	else
-		status.Text = `{unlockedCount}/{#destinations} OPEN  ·  DRAG TO PAN  ·  WHEEL OR +/− TO ZOOM`
-	end
+	local filterName = if activeStatFilter ~= nil then string.upper(activeStatFilter) else "ALL MUSCLES"
+	status.Text = `{unlockedCount}/{#visibleDestinations} OPEN  ·  {filterName}  ·  TRACK FREE`
 	status.ZIndex = 60
 	addCorner(status, 7)
 	addBorder(status, UI.Palette.GlassStroke, 0.5, 1)
@@ -912,7 +1138,7 @@ function FullMapController:_build()
 	local scrim = Instance.new("Frame")
 	scrim.Name = "Scrim"
 	scrim.Size = UDim2.fromScale(1, 1)
-	scrim.BackgroundColor3 = Color3.new(0, 0, 0)
+	scrim.BackgroundColor3 = UI.Palette.CartoonInk
 	scrim.BackgroundTransparency = 0.42
 	scrim.BorderSizePixel = 0
 	scrim.Active = true
@@ -986,16 +1212,31 @@ function FullMapController:IsOpen(): boolean
 	return isOpen
 end
 
-function FullMapController:Open(destinationId: string?)
+function FullMapController:Open(destinationId: string?, statFilter: string?)
 	local MenuController = Loader.Get("MenuController")
 	if MenuController:GetOpenTab() ~= nil then
 		MenuController:Toggle()
 	end
 
 	self:_fetchMap()
+	activeStatFilter = if statFilter ~= nil and StatConfig.Get(statFilter) ~= nil then statFilter else nil
 	selectedDestination = if destinationId ~= nil and MapRender.GetDestination(destinationId) ~= nil
 		then destinationId
 		else nil
+
+	-- Always open framed on the whole city.
+	--
+	-- `mapZoom` and `mapCenter` live at module scope so a drag survives a re-render,
+	-- which is right while the map is up and wrong the moment it closes: the next open
+	-- restored whatever corner you happened to leave it in, so the map appeared to show
+	-- a random place. Measured at 4x zoom that is 6 of 35 destinations on screen, with
+	-- no cue that the other 29 exist off the edge.
+	--
+	-- Opening is the one moment the map is being asked "where is everything", so it
+	-- answers that. The home control still re-frames mid-session.
+	mapZoom = 1
+	mapCenter = Vector2.new(0.5, 0.5)
+
 	isOpen = true
 	screen.Enabled = true
 	self:_fetchTravelAccess()
@@ -1008,14 +1249,17 @@ end
 function FullMapController:OpenForStat(statId: string)
 	self:_fetchMap()
 	local data = ProfileController:Get()
-	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
 	local chosen: Destination? = nil
 	for _, destination in destinations do
-		if destination.StatId == statId and (chosen == nil or power >= destination.RequiredPower) then
+		if
+			destination.StatId == statId
+			and destinationUnlocked(data, destination)
+			and (chosen == nil or destination.GainMultiplier > chosen.GainMultiplier)
+		then
 			chosen = destination
 		end
 	end
-	self:Open(if chosen ~= nil then chosen.Id else nil)
+	self:Open(if chosen ~= nil then chosen.Id else nil, statId)
 end
 
 function FullMapController:Close()
@@ -1042,25 +1286,7 @@ function FullMapController:Start()
 		if not isOpen then
 			return
 		end
-		local data = ProfileController:Get()
-		local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
-		local nextMultiplier = self:_currentMultiplier(power)
-		if nextMultiplier ~= currentTrainingMultiplier then
-			local selected = if selectedDestination ~= nil
-				then MapRender.GetDestination(selectedDestination)
-				else nil
-			if selected ~= nil and selected.GainMultiplier == currentTrainingMultiplier then
-				selectedDestination = nil
-			end
-			self:_render()
-			return
-		end
-		for _, destination in destinations do
-			if (renderedPower >= destination.RequiredPower) ~= (power >= destination.RequiredPower) then
-				self:_render()
-				return
-			end
-		end
+		self:_render()
 	end)
 
 	-- A successful purchase should unlock the button before the player closes the map.
