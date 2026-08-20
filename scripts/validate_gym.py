@@ -1627,6 +1627,89 @@ def validate_roof_access(validator: Validator, structure: Any) -> None:
         )
 
 
+# The starter ring is a plaza, not a scatter, so it gets its own numbers rather
+# than an exemption from MIN_SITE_SEPARATION. Weakening 700 to accommodate it
+# would silently permit two x64 machines to be built ninety studs apart on
+# opposite sides of the map, which is the thing that rule exists to stop.
+MIN_RING_SEPARATION = 80
+MIN_RING_SAFE_ZONE_GAP = 30
+MAX_RING_WALK = 220
+# Half the diagonal of a 44x42 court, so the clearance holds at any yaw.
+COURT_HALF_DIAGONAL = 30.4
+
+
+def validate_garage_ring(validator: Validator, builder: ModuleType) -> None:
+    """The five starter machines ring the spawn plaza, outside the safe zone.
+
+    Every other machine is chosen from whatever the city generator built. These
+    five are the one place that has to be somewhere specific: a player who has
+    just spawned has no Tokens and no travel, so if the starter tier drifts back
+    out into the map there is nothing to do on the first visit.
+    """
+    sites = builder.garage_ring_sites()
+    validator.check(
+        len(sites) == len(builder.FAMILY_ORDER),
+        f"the starter ring should hold one machine per muscle, found {len(sites)}",
+    )
+    validator.check(
+        all(site["kind"] == "ground" for site in sites),
+        "starter machines must stand at street level; a new player cannot be asked "
+        "to find a fire escape before they have trained anything",
+    )
+
+    for site in sites:
+        walk = math.hypot(site["x"], site["z"])
+        validator.check(
+            walk <= MAX_RING_WALK,
+            f"a starter machine is {walk:.0f} studs from spawn, past the "
+            f"{MAX_RING_WALK} that still reads as ringing the plaza",
+        )
+
+        # Outside the safe-zone box, measured to the court's corner. Inside it,
+        # TokenService pays nothing -- "no pay where you cannot be hit" -- so a
+        # starter gym in the safe zone would grow stats while earning none of the
+        # currency that buys multipliers.
+        reach = max(abs(site["x"]), abs(site["z"])) - COURT_HALF_DIAGONAL
+        validator.check(
+            reach >= builder.SAFE_ZONE_HALF + MIN_RING_SAFE_ZONE_GAP,
+            f"a starter court reaches {reach:.0f} studs from spawn, inside or too "
+            f"near the {builder.SAFE_ZONE_HALF}-stud safe zone, where training earns "
+            "no Tokens",
+        )
+
+        validator.check(
+            builder._off_road(site["x"], site["z"]),
+            f"a starter machine stands in the roadway at ({site['x']:.0f}, {site['z']:.0f})",
+        )
+
+        # Clear of the campus slab, whose top face sits 0.02 studs from a court's.
+        validator.check(
+            site["z"] + COURT_HALF_DIAGONAL < 15,
+            f"a starter court at z {site['z']:.0f} overlaps the campus floor, whose "
+            "top face is close enough to a court's to z-fight",
+        )
+
+    for index, a in enumerate(sites):
+        for b in sites[index + 1:]:
+            gap = math.hypot(a["x"] - b["x"], a["z"] - b["z"])
+            validator.check(
+                gap >= MIN_RING_SEPARATION,
+                f"two starter machines are {gap:.0f} studs apart, under the "
+                f"{MIN_RING_SEPARATION} that keeps their zone volumes from touching",
+            )
+
+    # The two pools must never interleave, or a scattered machine could land in
+    # the ring and its volume overlap a starter one -- a cross-tier overlap, which
+    # ZoneConfig resolves by taking the higher multiplier.
+    for site in sites:
+        for other in builder.scatter_sites():
+            gap = math.hypot(site["x"] - other["x"], site["z"] - other["z"])
+            validator.check(
+                gap > COURT_HALF_DIAGONAL * 2,
+                f"a scattered machine sits {gap:.0f} studs from a starter one",
+            )
+
+
 def validate_streaming_density(validator: Validator, payloads: Iterable[Any]) -> None:
     """No single streaming bubble may carry too much.
 
@@ -1998,6 +2081,7 @@ def run() -> int:
         validate_streaming_density(validator, (first_structure, first_machines))
         validate_building_budget(validator, (first_structure,))
         validate_scatter_separation(validator, builder)
+        validate_garage_ring(validator, builder)
         validate_station_zone_volumes(validator, builder, first_structure, station_by_id)
         validate_hostile_scatter(validator, builder)
         validate_roof_access(validator, first_structure)
