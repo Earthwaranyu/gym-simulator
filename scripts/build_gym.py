@@ -3581,10 +3581,11 @@ def sector_for(x):
 
 
 # Stride used to walk the scattered sites when handing out tier/muscle pairs.
-# Coprime with 35, so stepping by it visits every site exactly once and lands each
-# tier's five machines about seven sites apart in distance from spawn. That is
-# what keeps the tiers genuinely interleaved: no band of the map belongs to one
-# multiplier, which is the point of scattering rather than zoning.
+# Coprime with 30, so stepping by it visits every scattered site exactly once and
+# lands each tier's five machines about six sites apart in distance from spawn.
+# That is what keeps the tiers genuinely interleaved: no band of the map belongs
+# to one multiplier, which is the point of scattering rather than zoning. The
+# starter tier is not in this pool at all -- it rings the plaza.
 SITE_STRIDE = 13
 
 
@@ -3620,13 +3621,20 @@ def connected_locations():
     tier_rows = DISTRICTS[:7]
     # Nearest the spawn plaza first, which is the only ordering a player can
     # perceive, and the one the stride below is meant to interleave.
-    sites = sorted(scatter_sites(),
-                   key=lambda site: math.hypot(site["x"], site["z"] - 150))
+    scattered = sorted(scatter_sites(),
+                       key=lambda site: math.hypot(site["x"], site["z"] - 150))
+    ring = garage_ring_sites()
 
     pairs = [(row["zone"], family) for row in tier_rows for family in FAMILY_ORDER]
     out = []
-    for pair_index, (zone, family) in enumerate(pairs):
-        site = sites[(pair_index * SITE_STRIDE) % len(sites)]
+    scattered_index, ring_index = 0, 0
+    for zone, family in pairs:
+        if zone == STARTER_ZONE:
+            site = ring[ring_index]
+            ring_index += 1
+        else:
+            site = scattered[(scattered_index * SITE_STRIDE) % len(scattered)]
+            scattered_index += 1
         tier_index = next(i for i, row in enumerate(tier_rows) if row["zone"] == zone)
         equipment_id = STAT_VARIANTS[family][tier_index]
 
@@ -4478,10 +4486,29 @@ ROAD_SITE_CLEARANCE = 70
 HUB_SITE_CLEARANCE = 460
 
 # Five muscles across seven tiers: one site per machine.
-SCATTERED_SITE_COUNT = len(FAMILY_ORDER) * len(STAT_VARIANTS["Chest"])
+# The starter tier no longer draws from the scattered pool: its five machines ring
+# the spawn plaza instead, so a new player has something to train on before they
+# have any way to travel.
+STARTER_ZONE = "Garage"
+SCATTERED_SITE_COUNT = len(FAMILY_ORDER) * (len(STAT_VARIANTS["Chest"]) - 1)
 
 # How many of those stand on rooftops. The rest are street and park level.
-ROOF_SITE_QUOTA = 12
+ROOF_SITE_QUOTA = 10
+
+# The starter ring, as a horseshoe open toward the campus rather than a full
+# circle. The +z half of the plaza is not free: the campus floor begins at z 15,
+# the coach stands at (0, 32) and the entrance beacons at (+/-52, 28). A ring
+# through them would put a court on the campus slab, whose top face is 0.02 studs
+# from a court's own -- the tight kind of coplanar pair that z-fights.
+#
+# So the arc runs from due east round through south to due west, into the empty
+# band between the plaza and the first city block at z -180.
+GARAGE_RING_CENTER = (0, -25)
+GARAGE_RING_RADIUS = 120
+GARAGE_RING_ANGLES = (90, 135, 180, 225, 270)
+# Reported to the builders as the site's footprint. Comfortably larger than the
+# 44x42 court so nothing reads as crowded.
+GARAGE_RING_SITE_SPAN = 60
 
 
 def _off_road(x, z):
@@ -4493,6 +4520,42 @@ def _off_road(x, z):
            for centre in UPLAND_AVENUES):
         return False
     return True
+
+
+def garage_ring_sites():
+    """The five starter machines, ringing the spawn plaza.
+
+    Authored rather than selected. Every other machine is chosen from whatever the
+    city generator happened to build, which is what makes the world feel found; the
+    starter five are the one place that has to be somewhere specific, because a
+    player who has just spawned has no Tokens, no travel and no reason to walk
+    eight thousand studs on faith.
+
+    Deliberately *outside* the spawn safe zone. Safe zones block Token accrual --
+    "no pay where you cannot be hit" -- so a protected starter gym would grow
+    stats while paying nothing, and Tokens are what buy the multipliers. Outside
+    also means the first five machines still teach that this is a PvP game.
+
+    Returns the same shape site_candidates does, so connected_locations needs no
+    special case beyond choosing which pool a tier draws from.
+    """
+    centre_x, centre_z = GARAGE_RING_CENTER
+    out = []
+    for angle in GARAGE_RING_ANGLES:
+        theta = math.radians(angle)
+        out.append({
+            "kind": "ground",
+            "x": centre_x + GARAGE_RING_RADIUS * math.sin(theta),
+            "z": centre_z + GARAGE_RING_RADIUS * math.cos(theta),
+            "top": FLOOR_TOP,
+            "width": GARAGE_RING_SITE_SPAN,
+            "depth": GARAGE_RING_SITE_SPAN,
+            "base_depth": GARAGE_RING_SITE_SPAN,
+            # Facing the plaza, so a player walking out of spawn meets the front of
+            # each machine rather than its back.
+            "yaw": angle,
+        })
+    return out
 
 
 def site_candidates():
@@ -5311,7 +5374,10 @@ def build_connected_world():
     ))
 
     locations = connected_locations()
-    hostile = scatter_hostile_sites(scatter_sites())
+    # Measured against all 35 courts, not just the scattered thirty. The starter
+    # ring is where brand-new players train, and a boss arena landing beside it is
+    # the last thing that should happen.
+    hostile = scatter_hostile_sites(scatter_sites() + garage_ring_sites())
 
     # The hub is now the only place with a shop and a coach. Seven campuses each
     # carrying their own was seven walks to the same conversation.

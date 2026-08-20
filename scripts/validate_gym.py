@@ -1386,7 +1386,10 @@ MAX_RAMP_PITCH = 40.0
 
 
 def validate_scatter_separation(validator: Validator, builder: ModuleType) -> None:
-    """The scattered sites are the right number, far enough apart, and off the road.
+    """The scattered thirty are the right number, far enough apart, and off the road.
+
+    Thirty, not thirty-five: the starter tier rings the spawn plaza and is checked
+    by validate_garage_ring against its own, deliberately different rule.
 
     Checked against the selector directly rather than against the built world, so
     the placement is provably sound before any geometry is moved onto it.
@@ -1397,9 +1400,10 @@ def validate_scatter_separation(validator: Validator, builder: ModuleType) -> No
         validator.fail(f"scatter_sites() raised {type(error).__name__}: {error}")
         return
 
+    expected = builder.SCATTERED_SITE_COUNT
     validator.check(
-        len(sites) == EXPECTED_STATIONS,
-        f"scatter_sites returned {len(sites)} sites, expected {EXPECTED_STATIONS}",
+        len(sites) == expected,
+        f"scatter_sites returned {len(sites)} sites, expected {expected}",
     )
 
     worst, worst_pair = math.inf, None
@@ -1516,7 +1520,9 @@ def validate_hostile_scatter(validator: Validator, builder: ModuleType) -> None:
     fight is somewhere you choose to walk to, and why this clearance is a rule
     rather than a preference.
     """
-    stations = builder.scatter_sites()
+    # All 35 courts, matching what the builder does: the starter ring is where new
+    # players train and must be kept as clear of hostile ground as anywhere else.
+    stations = builder.scatter_sites() + builder.garage_ring_sites()
     sites = builder.scatter_hostile_sites(stations)
 
     validator.check(len(sites) == 14, f"expected 14 hostile sites, found {len(sites)}")
