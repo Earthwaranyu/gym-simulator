@@ -203,7 +203,13 @@ function GaitController:_apply(delta: number)
 			entry.weight = math.min(1, entry.weight + delta / GaitConfig.BLEND_IN_SECONDS)
 
 			local walkSpeed, topSpeed = speedRange()
-			local target = Formulas.GaitBlend(speed, walkSpeed, topSpeed)
+			-- Capped, so the pose never escalates past what a player with no Legs
+			-- already sees when they hold shift. Applied here rather than inside
+			-- Formulas.GaitBlend on purpose: VfxController computes its own blend
+			-- from that same function for speed lines and the sprint burst, and
+			-- those are a fine "you are fast" cue that has nothing to do with the
+			-- walk cycle. Capping the shared formula would silently take them too.
+			local target = math.min(Formulas.GaitBlend(speed, walkSpeed, topSpeed), GaitConfig.MAX_POSE_BLEND)
 			entry.blend += (target - entry.blend) * math.min(1, GaitConfig.BLEND_RESPONSIVENESS * delta)
 
 			-- The trick, and the one place this cannot copy TrainingPoseController.

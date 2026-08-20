@@ -259,6 +259,24 @@ GaitConfig.Dash = DASH
 ]]
 GaitConfig.SPRINT_FRACTION = 0.15
 
+--[[
+	The furthest along the walk-sprint-dash blend a pose is ever allowed to travel.
+
+	Derived, not chosen: it is exactly the blend a player with no Legs at all gets
+	when they hold shift. So the gait a new character has is the gait every
+	character has, at any power -- which is the look this game wants.
+
+	This deliberately retires the design the comment above `speedRange` describes,
+	where the ninja run was something Legs earned. The dash pose is still authored
+	and still in this file; it is one constant away from being reachable again.
+
+	Note what this does *not* touch: nothing here changes how fast anybody moves.
+	A maxed sprinter still covers 64 studs a second. Only the pose stops escalating,
+	and the stride keeps tracking the ground underneath it.
+]]
+GaitConfig.MAX_POSE_BLEND =
+	Formulas.GaitBlend(Formulas.SprintSpeed(0), Formulas.WalkSpeed(0), Formulas.SPRINT_CEILING)
+
 local byId: { [string]: Gait } = {}
 for _, gait in gaits do
 	if byId[gait.Id] ~= nil then
@@ -531,6 +549,19 @@ function GaitConfig.RunSelfTest(): { string }
 	for _, gait in gaits do
 		check(gait.Pose.MotionStyle == "Snapped", `{gait.Id} uses the snapped timing`)
 	end
+
+	-- The cap has to reach at least the sprint silhouette. Raise SPRINT_FRACTION past
+	-- it and the pose would freeze part-way through walk-to-sprint, so every player at
+	-- every power would look like they were jogging -- a change nobody would connect
+	-- back to a constant in a different file.
+	check(
+		GaitConfig.MAX_POSE_BLEND >= GaitConfig.SPRINT_FRACTION,
+		"the pose ceiling reaches at least the sprint silhouette"
+	)
+	check(
+		GaitConfig.MAX_POSE_BLEND > 0 and GaitConfig.MAX_POSE_BLEND < 1,
+		"the pose ceiling is a cap, not a fixed pose"
+	)
 
 	check(#GaitConfig.FOOTFALL_PHASES == 2, "a stride plants two feet")
 	for _, footfall in GaitConfig.FOOTFALL_PHASES do
