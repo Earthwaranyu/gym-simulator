@@ -1815,6 +1815,65 @@ def validate_roof_site_pool(validator: Validator, builder: ModuleType) -> None:
     )
 
 
+def validate_map_truthfulness(validator: Validator, machines: Any) -> None:
+    """What the map says about a machine matches the machine.
+
+    This exists because the map lied for two tasks and nothing noticed. Every
+    coordinate was correct the whole time; the fault was in what the map was told
+    to display and where it chose to draw it, which no check was looking at.
+
+    So: the muscle a station advertises is the muscle its equipment trains, its
+    location name is not a stale stock phrase, and the point the map sends a
+    player to is next to the machine rather than somewhere else entirely.
+    """
+    # Read from EquipmentConfig.luau, which is what the game itself uses, so this
+    # is a genuine cross-check between the shipped config and the built world
+    # rather than the world agreeing with itself.
+    families = {
+        equipment_id: fields["ExerciseFamily"]
+        for equipment_id, fields in parse_equipment_config().items()
+    }
+    stale = ("Civic Park Gym", "Boardwalk Barbell Club", "Freight Yard Strength",
+             "Titan Square", "Apex Office Gym", "Stormline Rooftop")
+
+    seen = 0
+    for node in walk(machines):
+        attributes = node.get("attributes") or {}
+        equipment_id = attributes.get("EquipmentId")
+        if not isinstance(equipment_id, str):
+            continue
+        seen += 1
+        travel_id = str(attributes.get("TravelId", "?"))
+
+        advertised = attributes.get("ExerciseFamily")
+        actual = families.get(equipment_id)
+        validator.check(
+            actual is None or advertised == actual,
+            f"{travel_id}: the map calls it {advertised} but {equipment_id} trains {actual}",
+        )
+
+        name = str(attributes.get("LocationName", ""))
+        validator.check(
+            name != "" and not any(dead in name for dead in stale),
+            f"{travel_id}: location name {name!r} names a place that no longer exists",
+        )
+
+        # The landing point is what the map sends you to. It has to be at the
+        # machine, not merely somewhere in the same district.
+        anchor = named_parts(node, "TrainAnchor")
+        landing = named_parts(node, "TrainExit")
+        if anchor and landing:
+            here, there = position(anchor[0]), position(landing[0])
+            if here is not None and there is not None:
+                gap = math.hypot(here[0] - there[0], here[2] - there[2])
+                validator.check(
+                    gap <= 120,
+                    f"{travel_id}: the map lands a player {gap:.0f} studs from the machine",
+                )
+
+    validator.check(seen > 0, "no stations found to check the map against")
+
+
 def validate_streaming_density(validator: Validator, payloads: Iterable[Any]) -> None:
     """No single streaming bubble may carry too much.
 
@@ -2187,6 +2246,7 @@ def run() -> int:
         validate_building_budget(validator, (first_structure,))
         validate_building_variety(validator, first_structure)
         validate_roof_site_pool(validator, builder)
+        validate_map_truthfulness(validator, first_machines)
         validate_scatter_separation(validator, builder)
         validate_garage_ring(validator, builder)
         validate_station_zone_volumes(validator, builder, first_structure, station_by_id)
