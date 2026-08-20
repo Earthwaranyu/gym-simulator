@@ -3550,40 +3550,38 @@ REGIONS = [MAINLAND]
 REGION_BY_ID = {MAINLAND["id"]: MAINLAND}
 
 
+# What survives of the six campuses: their positions and venue types, which still
+# decide the architectural character of the city around them. Their display names
+# are gone -- nothing read them once the campuses were dissolved, and leaving
+# names for demolished places in the source is how they crept back into the map.
 CITY_AREA_SPECS = (
     {
-        "zone": "Iron", "sequence": 1, "venue_type": "Park",
-        "display_name": "Civic Park Gym", "x": 1750, "z": -2250, "yaw": 12,
+        "zone": "Iron", "sequence": 1, "venue_type": "Park", "x": 1750, "z": -2250, "yaw": 12,
         "altitude": 0, "flight_only": False,
         "tagline": "Train beneath the trees in the public fitness garden.",
     },
     {
-        "zone": "Powerhouse", "sequence": 2, "venue_type": "Beach",
-        "display_name": "Boardwalk Barbell Club", "x": 3850, "z": 105, "yaw": -7,
+        "zone": "Powerhouse", "sequence": 2, "venue_type": "Beach", "x": 3850, "z": 105, "yaw": -7,
         "altitude": 0, "flight_only": False,
         "tagline": "An open-air club between the boardwalk and the surf.",
     },
     {
-        "zone": "Strongman", "sequence": 3, "venue_type": "Dock",
-        "display_name": "Freight Yard Strength", "x": 6600, "z": -1050, "yaw": 9,
+        "zone": "Strongman", "sequence": 3, "venue_type": "Dock", "x": 6600, "z": -1050, "yaw": 9,
         "altitude": 0, "flight_only": False,
         "tagline": "Heavy steel in the working harbor district.",
     },
     {
-        "zone": "Titan", "sequence": 4, "venue_type": "City",
-        "display_name": "Titan Square", "x": 8650, "z": -4300, "yaw": -14,
+        "zone": "Titan", "sequence": 4, "venue_type": "City", "x": 8650, "z": -4300, "yaw": -14,
         "altitude": 0, "flight_only": False,
         "tagline": "A floodlit performance plaza in the downtown blocks.",
     },
     {
-        "zone": "Skydeck", "sequence": 5, "venue_type": "Office",
-        "display_name": "Apex Office Gym", "x": 12050, "z": -2050, "yaw": 8,
+        "zone": "Skydeck", "sequence": 5, "venue_type": "Office", "x": 12050, "z": -2050, "yaw": 8,
         "altitude": 0, "flight_only": False,
         "tagline": "A glass-walled executive gym inside Apex Tower.",
     },
     {
-        "zone": "Storm", "sequence": 6, "venue_type": "Sky",
-        "display_name": "Stormline Rooftop", "x": 14500, "z": -6100, "yaw": 17,
+        "zone": "Storm", "sequence": 6, "venue_type": "Sky", "x": 14500, "z": -6100, "yaw": 17,
         "altitude": STORM_ALTITUDE, "flight_only": True,
         "tagline": "The final rooftop platform; flight is the only way up.",
     },
