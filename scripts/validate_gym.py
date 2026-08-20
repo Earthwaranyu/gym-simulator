@@ -89,14 +89,19 @@ MAX_MAP_FEATURES = 600
 # client pays is MAX_PARTS_PER_STREAM_CELL below, and these exist to stop the
 # generator producing a world nobody meant to make.
 #
-# 28,000 rather than the 25,000 first planned. That estimate was made before the
+# 34,000 now, and the headroom over the ~27,000 the world currently uses is
+# earmarked: the city is 438 buildings of a single archetype, and giving it a real
+# architectural vocabulary costs parts. Raised before any of that geometry lands so
+# the geometry commits are not also budget commits.
+#
+# 28,000 was the previous figure, itself raised from the 25,000 first planned. That estimate was made before the
 # per-lot keep-out fix, which restored roughly a dozen full blocks that a
 # too-coarse test had been deleting whole. Filling the city honestly costs about
 # 27,300 parts, and hitting a rounder number would have meant thinning the street
 # life this pass exists to add. The number that governs client cost is the cell
 # cap below, and that is unchanged at 444 against a 560 ceiling.
-MAX_BASE_PARTS = 28_000
-MAX_INSTANCES = 31_000
+MAX_BASE_PARTS = 34_000
+MAX_INSTANCES = 38_000
 
 # What a client actually pays for. StreamingEnabled keeps only a radius around the
 # player resident (StreamingTargetRadius 512 in default.project.json), so the global
