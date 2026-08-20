@@ -4323,13 +4323,48 @@ def _mass_prism(ctx, facade):
     return out, {"top": FLOOR_TOP + height, "width": width, "depth": depth, "flat": True}
 
 
+def _roof_clutter(ctx, cap):
+    """The plant a flat roof carries: a stair head, a tank, vents, an aerial.
+
+    Flight means players look down on these constantly, so a bare lid is the one
+    thing a flat roof must not be. Drawn from the building's own stream so two
+    neighbours are not wearing the same arrangement.
+    """
+    brng = ctx["brng"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, top = cap["width"], cap["depth"], cap["top"]
+    if min(w, d) < 18:
+        return []
+
+    skin = ctx["skin"]
+    out = [part("RoofHouse", [w * 0.26, 6, d * 0.26],
+                cf(x + w * 0.17, top + 3, z - d * 0.15),
+                skin["trim"], skin["material"], CanCollide=False)]
+    if brng.random() < 0.65:
+        out.append(cylinder("RoofTank", 7, min(13.0, min(w, d) * 0.22),
+                            mul(cf(x - w * 0.2, top + 5.5, z + d * 0.14), rot_z(90)),
+                            [0.32, 0.28, 0.24], "Metal", CanCollide=False))
+    for vent in (-1, 1):
+        out.append(tube("RoofVent",
+                        (x + vent * w * 0.12, top, z + d * 0.28),
+                        (x + vent * w * 0.12, top + 3.2, z + d * 0.28),
+                        1.5, [0.34, 0.34, 0.36], CanCollide=False))
+    if brng.random() < 0.4:
+        out.append(tube("RoofMast", (x - w * 0.28, top, z - d * 0.26),
+                        (x - w * 0.28, top + 16, z - d * 0.26),
+                        0.7, [0.30, 0.30, 0.33], CanCollide=False))
+    return out
+
+
 def _roof_parapet(ctx, cap):
-    """A flat top with a raised lip, and nothing else on it."""
+    """A flat top with a raised lip, and the plant a real roof carries."""
     skin = ctx["skin"]
     x, z = ctx["x"], ctx["z"]
     w, d, top = cap["width"], cap["depth"], cap["top"]
-    return [part("Parapet", [w + 2, 2.6, d + 2], cf(x, top + 1.3, z),
-                 skin["trim"], skin["material"], CanCollide=False)]
+    out = [part("Parapet", [w + 2, 2.6, d + 2], cf(x, top + 1.3, z),
+                skin["trim"], skin["material"], CanCollide=False)]
+    out.extend(_roof_clutter(ctx, cap))
+    return out
 
 
 def _roof_gable(ctx, cap):
