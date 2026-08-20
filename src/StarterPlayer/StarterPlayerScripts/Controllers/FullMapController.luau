@@ -109,9 +109,14 @@ local function destinationLabel(destination: Destination): (string, Color3)
 	local zone = ZoneConfig.Get(destination.ZoneId)
 	local stat = StatConfig.Get(destination.StatId)
 	local equipmentName = if equipment ~= nil then equipment.DisplayName else destination.EquipmentId
-	local zoneName = if zone ~= nil then zone.DisplayName else destination.LocationName
 	local color = if stat ~= nil then stat.Color else UI.Palette.Accent
-	return `{equipmentName} · {zoneName}`, color
+	-- Where it is, not which tier owns it. A tier is a rank now, and the one thing
+	-- a player tracking a machine across the city needs is the place.
+	local where = if destination.LocationName ~= ""
+		then destination.LocationName
+		elseif zone ~= nil then zone.DisplayName
+		else ""
+	return (if where ~= "" then `{equipmentName} · {where}` else equipmentName), color
 end
 
 -- One island is one multiplier tier, and every station on it shares that island's
@@ -348,7 +353,12 @@ function FullMapController:_renderTierList(parent: Frame, data: any?)
 		name.TextColor3 = if unlocked then UI.Palette.Text else UI.Palette.TextMuted
 		name.TextTruncate = Enum.TextTruncate.AtEnd
 		name.ZIndex = 5
-		name.Text = if zone ~= nil then zone.DisplayName else candidate.LocationName
+		-- The machine, not its tier. Seven Chest machines used to share one row
+		-- label because the label named the tier they belonged to, and after the
+		-- campuses were dissolved that tier was not even a place any more. What a
+		-- player is choosing between is a Bench Press and a Cable Crossover.
+		local rowEquipment = EquipmentConfig.Get(candidate.EquipmentId)
+		name.Text = if rowEquipment ~= nil then rowEquipment.DisplayName else candidate.EquipmentId
 
 		local detail = UI.Label("Detail", row)
 		detail.Position = UDim2.fromOffset(46, 24)
@@ -356,7 +366,9 @@ function FullMapController:_renderTierList(parent: Frame, data: any?)
 		detail.TextSize = 11
 		detail.TextColor3 = stat.Color
 		detail.ZIndex = 5
-		detail.Text = `×{NumberFormat.Format(candidate.GainMultiplier)} Multiplier`
+		detail.Text = if zone ~= nil
+			then `×{NumberFormat.Format(candidate.GainMultiplier)} · {zone.DisplayName}`
+			else `×{NumberFormat.Format(candidate.GainMultiplier)} Multiplier`
 
 		local requirement = UI.Label("Requires", row)
 		requirement.Position = UDim2.fromOffset(46, 39)
