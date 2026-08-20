@@ -4324,6 +4324,163 @@ def _roof_crown(ctx, cap):
                          spire=ctx["skin"]["glass"])
 
 
+def _facade_slots(ctx, volume):
+    """Deep recessed slots instead of glass: the concrete answer.
+
+    Reads as mass with holes cut in it rather than as a frame with glass hung on
+    it, which is the whole difference between a brutalist block and an office.
+    """
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    courses = max(1, min(3, int(share // 26)))
+    for course in range(courses):
+        sy = base_y + share * (course + 0.5) / courses
+        for face in (-1, 1):
+            out.append(part("Slot", [w * 0.62, 6.5, 2.2],
+                            cf(x, sy, z + face * (d / 2 - 1.1)),
+                            [0.06, 0.06, 0.07], "Slate",
+                            CanCollide=False, CastShadow=False))
+    return out
+
+
+def _facade_balconies(ctx, volume):
+    """Projecting balconies with rails: the residential read.
+
+    Kept to nine studs deep, and not for looks: a slab twelve studs or more in
+    both plan directions and under six thick counts as a floor to the coplanar
+    check, and several per building all overlap in plan. Nine studs is both the
+    right depth for a balcony and out of the check entirely.
+    """
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    tiers = max(1, min(3, int(share // 22)))
+    for tier in range(tiers):
+        by = base_y + share * (tier + 1) / (tiers + 1)
+        for face in (-1, 1):
+            out.append(part("Balcony", [w * 0.66, 0.7, 9.0],
+                            cf(x, by, z + face * (d / 2 + 4.0)),
+                            skin["trim"], skin["material"], CanCollide=False))
+            out.append(part("BalconyRail", [w * 0.66, 3.0, 0.4],
+                            cf(x, by + 1.8, z + face * (d / 2 + 8.2)),
+                            skin["glass"], "Glass", Transparency=0.35,
+                            CanCollide=False, CastShadow=False))
+    return out
+
+
+def _facade_arcade(ctx, volume):
+    """A colonnade at street level, glazing above it."""
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    columns = 4 if w < 100 else 6
+    for index in range(columns):
+        cx = x - w / 2 + w * (index + 0.5) / columns
+        out.append(cylinder("Column", 13.0, 4.4,
+                            mul(cf(cx, base_y + 6.5, z + d / 2 + 2.4), rot_z(90)),
+                            skin["trim"], skin["material"]))
+    # The lintel is seven studs deep so it is a beam, not a lid -- under six it
+    # would register as a floor and collide with the podium top beneath it.
+    out.append(part("Lintel", [w + 6, 7.0, 7.0],
+                    cf(x, base_y + 16.5, z + d / 2 + 2.4),
+                    skin["trim"], skin["material"], CanCollide=False))
+    for face in (-1, 1):
+        out.append(part("Glazing", [w - 8, max(4.0, share - 26), 0.7],
+                        cf(x, base_y + 20 + max(4.0, share - 26) / 2, z + face * d / 2),
+                        skin["glass"], "Glass", Transparency=0.3,
+                        CanCollide=False, CastShadow=False))
+    return out
+
+
+def _mass_ziggurat(ctx, facade):
+    """Aggressive setbacks all the way up: the art-deco silhouette.
+
+    Each step is a real block rather than a thin lid, which is both how a
+    ziggurat looks and what keeps a stack of them out of the coplanar check.
+    """
+    skin, brng = ctx["skin"], ctx["brng"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    steps = 4 if height < 160 else 5
+    out = []
+    base_y = FLOOR_TOP
+    w, d = width, depth
+    for level in range(steps):
+        share = height / steps
+        out.append(part("Tier", [w, share, d],
+                        cf(x, base_y + share / 2, z), skin["wall"], skin["material"]))
+        if level == 0:
+            out.extend(facade(ctx, {"width": w, "depth": d, "base_y": base_y,
+                                    "height": share, "level": 0}))
+        for side in (-1, 1):
+            out.append(part("DecoPier", [2.6, share, d * 0.5],
+                            cf(x + side * (w / 2 - 1.3), base_y + share / 2, z),
+                            skin["trim"], skin["material"], CanCollide=False))
+        base_y += share
+        w, d = w * 0.78, d * 0.78
+        if w < 20 or d < 20:
+            break
+    return out, {"top": base_y, "width": w, "depth": d, "flat": True}
+
+
+def _mass_courtyard(ctx, facade):
+    """Two or three bars around an open middle: the perimeter block.
+
+    The inner faces are never seen, so only the outer ones are dressed -- which
+    is what makes an L-plan cost little more than the slab it is built from.
+    """
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    arm = 0.34
+    out = []
+    bars = (
+        (x, z - depth * (0.5 - arm / 2), width, depth * arm),
+        (x - width * (0.5 - arm / 2), z + depth * arm / 2, width * arm, depth * (1 - arm)),
+    )
+    for index, (bx, bz, bw, bd) in enumerate(bars):
+        out.append(part("Wing", [bw, height, bd],
+                        cf(bx, FLOOR_TOP + height / 2, bz),
+                        skin["wall"], skin["material"]))
+        if index == 0:
+            out.extend(facade(ctx, {"width": bw, "depth": bd, "base_y": FLOOR_TOP,
+                                    "height": height, "level": 0}))
+    return out, {"top": FLOOR_TOP + height,
+                 "width": width * arm, "depth": depth * arm, "flat": True}
+
+
+def _mass_brutalist(ctx, facade):
+    """A heavy monolith with a cantilevered upper box."""
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    lower = height * 0.62
+    upper = height - lower
+    out = [
+        part("Monolith", [width * 0.82, lower, depth * 0.82],
+             cf(x, FLOOR_TOP + lower / 2, z), skin["wall"], skin["material"]),
+        # Cantilevered: wider than what carries it, which is the whole gesture.
+        part("Cantilever", [width, upper, depth],
+             cf(x, FLOOR_TOP + lower + upper / 2, z), skin["wall"], skin["material"]),
+    ]
+    out.extend(facade(ctx, {"width": width, "depth": depth,
+                            "base_y": FLOOR_TOP + lower, "height": upper, "level": 0}))
+    return out, {"top": FLOOR_TOP + height, "width": width, "depth": depth, "flat": True}
+
+
 BUILDING_ROOFS = {
     "deck": (_roof_deck, True),
     "parapet": (_roof_parapet, True),
@@ -4361,6 +4518,21 @@ BUILDING_ARCHETYPES = (
     {"id": "shed", "mass": _mass_slab, "weight": 2,
      "roofs": ("sawtooth", "vault"), "facades": ("none",),
      "kinds": ("shophouse", "midrise"), "height": (12, 44)},
+    {"id": "deco", "mass": _mass_ziggurat, "weight": 3,
+     "roofs": ("crown", "parapet"), "facades": ("bands", "piers"),
+     "kinds": ("tower", "midrise"), "height": (70, 400)},
+    {"id": "perimeter", "mass": _mass_courtyard, "weight": 2,
+     "roofs": ("parapet", "deck"), "facades": ("bands", "piers"),
+     "kinds": ("tower", "midrise"), "height": (45, 200)},
+    {"id": "brutalist", "mass": _mass_brutalist, "weight": 2,
+     "roofs": ("parapet",), "facades": ("slots",),
+     "kinds": ("tower", "midrise"), "height": (50, 260)},
+    {"id": "residential", "mass": _mass_slab, "weight": 3,
+     "roofs": ("parapet", "deck"), "facades": ("balconies",),
+     "kinds": ("tower", "midrise"), "height": (45, 220)},
+    {"id": "arcade", "mass": _mass_slab, "weight": 2,
+     "roofs": ("parapet", "hipped"), "facades": ("arcade",),
+     "kinds": ("midrise", "shophouse"), "height": (30, 120)},
 )
 
 BUILDING_FACADES = {
@@ -4369,6 +4541,9 @@ BUILDING_FACADES = {
     "curtain": _facade_curtain,
     "spandrel": _facade_spandrel,
     "none": _facade_none,
+    "slots": _facade_slots,
+    "balconies": _facade_balconies,
+    "arcade": _facade_arcade,
 }
 
 
