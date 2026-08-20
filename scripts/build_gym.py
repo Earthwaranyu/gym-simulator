@@ -4583,20 +4583,23 @@ BUILDING_ROOFS = {
 # `weight` biases the mix. Cheap archetypes are weighted up so the fleet average
 # stays near where it was while the range widens.
 BUILDING_ARCHETYPES = (
-    {"id": "setback", "mass": _mass_setback, "weight": 3,
+    {"id": "setback", "mass": _mass_setback, "weight": 3, "flat_ok": True,
      "roofs": ("deck",), "facades": ("bands",),
      "kinds": ("tower", "midrise"), "height": (45, 400)},
-    {"id": "slab", "mass": _mass_slab, "weight": 3,
+    {"id": "slab", "mass": _mass_slab, "weight": 3, "flat_ok": True,
      "roofs": ("parapet", "deck"), "facades": ("piers", "bands"),
      "kinds": ("tower", "midrise"), "height": (40, 260)},
     {"id": "curtain", "mass": _mass_prism, "weight": 3,
      "roofs": ("parapet", "crown"), "facades": ("curtain",),
      "kinds": ("tower", "midrise"), "height": (60, 400)},
-    {"id": "drum", "mass": _mass_cylinder, "weight": 2,
+    {"id": "drum", "mass": _mass_cylinder, "weight": 2, "flat_ok": True,
      "roofs": ("dome", "parapet"), "facades": ("spandrel",),
      "kinds": ("tower", "midrise"), "height": (40, 300)},
     {"id": "shophouse", "mass": _mass_gable, "weight": 3,
      "roofs": ("gable", "hipped"), "facades": ("none",),
+     "kinds": ("shophouse", "midrise"), "height": (12, 46)},
+    {"id": "lowblock", "mass": _mass_slab, "weight": 3, "flat_ok": True,
+     "roofs": ("parapet", "deck"), "facades": ("piers", "bands"),
      "kinds": ("shophouse", "midrise"), "height": (12, 46)},
     {"id": "shed", "mass": _mass_slab, "weight": 2,
      "roofs": ("sawtooth", "vault"), "facades": ("none",),
@@ -4604,16 +4607,16 @@ BUILDING_ARCHETYPES = (
     {"id": "deco", "mass": _mass_ziggurat, "weight": 3,
      "roofs": ("crown", "parapet"), "facades": ("bands", "piers"),
      "kinds": ("tower", "midrise"), "height": (70, 400)},
-    {"id": "perimeter", "mass": _mass_courtyard, "weight": 2,
+    {"id": "perimeter", "mass": _mass_courtyard, "weight": 2, "flat_ok": True,
      "roofs": ("parapet", "deck"), "facades": ("bands", "piers"),
      "kinds": ("tower", "midrise"), "height": (45, 200)},
     {"id": "brutalist", "mass": _mass_brutalist, "weight": 2,
      "roofs": ("parapet",), "facades": ("slots",),
      "kinds": ("tower", "midrise"), "height": (50, 260)},
-    {"id": "residential", "mass": _mass_slab, "weight": 3,
+    {"id": "residential", "mass": _mass_slab, "weight": 3, "flat_ok": True,
      "roofs": ("parapet", "deck"), "facades": ("balconies",),
      "kinds": ("tower", "midrise"), "height": (45, 220)},
-    {"id": "arcade", "mass": _mass_slab, "weight": 2,
+    {"id": "arcade", "mass": _mass_slab, "weight": 2, "flat_ok": True,
      "roofs": ("parapet", "hipped"), "facades": ("arcade",),
      "kinds": ("midrise", "shophouse"), "height": (30, 120)},
 )
@@ -4630,12 +4633,23 @@ BUILDING_FACADES = {
 }
 
 
-def _pick_archetype(kind, height, brng):
-    """The archetypes legal for this lot, weighted."""
+def _pick_archetype(kind, height, brng, prefer_flat=False):
+    """The archetypes legal for this lot, weighted.
+
+    `prefer_flat` narrows the field to archetypes that can finish flat. Rooftop
+    training courts need somewhere level to stand, and once the short archetypes
+    all grew gables and sawtooths the flat-roof pool emptied and every rooftop
+    site silently moved to the ground -- the build does not fail when that
+    happens, it just quietly stops having rooftop gyms.
+    """
     legal = [
         entry for entry in BUILDING_ARCHETYPES
         if kind in entry["kinds"] and entry["height"][0] <= height <= entry["height"][1]
     ]
+    if prefer_flat:
+        flat = [entry for entry in legal if entry.get("flat_ok")]
+        if flat:
+            legal = flat
     if not legal:
         return BUILDING_ARCHETYPES[0]
     total = sum(entry["weight"] for entry in legal)
@@ -4647,7 +4661,8 @@ def _pick_archetype(kind, height, brng):
     return legal[-1]
 
 
-def procedural_building(x, z, width, depth, height, skin, rng, kind="midrise"):
+def procedural_building(x, z, width, depth, height, skin, rng, kind="midrise",
+                        prefer_flat=False):
     """One building, composed from a mass, a facade and a roof.
 
     Everything here is capped by MAX_BUILDING_PARTS in the validator.
@@ -4665,7 +4680,7 @@ def procedural_building(x, z, width, depth, height, skin, rng, kind="midrise"):
         "brng": random.Random(f"city-v4:building:{round(x, 1)}:{round(z, 1)}"),
     }
 
-    archetype = _pick_archetype(kind, height, ctx["brng"])
+    archetype = _pick_archetype(kind, height, ctx["brng"], prefer_flat)
     # The skin the lot picked is replaced by one from an era that suits the
     # archetype. Choosing it here rather than in city_lot keeps every draw that
     # shapes a building inside this building's own stream.
@@ -4774,7 +4789,15 @@ def city_lot(lot, kind, character, rng, catalogue=None):
     # Grouped into a Model rather than left as loose parts: it is what lets the
     # validator hold a single building to a part budget, and it gives streaming a
     # unit to load a building as, instead of forty unrelated slabs.
-    parts, roof = procedural_building(x, z, width, depth, height, skin, rng, kind)
+    # A lot short enough and wide enough to carry a rooftop court is asked for a
+    # flat roof, so the pool those courts are chosen from never runs dry.
+    prefer_flat = (
+        height <= MAX_ROOF_SITE_HEIGHT
+        and width >= SITE_CLEAR_WIDTH + 10
+        and depth >= SITE_CLEAR_DEPTH + 10
+    )
+    parts, roof = procedural_building(x, z, width, depth, height, skin, rng, kind,
+                                      prefer_flat)
     if catalogue is not None:
         catalogue["roofs"].append(roof)
     return [group("Building", parts)]

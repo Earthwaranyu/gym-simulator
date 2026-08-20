@@ -1794,6 +1794,24 @@ def validate_building_variety(validator: Validator, structure: Any) -> None:
     )
 
 
+def validate_roof_site_pool(validator: Validator, builder: ModuleType) -> None:
+    """There are enough flat roofs to put the rooftop gyms on.
+
+    scatter_sites falls back to open ground when the roof pool is short. It does
+    not fail, it does not warn -- the world just quietly stops having rooftop
+    gyms, which is exactly what happened the moment the short archetypes all grew
+    pitched roofs: ten rooftop sites became zero and every check still passed.
+    """
+    builder.city_grid()
+    roofs = [site for site in builder.site_candidates() if site["kind"] == "roof"]
+    needed = builder.ROOF_SITE_QUOTA
+    validator.check(
+        len(roofs) >= needed + 8,
+        f"only {len(roofs)} flat roofs can carry a training court, against a quota "
+        f"of {needed}; scatter_sites would fall back to the ground without saying so",
+    )
+
+
 def validate_streaming_density(validator: Validator, payloads: Iterable[Any]) -> None:
     """No single streaming bubble may carry too much.
 
@@ -2165,6 +2183,7 @@ def run() -> int:
         validate_streaming_density(validator, (first_structure, first_machines))
         validate_building_budget(validator, (first_structure,))
         validate_building_variety(validator, first_structure)
+        validate_roof_site_pool(validator, builder)
         validate_scatter_separation(validator, builder)
         validate_garage_ring(validator, builder)
         validate_station_zone_volumes(validator, builder, first_structure, station_by_id)
