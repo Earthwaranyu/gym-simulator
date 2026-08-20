@@ -4647,6 +4647,130 @@ def scatter_sites():
     return picked
 
 
+# --------------------------------------------------------------------------
+# Roof forms.
+#
+# Every roof in the city was a flat slab, which is most of why 438 buildings read
+# as one building. These are the shapes that give a skyline a vocabulary, and all
+# of them are reachable with the primitives this project already allows: a pitch
+# is two wedges, a vault is a half-buried cylinder, a dome is a single ball.
+#
+# The wedge maths comes from the gym halls, which have had working pitched and
+# sawtooth roofs all along -- hard-coded to their own constants. Promoted here to
+# arguments so any building can use them.
+# --------------------------------------------------------------------------
+
+
+def pitched_roof(name, x, z, top, width, depth, rise, colour, material,
+                 ridge_colour=None, along_x=False):
+    """Two slopes meeting at a ridge down the middle of the span.
+
+    The wedge convention is the one documented on `wedge`: Roblox slopes a
+    WedgePart down along +Z from the top of its -Z face, so the two halves face
+    opposite ways and each covers half the depth.
+    """
+    half = depth / 2 if not along_x else width / 2
+    out = []
+    for side, yaw in ((-1, 0), (1, 180)):
+        if along_x:
+            size = [depth, rise, half]
+            frame = mul(cf(x + side * half / 2, top + rise / 2, z),
+                        rot_y(yaw + 90))
+        else:
+            size = [width, rise, half]
+            frame = mul(cf(x, top + rise / 2, z + side * half / 2), rot_y(yaw))
+        out.append(wedge(f"{name}Pitch", size, frame, colour, material))
+    ridge_span = width if not along_x else depth
+    out.append(part(f"{name}Ridge", [ridge_span, 1.4, 3] if not along_x else [3, 1.4, ridge_span],
+                    cf(x, top + rise, z), ridge_colour or colour, "Metal"))
+    return out
+
+
+def hipped_roof(name, x, z, top, width, depth, rise, colour, material):
+    """A pitch that also falls to the two ends, so the roof has four slopes.
+
+    The difference from a gable is only visible in silhouette -- which is exactly
+    where a roof does its work.
+    """
+    out = pitched_roof(name, x, z, top, width * 0.72, depth, rise, colour, material)
+    for side, yaw in ((-1, 90), (1, 270)):
+        out.append(wedge(f"{name}Hip", [depth, rise, width * 0.14],
+                         mul(cf(x + side * width * 0.43, top + rise / 2, z), rot_y(yaw)),
+                         colour, material))
+    return out
+
+
+def sawtooth_roof(name, x, z, top, width, depth, bays, rise, colour, material, glass):
+    """North-light sawtooth: the freight-shed roof, glazed on every riser."""
+    out = []
+    bay_depth = depth / bays
+    for index in range(bays):
+        bz = z - depth / 2 + bay_depth * (index + 0.5)
+        out.append(wedge(f"{name}Saw", [width, rise, bay_depth],
+                         cf(x, top + rise / 2, bz), colour, material))
+        out.append(part(f"{name}SawGlass", [width, rise, 0.8],
+                        cf(x, top + rise / 2, bz - bay_depth / 2),
+                        glass, "Glass", Transparency=0.4, CanCollide=False))
+    return out
+
+
+def barrel_vault(name, x, z, top, width, depth, colour, material):
+    """A half-cylinder lying along the building, the cheapest curve available.
+
+    One part. A cylinder's axis is its local X, so this is turned to lie along the
+    depth and sunk by its own radius so only the upper half shows.
+    """
+    radius = width / 2
+    return [cylinder(f"{name}Vault", depth, width,
+                     mul(cf(x, top, z), rot_y(90)), colour, material)]
+
+
+def dome_roof(name, x, z, top, diameter, rise, colour, material, lantern=None):
+    """A dome, as a ball sunk to its equator, with a drum ring at the springing.
+
+    Shape="Ball" is a plain Roblox part shape and the first use of it in this
+    project -- a dome is otherwise a great many small rotated boxes.
+    """
+    out = [
+        part(f"{name}Dome", [diameter, rise * 2, diameter],
+             cf(x, top, z), colour, material, Shape="Ball"),
+        # A drum, not a rim. At 1.6 thick and fifty across this registered as a
+        # floor to the coplanar check, which would have needed a height band for
+        # what is really just a shape problem: the springing of a dome sits on a
+        # drum, and a drum is tall.
+        cylinder(f"{name}DomeRing", 7.0, diameter * 1.04,
+                 mul(cf(x, top - 2.5, z), rot_z(90)), colour, material),
+    ]
+    if lantern is not None:
+        out.append(cylinder(f"{name}Lantern", 6, diameter * 0.16,
+                            mul(cf(x, top + rise, z), rot_z(90)), lantern, "Neon",
+                            CanCollide=False))
+    return out
+
+
+def stepped_crown(name, x, z, top, width, depth, steps, colour, material, spire=None):
+    """The art-deco answer: shrinking blocks, optionally topped with a spire.
+
+    Each step is a genuine block rather than a thin lid. That is partly how a
+    ziggurat should look and partly deliberate: a slab under six studs tall and
+    over twelve across counts as a floor to the coplanar check, and a stack of
+    those inside one building would all overlap in plan.
+    """
+    out = []
+    w, d, y = width, depth, top
+    for index in range(steps):
+        height = 7.2 + index * 0.6
+        w, d = w * 0.74, d * 0.74
+        out.append(part(f"{name}Crown", [w, height, d],
+                        cf(x, y + height / 2, z), colour, material))
+        y += height
+    if spire is not None:
+        out.append(cylinder(f"{name}Spire", 14, max(2.0, w * 0.10),
+                            mul(cf(x, y + 7, z), rot_z(90)), spire, "Metal",
+                            CanCollide=False))
+    return out
+
+
 def city_grid(locations=None):
     """A dense but readable street hierarchy with varied, human-scale blocks."""
     global CITY_CATALOGUE
