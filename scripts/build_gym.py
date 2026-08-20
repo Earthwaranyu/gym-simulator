@@ -2620,16 +2620,64 @@ SIDEWALK = [0.40, 0.40, 0.41]
 
 # Four skins rather than one, picked per building. A city where every wall is
 # the same colour reads as a texture, not as a place people built over time.
-BUILDING_SKINS = [
-    {"wall": [0.45, 0.41, 0.36], "trim": [0.29, 0.26, 0.23],
-     "glass": [0.15, 0.21, 0.26], "material": "Concrete"},
-    {"wall": [0.37, 0.24, 0.20], "trim": [0.24, 0.15, 0.12],
-     "glass": [0.14, 0.18, 0.23], "material": "Brick"},
-    {"wall": [0.56, 0.53, 0.47], "trim": [0.36, 0.34, 0.30],
-     "glass": [0.18, 0.25, 0.30], "material": "Sandstone"},
-    {"wall": [0.21, 0.23, 0.27], "trim": [0.14, 0.15, 0.18],
-     "glass": [0.20, 0.31, 0.37], "material": "Metal"},
+def _skin(wall, material, glass=(0.17, 0.24, 0.29)):
+    """One building skin, with its trim derived rather than chosen.
+
+    Trim is always the wall darkened by the same factor, so the twelve skins read
+    as siblings out of one palette instead of twelve independent colour choices.
+    That is the difference between a city and a colour chart: the eye reads the
+    *relationships* between surfaces, and keeping them constant is what lets the
+    hues range widely without the result looking random.
+    """
+    return {
+        "wall": list(wall),
+        "trim": [round(c * 0.63, 4) for c in wall],
+        "glass": list(glass),
+        "material": material,
+    }
+
+
+# Twelve skins in three eras. Era is what stops a glass curtain wall appearing in
+# brick: an archetype prefers the eras that suit it, so the palette carries some
+# of the architectural story rather than only the colour.
+BUILDING_SKINS_OLD = [
+    _skin((0.37, 0.24, 0.20), "Brick"),
+    _skin((0.45, 0.29, 0.23), "Brick"),
+    _skin((0.56, 0.53, 0.47), "Sandstone"),
+    _skin((0.48, 0.44, 0.34), "WoodPlanks"),
 ]
+
+BUILDING_SKINS_MID = [
+    _skin((0.45, 0.41, 0.36), "Concrete"),
+    _skin((0.34, 0.34, 0.32), "Concrete"),
+    _skin((0.52, 0.50, 0.46), "Granite"),
+    _skin((0.60, 0.58, 0.55), "Marble"),
+]
+
+BUILDING_SKINS_NEW = [
+    _skin((0.21, 0.23, 0.27), "Metal", (0.20, 0.31, 0.37)),
+    _skin((0.28, 0.32, 0.36), "Metal", (0.22, 0.34, 0.40)),
+    _skin((0.16, 0.18, 0.22), "Slate", (0.18, 0.28, 0.34)),
+    _skin((0.33, 0.36, 0.40), "Pebble", (0.21, 0.30, 0.36)),
+]
+
+BUILDING_SKINS = BUILDING_SKINS_OLD + BUILDING_SKINS_MID + BUILDING_SKINS_NEW
+
+# Which eras suit which archetype. Weighted rather than exclusive, so a brick
+# tower is unusual rather than impossible.
+ARCHETYPE_ERAS = {
+    "setback": (BUILDING_SKINS_MID, BUILDING_SKINS_NEW),
+    "slab": (BUILDING_SKINS_MID, BUILDING_SKINS_NEW),
+    "curtain": (BUILDING_SKINS_NEW,),
+    "drum": (BUILDING_SKINS_MID, BUILDING_SKINS_NEW),
+    "shophouse": (BUILDING_SKINS_OLD,),
+    "shed": (BUILDING_SKINS_NEW, BUILDING_SKINS_MID),
+    "deco": (BUILDING_SKINS_MID, BUILDING_SKINS_OLD),
+    "perimeter": (BUILDING_SKINS_OLD, BUILDING_SKINS_MID),
+    "brutalist": (BUILDING_SKINS_MID,),
+    "residential": (BUILDING_SKINS_MID, BUILDING_SKINS_OLD),
+    "arcade": (BUILDING_SKINS_OLD, BUILDING_SKINS_MID),
+}
 
 
 def street_light(x, z, facing):
@@ -4583,6 +4631,12 @@ def procedural_building(x, z, width, depth, height, skin, rng, kind="midrise"):
     }
 
     archetype = _pick_archetype(kind, height, ctx["brng"])
+    # The skin the lot picked is replaced by one from an era that suits the
+    # archetype. Choosing it here rather than in city_lot keeps every draw that
+    # shapes a building inside this building's own stream.
+    eras = ARCHETYPE_ERAS.get(archetype["id"])
+    if eras:
+        ctx["skin"] = ctx["brng"].choice(ctx["brng"].choice(eras))
     facade = BUILDING_FACADES[ctx["brng"].choice(archetype["facades"])]
     roof_builder, roof_flat = BUILDING_ROOFS[ctx["brng"].choice(archetype["roofs"])]
 
