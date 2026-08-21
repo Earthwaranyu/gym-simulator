@@ -34,6 +34,8 @@ local Net = require(ReplicatedStorage.Modules.Net)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
+local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
+local WeightConfig = require(ReplicatedStorage.Modules.WeightConfig)
 local Signal = require(ReplicatedStorage.Packages.Signal)
 
 -- Long enough that travel is a decision rather than a way to flicker around the
@@ -50,6 +52,8 @@ local FAST_TRAVEL_PRODUCT = "FastTravel"
 -- How long to wait for the destination to stream in before going anyway.
 local STREAM_WAIT = 1
 local MAP_FEATURE_TAG = "MapFeature"
+-- Both hostile site kinds, in the order they read as difficulty.
+local MOB_KINDS: { MobConfig.MobKind } = { "Normal", "Boss" }
 
 local TravelService = {
 	Name = "TravelService",
@@ -98,6 +102,38 @@ local function landingCFrame(station: Instance): CFrame?
 	return base.CFrame + Vector3.new(0, base.Size.Y / 2 + 4, 0)
 end
 
+-- The hostile twin of findStation. Mob ids are "<Zone>Goblin" / "<Zone>Boss" and
+-- machine travel ids are "<Zone>-<Family>", so the two id spaces cannot collide and
+-- one Travel remote can serve both.
+local function findHostile(travelId: string): MobConfig.Site?
+	for _, kind in MOB_KINDS do
+		for _, site in MobConfig.Sites(kind) do
+			if site.Mob.Id == travelId then
+				return site
+			end
+		end
+	end
+	return nil
+end
+
+-- Where to put someone who teleports to a hostile site.
+--
+-- A boss arena is one monster in the middle of a ring, so the middle is where the
+-- fight is and the middle is where you land. A field holds a whole population, and
+-- dropping into the centre of it means being surrounded before the screen has
+-- finished loading, so a field lands you on its near edge with the pack in front of
+-- you. Arriving at a fight and choosing to start it are meant to be two separate
+-- decisions.
+local function hostileLanding(site: MobConfig.Site): CFrame
+	local marker = site.Marker
+	local top = marker.Position + Vector3.new(0, marker.Size.Y / 2 + 4, 0)
+	if site.Mob.Kind == "Boss" then
+		return CFrame.new(top)
+	end
+	local edge = top - Vector3.new(0, 0, site.Radius)
+	return CFrame.lookAt(edge, Vector3.new(top.X, edge.Y, top.Z))
+end
+
 function TravelService:Init()
 	StatService = Loader.Get("StatService")
 	TrainingService = Loader.Get("TrainingService")
@@ -112,7 +148,7 @@ function TravelService:Init()
 	end)
 
 	Net.BindFunction("GetDestinations", 2, function(_player: Player)
-		return self:GetDestinations(), self:GetMapFeatures()
+		return self:GetDestinations(), self:GetMapFeatures(), self:GetHostiles()
 	end)
 
 	-- The client needs to know whether its separate Teleport action should look locked.
@@ -120,10 +156,6 @@ function TravelService:Init()
 	Net.BindFunction("GetTravelAccess", 2, function(player: Player)
 		return { HasFastTravel = self:CanTravelFrom(player) }
 	end)
-end
-
-function TravelService:CanEnter(player: Player, requiredPower: number): boolean
-	return StatService:GetTotalPower(player) >= requiredPower
 end
 
 --[[
@@ -190,12 +222,15 @@ function TravelService:GetDestinations(): { any }
 		local requiresFlight = station:GetAttribute("RequiresFlight")
 		local locationName = station:GetAttribute("LocationName")
 		local locationTagline = station:GetAttribute("LocationTagline")
+		local weightTier = WeightConfig.Get(zone.Id)
+		local requiredStat =
+			math.max(if weightTier ~= nil then weightTier.RequiredStat else 0, definition.UnlockPower)
 		table.insert(out, {
 			Id = travelId,
 			ZoneId = zone.Id,
 			EquipmentId = definition.Id,
 			StatId = definition.StatId,
-			RequiredPower = math.max(zone.RequiredPower, definition.UnlockPower),
+			RequiredStat = requiredStat,
 			GainMultiplier = zone.GainMultiplier,
 			X = landing.Position.X,
 			Y = landing.Position.Y,
@@ -211,11 +246,61 @@ function TravelService:GetDestinations(): { any }
 		})
 	end
 	table.sort(out, function(a, b)
-		if a.RequiredPower ~= b.RequiredPower then
-			return a.RequiredPower < b.RequiredPower
+		if a.RequiredStat ~= b.RequiredStat then
+			return a.RequiredStat < b.RequiredStat
 		end
 		if a.StatId ~= b.StatId then
 			return a.StatId < b.StatId
+		end
+		return a.Id < b.Id
+	end)
+
+	return out
+end
+
+-- Every mob field and boss arena in world space, for the same streaming reason
+-- GetDestinations exists: a client standing at spawn cannot see the Storm arena's
+-- marker, so it cannot ask the world where the monsters are.
+--
+-- These are travel rows, not a monster census. The row describes the *site* -- where
+-- it is, what lives there, what it costs to be allowed in -- and never how many are
+-- currently alive. Live population belongs to MobService and reaches the client
+-- through BossStateChanged, which updates without anyone reopening the map.
+function TravelService:GetHostiles(): { any }
+	local out = {}
+
+	for _, kind in MOB_KINDS do
+		for _, site in MobConfig.Sites(kind) do
+			local mob = site.Mob
+			local zone = ZoneConfig.Get(mob.ZoneId)
+			if zone == nil then
+				continue
+			end
+			local landing = hostileLanding(site)
+			table.insert(out, {
+				Id = mob.Id,
+				ZoneId = mob.ZoneId,
+				Kind = mob.Kind,
+				DisplayName = mob.DisplayName,
+				X = landing.Position.X,
+				Y = landing.Position.Y,
+				Z = landing.Position.Z,
+				Radius = site.Radius,
+				RequiredPower = zone.RequiredPower,
+				Health = mob.Health,
+				Damage = mob.Damage,
+				Reward = if mob.Kind == "Boss" then (mob.TokenReward or 0) else (mob.FightTokenReward or 0),
+				Color = mob.Color,
+			})
+		end
+	end
+
+	table.sort(out, function(a, b)
+		if a.RequiredPower ~= b.RequiredPower then
+			return a.RequiredPower < b.RequiredPower
+		end
+		if a.Kind ~= b.Kind then
+			return a.Kind < b.Kind
 		end
 		return a.Id < b.Id
 	end)
@@ -276,18 +361,82 @@ end
 	message is shown to the player verbatim, so every refusal has to read as an
 	explanation rather than as an error.
 ]]
-function TravelService:Travel(player: Player, travelId: string): (boolean, string)
+--[[
+	Resolves a travel id into somewhere to stand, a tier, an entry check, and what to
+	say on arrival — for a training station or a hostile site alike.
+
+	Both kinds go through the identical cooldown, alive, combat-lock and Fast Travel
+	rules below, so the only thing that varies between them is the gate. A machine
+	asks for one muscle, because a machine trains one muscle and the tier's weight is
+	what you have to be able to lift. A monster does not care which muscle you built,
+	so its arena asks for total Power — the same number the tier itself is priced in.
+]]
+type Trip = {
+	Landing: CFrame,
+	Zone: ZoneConfig.Zone,
+	Gate: (Player) -> (boolean, string),
+	Arrival: string,
+}
+
+local function resolveTrip(travelId: string): Trip?
 	local station = findStation(travelId)
-	if station == nil then
+	if station ~= nil then
+		local definition = EquipmentConfig.Resolve(station)
+		local zone = stationZone(station)
+		local landing = landingCFrame(station)
+		if definition == nil or zone == nil or landing == nil then
+			return nil
+		end
+		local weightTier = WeightConfig.Get(zone.Id)
+		local requiredStat =
+			math.max(if weightTier ~= nil then weightTier.RequiredStat else 0, definition.UnlockPower)
+		return {
+			Landing = landing,
+			Zone = zone,
+			Gate = function(player: Player): (boolean, string)
+				if StatService:GetStat(player, definition.StatId) >= requiredStat then
+					return true, ""
+				end
+				local needed = requiredStat - StatService:GetStat(player, definition.StatId)
+				return false,
+					`{definition.DisplayName} needs {NumberFormat.Format(needed)} more {definition.StatId}.`
+			end,
+			Arrival = `Travelled to {zone.DisplayName} {definition.DisplayName}.`,
+		}
+	end
+
+	local site = findHostile(travelId)
+	if site ~= nil then
+		local zone = ZoneConfig.Get(site.Mob.ZoneId)
+		if zone == nil then
+			return nil
+		end
+		local where = if site.Mob.Kind == "Boss" then "arena" else "hunting ground"
+		return {
+			Landing = hostileLanding(site),
+			Zone = zone,
+			Gate = function(player: Player): (boolean, string)
+				local power = StatService:GetTotalPower(player)
+				if power >= zone.RequiredPower then
+					return true, ""
+				end
+				return false,
+					`{site.Mob.DisplayName} needs {NumberFormat.Format(zone.RequiredPower - power)} more Power.`
+			end,
+			Arrival = `Travelled to the {site.Mob.DisplayName} {where}.`,
+		}
+	end
+
+	return nil
+end
+
+function TravelService:Travel(player: Player, travelId: string): (boolean, string)
+	local trip = resolveTrip(travelId)
+	if trip == nil then
 		return false, "Unknown destination."
 	end
-	local definition = EquipmentConfig.Resolve(station)
-	local zone = stationZone(station)
-	local landing = landingCFrame(station)
-	if definition == nil or zone == nil or landing == nil then
-		return false, "That training location is unavailable."
-	end
-	local requiredPower = math.max(zone.RequiredPower, definition.UnlockPower)
+	local landing = trip.Landing
+	local zone = trip.Zone
 
 	local now = os.clock()
 	if now < (nextTravelAt[player] or 0) then
@@ -312,9 +461,9 @@ function TravelService:Travel(player: Player, travelId: string): (boolean, strin
 		return false, "NO_FAST_TRAVEL"
 	end
 
-	if not self:CanEnter(player, requiredPower) then
-		local needed = requiredPower - StatService:GetTotalPower(player)
-		return false, `{definition.DisplayName} needs {NumberFormat.Format(needed)} more power.`
+	local allowed, refusal = trip.Gate(player)
+	if not allowed then
+		return false, refusal
 	end
 
 	-- Leave the machine first. Pivoting a player whose root is anchored to a
@@ -342,7 +491,7 @@ function TravelService:Travel(player: Player, travelId: string): (boolean, strin
 
 	TravelService.Traveled:Fire(player, zone.Id, travelId)
 
-	return true, `Travelled to {zone.DisplayName} {definition.DisplayName}.`
+	return true, trip.Arrival
 end
 
 function TravelService:Start()
