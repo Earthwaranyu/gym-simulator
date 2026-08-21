@@ -32,10 +32,16 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
 local MobRigConfig = require(ReplicatedStorage.Modules.MobRigConfig)
+local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 -- The AI runs on a shared timer rather than per-mob and rather than every frame.
 -- Four ticks a second is enough for a walking melee chase and is roughly a fifteenth
 -- of the work a RenderStepped-style loop over forty Humanoids would cost.
+-- The two strikes a monster plays, both defined in StrikeConfig alongside the player's.
+local SWING_STRIKE = "MobSwing"
+local ULTIMATE_STRIKE = "MobUltimate"
+
 local AI_INTERVAL = 1 / 4
 -- A field with nobody near it does no work at all. This is the single biggest saving:
 -- on a quiet server almost every field is asleep.
@@ -77,6 +83,9 @@ type Live = {
 	Damage: { [Player]: number }?,
 	-- Walking back to Home after breaking leash, and healing when it gets there.
 	Returning: boolean?,
+	-- Boss only: when the heavy may next be attempted, and whether one is mid-windup.
+	NextUltimateAt: number?,
+	Charging: boolean?,
 }
 
 local live: { [Model]: Live } = {}
@@ -343,6 +352,12 @@ function MobService:_spawn(definition: MobConfig.Mob, home: Vector3, radius: num
 		-- nothing.
 		Damage = if definition.Kind == "Boss" then {} else nil,
 		Returning = false,
+		-- Not available the instant a boss rises: a player who arrives to an immediate
+		-- unavoidable slam has not been given the fight, only the damage.
+		NextUltimateAt = if definition.Kind == "Boss"
+			then os.clock() + (definition.UltimateCooldown or 0)
+			else nil,
+		Charging = false,
 	}
 
 	return model
@@ -397,6 +412,72 @@ function MobService:_despawn(model: Model)
 	end
 	live[model] = nil
 	model:Destroy()
+end
+
+--[[
+	Tells every client that this monster swung, and which swing it was.
+
+	The same channel the player's three abilities use: two attributes on the model, read
+	independently by the body, the effects and the flinch. Nothing but "it swung, at this
+	moment" crosses the wire, because every machine already has StrikeConfig.
+]]
+local function stampStrike(model: Model, strikeId: string)
+	model:SetAttribute(StrikeConfig.STRIKE_ID_ATTRIBUTE, strikeId)
+	model:SetAttribute(StrikeConfig.STRIKE_ATTRIBUTE, workspace:GetServerTimeNow())
+end
+
+--[[
+	The boss's heavy: a telegraphed shockwave that anybody standing in it eats.
+
+	Damage is applied AFTER the wind-up and only to whoever is still inside the radius,
+	which is the entire point — the animation raises both arms overhead for well over a
+	second, and walking out during that window costs nothing. A boss that simply hit
+	harder would be a bigger goblin; one you have to read turns the fight into something
+	with a rhythm.
+
+	Falloff is Formulas.SlamFalloff, the same curve the player's own Ground Slam uses, so
+	the two read identically from either end.
+]]
+function MobService:_ultimate(model: Model, record: Live, now: number)
+	local definition = record.Definition
+	local radius = definition.UltimateRadius or 0
+	local windup = definition.UltimateWindup or 0
+	if radius <= 0 then
+		return
+	end
+
+	record.NextUltimateAt = now + (definition.UltimateCooldown or 0)
+	record.Charging = true
+	stampStrike(model, ULTIMATE_STRIKE)
+
+	task.delay(windup, function()
+		record.Charging = false
+		-- Everything can have changed across a second and a third of real time: the boss
+		-- may be dead, despawned, or have been dragged home by its leash.
+		if live[model] == nil or model.Parent == nil or record.Humanoid.Health <= 0 then
+			return
+		end
+
+		local epicentre = record.Root.Position
+		for _, player in Players:GetPlayers() do
+			local character = player.Character
+			local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+			if root == nil or not root:IsA("BasePart") then
+				continue
+			end
+			local offset = (root.Position - epicentre).Magnitude
+			local falloff = Formulas.SlamFalloff(offset, radius)
+			if falloff <= 0 then
+				continue
+			end
+			CombatService:ApplyEnvironmentDamage(
+				definition.DisplayName,
+				player,
+				definition.Damage * (definition.UltimateMultiplier or 1) * falloff,
+				definition.AttackStat
+			)
+		end
+	end)
 end
 
 function MobService:_step(now: number)
@@ -456,8 +537,22 @@ function MobService:_step(now: number)
 
 		-- In range: stop closing and swing on cooldown.
 		record.Humanoid:MoveTo(origin)
+
+		-- Mid-windup the boss is committed. Letting it throw an ordinary swing out of
+		-- the middle of its own heavy would make the telegraph a lie.
+		if record.Charging then
+			continue
+		end
+
+		local nextUltimate = record.NextUltimateAt
+		if nextUltimate ~= nil and now >= nextUltimate then
+			self:_ultimate(model, record, now)
+			continue
+		end
+
 		if now >= record.NextAttackAt then
 			record.NextAttackAt = now + definition.AttackCooldown
+			stampStrike(model, SWING_STRIKE)
 			CombatService:ApplyEnvironmentDamage(
 				definition.DisplayName,
 				victim,

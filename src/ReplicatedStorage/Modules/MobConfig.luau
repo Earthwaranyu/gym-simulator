@@ -75,6 +75,13 @@ export type Mob = {
 	-- before leaving so the next spawn cannot stack on top of it.
 	TokenReward: number?,
 	DespawnSeconds: number?,
+	-- Boss only: the heavy. Seconds between attempts, seconds spent visibly winding up
+	-- before it lands, how far the shockwave reaches, and what it multiplies the boss's
+	-- ordinary damage by at the centre.
+	UltimateCooldown: number?,
+	UltimateWindup: number?,
+	UltimateRadius: number?,
+	UltimateMultiplier: number?,
 	Color: Color3,
 	-- Multiplies the base goblin build. Bosses are visibly bigger from across the arena.
 	Scale: number,
@@ -191,6 +198,13 @@ local function boss(zoneId: string, displayName: string, health: number, damage:
 		AggroRadius = 90,
 		LeashRadius = 110,
 		TokenReward = tokens,
+		-- The rhythm of a boss fight. The wind-up is long enough to see, recognise and
+		-- walk out of — that is the whole move. A boss that simply hit harder would be
+		-- a bigger goblin; one you have to read turns the fight into a conversation.
+		UltimateCooldown = 12,
+		UltimateWindup = 1.3,
+		UltimateRadius = 34,
+		UltimateMultiplier = 3.5,
 		-- Ten minutes of the thirty-minute cycle. Long enough to travel to, short
 		-- enough that an unfought boss is gone well before the next one is due.
 		DespawnSeconds = 600,
