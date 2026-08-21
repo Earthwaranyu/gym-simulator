@@ -58,6 +58,11 @@ local CUSTOMIZING_ATTRIBUTE = "Customizing"
 local DataService: any = nil
 
 -- Everything that would make one player look different from another.
+--
+-- Decal is in here for the stock R15 face. Leaving it on was what made every player
+-- wear the same Roblox smiley no matter which expression they picked — the drawn face
+-- was a second face behind it. Characters carry no other decal, so this is safe as a
+-- blanket rule, and the DescendantAdded guard below keeps it from coming back.
 local WORN_CLASSES = {
 	"Shirt",
 	"Pants",
@@ -65,6 +70,7 @@ local WORN_CLASSES = {
 	"CharacterMesh",
 	"Accessory",
 	"Hat",
+	"Decal",
 }
 
 local function strip(character: Model)

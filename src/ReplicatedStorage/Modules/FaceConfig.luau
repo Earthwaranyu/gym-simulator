@@ -1,18 +1,24 @@
 --!strict
 --[[
-	FaceConfig — expressions drawn, not uploaded.
+	FaceConfig — expressions built, not uploaded.
 
 	A Roblox face is normally a Decal, which means an image asset, which the project's
-	asset rule forbids unless we drew it. Rather than take on an art pipeline for four
-	expressions, a face here is a short list of rectangles and ellipses that
-	AppearanceController lays out on a SurfaceGui stuck to the front of the head. Frames
-	with a UICorner are a perfectly good eye, and they cost nothing to author or change.
+	asset rule forbids unless we drew it. So a face here is a handful of thin
+	primitives stuck to the front of the skull: two blocks and a bar are a perfectly
+	good scowl, and they cost nothing to author or change.
 
-	Coordinates are **fractions of the head's front face**, with the origin at its
-	centre: x runs -0.5 (the character's right, as seen from the front) to 0.5, y runs
-	-0.5 (chin) to 0.5 (crown). Fractions rather than pixels for the same reason
-	HairConfig uses them — the head changes size as the body grows, and a face pinned in
-	pixels would slide off it.
+	This was a SurfaceGui of Frames first, and that is worth recording because the bug
+	it caused was invisible rather than wrong-looking: the GUI was mounted on the
+	surface of its canvas facing *into* the head, so no drawn face was ever on screen
+	and every player wore Roblox's stock decal instead. Parts cannot be mounted facing
+	the wrong way — they are simply somewhere — which is the actual reason this is
+	geometry now. It also means a face renders anywhere a part renders.
+
+	Coordinates are **fractions of the head**, with the origin at its centre: x runs
+	-0.5 to 0.5 across the face, y runs -0.5 (chin) to 0.5 (crown), and everything is
+	pushed out to the front of the skull by the builder. Fractions rather than studs for
+	the same reason HairConfig uses them — the head changes size as the body grows, and
+	a face pinned in studs would slide off it.
 
 	Every feature is opaque ink on skin. There is no white of the eye: at the distance
 	players actually see each other, a solid shape reads and an eyeball does not.
@@ -20,15 +26,17 @@
 
 local FaceConfig = {}
 
+-- Rect is a block, Ellipse is a cylinder seen end-on.
 export type Shape = "Rect" | "Ellipse"
 
 export type Feature = {
 	Shape: Shape,
-	-- Centre of the feature, in head-face fractions from the middle of the face.
+	-- Centre of the feature, in head fractions from the middle of the face.
 	Pos: Vector2,
-	-- Width and height as fractions of the head's front face.
+	-- Width and height as fractions of the head.
 	Size: Vector2,
-	-- Degrees, clockwise. This is what turns two identical bars into a scowl.
+	-- Degrees, clockwise as seen by someone looking at the face. This is what turns
+	-- two identical bars into a scowl.
 	Rotation: number?,
 	Color: Color3?,
 }
@@ -136,6 +144,10 @@ FaceConfig.Faces = {
 } :: { Face }
 
 FaceConfig.Ink = INK
+
+-- How far a feature stands off the skull, as a fraction of head depth. Enough to clear
+-- the curve of the generated mesh head; any more and the eyes read as stuck-on studs.
+FaceConfig.DEPTH = 0.06
 
 function FaceConfig.Get(id: string?): Face
 	if id ~= nil then

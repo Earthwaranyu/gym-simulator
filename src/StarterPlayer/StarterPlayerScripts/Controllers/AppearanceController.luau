@@ -14,10 +14,10 @@
 	  * **Hair**, primitives from HairConfig welded to the head. Sizes and offsets in
 	    that config are fractions of the head, multiplied out here, so one style fits
 	    a newbie and a player whose Chest broke a trillion.
-	  * **The face**, a SurfaceGui of Frames from FaceConfig. It hangs on its own thin
-	    canvas part a hair in front of the head rather than on the head itself,
-	    because BodyMeshController welds a generated mesh head over the stock one and
-	    a decal on the part underneath would be inside it.
+	  * **The face**, thin primitives from FaceConfig stuck to the front of the skull.
+	    It was a SurfaceGui first, and that shipped invisible: the GUI faced into the
+	    head, so what everyone saw was Roblox's stock decal, identical on every player
+	    and for every expression. Geometry cannot face the wrong way.
 
 	The head measurement comes from that generated piece when it is there and from the
 	stock Head when it is not, so hair sits on the head the player can actually see.
@@ -40,10 +40,6 @@ local FOLDER_NAME = "GeneratedAppearance"
 local BODY_FOLDER = "GeneratedBody"
 local HAIR_ATTRIBUTE = "HairId"
 local FACE_ATTRIBUTE = "FaceId"
-
--- How far in front of the head the face canvas floats, as a fraction of head depth.
--- Enough to clear the mesh head, little enough that it never reads as detached.
-local FACE_LIFT = 0.02
 
 local SHAPES: { [string]: Enum.PartType } = {
 	Block = Enum.PartType.Block,
@@ -130,52 +126,52 @@ local function buildFace(character: Model, head: BasePart, folder: Folder)
 	end
 
 	local size = headSize(character, head)
-
-	-- A flat, invisible canvas. Sized to the head's front face so the fractions in
-	-- FaceConfig land where the config says they do.
-	local canvas = Instance.new("Part")
-	canvas.Name = "FaceCanvas"
-	canvas.Size = Vector3.new(size.X, size.Y, 0.05)
-	canvas.Transparency = 1
-	canvas.Anchored = false
-	canvas.CanCollide = false
-	canvas.CanQuery = false
-	canvas.CanTouch = false
-	canvas.Massless = true
-	canvas.CastShadow = false
-	canvas.Parent = folder
-
-	-- The head faces -Z, so the canvas sits just beyond that face.
-	weldTo(head, canvas, CFrame.new(0, 0, -(size.Z * 0.5 + size.Z * FACE_LIFT)))
-
-	local gui = Instance.new("SurfaceGui")
-	gui.Name = "Face"
-	gui.Face = Enum.NormalId.Back
-	gui.AlwaysOnTop = false
-	gui.LightInfluence = 1
-	gui.PixelsPerStud = 96
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.Adornee = canvas
-	gui.Parent = canvas
+	local depth = size.Z * FaceConfig.DEPTH
+	-- Features sit on the front skin of the skull and stand out by their own depth, so
+	-- the flat face of every one of them is flush with the head rather than sunk in it.
+	local front = -(size.Z * 0.5)
 
 	for index, feature in face.Features do
-		local frame = Instance.new("Frame")
-		frame.Name = `Feature{index}`
-		frame.AnchorPoint = Vector2.new(0.5, 0.5)
-		-- Config x runs right-to-left from the viewer's side of the face; the GUI is
-		-- on the back face of the canvas, which flips it back the right way round.
-		frame.Position = UDim2.fromScale(0.5 + feature.Pos.X, 0.5 - feature.Pos.Y)
-		frame.Size = UDim2.fromScale(feature.Size.X, feature.Size.Y)
-		frame.Rotation = feature.Rotation or 0
-		frame.BackgroundColor3 = feature.Color or FaceConfig.Ink
-		frame.BorderSizePixel = 0
-		frame.Parent = gui
+		local width = size.X * feature.Size.X
+		local height = size.Y * feature.Size.Y
+
+		local part = Instance.new("Part")
+		part.Name = `Face{index}`
 
 		if feature.Shape == "Ellipse" then
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0.5, 0)
-			corner.Parent = frame
+			--[[
+				A Roblox cylinder's flat ends face along its **X** axis, not its Z. An
+				eye disc therefore has to be built lying on its side and turned to face
+				forward; sizing it as though the circle were in XY gives a sliver seen
+				edge-on, which is the exact mistake the original muscle shells made.
+			]]
+			part.Shape = Enum.PartType.Cylinder
+			part.Size = Vector3.new(depth, height, width)
+		else
+			part.Shape = Enum.PartType.Block
+			part.Size = Vector3.new(width, height, depth)
 		end
+
+		part.Color = feature.Color or FaceConfig.Ink
+		part.Material = Enum.Material.SmoothPlastic
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.Massless = true
+		part.CastShadow = false
+
+		-- Rotation is a roll about the axis pointing out of the face, so a brow tilts
+		-- in the plane the player is looking at. The cylinder's quarter turn is applied
+		-- after it, or the roll would spin the disc about the wrong axis entirely.
+		local offset = CFrame.new(size.X * feature.Pos.X, size.Y * feature.Pos.Y, front)
+			* CFrame.Angles(0, 0, math.rad(-(feature.Rotation or 0)))
+		if feature.Shape == "Ellipse" then
+			offset = offset * CFrame.Angles(0, math.rad(90), 0)
+		end
+
+		part.Parent = folder
+		weldTo(head, part, offset)
 	end
 end
 
