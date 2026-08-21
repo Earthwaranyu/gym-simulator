@@ -108,7 +108,26 @@ local function combatPose(offset: Vector3, angles: { [string]: Vector3 }): Comba
 	return { Angles = angles, Offset = offset }
 end
 
-local function transition(portion: number, easing: string, from: CombatPose, to: CombatPose): StrikeStage
+--[[
+	A stage built from two whole-body poses, optionally bent through a third.
+
+	Angles interpolate componentwise on Euler degrees rather than slerping, so a wide
+	two-axis swing travels a slightly wrong path — a fist crossing the body reaches for
+	where it is going in a straight line rather than hooking around. `mid` is the fix,
+	and PosePlayback.PoseAt has rendered Mid, MidOffset and MidAt since it was written;
+	nothing had ever passed one. `midAt` is where in the stage the bend sits, defaulting
+	to halfway.
+
+	Callers that pass no mid behave exactly as they always did.
+]]
+local function transition(
+	portion: number,
+	easing: string,
+	from: CombatPose,
+	to: CombatPose,
+	mid: CombatPose?,
+	midAt: number?
+): StrikeStage
 	local motions: { PoseConfig.JointMotion } = {}
 	for _, joint in JOINTS do
 		local motion: PoseConfig.JointMotion = {
@@ -116,9 +135,16 @@ local function transition(portion: number, easing: string, from: CombatPose, to:
 			Rest = from.Angles[joint],
 			Peak = to.Angles[joint],
 		}
+		if mid ~= nil then
+			motion.Mid = mid.Angles[joint]
+			motion.MidAt = midAt
+		end
 		if joint == "Root" then
 			motion.RestOffset = from.Offset
 			motion.PeakOffset = to.Offset
+			if mid ~= nil then
+				motion.MidOffset = mid.Offset
+			end
 		end
 		table.insert(motions, motion)
 	end
@@ -463,6 +489,150 @@ local MOB_SMASH = combatPose(Vector3.new(0, -0.7, 0.3), {
 	LeftKnee = deg(-64, 0, 0),
 })
 
+--[[
+	Anticipation, the hold and the follow-through — the three things the combo punches
+	never had, and between them most of what separates a swing from a hit.
+
+	A body that only ever moves toward the punch has no wind in it. These turn *away*
+	first: the shoulder rolls back, the weight drops onto the rear foot, and the head
+	leads the turn a moment before the fist does. It costs about a seventh of the clip
+	and it is what tells a viewer the punch is coming.
+
+	The follow poses are the other half of the same idea, and the reason HardPunch has
+	always had one: a punch that stops exactly where it landed reads as caught, and one
+	that carries past reads as having gone through. Contact is never the last frame of a
+	strike.
+]]
+local RIGHT_WIND = combatPose(Vector3.new(0, -0.02, 0.14), {
+	Root = deg(2, -13, 0),
+	RightShoulder = deg(-34, -9, 20),
+	RightElbow = deg(84, 0, 0),
+	LeftShoulder = deg(46, 6, -30),
+	LeftElbow = deg(104, 0, 0),
+	Waist = deg(-6, -26, -3),
+	Neck = deg(3, 13, 0),
+	RightHip = deg(-13, 0, 10),
+	LeftHip = deg(14, 0, -9),
+	RightKnee = deg(-25, 0, 0),
+	LeftKnee = deg(-12, 0, 0),
+})
+
+-- The elbow is still folded here while the shoulder has already opened: the arm is
+-- unrolling rather than swinging as one rigid piece, which is the whole read of a whip.
+local RIGHT_THROUGH = combatPose(Vector3.new(0, -0.02, -0.16), {
+	Root = deg(-1, 1, 0),
+	RightShoulder = deg(52, -1, 8),
+	RightElbow = deg(58, 0, 0),
+	LeftShoulder = deg(56, 1, -38),
+	LeftElbow = deg(120, 0, 0),
+	Waist = deg(0, 6, 1),
+	Neck = deg(-1, -2, 0),
+	RightHip = deg(2, 0, 8),
+	LeftHip = deg(0, 0, -8),
+	RightKnee = deg(-15, 0, 0),
+	LeftKnee = deg(-12, 0, 0),
+})
+
+local RIGHT_FOLLOW = combatPose(Vector3.new(0, -0.04, -0.2), {
+	Root = deg(-3, 15, 0),
+	RightShoulder = deg(96, 6, -14),
+	RightElbow = deg(16, 0, 0),
+	LeftShoulder = deg(48, -4, -46),
+	LeftElbow = deg(128, 0, 0),
+	Waist = deg(6, 31, 5),
+	Neck = deg(-4, -13, 0),
+	RightHip = deg(12, 0, 6),
+	LeftHip = deg(-9, 0, -9),
+	RightKnee = deg(-8, 0, 0),
+	LeftKnee = deg(-16, 0, 0),
+})
+
+local LEFT_WIND = combatPose(Vector3.new(0, -0.02, 0.12), {
+	Root = deg(2, 13, 0),
+	RightShoulder = deg(46, -6, 30),
+	RightElbow = deg(104, 0, 0),
+	LeftShoulder = deg(-34, 9, -20),
+	LeftElbow = deg(84, 0, 0),
+	Waist = deg(-6, 26, 3),
+	Neck = deg(3, -13, 0),
+	RightHip = deg(14, 0, 9),
+	LeftHip = deg(-13, 0, -10),
+	RightKnee = deg(-12, 0, 0),
+	LeftKnee = deg(-25, 0, 0),
+})
+
+local LEFT_THROUGH = combatPose(Vector3.new(0, -0.02, -0.18), {
+	Root = deg(-1, -1, 0),
+	RightShoulder = deg(56, -1, 38),
+	RightElbow = deg(120, 0, 0),
+	LeftShoulder = deg(52, 1, -8),
+	LeftElbow = deg(58, 0, 0),
+	Waist = deg(0, -6, -1),
+	Neck = deg(-1, 2, 0),
+	RightHip = deg(0, 0, 8),
+	LeftHip = deg(2, 0, -8),
+	RightKnee = deg(-12, 0, 0),
+	LeftKnee = deg(-15, 0, 0),
+})
+
+local LEFT_FOLLOW = combatPose(Vector3.new(0, -0.04, -0.22), {
+	Root = deg(-3, -16, 0),
+	RightShoulder = deg(48, 4, 46),
+	RightElbow = deg(128, 0, 0),
+	LeftShoulder = deg(96, -6, 14),
+	LeftElbow = deg(16, 0, 0),
+	Waist = deg(6, -34, -5),
+	Neck = deg(-4, 14, 0),
+	RightHip = deg(-9, 0, 9),
+	LeftHip = deg(12, 0, -6),
+	RightKnee = deg(-16, 0, 0),
+	LeftKnee = deg(-8, 0, 0),
+})
+
+-- The finisher turns furthest away and drops lowest, because it is the one the whole
+-- chain has been setting up and it should look like it took a decision.
+local FINISH_WIND = combatPose(Vector3.new(0, -0.16, 0.2), {
+	Root = deg(5, -20, 0),
+	RightShoulder = deg(-48, -12, 24),
+	RightElbow = deg(96, 0, 0),
+	LeftShoulder = deg(44, 8, -30),
+	LeftElbow = deg(108, 0, 0),
+	Waist = deg(-9, -40, -5),
+	Neck = deg(5, 18, 0),
+	RightHip = deg(-22, 0, 13),
+	LeftHip = deg(20, 0, -10),
+	RightKnee = deg(-34, 0, 0),
+	LeftKnee = deg(-14, 0, 0),
+})
+
+local FINISH_THROUGH = combatPose(Vector3.new(0, -0.06, -0.24), {
+	Root = deg(-2, 2, 0),
+	RightShoulder = deg(56, -2, 10),
+	RightElbow = deg(64, 0, 0),
+	LeftShoulder = deg(56, 1, -40),
+	LeftElbow = deg(122, 0, 0),
+	Waist = deg(0, 8, 1),
+	Neck = deg(-1, -3, 0),
+	RightHip = deg(0, 0, 9),
+	LeftHip = deg(2, 0, -9),
+	RightKnee = deg(-18, 0, 0),
+	LeftKnee = deg(-14, 0, 0),
+})
+
+local FINISH_FOLLOW = combatPose(Vector3.new(0, -0.08, -0.3), {
+	Root = deg(-6, 20, 0),
+	RightShoulder = deg(104, 8, -18),
+	RightElbow = deg(22, 0, 0),
+	LeftShoulder = deg(44, -6, -50),
+	LeftElbow = deg(132, 0, 0),
+	Waist = deg(9, 42, 7),
+	Neck = deg(-6, -17, 0),
+	RightHip = deg(18, 0, 5),
+	LeftHip = deg(-13, 0, -10),
+	RightKnee = deg(-6, 0, 0),
+	LeftKnee = deg(-20, 0, 0),
+})
+
 local strikes: { Strike } = {
 	--[[
 		The punch chain: one click, one swing.
@@ -482,23 +652,34 @@ local strikes: { Strike } = {
 		-- The jab. Right hand, fastest thing in the game to land, and the swing a chain
 		-- starts from.
 		Id = "PunchJab",
-		Duration = 0.34,
-		Contacts = { 0.5 },
+		Duration = 0.38,
+		-- End of the snap, so damage lands on the frame the fist does.
+		Contacts = { 0.42 },
 		Stages = {
-			transition(0.3, "Coil", NEUTRAL, RIGHT_COIL),
-			transition(0.2, "Snap", RIGHT_COIL, RIGHT_CONTACT),
-			transition(0.5, "Recover", RIGHT_CONTACT, NEUTRAL),
+			transition(0.14, "Coil", NEUTRAL, RIGHT_WIND),
+			transition(0.16, "Coil", RIGHT_WIND, RIGHT_COIL),
+			-- Bent through THROUGH so the fist unrolls along an arc instead of reaching
+			-- in a straight line. MidAt is late: most of the travel is the last part.
+			transition(0.12, "Snap", RIGHT_COIL, RIGHT_CONTACT, RIGHT_THROUGH, 0.62),
+			-- The beat at full extension. Three hundredths of a second, and the whole
+			-- difference between a swing and a hit.
+			transition(0.06, "Recover", RIGHT_CONTACT, RIGHT_CONTACT),
+			transition(0.12, "Recover", RIGHT_CONTACT, RIGHT_FOLLOW),
+			transition(0.4, "Recover", RIGHT_FOLLOW, NEUTRAL),
 		},
 	},
 	{
 		-- The cross. Left hand, so the chain alternates rather than hammering one arm.
 		Id = "PunchCross",
-		Duration = 0.34,
-		Contacts = { 0.5 },
+		Duration = 0.4,
+		Contacts = { 0.44 },
 		Stages = {
-			transition(0.3, "Coil", NEUTRAL, LEFT_COIL),
-			transition(0.2, "Snap", LEFT_COIL, LEFT_CONTACT),
-			transition(0.5, "Recover", LEFT_CONTACT, NEUTRAL),
+			transition(0.14, "Coil", NEUTRAL, LEFT_WIND),
+			transition(0.16, "Coil", LEFT_WIND, LEFT_COIL),
+			transition(0.14, "Snap", LEFT_COIL, LEFT_CONTACT, LEFT_THROUGH, 0.62),
+			transition(0.06, "Recover", LEFT_CONTACT, LEFT_CONTACT),
+			transition(0.12, "Recover", LEFT_CONTACT, LEFT_FOLLOW),
+			transition(0.38, "Recover", LEFT_FOLLOW, NEUTRAL),
 		},
 	},
 	{
@@ -506,12 +687,21 @@ local strikes: { Strike } = {
 		-- the recovery: reaching the end of a chain should visibly cost something, and
 		-- the swing that hits hardest is the one you are most exposed after.
 		Id = "PunchFinish",
-		Duration = 0.42,
+		Duration = 0.52,
 		Contacts = { 0.46 },
 		Stages = {
-			transition(0.28, "Coil", NEUTRAL, FINISH_COIL),
-			transition(0.18, "Snap", FINISH_COIL, FINISH_CONTACT),
-			transition(0.54, "Recover", FINISH_CONTACT, NEUTRAL),
+			transition(0.16, "Coil", NEUTRAL, FINISH_WIND),
+			transition(0.18, "Coil", FINISH_WIND, FINISH_COIL),
+			transition(0.12, "Snap", FINISH_COIL, FINISH_CONTACT, FINISH_THROUGH, 0.62),
+			-- Held longer than the other two. It is the swing the chain was for.
+			transition(0.1, "Recover", FINISH_CONTACT, FINISH_CONTACT),
+			transition(0.14, "Recover", FINISH_CONTACT, FINISH_FOLLOW),
+			transition(0.3, "Recover", FINISH_FOLLOW, NEUTRAL),
+		},
+		Vfx = {
+			-- Only the finisher. Something on every swing at three a second is noise
+			-- rather than weight, and this is the one that is meant to feel decided.
+			{ At = 0.3, Effect = "HeavyCharge", Attach = "RightHand" :: "RightHand" },
 		},
 	},
 	{
