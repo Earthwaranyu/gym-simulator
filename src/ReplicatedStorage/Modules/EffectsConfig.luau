@@ -61,6 +61,9 @@ EffectsConfig.Sounds = {
 	RankUp = { SoundId = "", Volume = 0.9, Pitch = 1, PitchJitter = 0 } :: SoundSpec,
 	-- Bought a multiplier or a shop item.
 	Purchase = { SoundId = "", Volume = 0.7, Pitch = 1, PitchJitter = 0 } :: SoundSpec,
+	-- The character creator taking over the screen. One long low swell rather than a
+	-- click, because it plays under a camera move rather than on a button.
+	CustomizerReveal = { SoundId = "", Volume = 0.55, Pitch = 1, PitchJitter = 0 } :: SoundSpec,
 	-- A menu button was pressed. Quieter than anything in the world, and jittered,
 	-- because this is the one sound a player can trigger as fast as they can tap.
 	UiClick = { SoundId = "", Volume = 0.25, Pitch = 1.1, PitchJitter = 0.05 } :: SoundSpec,
