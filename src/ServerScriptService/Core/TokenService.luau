@@ -137,6 +137,25 @@ function TokenService:AwardTokens(player: Player, amount: number): boolean
 end
 
 --[[
+	Awards an amount stated at Natural, scaled to what the player's class is worth.
+
+	Income doubles with every physique class, so a flat grant decays: four hundred tokens
+	is well over an hour of play to a Natural and about forty seconds to a Mythic. A pack
+	sold as "400 tokens" would quietly become worthless to exactly the players most likely
+	to buy one.
+
+	The number on a pack is therefore its Natural value, and this converts it, so what a
+	pack is really selling is a fixed stretch of progress at any point in the game. The
+	shop prices its items the same way and for the same reason; see ShopConfig's header.
+]]
+function TokenService:AwardClassScaled(player: Player, baseAmount: number): boolean
+	local data = DataService:GetData(player)
+	local level = if data ~= nil then data.MuscleClassLevel else 0
+	local class = MuscleClassConfig.Get(level)
+	return self:AwardTokens(player, baseAmount * class.TokenMultiplier)
+end
+
+--[[
 	Spends tokens if the player can afford it. Returns false without touching the
 	balance when they cannot, so callers never need to pre-check.
 ]]
