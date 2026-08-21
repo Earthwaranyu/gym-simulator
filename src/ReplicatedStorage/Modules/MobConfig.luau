@@ -14,10 +14,17 @@
 	  * Health tracks the tier's Power gate divided by roughly twenty, so a player who
 	    has just earned entry to an area needs a handful of punches, not one and not
 	    thirty. Damage from a punch is the attacker's Arms stat one-for-one.
-	  * Mob damage is a small fraction of the health a player at that tier will have
-	    (Formulas.MaxHealth is 100 + Chest * 10), so a goblin is a real threat to
-	    someone who trained only Arms and an annoyance to someone who trained Chest.
-	    That asymmetry is the point: Chest and Back are what make you survive here.
+	  * Damage is a fixed SHARE of the health a player at that tier will have
+	    (Formulas.MaxHealth is 100 + Chest * 10): a goblin takes about 6% a swing, so it
+	    kills an unprotected tier-appropriate player in seventeen, and a boss takes 18%
+	    and kills in six. Garage was always tuned that way and nothing above it was —
+	    every other tier sat near 0.04%, which is roughly two thousand swings, so a
+	    monster past the starter field could not kill anybody. Retune by picking the
+	    share, not by picking a number.
+
+	    Back is what blunts it, against the tier's AttackStat below; Chest is what gives
+	    you the health to spend. That asymmetry is the point: Chest and Back are what
+	    make you survive here.
 	  * A boss is roughly twelve field goblins of health and three of damage, which is
 	    what makes it a thing you come back for on the timer rather than something you
 	    clear on the way past.
@@ -73,6 +80,9 @@ export type Mob = {
 	Scale: number,
 	-- The highest physique-class bonus this monster's reward will accept. See TIER_CAP.
 	RewardCap: number,
+	-- The Arms-equivalent this monster swings with, for the victim's Back to block
+	-- against. See TIER_ATTACK.
+	AttackStat: number,
 }
 
 --[[
@@ -96,6 +106,35 @@ local TIER_CAP: { [string]: number } = {
 	Titan = 16,
 	Skydeck = 32,
 	Storm = 64,
+}
+
+--[[
+	What a monster hits like, expressed as the player stat its blow is worth.
+
+	A player's punch is their Arms one for one, so a monster needs the same kind of
+	number for Back to have anything to block against. Without one, environment damage
+	was resolved against an attacker of zero — and since the ratio floors the attacker at
+	one, every player above ten Core was immune to every monster in the game.
+
+	These are each tier's ceiling: the stat you have when you *finish* the tier, not when
+	you enter it. That is what shapes the curve. Inside the tier you take the hit in
+	full; blocking it outright takes ten times the ceiling, which is about two tiers
+	later — so a zone stops being dangerous only once you have genuinely left it behind.
+	Anchoring on the entry gate instead would put Garage at zero, and a starter with ten
+	Core would be immune to the one monster whose whole job is to teach them that
+	monsters bite.
+
+	Deliberately not read from WeightConfig at runtime. These are combat-feel numbers and
+	should be tunable per tier without dragging the weight ladder along behind them.
+]]
+local TIER_ATTACK: { [string]: number } = {
+	Garage = 1e4,
+	Iron = 50e3,
+	Powerhouse = 200e3,
+	Strongman = 1e6,
+	Titan = 5e6,
+	Skydeck = 50e6,
+	Storm = 500e6,
 }
 
 local GOBLIN_GREEN = Color3.fromRGB(96, 138, 61)
@@ -126,6 +165,7 @@ local function goblin(
 		Color = GOBLIN_GREEN,
 		Scale = 1,
 		RewardCap = TIER_CAP[zoneId] or 1,
+		AttackStat = TIER_ATTACK[zoneId] or 1,
 	}
 end
 
@@ -149,6 +189,7 @@ local function boss(zoneId: string, displayName: string, health: number, damage:
 		Color = BOSS_RED,
 		Scale = 2.1,
 		RewardCap = TIER_CAP[zoneId] or 1,
+		AttackStat = TIER_ATTACK[zoneId] or 1,
 	}
 end
 
@@ -159,28 +200,28 @@ local mobs: { Mob } = {
 	boss("Garage", "Scrap Warden", 1600, 18, 10),
 
 	-- Iron (gate 50K)
-	goblin("Iron", "Park Goblin", 2500, 45, 2),
-	boss("Iron", "Iron Warden", 30000, 130, 20),
+	goblin("Iron", "Park Goblin", 2500, 6_000, 2),
+	boss("Iron", "Iron Warden", 30000, 18_000, 20),
 
 	-- Powerhouse (gate 250K)
-	goblin("Powerhouse", "Dock Goblin", 12500, 220, 4),
-	boss("Powerhouse", "Tidebreaker", 150000, 640, 40),
+	goblin("Powerhouse", "Dock Goblin", 12500, 30_000, 4),
+	boss("Powerhouse", "Tidebreaker", 150000, 90_000, 40),
 
 	-- Strongman (gate 1M)
-	goblin("Strongman", "Freight Goblin", 50000, 850, 8),
-	boss("Strongman", "Yard Colossus", 600000, 2500, 80),
+	goblin("Strongman", "Freight Goblin", 50000, 120_000, 8),
+	boss("Strongman", "Yard Colossus", 600000, 360_000, 80),
 
 	-- Titan (gate 5M)
-	goblin("Titan", "Plaza Goblin", 250000, 4200, 16),
-	boss("Titan", "Titan of the Square", 3e6, 12500, 160),
+	goblin("Titan", "Plaza Goblin", 250000, 600_000, 16),
+	boss("Titan", "Titan of the Square", 3e6, 1.8e6, 160),
 
 	-- Skydeck (gate 25M)
-	goblin("Skydeck", "Rooftop Goblin", 1.25e6, 21000, 32),
-	boss("Skydeck", "Skydeck Sentinel", 15e6, 62000, 320),
+	goblin("Skydeck", "Rooftop Goblin", 1.25e6, 3e6, 32),
+	boss("Skydeck", "Skydeck Sentinel", 15e6, 9e6, 320),
 
 	-- Storm (gate 250M). The flight-only tier, and the hardest thing in the game.
-	goblin("Storm", "Storm Goblin", 12.5e6, 210000, 64),
-	boss("Storm", "Stormcaller", 150e6, 620000, 640),
+	goblin("Storm", "Storm Goblin", 12.5e6, 30e6, 64),
+	boss("Storm", "Stormcaller", 150e6, 90e6, 640),
 }
 
 local MobConfig = {}
