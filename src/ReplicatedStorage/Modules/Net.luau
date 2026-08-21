@@ -99,6 +99,12 @@ local FUNCTION_NAMES: { string } = {
 	"PurchaseMultiplier",
 	-- Client -> server: transform into the next ordered physique class. Returns ok, message.
 	"SelectPhysiqueClass",
+	-- Client -> server: buy one token-priced shop item. Returns ok, message.
+	"PurchaseShopItem",
+	-- Client -> server: what each shop item costs THIS player. Prices scale with the
+	-- physique class, so the client cannot work them out from the config alone without
+	-- duplicating the rule the server charges by.
+	"GetShopPrices",
 	-- Client -> server: prompt a Robux purchase by product id. Returns ok, message.
 	"PromptProduct",
 	-- Client -> server: the Robux catalogue for the shop screen. Returns a list of

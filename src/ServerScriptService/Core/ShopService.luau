@@ -1,13 +1,15 @@
 --!strict
 --[[
-	ShopService — spends cash on the ShopConfig catalogue.
+	ShopService — spends Tokens on the ShopConfig catalogue.
 
-	Server-authoritative in the usual way: the client sends an item id and nothing else,
-	and price, affordability, and ownership are all recomputed here.
+	Server-authoritative in the usual way: the client sends an item id and nothing else.
+	The price is recomputed here from the buyer's own physique class, so a client that
+	lies about its class, or simply holds a stale one from before a transformation, buys
+	at the price the server works out rather than the one its screen was showing.
 
-	Cash is taken only after the effect is known to be applicable, and one-time items
-	are checked against the profile first, so a double-click cannot charge twice for a
-	permanent unlock.
+	This existed once and bought things with cash. Cash was removed and it went with it;
+	Tokens are the soft currency now, and the shape of the thing is unchanged because it
+	was right the first time — charge, apply, refund if the apply fails.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +17,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
+local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 
 local ShopService = {
@@ -23,31 +27,29 @@ local ShopService = {
 }
 
 local DataService: any = nil
-local CurrencyService: any = nil
+local TokenService: any = nil
 local BoostService: any = nil
+local FlagService: any = nil
 
 function ShopService:Init()
 	DataService = Loader.Get("DataService")
-	CurrencyService = Loader.Get("CurrencyService")
+	TokenService = Loader.Get("TokenService")
 	BoostService = Loader.Get("BoostService")
+	FlagService = Loader.Get("FlagService")
 end
 
-function ShopService:Owns(player: Player, item: ShopConfig.ShopItem): boolean
-	if not item.OneTime then
-		return false
-	end
+--[[
+	What this player pays right now.
 
+	The class multiplier is the same number TokenService multiplies their income by, so
+	the price and the earning move together and an item costs the same stretch of
+	playing whoever buys it.
+]]
+function ShopService:PriceFor(player: Player, item: ShopConfig.ShopItem): number
 	local data = DataService:GetData(player)
-	if data == nil then
-		return false
-	end
-
-	local effect = item.Effect
-	if effect.Kind == "UnlockEquipment" then
-		return data.OwnedEquipment[effect.EquipmentId] == true
-	end
-
-	return false
+	local level = if data ~= nil then data.MuscleClassLevel else 0
+	local class = MuscleClassConfig.Get(level)
+	return ShopConfig.PriceFor(item, class.TokenMultiplier, Formulas.TokensPerMinute())
 end
 
 --[[
@@ -60,17 +62,6 @@ function ShopService:_apply(player: Player, item: ShopConfig.ShopItem): boolean
 	if effect.Kind == "GlobalBoost" then
 		BoostService:GrantGlobal(player, `Shop_{item.Id}`, effect.Multiplier, effect.Duration)
 		return true
-	elseif effect.Kind == "StatBoost" then
-		BoostService:GrantStat(player, `Shop_{item.Id}`, effect.StatId, effect.Multiplier, effect.Duration)
-		return true
-	elseif effect.Kind == "UnlockEquipment" then
-		local data = DataService:GetData(player)
-		if data == nil then
-			return false
-		end
-		data.OwnedEquipment[effect.EquipmentId] = true
-		DataService:MarkDirty(player)
-		return true
 	end
 
 	warn(`[ShopService] Item "{item.Id}" has an unhandled effect kind`)
@@ -81,9 +72,8 @@ end
 	Buys an item. Returns (success, message) — the message is shown verbatim in a toast.
 ]]
 function ShopService:Purchase(player: Player, itemId: string): (boolean, string)
-	-- Same kill switch as the Robux path. Cash items are not receipts, so there is
-	-- nothing in flight to protect: closing the store closes it.
-	local FlagService = Loader.Get("FlagService")
+	-- The same kill switch the Robux path checks, so closing the store closes all of it
+	-- rather than half.
 	if FlagService:Get(player, "ShopEnabled") == false then
 		return false, "The store is temporarily closed."
 	end
@@ -97,19 +87,17 @@ function ShopService:Purchase(player: Player, itemId: string): (boolean, string)
 		return false, "Your data is still loading."
 	end
 
-	if self:Owns(player, item) then
-		return false, "You already own that."
-	end
+	local price = self:PriceFor(player, item)
 
 	-- Charge first, then apply, then refund on failure. Checking the balance and
-	-- spending as two steps would leave a window where the effect lands but the charge
+	-- spending as two steps would leave a window where the effect lands and the charge
 	-- does not.
-	if not CurrencyService:TrySpend(player, item.Price) then
-		return false, `You need ${NumberFormat.Format(item.Price)} for that.`
+	if not TokenService:TrySpendTokens(player, price) then
+		return false, `You need {NumberFormat.Format(price)} tokens for that.`
 	end
 
 	if not self:_apply(player, item) then
-		CurrencyService:Add(player, item.Price)
+		TokenService:AwardTokens(player, price)
 		return false, "Something went wrong applying that item."
 	end
 
@@ -122,6 +110,17 @@ function ShopService:Start()
 			return false, "Invalid request."
 		end
 		return self:Purchase(player, itemId)
+	end)
+
+	-- The client needs the prices to draw the shop, and they depend on a class it would
+	-- otherwise have to compute for itself. Handing them over keeps one source of truth
+	-- for what a Protein Shake costs.
+	Net.BindFunction("GetShopPrices", 2, function(player: Player)
+		local prices: { [string]: number } = {}
+		for _, item in ShopConfig.List do
+			prices[item.Id] = self:PriceFor(player, item)
+		end
+		return prices
 	end)
 end
 
