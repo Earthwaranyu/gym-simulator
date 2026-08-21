@@ -1933,6 +1933,20 @@ function MenuController:_renderSettings(parent: Frame)
 		)
 	end
 
+	order += 1
+	local appearance = row(parent, 58, order)
+	local appearanceLabel = UI.Label("Text", appearance)
+	appearanceLabel.Size = UDim2.new(1, -132, 1, 0)
+	appearanceLabel.TextSize = 14
+	appearanceLabel.Text = `<b>Appearance</b>\n<font color="#8A93A8">Skin, shorts, hair and face</font>`
+
+	-- The creator needs the whole screen to show the body it is changing, so the menu
+	-- gets out of the way rather than hosting it as a page.
+	button(appearance, "EDIT", UI.Palette.Accent, function()
+		self:Toggle()
+		Loader.Get("CustomizerController"):Open(false)
+	end)
+
 	toggleRow("MusicEnabled", "Music", "Background soundtrack", settings.MusicEnabled)
 	toggleRow("SfxEnabled", "Sound effects", "Training, combat, and menu feedback", settings.SfxEnabled)
 
