@@ -27,6 +27,7 @@
 	_shouldApply do the same job directly, and the ordering is the belt to their braces.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -38,6 +39,7 @@ local GaitConfig = require(ReplicatedStorage.Modules.GaitConfig)
 local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
 local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
 
 local GaitController = {
 	Name = "GaitController",
@@ -70,6 +72,9 @@ type Entry = {
 }
 
 local active: { [Model]: Entry } = {}
+-- Mob models to consider each frame, kept as a set rather than re-read from the tag
+-- every frame. A field of six goblins and a boss are all walking at once.
+local mobs: { [Model]: boolean } = {}
 
 local function bindJoints(character: Model): { Bound }
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -381,6 +386,30 @@ function GaitController:Start()
 		self:_track(player)
 	end)
 
+	-- Monsters walk too, and everything above already works on any model: the entries
+	-- are keyed by Model, groundSpeedFor asks a Humanoid and a root part rather than a
+	-- Player, and a rig without the joints a gait names binds nothing and is skipped.
+	-- FlinchController takes mobs the same way and for the same reason.
+	--
+	-- Their speeds land where you would want: a goblin at 20 sits just past a walk and
+	-- a boss at 32 is a third of the way to the dash silhouette, so goblins jog in and
+	-- a boss charges, off the same two poses the player uses.
+	local function watchMob(instance: Instance)
+		if instance:IsA("Model") then
+			mobs[instance] = true
+		end
+	end
+	for _, model in CollectionService:GetTagged(MobConfig.MOB_TAG) do
+		watchMob(model)
+	end
+	CollectionService:GetInstanceAddedSignal(MobConfig.MOB_TAG):Connect(watchMob)
+	CollectionService:GetInstanceRemovedSignal(MobConfig.MOB_TAG):Connect(function(instance: Instance)
+		if instance:IsA("Model") then
+			mobs[instance] = nil
+			self:_clear(instance)
+		end
+	end)
+
 	RunService.PreSimulation:Connect(function(delta: number)
 		-- Characters are picked up here rather than from an attribute change, because
 		-- there is no attribute: starting to walk is not an event anybody publishes, it
@@ -390,6 +419,13 @@ function GaitController:Start()
 			local character = player.Character
 			if character ~= nil and active[character] == nil then
 				self:_sync(character)
+			end
+		end
+		for model in mobs do
+			if model.Parent == nil then
+				mobs[model] = nil
+			elseif active[model] == nil then
+				self:_sync(model)
 			end
 		end
 

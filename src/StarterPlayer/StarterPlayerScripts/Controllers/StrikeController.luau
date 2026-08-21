@@ -19,12 +19,14 @@
 	transforms; write later and the property is set but nothing ever sees it.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local PosePlayback = require(ReplicatedStorage.Modules.PosePlayback)
 local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
+local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
 
 local StrikeController = {
 	Name = "StrikeController",
@@ -218,6 +220,26 @@ function StrikeController:Start()
 	end
 	Players.PlayerAdded:Connect(function(player: Player)
 		self:_track(player)
+	end)
+
+	-- Monsters swing through the same channel. MobService stamps StrikeAt and StrikeId
+	-- on the mob model exactly as the three ability files stamp them on an attacker, and
+	-- everything below this line is keyed by Model already. A rig missing the joints a
+	-- strike names binds nothing and is skipped, so this is free for anything that
+	-- cannot use it.
+	local function watchMob(instance: Instance)
+		if instance:IsA("Model") then
+			self:_watch(instance)
+		end
+	end
+	for _, model in CollectionService:GetTagged(MobConfig.MOB_TAG) do
+		watchMob(model)
+	end
+	CollectionService:GetInstanceAddedSignal(MobConfig.MOB_TAG):Connect(watchMob)
+	CollectionService:GetInstanceRemovedSignal(MobConfig.MOB_TAG):Connect(function(instance: Instance)
+		if instance:IsA("Model") then
+			self:_clear(instance)
+		end
 	end)
 
 	RunService.PreSimulation:Connect(function()

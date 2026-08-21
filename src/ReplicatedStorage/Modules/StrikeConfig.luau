@@ -377,6 +377,92 @@ local HEAVY_FOLLOW = combatPose(Vector3.new(0, 0, -0.7), {
 	LeftKnee = deg(-18, 0, 0),
 })
 
+--[[
+	The monster swings. Two of them, both authored heavier and slower than anything a
+	player throws.
+
+	A goblin has no combat training and no reach discipline: it winds one arm back past
+	its own shoulder line, drops its guard completely and throws its whole body at you.
+	That readability is the point — the wind-up is the only warning a player gets, and it
+	has to be legible from behind as well as from in front.
+
+	These reuse the player's joint vocabulary exactly, so they need no new machinery. The
+	mob rig has no ankles; those joints resolve to nil and are skipped.
+]]
+local MOB_READY = combatPose(Vector3.new(0, -0.1, 0), {
+	Root = deg(2, 0, 0),
+	RightShoulder = deg(-14, 0, 16),
+	RightElbow = deg(38, 0, 0),
+	LeftShoulder = deg(-10, 0, -14),
+	LeftElbow = deg(32, 0, 0),
+	Waist = deg(4, 0, 0),
+	Neck = deg(-4, 0, 0),
+	RightHip = deg(-6, 0, 0),
+	LeftHip = deg(4, 0, 0),
+	RightKnee = deg(-14, 0, 0),
+	LeftKnee = deg(-10, 0, 0),
+})
+
+local MOB_WIND = combatPose(Vector3.new(0, -0.22, -0.18), {
+	Root = deg(-6, -26, 0),
+	-- Past the shoulder line, which a trained fighter would never do. It is what makes
+	-- the swing read from any angle.
+	RightShoulder = deg(52, 0, 62),
+	RightElbow = deg(74, 0, 0),
+	LeftShoulder = deg(-28, 0, -30),
+	LeftElbow = deg(18, 0, 0),
+	Waist = deg(-8, -20, 0),
+	Neck = deg(6, -14, 0),
+	RightHip = deg(-14, 0, 0),
+	LeftHip = deg(10, 0, 0),
+	RightKnee = deg(-26, 0, 0),
+	LeftKnee = deg(-8, 0, 0),
+})
+
+local MOB_CONTACT = combatPose(Vector3.new(0, -0.05, 0.4), {
+	Root = deg(8, 30, 0),
+	RightShoulder = deg(-42, 0, -18),
+	RightElbow = deg(12, 0, 0),
+	LeftShoulder = deg(20, 0, 34),
+	LeftElbow = deg(40, 0, 0),
+	Waist = deg(12, 24, 0),
+	Neck = deg(-8, 16, 0),
+	RightHip = deg(12, 0, 0),
+	LeftHip = deg(-12, 0, 0),
+	RightKnee = deg(-8, 0, 0),
+	LeftKnee = deg(-22, 0, 0),
+})
+
+-- Both arms overhead, body stretched tall. The silhouette IS the telegraph, so it is
+-- deliberately the opposite shape to everything else the creature does.
+local MOB_RAISE = combatPose(Vector3.new(0, 0.25, -0.1), {
+	Root = deg(-10, 0, 0),
+	RightShoulder = deg(-142, 0, 22),
+	RightElbow = deg(28, 0, 0),
+	LeftShoulder = deg(-142, 0, -22),
+	LeftElbow = deg(28, 0, 0),
+	Waist = deg(-12, 0, 0),
+	Neck = deg(-18, 0, 0),
+	RightHip = deg(-4, 0, 0),
+	LeftHip = deg(-4, 0, 0),
+	RightKnee = deg(-6, 0, 0),
+	LeftKnee = deg(-6, 0, 0),
+})
+
+local MOB_SMASH = combatPose(Vector3.new(0, -0.7, 0.3), {
+	Root = deg(26, 0, 0),
+	RightShoulder = deg(-8, 0, 6),
+	RightElbow = deg(6, 0, 0),
+	LeftShoulder = deg(-8, 0, -6),
+	LeftElbow = deg(6, 0, 0),
+	Waist = deg(30, 0, 0),
+	Neck = deg(-24, 0, 0),
+	RightHip = deg(28, 0, 0),
+	LeftHip = deg(28, 0, 0),
+	RightKnee = deg(-64, 0, 0),
+	LeftKnee = deg(-64, 0, 0),
+})
+
 local strikes: { Strike } = {
 	--[[
 		The punch chain: one click, one swing.
@@ -470,6 +556,38 @@ local strikes: { Strike } = {
 			-- fires on a whiff. Impacts are driven from the victim now; see
 			-- FlinchConfig's header.
 			{ At = 0.2, Effect = "HeavyCharge", Attach = "RightHand" :: "RightHand" },
+		},
+	},
+	{
+		-- The ordinary monster swing. Slower than a player's jab on purpose: a goblin
+		-- landing a hit should feel like something you let happen.
+		Id = "MobSwing",
+		Duration = 1.1,
+		Contacts = { 0.58 },
+		Stages = {
+			transition(0.2, "Coil", NEUTRAL, MOB_READY),
+			transition(0.24, "Coil", MOB_READY, MOB_WIND),
+			transition(0.14, "Snap", MOB_WIND, MOB_CONTACT),
+			transition(0.42, "Recover", MOB_CONTACT, NEUTRAL),
+		},
+	},
+	{
+		-- The boss's heavy. Over a third of it is the raise, because that window is what
+		-- a player is meant to spend walking out of the ring.
+		Id = "MobUltimate",
+		Duration = 2,
+		Contacts = { 0.66 },
+		Stages = {
+			transition(0.14, "Coil", NEUTRAL, MOB_READY),
+			transition(0.24, "Coil", MOB_READY, MOB_RAISE),
+			-- The hold at the top. Nothing moves, which is what makes the drop land.
+			transition(0.16, "Recover", MOB_RAISE, MOB_RAISE),
+			transition(0.12, "Snap", MOB_RAISE, MOB_SMASH),
+			transition(0.34, "Recover", MOB_SMASH, NEUTRAL),
+		},
+		Vfx = {
+			{ At = 0.38, Effect = "SlamCharge", Attach = "Ground" :: "Ground" },
+			{ At = 0.66, Effect = "SlamImpact", Attach = "Ground" :: "Ground" },
 		},
 	},
 }
