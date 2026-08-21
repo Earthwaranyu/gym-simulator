@@ -11,13 +11,21 @@
 
 	The shape of the curve, for anyone retuning it:
 
-	  * Health tracks the tier's Power gate divided by roughly twenty, so a player who
-	    has just earned entry to an area needs a handful of punches, not one and not
-	    thirty. Damage from a punch is the attacker's Arms stat one-for-one.
+	  * Health is counted in PUNCHES, because that is the only unit that means anything
+	    here: a player's punch does damage equal to their Arms, so a monster's health is
+	    chosen as a multiple of the Arms a player has when they first enter the tier. A
+	    goblin takes eight and a boss sixty.
+
+	    It used to be the tier's gate divided by twenty, which sounds similar and is not:
+	    the gate IS a player's Arms at that point, so every goblin above the starter
+	    field died in a single punch and every boss in three. A whole fight lasted less
+	    than a second and none of it was felt. Damage from a punch is the attacker's Arms stat one-for-one.
 	  * Damage is a fixed SHARE of the health a player at that tier will have
-	    (Formulas.MaxHealth is 100 + Chest * 10): a goblin takes about 6% a swing, so it
-	    kills an unprotected tier-appropriate player in seventeen, and a boss takes 18%
-	    and kills in six. Garage was always tuned that way and nothing above it was —
+	    (Formulas.MaxHealth is 100 + Chest * 10): a goblin takes about 8% a swing and
+	    kills an unprotected tier-appropriate player in twelve, and a boss takes 25% and
+	    kills in four. Against the eighteen seconds of punching a boss costs, that means
+	    it out-trades you unless you dodge the heavy — which is the whole reason the
+	    heavy spends two seconds winding up. Garage was always tuned that way and nothing above it was —
 	    every other tier sat near 0.04%, which is roughly two thousand swings, so a
 	    monster past the starter field could not kill anybody. Retune by picking the
 	    share, not by picking a number.
@@ -204,7 +212,11 @@ local function boss(zoneId: string, displayName: string, health: number, damage:
 		UltimateCooldown = 12,
 		UltimateWindup = 1.3,
 		UltimateRadius = 34,
-		UltimateMultiplier = 3.5,
+		-- 3.5 was eighty-seven percent of a tier-appropriate player's health in one blow.
+		-- Near-lethal is a coin flip rather than a mechanic; at 2.2 it costs a little
+		-- over half, so two connected heavies kill and one is a disaster you can still
+		-- come back from.
+		UltimateMultiplier = 2.2,
 		-- Ten minutes of the thirty-minute cycle. Long enough to travel to, short
 		-- enough that an unfought boss is gone well before the next one is due.
 		DespawnSeconds = 600,
@@ -218,32 +230,32 @@ end
 local mobs: { Mob } = {
 	-- Garage (gate 0). Deliberately beatable by someone who has trained nothing:
 	-- this is where a player learns that monsters hit back.
-	goblin("Garage", "Runt Goblin", 120, 6, 1),
-	boss("Garage", "Scrap Warden", 1600, 18, 10),
+	goblin("Garage", "Runt Goblin", 15, 8, 1),
+	boss("Garage", "Scrap Warden", 400, 25, 10),
 
 	-- Iron (gate 50K)
-	goblin("Iron", "Park Goblin", 2500, 6_000, 2),
-	boss("Iron", "Iron Warden", 30000, 18_000, 20),
+	goblin("Iron", "Park Goblin", 80_000, 8_000, 2),
+	boss("Iron", "Iron Warden", 600_000, 25_000, 20),
 
 	-- Powerhouse (gate 250K)
-	goblin("Powerhouse", "Dock Goblin", 12500, 30_000, 4),
-	boss("Powerhouse", "Tidebreaker", 150000, 90_000, 40),
+	goblin("Powerhouse", "Dock Goblin", 400_000, 40_000, 4),
+	boss("Powerhouse", "Tidebreaker", 3e6, 125_000, 40),
 
 	-- Strongman (gate 1M)
-	goblin("Strongman", "Freight Goblin", 50000, 120_000, 8),
-	boss("Strongman", "Yard Colossus", 600000, 360_000, 80),
+	goblin("Strongman", "Freight Goblin", 1.6e6, 160_000, 8),
+	boss("Strongman", "Yard Colossus", 12e6, 500_000, 80),
 
 	-- Titan (gate 5M)
-	goblin("Titan", "Plaza Goblin", 250000, 600_000, 16),
-	boss("Titan", "Titan of the Square", 3e6, 1.8e6, 160),
+	goblin("Titan", "Plaza Goblin", 8e6, 800_000, 16),
+	boss("Titan", "Titan of the Square", 60e6, 2.5e6, 160),
 
 	-- Skydeck (gate 25M)
-	goblin("Skydeck", "Rooftop Goblin", 1.25e6, 3e6, 32),
-	boss("Skydeck", "Skydeck Sentinel", 15e6, 9e6, 320),
+	goblin("Skydeck", "Rooftop Goblin", 40e6, 4e6, 32),
+	boss("Skydeck", "Skydeck Sentinel", 300e6, 12.5e6, 320),
 
 	-- Storm (gate 250M). The flight-only tier, and the hardest thing in the game.
-	goblin("Storm", "Storm Goblin", 12.5e6, 30e6, 64),
-	boss("Storm", "Stormcaller", 150e6, 90e6, 640),
+	goblin("Storm", "Storm Goblin", 400e6, 40e6, 64),
+	boss("Storm", "Stormcaller", 3e9, 125e6, 640),
 }
 
 local MobConfig = {}
