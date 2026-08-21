@@ -251,9 +251,15 @@ function FlightController:_takeOff()
 	orienter = orient
 	velocity = part.AssemblyLinearVelocity
 	flying = true
-	-- You are not running any more. Left set, the toggle would still read as "on" when
-	-- you landed, and Shift would appear to do nothing the first time you pressed it.
-	setSprint(false)
+	-- Sprint is deliberately left alone.
+	--
+	-- Takeoff used to clear it, on the theory that you are not running any more. But
+	-- the toggle is the player's standing intent, not a description of the current
+	-- animation, and clearing it is what made landing drop you to a walk and made the
+	-- first Shift press afterwards read as dead. Flight never consults WalkSpeed
+	-- anyway — the body is under PlatformStand, moved by a LinearVelocity paced by
+	-- Formulas.FlightSpeed — so a sprint-speed WalkSpeed sitting unused through the
+	-- flight costs nothing and is correct again the instant the humanoid takes over.
 
 	-- The humanoid would otherwise keep trying to walk, and fight the velocity every
 	-- frame while standing on nothing.
@@ -499,7 +505,9 @@ function FlightController:Start()
 			return
 		end
 
-		if input.KeyCode == MovementConfig.SPRINT_KEY and not flying then
+		-- Live in the air too, where it chooses what you land into. Shift has nothing
+		-- else to do up there: descent is on Ctrl precisely so the two never collide.
+		if input.KeyCode == MovementConfig.SPRINT_KEY then
 			setSprint(not sprinting)
 			return
 		end
