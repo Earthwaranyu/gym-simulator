@@ -76,16 +76,15 @@ export type Mob = {
 }
 
 --[[
-	How far a physique class may multiply this tier's reward.
+	How far a physique class may multiply this tier's boss reward.
 
-	The class multiplier doubles nine times; monster rewards double seven times across
-	the tiers. Multiplied together without a limit, the cheapest content in the game
-	becomes the best paid: a Titan-class player farming 120-HP Garage goblins would earn
-	a few hundred Fight Tokens a kill against a 2,555 cost for the whole class chain,
-	and the prestige ladder would fund itself off the safest thing on the map.
+	The class multiplier doubles nine times; rewards double seven times across the tiers.
+	Multiplied together without a limit the cheapest content in the game becomes the best
+	paid — a late class could sit on the 1,600-HP Garage boss and out-earn anyone
+	fighting at their own level.
 
-	So the bonus stops at what the tier is itself worth — the same doubling the rewards
-	use. A Garage mob pays Garage rates to everyone forever; a Storm mob will pay up to
+	So the bonus stops at what the tier is itself worth, the same doubling the rewards
+	use. A Garage boss pays Garage rates to everyone forever; a Storm boss will pay up to
 	sixty-four times. Killing things at your own level is what pays, which is the job the
 	tier ladder already exists to do.
 ]]
@@ -219,12 +218,26 @@ end
 --[[
 	What one kill is worth right now, as a multiplier on the reward written in the row.
 
-	Both currencies go through here so they cannot drift apart, and both the server that
-	pays the reward and the map card that promises it call the same function — a card
-	that quoted a different number from the one the kill pays would be worse than a card
-	that quoted nothing.
+	**Bosses only.** A goblin always pays its flat tier reward, however grand the killer
+	is, because goblins pay Fight Tokens and Fight Tokens buy physique classes — so a
+	class that multiplied them would be funding its own ladder. It is not a small effect:
+	a class-2 player one-shots Powerhouse goblins, and at a scaled 16 a kill, six to a
+	field on a twelve-second respawn, the entire 2,555 chain pays for itself in about
+	five minutes. The tier cap cannot catch it either, since a player farms the very tier
+	their class is capped at. Tying Fight Token income to *where* you fight rather than
+	to what you already are is the only version of this that paces anything.
+
+	Bosses pay Tokens, which buy stat multipliers, and multipliers do not make bosses
+	easier to reach — so scaling those is just the reward growing with the character.
+	The cap is still needed there, to stop a late class farming the starter boss.
+
+	Both the server that pays the reward and the map card that promises it call this, so
+	a card cannot quote one figure while the kill hands over another.
 ]]
 function MobConfig.RewardMultiplier(mob: Mob, classLevel: number): number
+	if mob.Kind ~= "Boss" then
+		return 1
+	end
 	return math.min(MuscleClassConfig.Get(classLevel).TokenMultiplier, mob.RewardCap)
 end
 
