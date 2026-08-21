@@ -187,6 +187,15 @@ Formulas.BASE_FLIGHT_SPEED = 40
 Formulas.FULL_DEFENSE_RATIO = 10
 Formulas.MAX_BACK_RESISTANCE = 1
 Formulas.MAX_CORE_REFLECTION = 1
+-- Monsters are the exception to that rule, and only monsters.
+--
+-- Against a player the 10x wall is the point: somebody that far above you is not
+-- fighting you any more, and you can walk away from them. You cannot walk away from a
+-- whole tier of the map. Full immunity there means an arena you have out-levelled is
+-- not merely easy but literally inert, which reads as a broken game rather than as a
+-- mastered one — and it hid two real bugs during testing precisely because zero damage
+-- looks the same however it was arrived at.
+Formulas.MAX_ENVIRONMENT_BLOCK = 0.9
 
 -- Direct velocity scaling has to stop before a Humanoid or flight constraint starts
 -- skipping through the map. These are bonus caps, not hidden conversion curves: every
@@ -446,6 +455,37 @@ function Formulas.ResolveDamage(
 		Reflected = reflected,
 		BlockRate = blockRate,
 		ReflectionRate = reflectionRate,
+	}
+end
+
+--[[
+	A hit from something that is not a player: a monster, and later anything else the
+	world can do to you.
+
+	Two differences from the player-versus-player path, both deliberate. Core is not
+	consulted at all — reflecting onto a goblin would need a damage path in the opposite
+	direction for no gameplay gain. And Back can never block the hit outright: at worst
+	it stops MAX_ENVIRONMENT_BLOCK of it, so a monster whose tier you have left behind
+	becomes trivial rather than harmless.
+]]
+function Formulas.ResolveEnvironmentDamage(
+	rawDamage: number,
+	backStat: number,
+	attackerStat: number
+): CombatBreakdown
+	local breakdown = Formulas.ResolveDamage(rawDamage, backStat, 0, attackerStat)
+	if breakdown.BlockRate <= Formulas.MAX_ENVIRONMENT_BLOCK then
+		return breakdown
+	end
+
+	local blockRate = Formulas.MAX_ENVIRONMENT_BLOCK
+	local blocked = rawDamage * blockRate
+	return {
+		Damage = math.max(0, rawDamage - blocked),
+		Blocked = blocked,
+		Reflected = 0,
+		BlockRate = blockRate,
+		ReflectionRate = 0,
 	}
 end
 
@@ -1110,6 +1150,20 @@ function Formulas.RunSelfTest(): { string }
 	check("impact tiers survive bad input", Formulas.ImpactTier(0 / 0) == "Light")
 
 	check("total power sums", Formulas.TotalPower({ a = 2, b = 3 }) == 5)
+
+	-- Monster damage: Core never applies, and Back can never zero the hit.
+	local outmatched = Formulas.ResolveEnvironmentDamage(100, 1e9, 10)
+	check("a vastly tougher player still takes a tenth of a monster hit", outmatched.Damage == 10)
+	check("Back's block against a monster is capped", outmatched.BlockRate == Formulas.MAX_ENVIRONMENT_BLOCK)
+	check("a monster is never reflected", outmatched.Reflected == 0)
+	local matched = Formulas.ResolveEnvironmentDamage(100, 10, 10)
+	check("an evenly matched player takes the whole monster hit", matched.Damage == 100)
+	local core = Formulas.ResolveEnvironmentDamage(100, 0, 10)
+	check("Core does not nullify a monster hit", core.Damage == 100)
+	check(
+		"a monster may be blunted further than a player may be",
+		Formulas.MAX_ENVIRONMENT_BLOCK < Formulas.MAX_BACK_RESISTANCE
+	)
 
 	return failures
 end

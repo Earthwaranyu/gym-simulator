@@ -595,10 +595,11 @@ end
 	attacker at one, and the result was that every player above ten Core took no damage
 	from any monster, ever.
 
-	Core is passed as zero because Core does not apply to environment damage. Reflecting
-	onto a goblin would need a damage path in the opposite direction for no gameplay
-	gain, and Core's band nullifies rather than reduces — letting it run here is exactly
-	what handed one stat total immunity to all of PvE.
+	Formulas.ResolveEnvironmentDamage owns the two rules that differ from a player hit:
+	Core is not consulted, and Back can never block the whole thing. Both exist so that
+	out-levelling a tier makes it trivial rather than inert — an arena that cannot touch
+	you at all reads as a broken game, and while it was true it hid two genuine bugs,
+	because zero damage looks identical however it was arrived at.
 ]]
 function CombatService:ApplyEnvironmentDamage(
 	sourceName: string,
@@ -619,7 +620,8 @@ function CombatService:ApplyEnvironmentDamage(
 		return 0
 	end
 
-	local breakdown = Formulas.ResolveDamage(rawDamage, StatService:GetStat(victim, "Back"), 0, attackStat)
+	local breakdown =
+		Formulas.ResolveEnvironmentDamage(rawDamage, StatService:GetStat(victim, "Back"), attackStat)
 	local damage = breakdown.Damage
 	-- The same last word the player-versus-player path gives a modifier. A guard that
 	-- stopped a punch but not a goblin would be a rule the player has no way to learn.
