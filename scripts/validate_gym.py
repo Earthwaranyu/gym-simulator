@@ -29,6 +29,7 @@ ZONE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "ZoneConfig.
 POSE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "PoseConfig.luau"
 MOVEMENT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MovementConfig.luau"
 MOB_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MobConfig.luau"
+FORMULAS_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "Formulas.luau"
 WEIGHT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "WeightConfig.luau"
 CITY_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "City.model.json"
 DISTRICTS_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "Districts.model.json"
@@ -1673,7 +1674,16 @@ def validate_mob_roster(validator: Validator) -> None:
         )
 
     # Shared behaviour, read off the two factories rather than the rows.
+    #
+    # Speed is checked against the player's, not against zero. A goblin ran at 14 and a
+    # boss at 12 while a player walks at 16, so neither could close on anyone who was
+    # moving and a whole arena read as empty. "Faster than nothing" is not the contract;
+    # "able to catch someone walking away" is.
+    walk_speed = re.search(r"Formulas\.BASE_WALK_SPEED = ([\d_.e+]+)", FORMULAS_PATH.read_text(encoding="utf-8"))
+    player_walk = _luau_number(walk_speed.group(1)) if walk_speed else 16.0
+
     source = MOB_CONFIG_PATH.read_text(encoding="utf-8")
+    speeds: dict[str, float] = {}
     for factory in ("goblin", "boss"):
         body = re.search(
             r"local function " + factory + r"\(.*?\n\treturn \{(.*?)\n\t\}", source, re.S
@@ -1688,8 +1698,21 @@ def validate_mob_roster(validator: Validator) -> None:
             f"{factory} aggro radius {aggro} must be positive and inside its leash {leash}",
         )
         validator.check(fields.get("AttackRange", 0) > 0, f"{factory} cannot reach anything")
-        validator.check(fields.get("WalkSpeed", 0) > 0, f"{factory} cannot move")
         validator.check(fields.get("AttackCooldown", 0) > 0, f"{factory} has no attack cooldown")
+
+        speed = fields.get("WalkSpeed", 0)
+        speeds[factory] = speed
+        validator.check(
+            speed > player_walk,
+            f"{factory} walks at {speed:g}, no faster than a player at {player_walk:g} — "
+            f"it can never catch anyone",
+        )
+
+    validator.check(
+        speeds.get("boss", 0) > speeds.get("goblin", 0),
+        f"a boss at {speeds.get('boss', 0):g} must outrun its field goblins at "
+        f"{speeds.get('goblin', 0):g}",
+    )
 
 
 def validate_hostile_scatter(validator: Validator, builder: ModuleType) -> None:
