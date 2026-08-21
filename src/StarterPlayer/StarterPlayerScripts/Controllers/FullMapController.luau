@@ -30,6 +30,8 @@ local MapRender = require(ReplicatedStorage.Modules.MapRender)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
+local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
+local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MapViewportMath = require(ReplicatedStorage.Modules.MapViewportMath)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
@@ -555,6 +557,13 @@ end
 ]]
 function FullMapController:_renderHostile(parent: Frame, data: any?, hostile: Hostile)
 	local zone = ZoneConfig.Get(hostile.ZoneId)
+	-- What this kill is worth to THIS player. Resolved through the same MobConfig
+	-- function the server pays through, so the card cannot promise one figure and the
+	-- kill hand over another.
+	local definition = MobConfig.Get(hostile.Id)
+	local classLevel = if data ~= nil then data.MuscleClassLevel else 0
+	local rewardBonus = if definition ~= nil then MobConfig.RewardMultiplier(definition, classLevel) else 1
+	local classBonus = MuscleClassConfig.Get(classLevel).TokenMultiplier
 	local site = MapRender.SiteIcon(hostile.Kind)
 	local accent = if hostile.Kind == "Boss" then UI.Palette.Danger else site.Color
 
@@ -641,7 +650,7 @@ function FullMapController:_renderHostile(parent: Frame, data: any?, hostile: Ho
 		-- bosses pay Tokens, which buy stat multipliers. Naming the wrong one sends a
 		-- player to farm for something they cannot spend on what they are saving for.
 		local currency = if hostile.Kind == "Boss" then "TOKENS" else "FIGHT TOKENS"
-		powerLabel.Text = `OPEN TO YOU\nPAYS {NumberFormat.Format(hostile.Reward)} {currency}`
+		powerLabel.Text = `OPEN TO YOU\nPAYS {NumberFormat.Format(hostile.Reward * rewardBonus)} {currency}`
 	end
 
 	local rule = Instance.new("Frame")
@@ -658,7 +667,12 @@ function FullMapController:_renderHostile(parent: Frame, data: any?, hostile: Ho
 	actionHint.TextWrapped = true
 	actionHint.TextSize = 11
 	actionHint.TextColor3 = UI.Palette.TextMuted
-	actionHint.Text = "Track is free. Teleport needs Fast Travel and enough Power."
+	-- Only worth saying when the cap is actually costing them something. A player whose
+	-- class sits below the tier is already paid in full and does not need to be told
+	-- about a ceiling they have not reached.
+	actionHint.Text = if definition ~= nil and classBonus > definition.RewardCap
+		then `This tier caps your class bonus at ×{NumberFormat.Format(definition.RewardCap)}. Stronger monsters pay more.`
+		else "Track is free. Teleport needs Fast Travel and enough Power."
 
 	self:_sideButton(parent, "Track", "TRACK", UDim2.new(0, 10, 1, -108), accent, true, function()
 		self:_track(hostile.Position, hostile.DisplayName, accent)
