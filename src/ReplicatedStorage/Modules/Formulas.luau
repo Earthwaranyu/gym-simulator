@@ -105,9 +105,17 @@ end
 Formulas.TOKEN_TICK_SECONDS = 15
 
 --[[
-	Tokens granted per tick. Flat on purpose: tokens measure time invested, not power,
-	so a new player and a veteran earn at the same rate and the upgrade curve alone
-	decides pacing.
+	The BASE tokens granted per tick, before the player's physique class multiplies it.
+
+	This was flat forever, on the reasoning that tokens measure time invested rather
+	than power. That held while the upgrade curve was hand-tuned; it stopped holding
+	when every multiplier level started costing exactly double the last, because a flat
+	income against a doubling cost means each tier takes twice as long than the one
+	before it, forever.
+
+	The scaling lives on the physique class instead of here (MuscleClassConfig's
+	TokenMultiplier), so income rises when a player *chooses* to prestige rather than
+	simply as a side effect of accumulating power. TokenService multiplies the two.
 ]]
 function Formulas.TokensPerTick(): number
 	return 1

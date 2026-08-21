@@ -30,6 +30,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
 
 local GYM_ZONE_TAG = "GymZone"
 
@@ -151,13 +152,33 @@ function TokenService:TrySpendTokens(player: Player, amount: number): boolean
 end
 
 function TokenService:Start()
+	-- Boss kills are the one combat source of training Tokens. Everything else pays
+	-- Tokens for time; this pays for a trip and a fight, which is why the lump is large
+	-- enough to be worth planning around and why only bosses grant it.
+	Loader.Get("MobService").MobKilled:Connect(function(killer: Player, mob)
+		if mob.Kind ~= "Boss" then
+			return
+		end
+		local reward = mob.TokenReward or 0
+		if reward > 0 then
+			self:AwardTokens(killer, reward)
+		end
+	end)
+
 	task.spawn(function()
 		while true do
 			task.wait(Formulas.TOKEN_TICK_SECONDS)
 
 			for _, player in Players:GetPlayers() do
 				if self:IsAccruing(player) then
-					self:AwardTokens(player, Formulas.TokensPerTick())
+					-- The physique class multiplies the tick. Everything else in this
+					-- economy doubles per step, and a flat income against doubling costs
+					-- would make each multiplier tier take twice as long as the last with
+					-- nothing a player could do about it. Prestige is that something.
+					local data = DataService:GetData(player)
+					local level = if data ~= nil then data.MuscleClassLevel else 0
+					local class = MuscleClassConfig.Get(level)
+					self:AwardTokens(player, Formulas.TokensPerTick() * class.TokenMultiplier)
 				end
 			end
 		end
