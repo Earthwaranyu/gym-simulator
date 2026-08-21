@@ -59,6 +59,12 @@ local MAX_ZOOM = 4
 local ZOOM_STEP = 1.25
 local PIN_SIZE = 26
 local SELECTED_PIN_SIZE = 30
+-- Monster pins are deliberately smaller than machine pins, and drawn under them.
+-- Fourteen hostile sites at the same size as thirty-five machines made the map look
+-- like it was about the monsters; it is about where to train, and a fight is
+-- somewhere you may choose to go instead.
+local HOSTILE_PIN_SIZE = 18
+local SELECTED_HOSTILE_PIN_SIZE = 22
 
 local MAP_PAPER = MapRender.Paper
 local MAP_INK = MapRender.Ink
@@ -1197,9 +1203,10 @@ function FullMapController:_render()
 		end)
 	end
 
-	-- Monster sites, on top of the circles the feature layer already draws for them.
-	-- Same pin machinery as a machine, deliberately: this is a place you can decide to
-	-- go to, and the map should not make you learn a second way to say so.
+	-- Monster sites, on the circles the feature layer already draws for them. Same pin
+	-- machinery as a machine, deliberately: this is a place you can decide to go to, and
+	-- the map should not make you learn a second way to say so. Smaller and below the
+	-- machine pins, just as deliberately, so it stays the secondary reading.
 	if activeStatFilter == nil then
 		local playerPower = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
 		for _, hostile in hostiles do
@@ -1207,7 +1214,7 @@ function FullMapController:_render()
 			local accent = if hostile.Kind == "Boss" then UI.Palette.Danger else site.Color
 			local selectedSite = selectedHostile == hostile.Id
 			local unlocked = playerPower >= hostile.RequiredPower
-			local size = if selectedSite then SELECTED_PIN_SIZE else PIN_SIZE
+			local size = if selectedSite then SELECTED_HOSTILE_PIN_SIZE else HOSTILE_PIN_SIZE
 
 			local pin = Instance.new("TextButton")
 			pin.Name = hostile.Id
@@ -1218,7 +1225,7 @@ function FullMapController:_render()
 			pin.BorderSizePixel = 0
 			pin.AutoButtonColor = false
 			pin.Text = ""
-			pin.ZIndex = if selectedSite then 27 else 23
+			pin.ZIndex = if selectedSite then 21 else 20
 			pin.Parent = viewport
 			registerMapItem(pin)
 			addCorner(pin, 20)

@@ -1030,7 +1030,7 @@ function HudController:_drawMinimapRegion(centre: Vector3)
 		end
 		local site = MapRender.SiteIcon(hostile.Kind)
 		local color = if hostile.Kind == "Boss" then UI.Palette.Danger else site.Color
-		local pin = MapRender.Dot(canvas, hostile.Id, 8, color, 21)
+		local pin = MapRender.Dot(canvas, hostile.Id, 5, color, 19)
 		pin.Position = project(at.X, at.Z)
 	end
 
