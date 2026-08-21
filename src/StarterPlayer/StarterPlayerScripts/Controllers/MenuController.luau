@@ -29,6 +29,7 @@ local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
 local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
+local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
 local TokenMultiplierConfig = require(ReplicatedStorage.Modules.TokenMultiplierConfig)
 local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
 
@@ -1519,15 +1520,28 @@ function MenuController:_renderShop(parent: Frame)
 		return Net.Function("GetProductCatalogue"):InvokeServer()
 	end)
 
-	local sections: { [string]: { any } } = { Gamepass = {}, Potion = {}, Token = {} }
+	local prices: { [string]: number } = {}
+	local pricesOk, fetched = pcall(function()
+		return Net.Function("GetShopPrices"):InvokeServer()
+	end)
+	if pricesOk and type(fetched) == "table" then
+		prices = fetched
+	end
+
+	local sections: { [string]: { any } } = { Gamepass = {}, Potion = {}, Supplement = {}, Token = {} }
 	if ok and type(catalogue) == "table" then
 		for _, product in catalogue do
 			-- Grouped by what the thing is to the player, not by Roblox's product
 			-- kind: a potion and a token pack are both DevProducts and belong in
 			-- different parts of a shop.
+			-- Supplements are their own row now that they can also be bought with
+			-- tokens. They were filed under the immortality potions, which was never
+			-- true and reads worse with the same three items listed above in a section
+			-- of their own.
 			local group = if product.Kind == "Gamepass"
 				then "Gamepass"
 				elseif string.find(tostring(product.Id), "TokenPack") ~= nil then "Token"
+				elseif ShopConfig.Get(tostring(product.Id)) ~= nil then "Supplement"
 				else "Potion"
 			table.insert(sections[group], product)
 		end
@@ -1680,6 +1694,43 @@ function MenuController:_renderShop(parent: Frame)
 		render(grid)
 	end
 
+	-- Tokens first. It is the only part of this screen anybody can actually buy from
+	-- today — every Robux product below is still AssetId 0 — and it is the half that
+	-- rewards playing rather than paying.
+	local data = ProfileController:Get()
+	local balance = if data ~= nil then data.Tokens else 0
+	section("SUPPLEMENTS", "Bought with tokens you earned", UI.Palette.Vital, #ShopConfig.List, function(grid)
+		for index, item in ShopConfig.List do
+			local price = prices[item.Id]
+			local known = type(price) == "number"
+			local affordable = known and balance >= price
+			local actionText = if not known
+				then "UNAVAILABLE"
+				elseif affordable then `BUY  ·  {NumberFormat.Format(price)}`
+				else `NEED {NumberFormat.Format(price - balance)} MORE`
+			productCard(
+				grid,
+				index,
+				item.DisplayName,
+				item.Description,
+				"Token",
+				UI.Palette.Vital,
+				actionText,
+				affordable,
+				function()
+					local bought, message = Net.Function("PurchaseShopItem"):InvokeServer(item.Id)
+					-- Toasted either way, unlike the Robux path: a Robux purchase
+					-- announces itself with Roblox's own dialog, and a token one has
+					-- nothing to say it happened but this.
+					toast(message)
+					if bought then
+						self:_refresh()
+					end
+				end
+			)
+		end
+	end)
+
 	local groupVisuals = {
 		Gamepass = {
 			Title = "VIP & PASSES",
@@ -1693,6 +1744,12 @@ function MenuController:_renderShop(parent: Frame)
 			Accent = UI.Palette.CartoonPink,
 			Icon = "Potion",
 		},
+		Supplement = {
+			Title = "SUPPLEMENTS · ROBUX",
+			Detail = "The same boosts, without the wait",
+			Accent = UI.Palette.CartoonPink,
+			Icon = "Potion",
+		},
 		Token = {
 			Title = "TOKEN DUMBBELLS",
 			Detail = "Permanent multiplier currency",
@@ -1701,7 +1758,7 @@ function MenuController:_renderShop(parent: Frame)
 		},
 	}
 
-	for _, group in { "Gamepass", "Potion", "Token" } do
+	for _, group in { "Gamepass", "Potion", "Supplement", "Token" } do
 		local products = sections[group]
 		local visual = groupVisuals[group]
 		section(visual.Title, visual.Detail, visual.Accent, #products, function(grid)
@@ -1730,10 +1787,6 @@ function MenuController:_renderShop(parent: Frame)
 			end
 		end)
 	end
-
-	-- The supplements used to have their own section here, priced in cash. They are
-	-- Robux products now, so the registry loop above already lists them and a second
-	-- section would show each one twice.
 end
 
 function MenuController:_renderTitles(parent: Frame)
