@@ -35,6 +35,10 @@ local MobNameplateController = {
 
 local HEADROOM = 1.4
 
+-- How long to wait for a streaming rig to finish arriving. The same budget the player
+-- nameplate allows for a character.
+local BIND_TIMEOUT = 10
+
 -- A goblin only matters once you are close enough to be in trouble. A boss has to be
 -- legible from the rim of its own arena, which is seventy studs from the middle, and
 -- from far enough out to decide whether to walk in at all.
@@ -73,9 +77,24 @@ function MobNameplateController:_bind(model: Instance)
 		return
 	end
 
-	local head = model:FindFirstChild("Head")
-	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	if head == nil or not head:IsA("BasePart") or humanoid == nil then
+	-- Wait for the rig rather than give up on it. This yields, which is the whole point:
+	-- a boss is created wherever its timer says, usually nowhere near you, so with
+	-- streaming it does not reach this client until you travel to the arena — and a
+	-- model that streams in delivers its descendants over several frames. Looking once
+	-- and returning meant every boss went bar-less for its entire life, while goblins
+	-- were fine because a field only ever spawns one within four hundred studs of a
+	-- player, well inside the streaming radius, arriving complete.
+	local head = model:WaitForChild("Head", BIND_TIMEOUT)
+	local humanoid = model:WaitForChild("Humanoid", BIND_TIMEOUT)
+	if head == nil or not head:IsA("BasePart") or humanoid == nil or not humanoid:IsA("Humanoid") then
+		return
+	end
+
+	-- Everything can have changed across those yields: the monster may have died,
+	-- despawned, or streamed back out and in again, and the tag signal fires afresh on a
+	-- re-stream. The player nameplate never has to think about this because a character
+	-- is not streamed away from its own owner.
+	if model.Parent == nil or plates[model] ~= nil then
 		return
 	end
 
@@ -149,12 +168,14 @@ end
 
 function MobNameplateController:Start()
 	for _, model in CollectionService:GetTagged(MobConfig.MOB_TAG) do
-		self:_bind(model)
+		task.spawn(function()
+			self:_bind(model)
+		end)
 	end
 	CollectionService:GetInstanceAddedSignal(MobConfig.MOB_TAG):Connect(function(instance: Instance)
-		-- Spawned models are tagged before their parts finish arriving on this client, so
-		-- give the rig a moment rather than binding to a head that is not there yet.
-		task.defer(function()
+		-- Spawned in a thread because _bind waits for the rig to finish streaming in, and
+		-- a tag signal is not somewhere to yield.
+		task.spawn(function()
 			self:_bind(instance)
 		end)
 	end)
