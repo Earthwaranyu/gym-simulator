@@ -156,7 +156,11 @@ local function goblin(
 		Damage = damage,
 		AttackCooldown = 1.6,
 		AttackRange = 9,
-		WalkSpeed = 14,
+		-- Faster than a walking player (Formulas.BASE_WALK_SPEED, 16) and slower than a
+		-- base sprint (24). Ignore a goblin and it catches you; decide to leave and it
+		-- cannot stop you. It used to be 14, which meant it lost ground to anyone
+		-- strolling away and was scenery rather than a threat.
+		WalkSpeed = 20,
 		AggroRadius = 60,
 		LeashRadius = 130,
 		Population = 6,
@@ -179,7 +183,11 @@ local function boss(zoneId: string, displayName: string, health: number, damage:
 		Damage = damage,
 		AttackCooldown = 2.2,
 		AttackRange = 13,
-		WalkSpeed = 12,
+		-- Faster than a base sprint, so escaping a boss means having trained Legs —
+		-- sprint climbs one stud per point to a 64 ceiling — or taking off. It was 12:
+		-- slower than a walking player, which made the slowest thing on the map the one
+		-- that was supposed to be hunting you.
+		WalkSpeed = 32,
 		AggroRadius = 90,
 		LeashRadius = 110,
 		TokenReward = tokens,
