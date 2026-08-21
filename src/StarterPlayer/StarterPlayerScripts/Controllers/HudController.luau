@@ -973,7 +973,7 @@ function HudController:_drawMinimapRegion(centre: Vector3)
 	-- doubled-up map looks like.
 	minimapDrawing = true
 
-	local dests, feats = MapRender.Fetch()
+	local dests, feats, sites = MapRender.Fetch()
 	local bounds = MapRender.BoundsAround(centre.X, centre.Z, MINIMAP_REGION_STUDS / 2)
 	local side = MINIMAP_REGION_STUDS / MINIMAP_STUDS_PER_PIXEL
 
@@ -1012,6 +1012,25 @@ function HudController:_drawMinimapRegion(centre: Vector3)
 		-- A dot in the muscle's colour and nothing else. The names, the multipliers and
 		-- the locks are on the full map, and none of them can be read at this size.
 		local pin = MapRender.Dot(canvas, destination.Id, 6, stat.Color, 20)
+		pin.Position = project(at.X, at.Z)
+	end
+
+	-- Monster sites get a dot too, one size up and above the machines. At this scale it
+	-- is only "something dangerous is that way", which is the one thing about a mob
+	-- field worth knowing while you are running past it.
+	for _, hostile in sites do
+		local at = hostile.Position
+		if
+			at.X < bounds.MinX
+			or at.X > bounds.MinX + bounds.Width
+			or at.Z < bounds.MinZ
+			or at.Z > bounds.MinZ + bounds.Depth
+		then
+			continue
+		end
+		local site = MapRender.SiteIcon(hostile.Kind)
+		local color = if hostile.Kind == "Boss" then UI.Palette.Danger else site.Color
+		local pin = MapRender.Dot(canvas, hostile.Id, 8, color, 21)
 		pin.Position = project(at.X, at.Z)
 	end
 
