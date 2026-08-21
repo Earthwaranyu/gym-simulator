@@ -1943,7 +1943,8 @@ function MenuController:_renderSettings(parent: Frame)
 	-- The creator needs the whole screen to show the body it is changing, so the menu
 	-- gets out of the way rather than hosting it as a page.
 	button(appearance, "EDIT", UI.Palette.Accent, function()
-		self:Toggle()
+		-- Open closes this menu itself, the same way the full map does. Closing it
+		-- here as well worked only because Toggle happens to be synchronous.
 		Loader.Get("CustomizerController"):Open(false)
 	end)
 

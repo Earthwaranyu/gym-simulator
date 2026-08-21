@@ -20,6 +20,11 @@
 
 	`None` is a real style, first in the list. A player who wants a bald bruiser should
 	not have to hunt for the absence of a choice.
+
+	**Nothing may hang below y = 0.2 across the front of the head.** The eyes sit around
+	y = 0.08 and the brows at 0.2, so a cap that is merely head-sized and nudged upward
+	reads as a motorcycle helmet with a chin showing — it swallows the forehead and the
+	eyes both. Lift and height, not width, are what make a style read as hair.
 ]]
 
 local HairConfig = {}
@@ -61,7 +66,7 @@ HairConfig.Styles = {
 		Pieces = {
 			-- One shallow cap. A buzz cut is a shadow on the scalp, so it barely
 			-- stands off the head at all.
-			{ Shape = "Ball", Size = Vector3.new(1.04, 1.02, 1.04), Offset = Vector3.new(0, 0.16, 0) },
+			{ Shape = "Ball", Size = Vector3.new(1.02, 0.62, 1.02), Offset = Vector3.new(0, 0.4, 0) },
 		},
 	},
 	{
@@ -69,11 +74,11 @@ HairConfig.Styles = {
 		DisplayName = "Flat Top",
 		Color = BLACK,
 		Pieces = {
-			{ Shape = "Block", Size = Vector3.new(1.02, 0.42, 1.02), Offset = Vector3.new(0, 0.42, 0) },
+			{ Shape = "Block", Size = Vector3.new(1.0, 0.4, 1.0), Offset = Vector3.new(0, 0.58, 0) },
 			{
 				Shape = "Block",
-				Size = Vector3.new(1.04, 0.2, 1.04),
-				Offset = Vector3.new(0, 0.16, 0),
+				Size = Vector3.new(1.02, 0.22, 1.02),
+				Offset = Vector3.new(0, 0.38, 0),
 				Shade = -0.2,
 			},
 		},
@@ -83,13 +88,13 @@ HairConfig.Styles = {
 		DisplayName = "Messy",
 		Color = BLACK,
 		Pieces = {
-			{ Shape = "Ball", Size = Vector3.new(1.14, 0.92, 1.12), Offset = Vector3.new(0, 0.3, 0) },
+			{ Shape = "Ball", Size = Vector3.new(1.12, 0.72, 1.1), Offset = Vector3.new(0, 0.44, 0) },
 			-- The fringe. Pushed forward and tilted so it breaks the brow line, which
 			-- is what separates "messy" from "helmet".
 			{
 				Shape = "Wedge",
-				Size = Vector3.new(0.9, 0.34, 0.42),
-				Offset = Vector3.new(0, 0.3, -0.5),
+				Size = Vector3.new(0.86, 0.3, 0.4),
+				Offset = Vector3.new(0, 0.36, -0.46),
 				Rotation = Vector3.new(-16, 0, 0),
 			},
 			{
@@ -113,8 +118,8 @@ HairConfig.Styles = {
 		DisplayName = "Ponytail",
 		Color = BLACK,
 		Pieces = {
-			{ Shape = "Ball", Size = Vector3.new(1.1, 0.94, 1.08), Offset = Vector3.new(0, 0.3, 0) },
-			{ Shape = "Block", Size = Vector3.new(0.34, 0.72, 0.34), Offset = Vector3.new(0, 0.24, 0.6) },
+			{ Shape = "Ball", Size = Vector3.new(1.08, 0.7, 1.06), Offset = Vector3.new(0, 0.44, 0) },
+			{ Shape = "Block", Size = Vector3.new(0.34, 0.72, 0.34), Offset = Vector3.new(0, 0.3, 0.58) },
 			{
 				Shape = "Block",
 				Size = Vector3.new(0.26, 0.5, 0.26),
@@ -131,15 +136,15 @@ HairConfig.Styles = {
 		Pieces = {
 			{
 				Shape = "Block",
-				Size = Vector3.new(1.02, 0.14, 1.02),
-				Offset = Vector3.new(0, 0.2, 0),
+				Size = Vector3.new(0.98, 0.14, 0.98),
+				Offset = Vector3.new(0, 0.44, 0),
 				Shade = -0.3,
 			},
-			{ Shape = "Block", Size = Vector3.new(0.22, 0.6, 1.0), Offset = Vector3.new(0, 0.56, 0) },
+			{ Shape = "Block", Size = Vector3.new(0.22, 0.56, 0.98), Offset = Vector3.new(0, 0.74, 0) },
 			{
 				Shape = "Wedge",
 				Size = Vector3.new(0.22, 0.3, 0.34),
-				Offset = Vector3.new(0, 0.6, -0.52),
+				Offset = Vector3.new(0, 0.76, -0.5),
 				Rotation = Vector3.new(0, 180, 0),
 			},
 		},
@@ -149,17 +154,17 @@ HairConfig.Styles = {
 		DisplayName = "Afro",
 		Color = BLACK,
 		Pieces = {
-			{ Shape = "Ball", Size = Vector3.new(1.5, 1.34, 1.5), Offset = Vector3.new(0, 0.34, 0.06) },
+			{ Shape = "Ball", Size = Vector3.new(1.46, 1.02, 1.44), Offset = Vector3.new(0, 0.58, 0.06) },
 			{
 				Shape = "Ball",
-				Size = Vector3.new(0.9, 0.8, 0.9),
-				Offset = Vector3.new(-0.44, 0.2, 0.2),
+				Size = Vector3.new(0.86, 0.72, 0.86),
+				Offset = Vector3.new(-0.46, 0.4, 0.2),
 				Shade = 0.06,
 			},
 			{
 				Shape = "Ball",
-				Size = Vector3.new(0.9, 0.8, 0.9),
-				Offset = Vector3.new(0.44, 0.24, 0.16),
+				Size = Vector3.new(0.86, 0.72, 0.86),
+				Offset = Vector3.new(0.46, 0.42, 0.16),
 				Shade = 0.06,
 			},
 		},
@@ -169,7 +174,7 @@ HairConfig.Styles = {
 		DisplayName = "Locs",
 		Color = BLACK,
 		Pieces = {
-			{ Shape = "Ball", Size = Vector3.new(1.12, 0.96, 1.1), Offset = Vector3.new(0, 0.3, 0) },
+			{ Shape = "Ball", Size = Vector3.new(1.1, 0.72, 1.08), Offset = Vector3.new(0, 0.44, 0) },
 			{
 				Shape = "Block",
 				Size = Vector3.new(0.18, 0.86, 0.18),

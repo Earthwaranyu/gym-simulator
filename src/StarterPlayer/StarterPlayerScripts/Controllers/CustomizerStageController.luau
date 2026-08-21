@@ -40,6 +40,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
+local PosePlayback = require(ReplicatedStorage.Modules.PosePlayback)
 local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
 local UI = require(ReplicatedStorage.Modules.UI)
 
@@ -50,20 +51,37 @@ local CustomizerStageController = {
 }
 
 local FOLDER_NAME = "CustomizerStage"
-local BLUR_NAME = "CustomizerBlur"
+local DOF_NAME = "CustomizerDepth"
 
 -- Framing, in multiples of the character's own height. Everything here scales with
 -- the body: a Titan is several times the size of a newbie, and a fixed stud distance
 -- would frame one of them and lose the other entirely.
-local CAMERA_BACK = 2.0
-local CAMERA_UP = 0.42
-local FOCUS_UP = 0.6
+--
+-- The camera sits at chest height rather than above the head. Looking down at someone
+-- makes them small, which is the opposite of what a screen celebrating a body should
+-- do; level with the sternum is how every fighter select frames its roster.
+local CAMERA_BACK = 1.55
+local CAMERA_UP = 0.1
+local FOCUS_UP = 0.42
+-- Pushed off-centre so the figure sits clear of the panel down the left.
+local FRAME_SHIFT = 0.1
 -- Where the dolly starts, as a multiple of the settled distance.
 local DOLLY_FROM = 2.4
 local DOLLY_SECONDS = 1.1
 
--- Degrees per second of turntable when nobody is dragging.
-local AUTO_SPIN = 7
+--[[
+	The idle motion is a sway across the front, not a turntable.
+
+	A continuous orbit sounds more impressive and is much worse: at seven degrees a
+	second the camera is behind the player's head inside a minute, and the one thing
+	this screen exists to show them is their own face. So the camera drifts a few
+	degrees either side of front and always comes back, and anyone who wants to see
+	the back can drag to it.
+]]
+local SWAY_DEGREES = 11
+local SWAY_SPEED = 0.35
+-- How fast a dragged view eases back to facing front once the throw has died.
+local RETURN_RATE = 0.7
 -- Degrees of spin per pixel dragged, and how fast a throw runs out.
 local DRAG_SENSITIVITY = 0.42
 local SPIN_DECAY = 3.4
@@ -90,8 +108,9 @@ local stageFolder: Folder? = nil
 local renderConnection: RBXScriptConnection? = nil
 local inputConnections: { RBXScriptConnection } = {}
 
--- Turntable state. `spin` is where the camera has turned to, `velocity` is what a
--- throw left behind, and both are in degrees.
+-- Turntable state. `spin` is where the player has dragged the view to, `velocity` is
+-- what a throw left behind, and both are in degrees. The sway is added on top and is
+-- not stored, so it never accumulates.
 local spin = 0
 local velocity = 0
 local dragging = false
@@ -99,8 +118,28 @@ local dragTouch: InputObject? = nil
 local lastDragX = 0
 local elapsed = 0
 
+--[[
+	The HUD that steps aside while the creator is up.
+
+	Named rather than "everything except us": PlayerGui also holds Roblox's own
+	chrome and the toast layer, and a screen that swallowed the toast would eat the
+	confirmation the player gets for saving.
+]]
+local HIDDEN_GUIS = {
+	"GymHud",
+	"GymTabBar",
+	"GymMenuButton",
+	"TrainingLoadGui",
+}
+
+-- The player's own overhead plate, which otherwise floats across the name headline
+-- announcing the same person twice.
+local NAMEPLATE_NAME = "GymNameplate"
+
 -- What the world looked like before we touched it.
 local restoreCamera: Enum.CameraType? = nil
+local hidden: { ScreenGui } = {}
+local hiddenPlate: BillboardGui? = nil
 local restoreColor: { Brightness: number, Contrast: number, Saturation: number }? = nil
 
 --[[
@@ -130,7 +169,9 @@ local function buildStage(character: Model)
 	-- The backdrop. Big enough that its edges never enter frame at any spin angle.
 	local backdrop = Instance.new("Part")
 	backdrop.Name = "Backdrop"
-	backdrop.Size = Vector3.new(height * 9, height * 6, 1)
+	-- Sized to swallow the whole frame at any orbit angle. An edge coming into shot
+	-- and showing a lit gym behind it undoes the entire effect in one frame.
+	backdrop.Size = Vector3.new(height * 26, height * 16, 1)
 	backdrop.Color = BACKDROP_COLOR
 	backdrop.Material = Enum.Material.SmoothPlastic
 	backdrop.Anchored = true
@@ -143,11 +184,16 @@ local function buildStage(character: Model)
 	-- A disc under the feet, so the figure is standing on something rather than
 	-- floating in a void. Slightly lighter than the backdrop; the shadow falling on
 	-- it is what sells the contact.
+	--
+	-- It is far wider than the shot needs because it is also doing the backdrop's job
+	-- along the ground: the gym floor runs toward the camera, in front of anything
+	-- standing behind the figure, and a lit strip of floorboards at the frame edge
+	-- gives the whole thing away.
 	local floor = Instance.new("Part")
 	floor.Name = "Floor"
 	floor.Shape = Enum.PartType.Cylinder
-	floor.Size = Vector3.new(0.4, height * 2.6, height * 2.6)
-	floor.Color = BACKDROP_COLOR:Lerp(Color3.new(1, 1, 1), 0.06)
+	floor.Size = Vector3.new(0.4, height * 11, height * 11)
+	floor.Color = BACKDROP_COLOR:Lerp(Color3.new(1, 1, 1), 0.05)
 	floor.Material = Enum.Material.Slate
 	floor.Anchored = true
 	floor.CanCollide = false
@@ -218,6 +264,11 @@ end
 	the body is being rescaled and repainted underneath and the backdrop has to stay
 	square to a camera that is itself orbiting.
 ]]
+local function humanoidRigType(character: Model): Enum.HumanoidRigType
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	return if humanoid ~= nil then humanoid.RigType else Enum.HumanoidRigType.R15
+end
+
 local function place(deltaTime: number)
 	local character = player.Character
 	local camera = Workspace.CurrentCamera
@@ -235,11 +286,17 @@ local function place(deltaTime: number)
 	if dragging then
 		velocity = 0
 	else
-		spin += (AUTO_SPIN + velocity) * deltaTime
+		spin += velocity * deltaTime
 		-- Exponential decay rather than a linear stop: a throw should ease out of the
 		-- player's hand, not brake.
 		velocity -= velocity * math.min(1, SPIN_DECAY * deltaTime)
+		-- Once the throw is spent, the view drifts back to facing front on its own.
+		if math.abs(velocity) < 8 then
+			spin -= spin * math.min(1, RETURN_RATE * deltaTime)
+		end
 	end
+
+	local sway = SWAY_DEGREES * math.sin(elapsed * SWAY_SPEED)
 
 	local height = figureHeight(character)
 	local focus = root.Position + Vector3.new(0, height * FOCUS_UP, 0)
@@ -250,10 +307,39 @@ local function place(deltaTime: number)
 	local eased = TweenService:GetValue(alpha, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	local distance = height * CAMERA_BACK * (DOLLY_FROM + (1 - DOLLY_FROM) * eased)
 
-	local turn = CFrame.new(root.Position) * CFrame.Angles(0, math.rad(spin), 0)
+	local turn = CFrame.new(root.Position) * CFrame.Angles(0, math.rad(spin + sway), 0)
 	local offset = turn:VectorToWorldSpace(Vector3.new(0, height * CAMERA_UP, -distance))
 	local eye = focus + offset
-	camera.CFrame = CFrame.lookAt(eye, focus)
+	-- Aiming a little to one side of the figure is what puts it off-centre without
+	-- swinging the camera off its orbit.
+	local aim = focus + turn:VectorToWorldSpace(Vector3.new(-height * FRAME_SHIFT, 0, 0))
+	camera.CFrame = CFrame.lookAt(eye, aim)
+
+	--[[
+		Hold the head still.
+
+		The idle poses include a glance to the side, which is good animation and awful
+		timing: it fires every few seconds and turns the face away from the one screen
+		whose entire job is showing the player their face. Writing identity here rather
+		than editing the pose keeps the glance everywhere else in the game.
+
+		This works because of the frame order, not by luck: GaitController writes the
+		neck on PreSimulation, and a RenderStepped write is the last one to land before
+		the frame is drawn. Same rule that decides which pose wins anywhere else.
+	]]
+	local neck = PosePlayback.FindJoint(character, humanoidRigType(character), "Neck")
+	if neck ~= nil then
+		neck.Transform = CFrame.identity
+	end
+
+	-- Keep the body in focus and everything past it soft. Without this the depth of
+	-- field is focused wherever the last frame left it, which on a moving camera means
+	-- the subject drifts in and out of sharpness.
+	local dof = Lighting:FindFirstChild(DOF_NAME)
+	if dof ~= nil and dof:IsA("DepthOfFieldEffect") then
+		dof.FocusDistance = distance
+		dof.InFocusRadius = height * 1.6
+	end
 
 	local toEye = (eye - focus)
 	local flat = Vector3.new(toEye.X, 0, toEye.Z)
@@ -264,7 +350,7 @@ local function place(deltaTime: number)
 
 	local backdrop = folder:FindFirstChild("Backdrop")
 	if backdrop ~= nil and backdrop:IsA("BasePart") then
-		backdrop.CFrame = CFrame.lookAt(focus + behind * (height * 2.4), focus)
+		backdrop.CFrame = CFrame.lookAt(focus + behind * (height * 2.2), focus)
 	end
 
 	local floor = folder:FindFirstChild("Floor")
@@ -429,13 +515,23 @@ function CustomizerStageController:Enter()
 
 	buildStage(character)
 
-	-- The world, pushed back: out of focus and drained of colour, so the only thing
-	-- worth looking at is the body.
-	local blur = Instance.new("BlurEffect")
-	blur.Name = BLUR_NAME
-	blur.Size = 0
-	blur.Parent = Lighting
-	TweenService:Create(blur, TweenInfo.new(0.6), { Size = 24 }):Play()
+	--[[
+		The world pushed out of focus.
+
+		Depth of field rather than a BlurEffect, and the difference is not subtle: a
+		BlurEffect is a full-screen pass, so it smears the character just as hard as
+		the gym behind them and turns the subject of the screen into a bruise. Depth of
+		field is the only one of the two that can tell them apart, which is the entire
+		reason it is here. `place` keeps the focus on the body as the camera moves.
+	]]
+	local dof = Instance.new("DepthOfFieldEffect")
+	dof.Name = DOF_NAME
+	dof.FarIntensity = 0
+	dof.NearIntensity = 0
+	dof.FocusDistance = 20
+	dof.InFocusRadius = 12
+	dof.Parent = Lighting
+	TweenService:Create(dof, TweenInfo.new(0.7), { FarIntensity = 0.78 }):Play()
 
 	local color = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 	if color ~= nil then
@@ -449,6 +545,25 @@ function CustomizerStageController:Enter()
 			Contrast = color.Contrast + 0.1,
 			Saturation = -0.45,
 		}):Play()
+	end
+
+	-- Only what was actually on screen is remembered, so leaving does not switch on a
+	-- HUD the player had hidden for their own reasons.
+	table.clear(hidden)
+	local playerGui = player:FindFirstChild("PlayerGui")
+	for _, name in HIDDEN_GUIS do
+		local found = if playerGui ~= nil then playerGui:FindFirstChild(name) else nil
+		if found ~= nil and found:IsA("ScreenGui") and found.Enabled then
+			found.Enabled = false
+			table.insert(hidden, found)
+		end
+	end
+
+	local head = character:FindFirstChild("Head")
+	local plate = if head ~= nil then head:FindFirstChild(NAMEPLATE_NAME) else nil
+	if plate ~= nil and plate:IsA("BillboardGui") and plate.Enabled then
+		plate.Enabled = false
+		hiddenPlate = plate
 	end
 
 	screen.Enabled = true
@@ -479,9 +594,9 @@ function CustomizerStageController:Exit()
 		stageFolder = nil
 	end
 
-	local blur = Lighting:FindFirstChild(BLUR_NAME)
-	if blur ~= nil then
-		blur:Destroy()
+	local dof = Lighting:FindFirstChild(DOF_NAME)
+	if dof ~= nil then
+		dof:Destroy()
 	end
 
 	local color = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
@@ -504,6 +619,19 @@ function CustomizerStageController:Exit()
 			screen.Enabled = false
 		end
 	end)
+
+	for _, gui in hidden do
+		if gui.Parent ~= nil then
+			gui.Enabled = true
+		end
+	end
+	table.clear(hidden)
+
+	local plate = hiddenPlate
+	if plate ~= nil and plate.Parent ~= nil then
+		plate.Enabled = true
+	end
+	hiddenPlate = nil
 
 	local camera = Workspace.CurrentCamera
 	if camera ~= nil then

@@ -388,7 +388,7 @@ function CustomizerController:_build()
 	closeButton.Font = UI.Font.Heading
 	closeButton.TextSize = 16
 	closeButton.TextColor3 = UI.Palette.TextMuted
-	closeButton.Text = "✕"
+	closeButton.Text = "X"
 	UI.Role(closeButton, { Ink = "TextMuted", Fill = "Backdrop" })
 	closeButton.Parent = panel
 
