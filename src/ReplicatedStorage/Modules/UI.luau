@@ -15,8 +15,112 @@ local TweenService = game:GetService("TweenService")
 
 local UI = {}
 
+--[[
+	The 2D interface is a warm cream theme: paper surfaces, ink-brown text.
+
+	It is deliberately the opposite of the world it sits over. The city is dark,
+	gritty and desaturated, and a dark HUD on top of it competes with the scenery
+	for the same narrow band of greys — the map board (MapRender.Paper) already had
+	to break out to paper for exactly that reason, and this extends that decision to
+	the rest of the interface rather than leaving one light panel in a dark suite.
+
+	Two rules keep an inverted theme from going wrong, and both are why the semantic
+	tokens below exist rather than just new values on the old names:
+
+	  * A surface colour is not a text colour. The dark theme could get away with
+	    painting ink as `Backdrop` because the backdrop happened to be near-black;
+	    on cream that silently turns light-on-light. Anything drawn *on* a filled
+	    accent chip uses `OnAccent`, and anything drawn on a panel uses `Text`.
+	  * The stroke inverts. A dark panel is rimmed with a lighter line to catch an
+	    edge; a light panel needs a darker one, and at lower transparency, or the
+	    border disappears into the fill.
+
+	Accents are also darkened from their dark-theme values. The old amber (255,196,61)
+	is a fine glow on near-black and close to illegible as text on cream.
+]]
 UI.Palette = {
-	-- Deep neutral base, so the accent colours carry all the meaning.
+	-- Paper base. Shared with MapRender's board so the map does not read as a
+	-- different material from the panel holding it.
+	Backdrop = Color3.fromRGB(232, 228, 216),
+	Glass = Color3.fromRGB(252, 249, 240),
+	GlassStroke = Color3.fromRGB(150, 138, 116),
+
+	Text = Color3.fromRGB(38, 33, 26),
+	TextMuted = Color3.fromRGB(122, 112, 95),
+
+	-- What sits on top of a filled accent/stat chip. Never reuse Backdrop for this.
+	OnAccent = Color3.fromRGB(252, 249, 240),
+	-- Explicit surface names, so nothing has to press a backdrop into service as a
+	-- panel fill or a border again.
+	Surface = Color3.fromRGB(252, 249, 240),
+	SurfaceRaised = Color3.fromRGB(255, 253, 248),
+	Border = Color3.fromRGB(150, 138, 116),
+
+	Accent = Color3.fromRGB(178, 108, 12),
+	Power = Color3.fromRGB(158, 92, 8),
+	Token = Color3.fromRGB(16, 112, 138),
+	FightToken = Color3.fromRGB(186, 74, 16),
+
+	Health = Color3.fromRGB(178, 44, 40),
+	-- The healthy part of the health bar. Health above stays the colour of the part that
+	-- is gone, so a bar reads as "this much left, that much taken" rather than as one
+	-- block whose length you have to judge against a track.
+	Vital = Color3.fromRGB(44, 138, 62),
+	Combo = Color3.fromRGB(186, 74, 16),
+
+	Danger = Color3.fromRGB(184, 36, 36),
+
+	-- "This is the one to pick" affirmatives, as a filled chip and as the ink and rim
+	-- that go on it. The weight panel used to spell these out as literals, which meant
+	-- it was the one panel a theme change could not reach.
+	Success = Color3.fromRGB(30, 108, 58),
+	SuccessInk = Color3.fromRGB(240, 252, 243),
+	SuccessEdge = Color3.fromRGB(46, 148, 80),
+	-- The filled version of Danger, for a chip rather than a word.
+	DangerFill = Color3.fromRGB(146, 40, 44),
+
+	-- Legacy names retained for callers, now used as small highlights inside the
+	-- restrained cream menu rather than as full saturated card surfaces.
+	CartoonInk = Color3.fromRGB(52, 45, 36),
+	CartoonCream = Color3.fromRGB(255, 247, 218),
+	CartoonLime = Color3.fromRGB(58, 132, 40),
+	CartoonPink = Color3.fromRGB(176, 46, 104),
+}
+
+--[[
+	Fill opacity, kept here rather than inline because it is theme-dependent.
+
+	A translucent panel over a bright world washes out far faster than the same panel
+	over a dark one, so the cream theme runs its surfaces much closer to opaque than
+	the glassmorphism the dark theme could afford.
+]]
+UI.Surfaces = {
+	PanelTransparency = 0.04,
+	CardTransparency = 0,
+	StrokeTransparency = 0.35,
+	-- The dimmer behind a modal. Inverted: a light theme dims by veiling toward the
+	-- ink, not by adding more black to an already-black backdrop.
+	ScrimTransparency = 0.45,
+	BarTrackTransparency = 0.18,
+}
+
+--[[
+	The dark counterpart, for chrome rather than content.
+
+	The cream theme is right for a panel you *read* — a menu tab full of stat rows and
+	shop cards. It is wrong for the chrome that sits permanently over the world: a
+	always-on cream slab in the corner of the screen competes with the game behind it,
+	and the HUD's job is to be legible without being the brightest thing on screen.
+
+	So the two live side by side. `UI.Palette` stays the default every helper paints
+	from, which keeps the ~60 menu call sites light without touching one of them, and a
+	panel opts into this table by calling `UI.ApplyTheme` once it is built.
+
+	Same key names as `UI.Palette` throughout — that is what lets `ApplyTheme` be a
+	lookup rather than a special case per element. Accents are the brighter pre-cream
+	values, because on near-black they need to glow rather than carry contrast.
+]]
+UI.Dark = {
 	Backdrop = Color3.fromRGB(14, 15, 20),
 	Glass = Color3.fromRGB(30, 33, 44),
 	GlassStroke = Color3.fromRGB(120, 130, 160),
@@ -24,25 +128,42 @@ UI.Palette = {
 	Text = Color3.fromRGB(240, 243, 250),
 	TextMuted = Color3.fromRGB(150, 158, 178),
 
+	-- On a filled accent chip the ink goes dark again, because the chip is bright.
+	OnAccent = Color3.fromRGB(14, 15, 20),
+	Surface = Color3.fromRGB(30, 33, 44),
+	SurfaceRaised = Color3.fromRGB(38, 42, 55),
+	Border = Color3.fromRGB(120, 130, 160),
+
 	Accent = Color3.fromRGB(255, 196, 61),
 	Power = Color3.fromRGB(255, 214, 102),
 	Token = Color3.fromRGB(126, 231, 255),
+	FightToken = Color3.fromRGB(255, 138, 61),
 
 	Health = Color3.fromRGB(239, 83, 80),
-	-- The healthy part of the health bar. Health above stays the colour of the part that
-	-- is gone, so a bar reads as "this much left, that much taken" rather than as one
-	-- block whose length you have to judge against a track.
 	Vital = Color3.fromRGB(88, 202, 106),
 	Combo = Color3.fromRGB(255, 138, 61),
 
 	Danger = Color3.fromRGB(255, 92, 92),
 
-	-- Saturated surfaces used by the stat identity and store. These keep the game's
-	-- dark world-readable base while letting the requested cartoon UI feel playful.
+	Success = Color3.fromRGB(35, 126, 70),
+	SuccessInk = Color3.fromRGB(210, 255, 221),
+	SuccessEdge = Color3.fromRGB(87, 214, 123),
+	DangerFill = Color3.fromRGB(91, 38, 42),
+
 	CartoonInk = Color3.fromRGB(35, 34, 52),
 	CartoonCream = Color3.fromRGB(255, 247, 218),
 	CartoonLime = Color3.fromRGB(154, 236, 91),
 	CartoonPink = Color3.fromRGB(255, 108, 176),
+
+	-- A dark panel over a bright world can afford the glassmorphism the cream one
+	-- cannot, so the transparencies travel with the palette rather than beside it.
+	Surfaces = {
+		PanelTransparency = 0.25,
+		CardTransparency = 0.08,
+		StrokeTransparency = 0.7,
+		ScrimTransparency = 0.35,
+		BarTrackTransparency = 0.35,
+	},
 }
 
 UI.Font = {
@@ -56,6 +177,117 @@ UI.Font = {
 local CORNER_RADIUS = UDim.new(0, 10)
 
 --[[
+	Which palette entry a given object was painted from.
+
+	`ApplyTheme` has to know what a colour *meant* in order to restate it in another
+	theme, and the finished instance cannot tell it: a frame filled with `Glass` and a
+	frame filled with a stat's own colour are both just a BackgroundColor3 afterwards.
+	Re-deriving the intent by comparing against the palette would repaint every one of
+	those deliberate stat colours the moment one happened to match.
+
+	So the helpers record the intent as they paint. The attribute names a palette key,
+	and re-theming is a lookup.
+]]
+-- One attribute per thing a caller can paint. They are separate rather than one
+-- "colour" role because a button owns a fill, its own ink and a stroke at the same
+-- time, and a single attribute would have to guess which of the three was meant.
+export type Roles = {
+	-- Palette key for text (TextLabel/Button/Box) or, on a plain Frame, its fill.
+	Ink: string?,
+	-- Palette key for BackgroundColor3, when the object also carries text.
+	Fill: string?,
+	-- Palette key for a child UIStroke's colour.
+	Stroke: string?,
+	-- UI.Surfaces key for BackgroundTransparency.
+	Opacity: string?,
+}
+
+local ROLE_ATTRIBUTES = {
+	Ink = "UIRoleInk",
+	Fill = "UIRoleFill",
+	Stroke = "UIRoleStroke",
+	Opacity = "UIRoleOpacity",
+}
+
+--[[
+	Records which palette entries `object` was painted from, so `ApplyTheme` can
+	restate them in another theme.
+
+	Exported because the panels that build their own frames — the menu bar, the weight
+	rows — need the same bookkeeping as the shared helpers, and a second private copy
+	of it in each controller is how the two drift apart.
+]]
+function UI.Role(object: Instance, roles: Roles): Instance
+	for field, attribute in ROLE_ATTRIBUTES do
+		local value = (roles :: any)[field]
+		if value ~= nil then
+			object:SetAttribute(attribute, value)
+		end
+	end
+	return object
+end
+
+--[[
+	Repaints an already-built subtree in `theme`, following the roles the helpers left.
+
+	Call it once at the end of a `_build`. Anything without a role attribute is left
+	exactly as it is, which is the point: a stat colour, a rank colour or a hand-picked
+	highlight stays itself, and only the chrome moves.
+
+	Panels that repaint themselves per frame (the weight rows, the menu bar's open and
+	closed states) cannot rely on this alone — they have to read the same theme table
+	when they recolour, or the next refresh puts the light values straight back.
+]]
+function UI.ApplyTheme(root: Instance, theme: { [string]: any })
+	local surfaces = theme.Surfaces or UI.Surfaces
+
+	local function lookup(object: Instance, field: string): Color3?
+		local key = object:GetAttribute(ROLE_ATTRIBUTES[field])
+		return if type(key) == "string" then theme[key] else nil
+	end
+
+	local function paint(object: Instance)
+		local ink = lookup(object, "Ink")
+		if ink ~= nil then
+			if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+				object.TextColor3 = ink
+			elseif object:IsA("UIStroke") then
+				object.Color = ink
+			elseif object:IsA("GuiObject") then
+				-- A frame has no text, so its one colour is its fill.
+				object.BackgroundColor3 = ink
+			end
+		end
+
+		local fill = lookup(object, "Fill")
+		if fill ~= nil and object:IsA("GuiObject") then
+			object.BackgroundColor3 = fill
+		end
+
+		local strokeColour = lookup(object, "Stroke")
+		if strokeColour ~= nil and object:IsA("GuiObject") then
+			local stroke = object:FindFirstChildOfClass("UIStroke")
+			if stroke ~= nil then
+				stroke.Color = strokeColour
+			end
+		end
+
+		local opacityKey = object:GetAttribute(ROLE_ATTRIBUTES.Opacity)
+		if type(opacityKey) == "string" and object:IsA("GuiObject") then
+			local value = surfaces[opacityKey]
+			if value ~= nil then
+				object.BackgroundTransparency = value
+			end
+		end
+	end
+
+	paint(root)
+	for _, descendant in root:GetDescendants() do
+		paint(descendant)
+	end
+end
+
+--[[
 	The glass surface every panel sits on: translucent fill, light stroke, rounded,
 	padded. `parent` may be nil so callers can build a tree before parenting.
 ]]
@@ -63,17 +295,19 @@ function UI.Panel(name: string, parent: Instance?): Frame
 	local frame = Instance.new("Frame")
 	frame.Name = name
 	frame.BackgroundColor3 = UI.Palette.Glass
-	frame.BackgroundTransparency = 0.25
+	frame.BackgroundTransparency = UI.Surfaces.PanelTransparency
 	frame.BorderSizePixel = 0
+	UI.Role(frame, { Ink = "Glass", Opacity = "PanelTransparency" })
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = CORNER_RADIUS
 	corner.Parent = frame
 
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = UI.Palette.GlassStroke
-	stroke.Transparency = 0.7
+	stroke.Color = UI.Palette.Border
+	stroke.Transparency = UI.Surfaces.StrokeTransparency
 	stroke.Thickness = 1
+	UI.Role(stroke, { Ink = "Border" })
 	stroke.Parent = frame
 
 	local padding = Instance.new("UIPadding")
@@ -88,46 +322,47 @@ function UI.Panel(name: string, parent: Instance?): Frame
 end
 
 --[[
-	A chunky, stat-coloured card for the cartoony HUD and shop. It remains a plain
-	Frame so callers can choose their own layout, while the outline, gradient, corner,
-	and highlight stay consistent everywhere.
+	The shared menu card. The name is retained for compatibility, but the visual is a
+	clean GTA-style dark surface: a thin stat-coloured rail and border carry identity
+	without filling every page with saturated gradients. Info, transformations, quests
+	and the shop all use this helper, so they remain one coherent interface.
 ]]
 function UI.CartoonCard(name: string, accent: Color3, parent: Instance?): Frame
 	local frame = Instance.new("Frame")
 	frame.Name = name
-	frame.BackgroundColor3 = accent:Lerp(UI.Palette.CartoonInk, 0.72)
-	frame.BackgroundTransparency = 0
+	frame.BackgroundColor3 = UI.Palette.SurfaceRaised
+	frame.BackgroundTransparency = UI.Surfaces.CardTransparency
 	frame.BorderSizePixel = 0
 	frame.ClipsDescendants = true
 
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
+	corner.CornerRadius = UDim.new(0, 7)
 	corner.Parent = frame
 
 	local stroke = Instance.new("UIStroke")
 	stroke.Name = "CartoonStroke"
-	stroke.Color = UI.Palette.CartoonInk
-	stroke.Thickness = 3
-	stroke.Transparency = 0
+	stroke.Color = accent
+	stroke.Thickness = 1
+	stroke.Transparency = 0.3
 	stroke.Parent = frame
 
 	local gradient = Instance.new("UIGradient")
 	gradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, accent:Lerp(Color3.new(1, 1, 1), 0.18)),
-		ColorSequenceKeypoint.new(0.1, accent:Lerp(UI.Palette.CartoonInk, 0.56)),
-		ColorSequenceKeypoint.new(1, accent:Lerp(UI.Palette.CartoonInk, 0.84)),
+		ColorSequenceKeypoint.new(0, accent:Lerp(UI.Palette.SurfaceRaised, 0.86)),
+		ColorSequenceKeypoint.new(0.2, UI.Palette.SurfaceRaised),
+		ColorSequenceKeypoint.new(1, UI.Palette.Backdrop:Lerp(UI.Palette.SurfaceRaised, 0.35)),
 	})
-	gradient.Rotation = 90
+	gradient.Rotation = 0
 	gradient.Parent = frame
 
-	local shine = Instance.new("Frame")
-	shine.Name = "Shine"
-	shine.Size = UDim2.new(1, 0, 0, 4)
-	shine.BackgroundColor3 = Color3.new(1, 1, 1)
-	shine.BackgroundTransparency = 0.45
-	shine.BorderSizePixel = 0
-	shine.ZIndex = 2
-	shine.Parent = frame
+	local rail = Instance.new("Frame")
+	rail.Name = "AccentRail"
+	rail.Size = UDim2.new(0, 4, 1, 0)
+	rail.BackgroundColor3 = accent
+	rail.BackgroundTransparency = 0.04
+	rail.BorderSizePixel = 0
+	rail.ZIndex = 2
+	rail.Parent = frame
 
 	frame.Parent = parent
 	return frame
@@ -143,6 +378,7 @@ function UI.Label(name: string, parent: Instance?): TextLabel
 	label.BackgroundTransparency = 1
 	label.Font = UI.Font.Body
 	label.TextColor3 = UI.Palette.Text
+	UI.Role(label, { Ink = "Text" })
 	label.TextSize = 16
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.TextYAlignment = Enum.TextYAlignment.Center
@@ -161,6 +397,25 @@ export type Bar = {
 }
 
 --[[
+	How high above an adornee a billboard has to float to clear the whole figure.
+
+	The plate hangs off one part — a head, a torso — but has to clear the entire model,
+	and the two are only the same height on a figure that happens to be built that way.
+	A boss is 2.1 times a goblin, so a fixed offset either buries the plate in its horns
+	or leaves it hanging in the sky above a goblin.
+
+	`headroom` is the gap left above the model's own top.
+]]
+function UI.HeadroomOffset(model: Instance, adornee: BasePart, headroom: number): Vector3
+	if model:IsA("Model") then
+		local boundsCFrame, boundsSize = model:GetBoundingBox()
+		local top = boundsCFrame.Position.Y + boundsSize.Y / 2
+		return Vector3.new(0, (top - adornee.Position.Y) + headroom, 0)
+	end
+	return Vector3.new(0, adornee.Size.Y / 2 + headroom, 0)
+end
+
+--[[
 	A labelled progress bar. Returns a Set function rather than exposing the fill, so
 	callers cannot forget to clamp the ratio.
 ]]
@@ -171,8 +426,13 @@ function UI.Bar(name: string, color: Color3, parent: Instance?, emptyColor: Colo
 	-- empty slot; a bar that passes `emptyColor` paints the missing part instead, which
 	-- is what health wants — green for what is left, red for what has been taken.
 	root.BackgroundColor3 = emptyColor or UI.Palette.Backdrop
-	root.BackgroundTransparency = if emptyColor ~= nil then 0.1 else 0.35
+	root.BackgroundTransparency = if emptyColor ~= nil then 0.1 else UI.Surfaces.BarTrackTransparency
 	root.BorderSizePixel = 0
+	-- Only an untinted track follows the theme. A bar that named its own empty colour
+	-- did so to mean something — health lost, not "the surface behind the fill".
+	if emptyColor == nil then
+		UI.Role(root, { Ink = "Backdrop", Opacity = "BarTrackTransparency" })
+	end
 	root.Size = UDim2.new(1, 0, 0, 22)
 
 	local corner = Instance.new("UICorner")
@@ -453,8 +713,10 @@ function UI.Confirm(parent: Instance, options: ConfirmOptions): Frame
 	local scrim = Instance.new("TextButton")
 	scrim.Name = "ConfirmScrim"
 	scrim.Size = UDim2.fromScale(1, 1)
-	scrim.BackgroundColor3 = UI.Palette.Backdrop
-	scrim.BackgroundTransparency = 0.35
+	-- Veiled toward the ink rather than the paper: dimming a light theme with more
+	-- light does nothing, so the scrim is the dark end of the palette.
+	scrim.BackgroundColor3 = UI.Palette.CartoonInk
+	scrim.BackgroundTransparency = UI.Surfaces.ScrimTransparency
 	scrim.BorderSizePixel = 0
 	scrim.AutoButtonColor = false
 	scrim.Text = ""
@@ -465,23 +727,32 @@ function UI.Confirm(parent: Instance, options: ConfirmOptions): Frame
 	local dialog = UI.Panel("Confirm", scrim)
 	dialog.AnchorPoint = Vector2.new(0.5, 0.5)
 	dialog.Position = UDim2.fromScale(0.5, 0.5)
-	dialog.Size = UDim2.fromOffset(320, 172)
-	dialog.BackgroundTransparency = 0.02
+	dialog.Size = UDim2.fromOffset(400, 184)
+	dialog.BackgroundTransparency = 0
 	dialog.ZIndex = 51
 
+	local dialogStroke = dialog:FindFirstChildOfClass("UIStroke")
+	if dialogStroke ~= nil then
+		dialogStroke.Color = UI.Palette.Accent
+		dialogStroke.Transparency = 0.2
+		dialogStroke.Thickness = 2
+	end
+
 	local title = UI.Label("Title", dialog)
-	title.Size = UDim2.new(1, 0, 0, 24)
+	title.Size = UDim2.new(1, 0, 0, 28)
 	title.Font = UI.Font.Heading
-	title.TextSize = 16
+	title.TextSize = 17
 	title.TextColor3 = UI.Palette.Accent
+	title.TextXAlignment = Enum.TextXAlignment.Center
 	title.Text = options.Title
 	title.ZIndex = 51
 
 	local body = UI.Label("Body", dialog)
-	body.Position = UDim2.fromOffset(0, 32)
-	body.Size = UDim2.new(1, 0, 0, 72)
+	body.Position = UDim2.fromOffset(6, 36)
+	body.Size = UDim2.new(1, -12, 0, 76)
 	body.TextSize = 14
 	body.TextWrapped = true
+	body.TextXAlignment = Enum.TextXAlignment.Center
 	body.TextYAlignment = Enum.TextYAlignment.Top
 	body.Text = options.Body
 	body.ZIndex = 51
@@ -495,7 +766,7 @@ function UI.Confirm(parent: Instance, options: ConfirmOptions): Frame
 		button.AutoButtonColor = false
 		button.Font = UI.Font.Heading
 		button.TextSize = 14
-		button.TextColor3 = UI.Palette.Backdrop
+		button.TextColor3 = UI.Palette.OnAccent
 		button.Text = text
 		button.ZIndex = 51
 		button.Parent = dialog
@@ -513,13 +784,13 @@ function UI.Confirm(parent: Instance, options: ConfirmOptions): Frame
 		scrim:Destroy()
 	end
 
-	local confirm = choice("Confirm", options.ConfirmText or "Confirm", UI.Palette.Accent, function()
+	local confirm = choice("Confirm", options.ConfirmText or "Confirm", UI.Palette.Vital, function()
 		close()
 		options.OnConfirm()
 	end)
 	confirm.Position = UDim2.new(0, 0, 1, -34)
 
-	local cancel = choice("Cancel", options.CancelText or "Cancel", UI.Palette.Danger, close)
+	local cancel = choice("Cancel", options.CancelText or "Cancel", UI.Palette.FightToken, close)
 	cancel.Position = UDim2.new(0.5, 6, 1, -34)
 
 	scrim.Activated:Connect(close)
