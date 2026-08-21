@@ -74,6 +74,8 @@ type Live = {
 	DespawnAt: number?,
 	-- Boss only: total damage each player has put into it, for shared kill credit.
 	Damage: { [Player]: number }?,
+	-- Walking back to Home after breaking leash, and healing when it gets there.
+	Returning: boolean?,
 }
 
 local live: { [Model]: Live } = {}
@@ -101,6 +103,11 @@ end
 	body, a big head and pointed ears read as "goblin" at fifty studs, which is further
 	than any of the detail would.
 ]]
+-- How far the drawn feet hang below the bottom of the collidable root, at scale 1:
+-- the legs sit at -1.7 and are 1.4 tall, so their soles are 2.4 below the root centre
+-- and 1.4 below the root's own bottom edge.
+local FOOT_DROP = 1.4
+
 local function buildMob(definition: MobConfig.Mob): (Model, Humanoid, BasePart)
 	local scale = definition.Scale
 	local model = Instance.new("Model")
@@ -151,6 +158,12 @@ local function buildMob(definition: MobConfig.Mob): (Model, Humanoid, BasePart)
 	end
 
 	local humanoid = Instance.new("Humanoid")
+	-- The root is the only collidable part and the legs below it are decoration, so the
+	-- humanoid has to be told how far the drawn feet hang past the collidable body —
+	-- otherwise it holds the root's *bottom* at floor level and buries the legs. At a
+	-- boss's 2.1 scale that is nearly three studs of body inside a 0.3-stud arena disc,
+	-- which is where a humanoid's ground ray starts missing and it never stands up.
+	humanoid.HipHeight = FOOT_DROP * scale
 	humanoid.MaxHealth = definition.Health
 	humanoid.Health = definition.Health
 	humanoid.WalkSpeed = definition.WalkSpeed
@@ -196,6 +209,20 @@ function MobService:_spawn(definition: MobConfig.Mob, home: Vector3, radius: num
 	assemble(model, root)
 	model.Parent = mobFolder
 
+	-- Load-bearing, and invisible when missing.
+	--
+	-- The root is unanchored and the AI's only way to move this thing is a server-side
+	-- Humanoid:MoveTo. Roblox hands ownership of an unanchored assembly to the nearest
+	-- player within a couple of hundred studs, and from that moment the server's
+	-- controller output is discarded — so the mob froze precisely when somebody walked
+	-- up to it, never closed to AttackRange, and therefore never swung either. It looked
+	-- exactly like an AI that was not running, with nothing in the output to say so.
+	--
+	-- pcall because it throws on a part that has been anchored or is already leaving.
+	pcall(function()
+		root:SetNetworkOwner(nil)
+	end)
+
 	live[model] = {
 		Model = model,
 		Humanoid = humanoid,
@@ -211,6 +238,7 @@ function MobService:_spawn(definition: MobConfig.Mob, home: Vector3, radius: num
 		-- so every contributor would clear any threshold and the bookkeeping would buy
 		-- nothing.
 		Damage = if definition.Kind == "Boss" then {} else nil,
+		Returning = false,
 	}
 
 	return model
@@ -293,10 +321,24 @@ function MobService:_step(now: number)
 
 		-- Too far from home to still be defending it. Walk back and heal: this is the
 		-- entire anti-kiting rule, and without it a boss can be led anywhere.
-		if (origin - record.Home).Magnitude > definition.LeashRadius then
+		--
+		-- The heal waits until it actually arrives. Healing every tick of the walk back
+		-- made a boss dragged past its leash literally unkillable — it outhealed
+		-- anything you could do to it on the way. Giving up and resetting is the
+		-- intended behaviour; being invulnerable for the whole return trip was not.
+		local fromHome = (origin - record.Home).Magnitude
+		if fromHome > definition.LeashRadius then
 			record.Humanoid:MoveTo(record.Home)
-			record.Humanoid.Health = definition.Health
+			record.Returning = true
 			continue
+		end
+		if record.Returning then
+			if fromHome > definition.AttackRange then
+				record.Humanoid:MoveTo(record.Home)
+				continue
+			end
+			record.Returning = false
+			record.Humanoid.Health = definition.Health
 		end
 
 		if victim == nil or victimRoot == nil then
@@ -547,7 +589,9 @@ function MobService:Start()
 		if accumulator < AI_INTERVAL then
 			return
 		end
-		accumulator = 0
+		-- Subtract rather than zero: zeroing threw away the remainder every tick and
+		-- quietly ran the AI slower than the interval asks for.
+		accumulator -= AI_INTERVAL
 
 		local tickNow = os.clock()
 		self:_maintainFields()
