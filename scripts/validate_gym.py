@@ -28,6 +28,8 @@ EQUIPMENT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "Equipm
 ZONE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "ZoneConfig.luau"
 POSE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "PoseConfig.luau"
 MOVEMENT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MovementConfig.luau"
+MOB_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MobConfig.luau"
+WEIGHT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "WeightConfig.luau"
 CITY_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "City.model.json"
 DISTRICTS_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "Districts.model.json"
 MACHINES_PATH = ROOT / "src" / "Workspace" / "Gym" / "Machines.model.json"
@@ -1520,6 +1522,176 @@ def validate_station_zone_volumes(
         )
 
 
+# What a monster's swing is worth, as a share of the health a player at that tier
+# actually has. Garage was always tuned this way and nothing above it was -- every
+# other tier sat near 0.04%, about two thousand swings, so nothing past the starter
+# field could kill anybody. These are the shares the rows are now written from.
+GOBLIN_DAMAGE_SHARE = 0.06
+BOSS_DAMAGE_SHARE = 0.18
+# Rounded rows will not hit the share exactly; this is wide enough for that and far
+# too narrow to let a tier drift back to a different curve.
+DAMAGE_SHARE_TOLERANCE = 0.005
+
+
+def _luau_number(text: str) -> float:
+    return float(text.replace("_", ""))
+
+
+def _luau_number_table(source: str, name: str) -> dict[str, float]:
+    """The `{ Zone = number }` tables MobConfig keys its per-tier rules by."""
+    body = re.search(name + r": \{ \[string\]: number \} = \{(.*?)\n\}", source, re.S)
+    if body is None:
+        return {}
+    return {
+        key: _luau_number(value)
+        for key, value in re.findall(r"(\w+) = ([\d_.e+]+)", body.group(1))
+    }
+
+
+def read_mob_rows() -> tuple[list[dict[str, Any]], dict[str, float], dict[str, float]]:
+    """Every monster, parsed from its factory call.
+
+    MobConfig cannot join selftest.luau -- it requires MuscleClassConfig through
+    ReplicatedStorage, which the bare `luau` CLI cannot resolve -- so its numbers are
+    checked here instead, the same way extract_balance.py reads the configs it needs.
+    """
+    source = MOB_CONFIG_PATH.read_text(encoding="utf-8")
+    patterns = {
+        "Normal": r'goblin\("(\w+)",\s*"([^"]+)",\s*([\d_.e+]+),\s*([\d_.e+]+),\s*([\d_.e+]+)\)',
+        "Boss": r'boss\("(\w+)",\s*"([^"]+)",\s*([\d_.e+]+),\s*([\d_.e+]+),\s*([\d_.e+]+)\)',
+    }
+    rows: list[dict[str, Any]] = []
+    for kind, pattern in patterns.items():
+        for match in re.finditer(pattern, source):
+            rows.append(
+                {
+                    "kind": kind,
+                    "zone": match.group(1),
+                    "name": match.group(2),
+                    "health": _luau_number(match.group(3)),
+                    "damage": _luau_number(match.group(4)),
+                    "reward": _luau_number(match.group(5)),
+                }
+            )
+    return rows, _luau_number_table(source, "TIER_CAP"), _luau_number_table(source, "TIER_ATTACK")
+
+
+def read_weight_gates() -> dict[str, tuple[float, float]]:
+    """Each tier's entry stat and its ceiling, from WeightConfig."""
+    source = WEIGHT_CONFIG_PATH.read_text(encoding="utf-8")
+    gates: dict[str, tuple[float, float]] = {}
+    for match in re.finditer(
+        r'ZoneId = "(\w+)",\s*RequiredStat = ([\d_.e+]+).*?MaxRequiredStat = ([\d_.e+]+)',
+        source,
+        re.S,
+    ):
+        gates[match.group(1)] = (_luau_number(match.group(2)), _luau_number(match.group(3)))
+    return gates
+
+
+def validate_mob_roster(validator: Validator) -> None:
+    """Every monster, normal and boss, against the rules the curve is built from.
+
+    Mob numbers have been hand-edited a lot and nothing checked them. Two of the bugs
+    that reached a play session -- damage sitting at 0.04% of tier health above Garage,
+    and monsters resolved against an attacker stat that did not exist -- were both a
+    wrong number in a row that compiled, linted and type-checked perfectly.
+    """
+    rows, tier_cap, tier_attack = read_mob_rows()
+    gates = read_weight_gates()
+
+    tiers = [zone for zone in gates if zone in tier_cap]
+    validator.check(
+        len(rows) == 2 * len(tiers),
+        f"expected one goblin and one boss per active tier ({2 * len(tiers)}), found {len(rows)}",
+    )
+
+    seen: Counter[str] = Counter(f"{row['zone']}{row['kind']}" for row in rows)
+    duplicates = [key for key, count in seen.items() if count > 1]
+    validator.check(not duplicates, f"duplicate monster rows: {duplicates}")
+
+    for row in rows:
+        zone, kind, label = row["zone"], row["kind"], f"{row['name']} ({row['zone']})"
+        if zone not in gates:
+            validator.fail(f"{label} belongs to a tier WeightConfig does not know")
+            continue
+
+        entry_stat, ceiling = gates[zone]
+        validator.check(row["health"] > 0, f"{label} has no health")
+        validator.check(row["damage"] > 0, f"{label} deals no damage")
+        validator.check(row["reward"] > 0, f"{label} pays nothing")
+
+        # Back blocks against this; when it was missing entirely, every player above
+        # ten Core was immune to every monster in the game.
+        validator.check(
+            tier_attack.get(zone) == ceiling,
+            f"{label} attack stat {tier_attack.get(zone)} is not its tier ceiling {ceiling}",
+        )
+
+        player_health = 100 + entry_stat * 10
+        share = row["damage"] / player_health
+        want = BOSS_DAMAGE_SHARE if kind == "Boss" else GOBLIN_DAMAGE_SHARE
+        validator.check(
+            abs(share - want) <= DAMAGE_SHARE_TOLERANCE,
+            f"{label} deals {share:.2%} of tier health, wanted about {want:.0%}",
+        )
+
+    # Both currencies double per tier, and so does the class bonus each tier accepts.
+    for kind in ("Normal", "Boss"):
+        ordered = [row for zone in tiers for row in rows if row["zone"] == zone and row["kind"] == kind]
+        for previous, current in zip(ordered, ordered[1:]):
+            validator.check(
+                current["reward"] == previous["reward"] * 2,
+                f"{current['name']} pays {current['reward']:g}, not double {previous['name']}'s "
+                f"{previous['reward']:g}",
+            )
+
+    for previous, current in zip(tiers, tiers[1:]):
+        validator.check(
+            tier_cap.get(current) == tier_cap.get(previous, 0) * 2,
+            f"{current} reward cap {tier_cap.get(current)} is not double {previous}'s "
+            f"{tier_cap.get(previous)}",
+        )
+
+    # A boss is meant to read as roughly a dozen field goblins with a much heavier
+    # swing, which is what makes it a thing you come back for rather than clear on the
+    # way past.
+    for zone in tiers:
+        goblin = next((r for r in rows if r["zone"] == zone and r["kind"] == "Normal"), None)
+        boss = next((r for r in rows if r["zone"] == zone and r["kind"] == "Boss"), None)
+        if goblin is None or boss is None:
+            validator.fail(f"{zone} is missing a goblin or a boss")
+            continue
+        ratio = boss["health"] / goblin["health"]
+        validator.check(
+            10 <= ratio <= 15,
+            f"{zone} boss has {ratio:.1f}x its goblin's health, wanted roughly 12x",
+        )
+        validator.check(
+            boss["damage"] == goblin["damage"] * 3,
+            f"{zone} boss hits for {boss['damage']:g}, not triple its goblin's {goblin['damage']:g}",
+        )
+
+    # Shared behaviour, read off the two factories rather than the rows.
+    source = MOB_CONFIG_PATH.read_text(encoding="utf-8")
+    for factory in ("goblin", "boss"):
+        body = re.search(
+            r"local function " + factory + r"\(.*?\n\treturn \{(.*?)\n\t\}", source, re.S
+        )
+        if body is None:
+            validator.fail(f"could not read the {factory} factory")
+            continue
+        fields = {k: _luau_number(v) for k, v in re.findall(r"(\w+) = ([\d_.e+]+),", body.group(1))}
+        aggro, leash = fields.get("AggroRadius", 0), fields.get("LeashRadius", 0)
+        validator.check(
+            0 < aggro < leash,
+            f"{factory} aggro radius {aggro} must be positive and inside its leash {leash}",
+        )
+        validator.check(fields.get("AttackRange", 0) > 0, f"{factory} cannot reach anything")
+        validator.check(fields.get("WalkSpeed", 0) > 0, f"{factory} cannot move")
+        validator.check(fields.get("AttackCooldown", 0) > 0, f"{factory} has no attack cooldown")
+
+
 def validate_hostile_scatter(validator: Validator, builder: ModuleType) -> None:
     """Mob fields and boss arenas are spread, and clear of every training court.
 
@@ -2251,6 +2423,7 @@ def run() -> int:
         validate_garage_ring(validator, builder)
         validate_station_zone_volumes(validator, builder, first_structure, station_by_id)
         validate_hostile_scatter(validator, builder)
+        validate_mob_roster(validator)
         validate_roof_access(validator, first_structure)
         instance_count, base_part_count = validate_instance_budgets(
             validator,
