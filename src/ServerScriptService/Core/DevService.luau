@@ -23,11 +23,15 @@
 	    /power <n>        set total power to n, split across all five stats
 	    /stat <id> <n>    set one stat: /stat Legs 1e9
 	    /tokens <n>       set token balance
+	    /fighttokens <n>  set Fight Tokens earned from rewarded KOs
 	    /unlockall        enough power to open every district and machine
 	    /reset            back to a fresh profile's stats and tokens
 	    /where <muscle>   list every station for a muscle and whether it is open
+	    /boss [zone]      raise a boss now: /boss Storm, or /boss for all seven. They
+	                      are otherwise on a staggered thirty-minute clock
 	    /fasttravel       toggle Fast Travel for yourself, so Go teleports instead of
 	                      tracking (the real gamepass is still AssetId 0)
+	    /autoload         toggle the Auto Load gamepass override and its setting
 	    /help             print this list in the output window
 ]]
 
@@ -43,6 +47,7 @@ local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local WeightConfig = require(ReplicatedStorage.Modules.WeightConfig)
 
 local DevService = {
 	Name = "DevService",
@@ -115,7 +120,10 @@ COMMANDS["/power"] = function(player: Player, args: { string })
 	for _, definition in StatConfig.List do
 		setStat(player, definition.Id, share)
 	end
-	notify(player, `Power set to {NumberFormat.Format(total)}`)
+	notify(
+		player,
+		`Power set to {NumberFormat.Format(total)} · {NumberFormat.Format(share)} in each of 5 muscles`
+	)
 end
 
 COMMANDS["/stat"] = function(player: Player, args: { string })
@@ -143,14 +151,27 @@ COMMANDS["/tokens"] = function(player: Player, args: { string })
 	notify(player, `Tokens set to {NumberFormat.Format(data.Tokens)}`)
 end
 
+COMMANDS["/fighttokens"] = function(player: Player, args: { string })
+	local value = parseNumber(args[1])
+	local data = DataService:GetData(player)
+	if value == nil or data == nil then
+		notify(player, "Usage: /fighttokens 45")
+		return
+	end
+
+	data.FightTokens = math.floor(value)
+	DataService:MarkDirty(player)
+	notify(player, `Fight Tokens set to {NumberFormat.Format(data.FightTokens)}`)
+end
+
 --[[
 	Enough power for every district and every machine, found from the configs rather
 	than hardcoded — a new top district raises this automatically.
 ]]
 COMMANDS["/unlockall"] = function(player: Player, _args: { string })
 	local needed = 0
-	for _, zone in ZoneConfig.List do
-		needed = math.max(needed, zone.RequiredPower)
+	for _, tier in WeightConfig.List do
+		needed = math.max(needed, tier.RequiredStat)
 	end
 	for _, definition in EquipmentConfig.List do
 		needed = math.max(needed, definition.UnlockPower)
@@ -158,12 +179,11 @@ COMMANDS["/unlockall"] = function(player: Player, _args: { string })
 
 	-- A margin above the highest gate, because gates compare with `>=` against a total
 	-- that floating-point division across five stats can land a hair under.
-	local total = needed * 1.1
-	local share = total / #StatConfig.List
+	local share = needed * 1.1
 	for _, definition in StatConfig.List do
 		setStat(player, definition.Id, share)
 	end
-	notify(player, `Everything unlocked — power {NumberFormat.Format(total)}`)
+	notify(player, `Everything unlocked — every muscle {NumberFormat.Format(share)}`)
 end
 
 COMMANDS["/reset"] = function(player: Player, _args: { string })
@@ -175,8 +195,9 @@ COMMANDS["/reset"] = function(player: Player, _args: { string })
 		setStat(player, definition.Id, 0)
 	end
 	data.Tokens = 0
+	data.FightTokens = 0
 	DataService:MarkDirty(player)
-	notify(player, "Stats and tokens reset")
+	notify(player, "Stats, training tokens, and Fight Tokens reset")
 end
 
 --[[
@@ -191,10 +212,10 @@ COMMANDS["/where"] = function(player: Player, args: { string })
 		return
 	end
 
-	local power = StatService:GetTotalPower(player)
+	local relevantStat = StatService:GetStat(player, statId)
 	local status = TrainingService:GetSpotStatus(player)
 
-	print(`[DevService] {statId} stations (your power: {NumberFormat.Format(power)}):`)
+	print(`[DevService] {statId} stations (your stat: {NumberFormat.Format(relevantStat)}):`)
 	local count = 0
 	for _, station in CollectionService:GetTagged(EquipmentConfig.STATION_TAG) do
 		local definition = EquipmentConfig.Resolve(station)
@@ -205,17 +226,45 @@ COMMANDS["/where"] = function(player: Player, args: { string })
 
 		local travelId = station:GetAttribute(EquipmentConfig.TRAVEL_ATTRIBUTE)
 		local zone = ZoneConfig.AtPosition(station:GetPivot().Position)
-		local required = math.max(if zone ~= nil then zone.RequiredPower else 0, definition.UnlockPower)
+		local tier = if zone ~= nil then WeightConfig.Get(zone.Id) else nil
+		local required = math.max(if tier ~= nil then tier.RequiredStat else 0, definition.UnlockPower)
 		local spot = if type(travelId) == "string" then status.Spots[travelId] else nil
 
 		print(
-			`  {if power >= required then "OPEN  " else "LOCKED"} `
+			`  {if relevantStat >= required then "OPEN  " else "LOCKED"} `
 				.. `{definition.DisplayName} @ {if zone ~= nil then zone.DisplayName else "?"} `
 				.. `needs {NumberFormat.Format(required)} `
 				.. (if spot ~= nil then `({spot.Capacity - spot.Occupied}/{spot.Capacity} free)` else "")
 		)
 	end
 	notify(player, `{count} {statId} stations listed in Output`)
+end
+
+COMMANDS["/autoload"] = function(player: Player, _args: { string })
+	local enabled = player:GetAttribute("AutoLoadOwned") ~= true
+	player:SetAttribute("AutoLoadOwned", enabled)
+	local data = DataService:GetData(player)
+	if data ~= nil then
+		data.AutoLoadEnabled = enabled
+		DataService:MarkDirty(player)
+	end
+	notify(player, if enabled then "Auto Load Studio override ON" else "Auto Load Studio override OFF")
+end
+
+COMMANDS["/boss"] = function(player: Player, args: { string })
+	local MobService = Loader.Get("MobService")
+	local zoneId = args[1]
+	if zoneId ~= nil and ZoneConfig.Get(zoneId) == nil then
+		notify(player, `Unknown tier "{zoneId}". Usage: /boss Storm, or /boss for all seven.`)
+		return
+	end
+
+	local risen = MobService:ForceBoss(zoneId)
+	if risen > 0 then
+		notify(player, `Raised {risen} boss(es). Track them from the map.`)
+	else
+		notify(player, "Nothing to raise — those bosses are already standing.")
+	end
 end
 
 COMMANDS["/fasttravel"] = function(player: Player, _args: { string })
@@ -230,7 +279,7 @@ end
 
 COMMANDS["/help"] = function(player: Player, _args: { string })
 	print(
-		"[DevService] /power n · /stat id n · /tokens n · /unlockall · /reset · /where muscle · /fasttravel"
+		"[DevService] /power n · /stat id n · /tokens n · /fighttokens n · /unlockall · /reset · /where muscle · /boss [zone] · /fasttravel · /autoload"
 	)
 	notify(player, "Commands printed to Output")
 end
