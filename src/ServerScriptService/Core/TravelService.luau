@@ -52,8 +52,6 @@ local FAST_TRAVEL_PRODUCT = "FastTravel"
 -- How long to wait for the destination to stream in before going anyway.
 local STREAM_WAIT = 1
 local MAP_FEATURE_TAG = "MapFeature"
--- Both hostile site kinds, in the order they read as difficulty.
-local MOB_KINDS: { MobConfig.MobKind } = { "Normal", "Boss" }
 
 local TravelService = {
 	Name = "TravelService",
@@ -106,11 +104,14 @@ end
 -- machine travel ids are "<Zone>-<Family>", so the two id spaces cannot collide and
 -- one Travel remote can serve both.
 local function findHostile(travelId: string): MobConfig.Site?
-	for _, kind in MOB_KINDS do
-		for _, site in MobConfig.Sites(kind) do
-			if site.Mob.Id == travelId then
-				return site
-			end
+	for _, site in MobConfig.Sites("Normal") do
+		if site.Mob.Id == travelId then
+			return site
+		end
+	end
+	for _, site in MobConfig.Sites("Boss") do
+		if site.Mob.Id == travelId then
+			return site
 		end
 	end
 	return nil
@@ -269,30 +270,32 @@ end
 function TravelService:GetHostiles(): { any }
 	local out = {}
 
-	for _, kind in MOB_KINDS do
-		for _, site in MobConfig.Sites(kind) do
-			local mob = site.Mob
-			local zone = ZoneConfig.Get(mob.ZoneId)
-			if zone == nil then
-				continue
-			end
-			local landing = hostileLanding(site)
-			table.insert(out, {
-				Id = mob.Id,
-				ZoneId = mob.ZoneId,
-				Kind = mob.Kind,
-				DisplayName = mob.DisplayName,
-				X = landing.Position.X,
-				Y = landing.Position.Y,
-				Z = landing.Position.Z,
-				Radius = site.Radius,
-				RequiredPower = zone.RequiredPower,
-				Health = mob.Health,
-				Damage = mob.Damage,
-				Reward = if mob.Kind == "Boss" then (mob.TokenReward or 0) else (mob.FightTokenReward or 0),
-				Color = mob.Color,
-			})
+	local sites = MobConfig.Sites("Normal")
+	local bosses = MobConfig.Sites("Boss")
+	table.move(bosses, 1, #bosses, #sites + 1, sites)
+
+	for _, site in sites do
+		local mob = site.Mob
+		local zone = ZoneConfig.Get(mob.ZoneId)
+		if zone == nil then
+			continue
 		end
+		local landing = hostileLanding(site)
+		table.insert(out, {
+			Id = mob.Id,
+			ZoneId = mob.ZoneId,
+			Kind = mob.Kind,
+			DisplayName = mob.DisplayName,
+			X = landing.Position.X,
+			Y = landing.Position.Y,
+			Z = landing.Position.Z,
+			Radius = site.Radius,
+			RequiredPower = zone.RequiredPower,
+			Health = mob.Health,
+			Damage = mob.Damage,
+			Reward = if mob.Kind == "Boss" then (mob.TokenReward or 0) else (mob.FightTokenReward or 0),
+			Color = mob.Color,
+		})
 	end
 
 	table.sort(out, function(a, b)
