@@ -32,8 +32,11 @@ local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MapViewportMath = require(ReplicatedStorage.Modules.MapViewportMath)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 type Destination = MapRender.Destination
+type Hostile = MapRender.Hostile
+type BossState = { Alive: boolean, SecondsUntil: number }
 type MapItemLayout = {
 	Position: UDim2,
 	Size: UDim2,
@@ -68,8 +71,17 @@ local screen: ScreenGui
 local content: Frame
 local isOpen = false
 local hasFastTravel = false
+-- Exactly one of these is ever set. The sidebar shows a machine or a monster, and
+-- selecting either kind clears the other, so there is no state where the panel has to
+-- choose which of two selections it is describing.
 local selectedDestination: string? = nil
+local selectedHostile: string? = nil
 local destinations: { Destination } = {}
+local hostiles: { Hostile } = {}
+-- Per zone, from MobService's BossStateChanged broadcast. Stamped with the clock time
+-- it arrived so the countdown stays honest between broadcasts without a render loop.
+local bossState: { [string]: BossState } = {}
+local bossStateAt = 0
 local mapFeatures: { MapRender.Feature } = {}
 local mapZoom = 1
 local mapCenter = Vector2.new(0.5, 0.5)
@@ -160,7 +172,48 @@ function FullMapController:Init()
 end
 
 function FullMapController:_fetchMap()
-	destinations, mapFeatures = MapRender.Fetch()
+	destinations, mapFeatures, hostiles = MapRender.Fetch()
+end
+
+--[[
+	How long until this zone's boss is back, or nil if it is standing right now.
+
+	Returns nil for a zone nobody has broadcast yet too — an unknown boss is drawn as
+	unknown rather than as a countdown from zero.
+]]
+local function bossCountdown(zoneId: string): number?
+	local state = bossState[zoneId]
+	if state == nil or state.Alive then
+		return nil
+	end
+	return math.max(state.SecondsUntil - (os.clock() - bossStateAt), 0)
+end
+
+local function countdownText(seconds: number): string
+	local minutes = math.floor(seconds / 60)
+	return `{minutes}:{string.format("%02d", math.floor(seconds % 60))}`
+end
+
+--[[
+	The line under a hostile site's name: what is standing there, or when it will be.
+
+	A field never has a timer. Its goblins respawn one at a time on their own clocks and
+	the field is always worth walking to, so promising a countdown for it would be
+	inventing a fact the server never sends.
+]]
+local function hostileState(hostile: Hostile): (string, Color3)
+	if hostile.Kind ~= "Boss" then
+		return "ALWAYS HUNTING", UI.Palette.TextMuted
+	end
+	local remaining = bossCountdown(hostile.ZoneId)
+	if remaining == nil then
+		local state = bossState[hostile.ZoneId]
+		if state == nil then
+			return "STATUS UNKNOWN", UI.Palette.TextMuted
+		end
+		return "ALIVE NOW", UI.Palette.Vital
+	end
+	return `RESPAWNS IN {countdownText(remaining)}`, UI.Palette.Token
 end
 
 function FullMapController:_fetchTravelAccess()
@@ -179,18 +232,20 @@ function FullMapController:_promptFastTravel()
 	end
 end
 
-function FullMapController:_track(destination: Destination)
-	local label, color = destinationLabel(destination)
+-- Track and Teleport are told where and what, never which kind. A monster site and a
+-- machine are the same request to the waypoint and to the server; only the sidebar
+-- above them knows the difference.
+function FullMapController:_track(position: Vector3, label: string, color: Color3)
 	local WaypointController = Loader.Get("WaypointController")
-	WaypointController:SetTarget(destination.Position, label, color)
+	WaypointController:SetTarget(position, label, color)
 	toast(`Tracking {label} — follow the arrow`)
 	self:Close()
 end
 
-function FullMapController:_teleport(destination: Destination)
+function FullMapController:_teleport(id: string)
 	-- The client lock is presentation only. TravelService repeats every check and is
 	-- the sole authority that can move the character.
-	local ok, message = Net.Function("Travel"):InvokeServer(destination.Id)
+	local ok, message = Net.Function("Travel"):InvokeServer(id)
 	if ok then
 		toast(message)
 		self:Close()
@@ -382,8 +437,246 @@ function FullMapController:_renderTierList(parent: Frame, data: any?)
 
 		row.Activated:Connect(function()
 			selectedDestination = candidate.Id
+			selectedHostile = nil
 			self:_render()
 		end)
+	end
+
+	self:_renderThreatRows(list, data, #rows)
+end
+
+--[[
+	The monsters, appended under the machine tiers as their own section.
+
+	They belong in the same list rather than behind a separate tab because they are the
+	same decision: this is the index of everywhere in the city worth going, ordered by
+	what it costs to be allowed there. A muscle filter hides them — a monster does not
+	train a muscle, so under "LEGS" it would be noise.
+]]
+function FullMapController:_renderThreatRows(list: ScrollingFrame, data: any?, offset: number)
+	if activeStatFilter ~= nil or #hostiles == 0 then
+		return
+	end
+
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+
+	local header = UI.Label("ThreatsHeading", list)
+	header.LayoutOrder = offset + 1
+	header.Size = UDim2.new(1, -6, 0, 28)
+	header.Font = UI.Font.Heading
+	header.TextSize = 12
+	header.TextColor3 = UI.Palette.TextMuted
+	header.ZIndex = 4
+	header.Text = "THREATS"
+
+	for index, hostile in hostiles do
+		local site = MapRender.SiteIcon(hostile.Kind)
+		local accent = if hostile.Kind == "Boss" then UI.Palette.Danger else site.Color
+		local unlocked = power >= hostile.RequiredPower
+
+		local row = Instance.new("TextButton")
+		row.Name = hostile.Id
+		row.LayoutOrder = offset + 1 + index
+		row.Size = UDim2.new(1, -6, 0, 56)
+		row.BackgroundColor3 = UI.Palette.Glass
+		row.BackgroundTransparency = if unlocked then 0.12 else 0.4
+		row.BorderSizePixel = 0
+		row.AutoButtonColor = false
+		row.Text = ""
+		row.ZIndex = 4
+		row.Parent = list
+		addCorner(row, 7)
+		addBorder(row, accent, if unlocked then 0.25 else 0.7, 1)
+		UI.Pressable(row, { PressScale = 0.98, HoverScale = 1.01 })
+
+		local icon = Instance.new("Frame")
+		icon.Name = "Icon"
+		icon.AnchorPoint = Vector2.new(0, 0.5)
+		icon.Position = UDim2.new(0, 8, 0.5, 0)
+		icon.Size = UDim2.fromOffset(30, 30)
+		icon.BackgroundTransparency = 1
+		icon.ZIndex = 5
+		icon.Parent = row
+		Icons.Draw(site.Icon, icon, accent, UI.Palette.CartoonInk)
+
+		local name = UI.Label("Name", row)
+		name.Position = UDim2.fromOffset(46, 6)
+		name.Size = UDim2.new(1, -56, 0, 18)
+		name.Font = UI.Font.Heading
+		name.TextSize = 12
+		name.TextColor3 = if unlocked then UI.Palette.Text else UI.Palette.TextMuted
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		name.ZIndex = 5
+		name.Text = hostile.DisplayName
+
+		local stateText, stateColor = hostileState(hostile)
+		local detail = UI.Label("Detail", row)
+		detail.Position = UDim2.fromOffset(46, 24)
+		detail.Size = UDim2.new(1, -56, 0, 16)
+		detail.TextSize = 11
+		detail.TextColor3 = stateColor
+		detail.ZIndex = 5
+		detail.Text = stateText
+
+		local requirement = UI.Label("Requires", row)
+		requirement.Position = UDim2.fromOffset(46, 39)
+		requirement.Size = UDim2.new(1, -56, 0, 14)
+		requirement.TextSize = 10
+		requirement.TextColor3 = if unlocked then UI.Palette.TextMuted else UI.Palette.Danger
+		requirement.ZIndex = 5
+		requirement.Text = if hostile.RequiredPower > 0
+			then `REQUIRES {NumberFormat.Format(hostile.RequiredPower)} POWER`
+			else "OPEN TO EVERYONE"
+
+		row.Activated:Connect(function()
+			selectedHostile = hostile.Id
+			selectedDestination = nil
+			self:_render()
+		end)
+	end
+end
+
+--[[
+	The detail card for a mob field or a boss arena.
+
+	Deliberately the same card as a machine's: a glyph, what it is, where it is, what it
+	costs to be let in, and the same two buttons in the same two places. The PvE half of
+	the game was navigable only from memory; making it look like a different feature
+	with different rules would not have fixed that.
+
+	Teleport is offered for a dead boss too. The destination is the arena, and standing
+	in it waiting for the timer is a legitimate way to spend the wait.
+]]
+function FullMapController:_renderHostile(parent: Frame, data: any?, hostile: Hostile)
+	local zone = ZoneConfig.Get(hostile.ZoneId)
+	local site = MapRender.SiteIcon(hostile.Kind)
+	local accent = if hostile.Kind == "Boss" then UI.Palette.Danger else site.Color
+
+	local iconBubble = Instance.new("Frame")
+	iconBubble.Name = "MobIcon"
+	iconBubble.Position = UDim2.fromOffset(12, 38)
+	iconBubble.Size = UDim2.fromOffset(54, 54)
+	iconBubble.BackgroundColor3 = accent:Lerp(UI.Palette.CartoonInk, 0.68)
+	iconBubble.BorderSizePixel = 0
+	iconBubble.Parent = parent
+	addCorner(iconBubble, 27)
+	addBorder(iconBubble, accent, 0.1, 2)
+
+	local iconPadding = Instance.new("UIPadding")
+	iconPadding.PaddingTop = UDim.new(0, 8)
+	iconPadding.PaddingBottom = UDim.new(0, 8)
+	iconPadding.PaddingLeft = UDim.new(0, 8)
+	iconPadding.PaddingRight = UDim.new(0, 8)
+	iconPadding.Parent = iconBubble
+	Icons.Draw(site.Icon, iconBubble, accent, UI.Palette.CartoonInk)
+
+	local name = UI.Label("Name", parent)
+	name.Position = UDim2.fromOffset(76, 40)
+	name.Size = UDim2.new(1, -88, 0, 24)
+	name.Font = UI.Font.Heading
+	name.TextSize = 15
+	name.TextColor3 = UI.Palette.Text
+	name.TextTruncate = Enum.TextTruncate.AtEnd
+	name.Text = string.upper(hostile.DisplayName)
+
+	local kind = UI.Label("Kind", parent)
+	kind.Position = UDim2.fromOffset(76, 66)
+	kind.Size = UDim2.new(1, -88, 0, 18)
+	kind.Font = UI.Font.Heading
+	kind.TextSize = 12
+	kind.TextColor3 = accent
+	kind.Text = if hostile.Kind == "Boss" then "BOSS ARENA" else "HUNTING GROUND"
+
+	local where = UI.Label("Where", parent)
+	where.Position = UDim2.fromOffset(12, 108)
+	where.Size = UDim2.new(1, -24, 0, 38)
+	where.Font = UI.Font.Heading
+	where.TextSize = 13
+	where.TextWrapped = true
+	where.TextColor3 = UI.Palette.Text
+	where.Text = if zone ~= nil
+		then `{zone.DisplayName} tier\n<font color="#8A93A8">{math.round(hostile.Radius)} stud site</font>`
+		else hostile.ZoneId
+
+	local threat = UI.Label("Threat", parent)
+	threat.Position = UDim2.fromOffset(12, 158)
+	threat.Size = UDim2.new(1, -24, 0, 42)
+	threat.Font = UI.Font.Numeric
+	threat.TextSize = 16
+	threat.TextWrapped = true
+	threat.TextColor3 = accent
+	threat.Text =
+		`{NumberFormat.Format(hostile.Health)} HP  ·  {NumberFormat.Format(hostile.Damage)} PER HIT`
+
+	local stateText, stateColor = hostileState(hostile)
+	local stateLabel = UI.Label("State", parent)
+	stateLabel.Position = UDim2.fromOffset(12, 204)
+	stateLabel.Size = UDim2.new(1, -24, 0, 18)
+	stateLabel.Font = UI.Font.Heading
+	stateLabel.TextSize = 11
+	stateLabel.TextColor3 = stateColor
+	stateLabel.Text = stateText
+
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+	local shortfall = hostile.RequiredPower - power
+	local powerLabel = UI.Label("Power", parent)
+	powerLabel.Position = UDim2.fromOffset(12, 230)
+	powerLabel.Size = UDim2.new(1, -24, 0, 44)
+	powerLabel.Font = UI.Font.Heading
+	powerLabel.TextSize = 12
+	powerLabel.TextWrapped = true
+	if shortfall > 0 then
+		powerLabel.TextColor3 = UI.Palette.Danger
+		powerLabel.Text = `POWER LOCKED\nNEED {NumberFormat.Format(shortfall)} MORE`
+	else
+		powerLabel.TextColor3 = UI.Palette.Vital
+		powerLabel.Text = `OPEN TO YOU\nPAYS {NumberFormat.Format(hostile.Reward)} FIGHT TOKENS`
+	end
+
+	local rule = Instance.new("Frame")
+	rule.Position = UDim2.fromOffset(12, 286)
+	rule.Size = UDim2.new(1, -24, 0, 2)
+	rule.BackgroundColor3 = UI.Palette.GlassStroke
+	rule.BackgroundTransparency = 0.55
+	rule.BorderSizePixel = 0
+	rule.Parent = parent
+
+	local actionHint = UI.Label("ActionHint", parent)
+	actionHint.Position = UDim2.fromOffset(12, 302)
+	actionHint.Size = UDim2.new(1, -24, 0, 34)
+	actionHint.TextWrapped = true
+	actionHint.TextSize = 11
+	actionHint.TextColor3 = UI.Palette.TextMuted
+	actionHint.Text = "Track is free. Teleport needs Fast Travel and enough Power."
+
+	self:_sideButton(parent, "Track", "TRACK", UDim2.new(0, 10, 1, -108), accent, true, function()
+		self:_track(hostile.Position, hostile.DisplayName, accent)
+	end)
+
+	if not hasFastTravel then
+		self:_sideButton(
+			parent,
+			"TeleportLocked",
+			"LOCKED · GET FAST TRAVEL",
+			UDim2.new(0, 10, 1, -54),
+			UI.Palette.Token,
+			true,
+			function()
+				self:_promptFastTravel()
+			end
+		)
+	else
+		self:_sideButton(
+			parent,
+			"Teleport",
+			if shortfall > 0 then "LOCKED · NEED MORE POWER" else "TELEPORT",
+			UDim2.new(0, 10, 1, -54),
+			UI.Palette.Token,
+			shortfall <= 0,
+			function()
+				self:_teleport(hostile.Id)
+			end
+		)
 	end
 end
 
@@ -391,6 +684,7 @@ function FullMapController:_renderSidebar(parent: Frame, data: any?)
 	local destination = if selectedDestination ~= nil
 		then MapRender.GetDestination(selectedDestination)
 		else nil
+	local hostile = if selectedHostile ~= nil then MapRender.GetHostile(selectedHostile) else nil
 
 	local heading = UI.Label("Heading", parent)
 	heading.Position = UDim2.fromOffset(12, 10)
@@ -398,12 +692,20 @@ function FullMapController:_renderSidebar(parent: Frame, data: any?)
 	heading.Font = UI.Font.Heading
 	heading.TextSize = 12
 	heading.TextColor3 = UI.Palette.TextMuted
-	heading.Text = if destination == nil
-		then (if activeStatFilter ~= nil then `{string.upper(activeStatFilter)} TIERS` else "ALL TIERS")
+	heading.Text = if hostile ~= nil
+		then (if hostile.Kind == "Boss" then "SELECTED BOSS" else "SELECTED HUNTING GROUND")
+		elseif destination == nil then (if activeStatFilter ~= nil
+			then `{string.upper(activeStatFilter)} TIERS`
+			else "ALL TIERS")
 		elseif
 			destination.GainMultiplier == self:_currentMultiplier(data, destination.StatId)
 		then "CURRENT MUSCLE TIER"
 		else "SELECTED LOCATION"
+
+	if hostile ~= nil then
+		self:_renderHostile(parent, data, hostile)
+		return
+	end
 
 	if destination == nil then
 		self:_renderTierList(parent, data)
@@ -518,8 +820,9 @@ function FullMapController:_renderSidebar(parent: Frame, data: any?)
 	actionHint.TextColor3 = UI.Palette.TextMuted
 	actionHint.Text = `Track is free. Teleport needs Fast Travel and enough {stat.DisplayName}.`
 
+	local trackLabel, trackColor = destinationLabel(destination)
 	self:_sideButton(parent, "Track", "TRACK", UDim2.new(0, 10, 1, -108), stat.Color, true, function()
-		self:_track(destination)
+		self:_track(destination.Position, trackLabel, trackColor)
 	end)
 
 	if not hasFastTravel then
@@ -543,7 +846,7 @@ function FullMapController:_renderSidebar(parent: Frame, data: any?)
 			UI.Palette.Token,
 			shortfall <= 0,
 			function()
-				self:_teleport(destination)
+				self:_teleport(destination.Id)
 			end
 		)
 	end
@@ -562,6 +865,13 @@ function FullMapController:_render()
 	local selected = if selectedDestination ~= nil then MapRender.GetDestination(selectedDestination) else nil
 	if selected ~= nil and activeStatFilter ~= nil and selected.StatId ~= activeStatFilter then
 		selectedDestination = nil
+	end
+	-- A muscle filter hides the monsters, so it must also drop a monster selection:
+	-- otherwise the sidebar describes a site with no pin anywhere on the board.
+	if
+		selectedHostile ~= nil and (activeStatFilter ~= nil or MapRender.GetHostile(selectedHostile) == nil)
+	then
+		selectedHostile = nil
 	end
 
 	local visibleDestinations: { Destination } = {}
@@ -885,6 +1195,52 @@ function FullMapController:_render()
 			end
 			self:_renderSidebar(sidebar, data)
 		end)
+	end
+
+	-- Monster sites, on top of the circles the feature layer already draws for them.
+	-- Same pin machinery as a machine, deliberately: this is a place you can decide to
+	-- go to, and the map should not make you learn a second way to say so.
+	if activeStatFilter == nil then
+		local playerPower = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+		for _, hostile in hostiles do
+			local site = MapRender.SiteIcon(hostile.Kind)
+			local accent = if hostile.Kind == "Boss" then UI.Palette.Danger else site.Color
+			local selectedSite = selectedHostile == hostile.Id
+			local unlocked = playerPower >= hostile.RequiredPower
+			local size = if selectedSite then SELECTED_PIN_SIZE else PIN_SIZE
+
+			local pin = Instance.new("TextButton")
+			pin.Name = hostile.Id
+			pin.AnchorPoint = Vector2.new(0.5, 0.5)
+			pin.Position = project(hostile.Position.X, hostile.Position.Z)
+			pin.Size = UDim2.fromOffset(size, size)
+			pin.BackgroundColor3 = if unlocked then accent else accent:Lerp(UI.Palette.Glass, 0.6)
+			pin.BorderSizePixel = 0
+			pin.AutoButtonColor = false
+			pin.Text = ""
+			pin.ZIndex = if selectedSite then 27 else 23
+			pin.Parent = viewport
+			registerMapItem(pin)
+			addCorner(pin, 20)
+			addBorder(pin, if selectedSite then MAP_PAPER else MAP_INK, 0, if selectedSite then 2 else 1)
+
+			local glyph = Instance.new("Frame")
+			glyph.Name = "Glyph"
+			glyph.Size = UDim2.fromScale(0.74, 0.74)
+			glyph.AnchorPoint = Vector2.new(0.5, 0.5)
+			glyph.Position = UDim2.fromScale(0.5, 0.5)
+			glyph.BackgroundTransparency = 1
+			glyph.ZIndex = pin.ZIndex + 1
+			glyph.Parent = pin
+			Icons.Draw(site.Icon, glyph, MAP_PAPER, UI.Palette.CartoonInk)
+
+			UI.Pressable(pin, { PressScale = 0.9, HoverScale = 1.12 })
+			pin.Activated:Connect(function()
+				selectedHostile = hostile.Id
+				selectedDestination = nil
+				self:_render()
+			end)
+		end
 	end
 
 	local character = player.Character
@@ -1235,6 +1591,11 @@ function FullMapController:Open(destinationId: string?, statFilter: string?)
 	selectedDestination = if destinationId ~= nil and MapRender.GetDestination(destinationId) ~= nil
 		then destinationId
 		else nil
+	selectedHostile = if selectedDestination == nil
+			and destinationId ~= nil
+			and MapRender.GetHostile(destinationId) ~= nil
+		then destinationId
+		else nil
 
 	-- Always open framed on the whole city.
 	--
@@ -1293,6 +1654,28 @@ end
 
 function FullMapController:Start()
 	self:_build()
+
+	-- MobService has been broadcasting this since bosses existed and nothing listened,
+	-- so the respawn timer the server keeps was invisible in game. The map is where a
+	-- player decides which fight to walk to, which makes it the right consumer.
+	Net.Event("BossStateChanged").OnClientEvent:Connect(function(state: any)
+		if type(state) ~= "table" then
+			return
+		end
+		table.clear(bossState)
+		for zoneId, entry in state do
+			if type(zoneId) == "string" and type(entry) == "table" then
+				bossState[zoneId] = {
+					Alive = entry.Alive == true,
+					SecondsUntil = if type(entry.SecondsUntil) == "number" then entry.SecondsUntil else 0,
+				}
+			end
+		end
+		bossStateAt = os.clock()
+		if isOpen then
+			self:_render()
+		end
+	end)
 
 	ProfileController.Changed:Connect(function()
 		if not isOpen then
