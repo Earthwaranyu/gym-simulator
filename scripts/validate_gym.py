@@ -32,6 +32,7 @@ MOB_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MobConfig.lu
 FORMULAS_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "Formulas.luau"
 MOB_RIG_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MobRigConfig.luau"
 STRIKE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "StrikeConfig.luau"
+ABILITY_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "AbilityConfig.luau"
 WEIGHT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "WeightConfig.luau"
 CITY_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "City.model.json"
 DISTRICTS_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "Districts.model.json"
@@ -1664,7 +1665,9 @@ def validate_mob_strikes(validator: Validator) -> None:
     arithmetic slip hand-authored poses invite.
     """
     source = STRIKE_CONFIG_PATH.read_text(encoding="utf-8")
-    for strike_id in ("MobSwing", "MobUltimate"):
+    durations: dict[str, float] = {}
+    contact_fractions: dict[str, float] = {}
+    for strike_id in ("MobSwing", "MobUltimate", "PunchJab", "PunchCross", "PunchFinish"):
         block = re.search(
             r'Id = "' + strike_id + r'",(.*?)\n\t\},\n', source, re.S
         )
@@ -1684,6 +1687,52 @@ def validate_mob_strikes(validator: Validator) -> None:
             validator.check(
                 0 < contact < 1, f"{strike_id} lands its contact at {contact:g}, outside the clip"
             )
+        durations[strike_id] = _strike_duration(source, strike_id)
+        if contacts:
+            contact_fractions[strike_id] = contacts[0]
+
+    validate_punch_timing(validator, durations, contact_fractions)
+
+
+def _strike_duration(source: str, strike_id: str) -> float:
+    found = re.search(r'Id = "' + strike_id + r'",.*?Duration = ([\d.]+)', source, re.S)
+    return float(found.group(1)) if found is not None else 0.0
+
+
+def validate_punch_timing(
+    validator: Validator, durations: dict[str, float], contacts: dict[str, float]
+) -> None:
+    """The couplings between the punch clips and the ability that fires them.
+
+    StrikeConfig asserts these in its own RunSelfTest, which nothing can run: it reaches
+    ReplicatedStorage through game:GetService, so the bare luau CLI cannot load it. They
+    are real constraints -- retiming a punch without them silently either fires the next
+    swing before this one has landed, or leaves a gap where the animation has finished
+    and the input has not come back.
+    """
+    jab_duration = durations.get("PunchJab", 0)
+    jab_contact = jab_duration * contacts.get("PunchJab", 0)
+
+    ability = ABILITY_CONFIG_PATH.read_text(encoding="utf-8")
+    found = re.search(r'Id = "Punch",.*?Cooldown = ([\d.]+)', ability, re.S)
+    if found is None:
+        validator.fail("could not read the Punch cooldown")
+        return
+    cooldown = float(found.group(1))
+
+    validator.check(
+        cooldown > jab_contact,
+        f"the punch cooldown {cooldown:g}s fires before the jab lands at {jab_contact:.3f}s",
+    )
+    validator.check(
+        cooldown < jab_duration,
+        f"the punch cooldown {cooldown:g}s outlasts the jab clip {jab_duration:g}s, "
+        f"leaving a gap with no animation",
+    )
+    validator.check(
+        durations.get("PunchFinish", 0) > jab_duration,
+        "the finisher must be a longer clip than the jab",
+    )
 
 
 def validate_mob_roster(validator: Validator) -> None:
