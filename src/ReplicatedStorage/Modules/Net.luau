@@ -136,6 +136,10 @@ local FUNCTION_NAMES: { string } = {
 	"GetDestinations",
 	-- Client -> server: save one whitelisted boolean preference. Returns ok, message.
 	"UpdateSetting",
+	-- Client -> server: the whole chosen look at once — skin, shorts, hair, face — as
+	-- ids into the appearance configs. One call rather than four so a player is never
+	-- saved half-way through a change. Returns ok, message.
+	"SetAppearance",
 }
 
 local folder: Folder
