@@ -589,10 +589,23 @@ end
 	Player to credit, and PlayerKilled's seven listeners all assume there is. Deaths are
 	counted here directly so being killed by a goblin is not invisible to the profile.
 
-	Core reflection is deliberately not applied. Reflecting onto an entity would need a
-	damage path in the opposite direction for no gameplay gain.
+	`attackStat` is the Arms-equivalent of whatever swung — MobConfig's per-tier
+	AttackStat. Back's bands are a ratio of defence to attack, so without a real number
+	here there is nothing to block against: this used to pass zero, the ratio floored the
+	attacker at one, and the result was that every player above ten Core took no damage
+	from any monster, ever.
+
+	Core is passed as zero because Core does not apply to environment damage. Reflecting
+	onto a goblin would need a damage path in the opposite direction for no gameplay
+	gain, and Core's band nullifies rather than reduces — letting it run here is exactly
+	what handed one stat total immunity to all of PvE.
 ]]
-function CombatService:ApplyEnvironmentDamage(sourceName: string, victim: Player, rawDamage: number): number
+function CombatService:ApplyEnvironmentDamage(
+	sourceName: string,
+	victim: Player,
+	rawDamage: number,
+	attackStat: number
+): number
 	if not Formulas.IsFinite(rawDamage) or rawDamage <= 0 then
 		return 0
 	end
@@ -606,12 +619,7 @@ function CombatService:ApplyEnvironmentDamage(sourceName: string, victim: Player
 		return 0
 	end
 
-	local breakdown = Formulas.ResolveDamage(
-		rawDamage,
-		StatService:GetStat(victim, "Back"),
-		StatService:GetStat(victim, "Core"),
-		0
-	)
+	local breakdown = Formulas.ResolveDamage(rawDamage, StatService:GetStat(victim, "Back"), 0, attackStat)
 	local damage = breakdown.Damage
 	-- The same last word the player-versus-player path gives a modifier. A guard that
 	-- stopped a punch but not a goblin would be a rule the player has no way to learn.

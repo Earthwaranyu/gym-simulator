@@ -312,7 +312,12 @@ function MobService:_step(now: number)
 		record.Humanoid:MoveTo(origin)
 		if now >= record.NextAttackAt then
 			record.NextAttackAt = now + definition.AttackCooldown
-			CombatService:ApplyEnvironmentDamage(definition.DisplayName, victim, definition.Damage)
+			CombatService:ApplyEnvironmentDamage(
+				definition.DisplayName,
+				victim,
+				definition.Damage,
+				definition.AttackStat
+			)
 		end
 	end
 end
