@@ -31,6 +31,7 @@ local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
+local MobRigConfig = require(ReplicatedStorage.Modules.MobRigConfig)
 
 -- The AI runs on a shared timer rather than per-mob and rather than every frame.
 -- Four ticks a second is enough for a walking melee chase and is roughly a fifteenth
@@ -96,74 +97,198 @@ function MobService:Init()
 end
 
 --[[
-	A goblin, built from primitives.
+	A monster, assembled from its rig.
 
-	No Toolbox models and no imported meshes anywhere in this game, so a monster is the
-	same kind of part stack the NPCs are. The silhouette is doing all the work: a squat
-	body, a big head and pointed ears read as "goblin" at fifty studs, which is further
-	than any of the detail would.
+	Every part, joint and ornament is described in MobRigConfig; this walks that
+	description and builds it. The shape of the thing is data, and this is the
+	interpreter — which is what lets a goblin and a boss be two tables rather than two
+	code paths, and what makes redesigning one an edit to a config.
+
+	The rig is jointed with Motor6Ds carrying the stock R15 joint names, so every pose,
+	gait and strike the player already has addresses a goblin correctly. It used to be
+	WeldConstraints, which is why monsters could not animate at all: a weld has nothing
+	to rotate.
+
+	No Animator is created. The player rig has one because Roblox's Animate script needs
+	it for jump, fall and climb; a monster has no stock clips to preserve, and an Animator
+	with nothing playing zeroes Transform every frame — which would fight the controller
+	that is the only thing posing this body.
 ]]
--- How far the drawn feet hang below the bottom of the collidable root, at scale 1:
--- the legs sit at -1.7 and are 1.4 tall, so their soles are 2.4 below the root centre
--- and 1.4 below the root's own bottom edge.
-local FOOT_DROP = 1.4
+local function shapeOf(kind: MobRigConfig.Shape): (string, Enum.PartType?)
+	if kind == "Wedge" then
+		return "WedgePart", nil
+	elseif kind == "Ball" then
+		return "Part", Enum.PartType.Ball
+	elseif kind == "Cylinder" then
+		return "Part", Enum.PartType.Cylinder
+	end
+	return "Part", Enum.PartType.Block
+end
+
+local function makePart(
+	name: string,
+	kind: MobRigConfig.Shape,
+	size: Vector3,
+	color: Color3,
+	material: Enum.Material?
+): BasePart
+	local class, partType = shapeOf(kind)
+	local piece = Instance.new(class) :: BasePart
+	piece.Name = name
+	piece.Size = size
+	piece.Color = color
+	piece.Material = material or MobRigConfig.DefaultMaterial
+	piece.CanCollide = false
+	piece.CanQuery = false
+	piece.CanTouch = false
+	piece.Massless = true
+	piece.TopSurface = Enum.SurfaceType.Smooth
+	piece.BottomSurface = Enum.SurfaceType.Smooth
+	if partType ~= nil and piece:IsA("Part") then
+		piece.Shape = partType
+	end
+	return piece
+end
+
+local function weldTo(parent: BasePart, child: BasePart, offset: CFrame)
+	-- A Weld rather than a WeldConstraint, so the offset and the rotation live in the
+	-- joint. WeldConstraint freezes whatever relative CFrame the parts happen to have,
+	-- which means every ornament would need placing before it could be attached.
+	local weld = Instance.new("Weld")
+	weld.Part0 = parent
+	weld.Part1 = child
+	weld.C0 = offset
+	weld.Parent = parent
+	child.CFrame = parent.CFrame * offset
+end
 
 local function buildMob(definition: MobConfig.Mob): (Model, Humanoid, BasePart)
 	local scale = definition.Scale
+	local rig = MobRigConfig.ForKind(definition.Kind)
+	local skin = definition.Color
+
 	local model = Instance.new("Model")
 	model.Name = definition.Id
 
-	local function block(name: string, size: Vector3, offset: Vector3, color: Color3): BasePart
-		local piece = Instance.new("Part")
-		piece.Name = name
-		piece.Size = size * scale
-		piece.Color = color
-		piece.Material = Enum.Material.SmoothPlastic
-		piece.TopSurface = Enum.SurfaceType.Smooth
-		piece.BottomSurface = Enum.SurfaceType.Smooth
-		piece.CanCollide = false
-		piece.Massless = true
-		piece.Parent = model
-		piece:SetAttribute("LocalOffset", offset * scale)
-		return piece
-	end
-
-	local skin = definition.Color
-	local dark = skin:Lerp(Color3.new(0, 0, 0), 0.45)
-
-	-- The root is the only collidable part, so the model walks as one body rather than
-	-- catching its ears on the terrain.
 	local root = Instance.new("Part")
 	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(2, 2, 1) * scale
+	root.Size = rig.RootSize * scale
 	root.Transparency = 1
+	-- The only collidable part, so the body walks as one piece rather than catching an
+	-- ear on the terrain.
 	root.CanCollide = true
+	root.CanQuery = false
 	root.TopSurface = Enum.SurfaceType.Smooth
 	root.BottomSurface = Enum.SurfaceType.Smooth
 	root.Parent = model
 
-	local torso = block("Torso", Vector3.new(2, 2, 1), Vector3.new(0, 0, 0), skin)
-	block("Head", Vector3.new(1.6, 1.4, 1.4), Vector3.new(0, 1.7, 0), skin)
-	block("EarLeft", Vector3.new(0.9, 0.3, 0.3), Vector3.new(-1.1, 1.9, 0), dark)
-	block("EarRight", Vector3.new(0.9, 0.3, 0.3), Vector3.new(1.1, 1.9, 0), dark)
-	block("ArmLeft", Vector3.new(0.7, 1.6, 0.7), Vector3.new(-1.35, 0.1, 0), skin)
-	block("ArmRight", Vector3.new(0.7, 1.6, 0.7), Vector3.new(1.35, 0.1, 0), skin)
-	block("LegLeft", Vector3.new(0.7, 1.4, 0.7), Vector3.new(-0.5, -1.7, 0), dark)
-	block("LegRight", Vector3.new(0.7, 1.4, 0.7), Vector3.new(0.5, -1.7, 0), dark)
+	local bones: { [string]: BasePart? } = { HumanoidRootPart = root }
+	local restAt: { [string]: CFrame? } = { HumanoidRootPart = CFrame.identity }
+	-- The lowest point any part reaches, in root space. HipHeight comes from this rather
+	-- than a hard-coded constant, so redesigning the legs cannot leave the body sunk
+	-- into the floor or hovering above it.
+	local lowest = -rig.RootSize.Y / 2 * scale
 
-	if definition.Kind == "Boss" then
-		-- Horns, so a boss is not just a bigger goblin at a glance.
-		block("HornLeft", Vector3.new(0.3, 1.1, 0.3), Vector3.new(-0.5, 2.6, 0), dark)
-		block("HornRight", Vector3.new(0.3, 1.1, 0.3), Vector3.new(0.5, 2.6, 0), dark)
+	local function reach(at: CFrame, size: Vector3)
+		lowest = math.min(lowest, at.Position.Y - size.Y / 2)
+	end
+
+	for _, bone in rig.Bones do
+		local piece = makePart(
+			bone.Name,
+			bone.Shape,
+			bone.Size * scale,
+			MobRigConfig.Shade(skin, bone.Shade),
+			bone.Material
+		)
+		piece.Transparency = bone.Transparency or 0
+		piece.Parent = model
+		bones[bone.Name] = piece
+	end
+
+	for _, joint in rig.Joints do
+		local parent = bones[joint.Part0]
+		local child = bones[joint.Part1]
+		if parent == nil or child == nil then
+			continue
+		end
+
+		local c0 = CFrame.new(joint.C0 * scale)
+		local c1 = CFrame.new(joint.C1 * scale)
+		local rest = (restAt[joint.Part0] or CFrame.identity) * c0 * c1:Inverse()
+		restAt[joint.Part1] = rest
+		child.CFrame = rest
+
+		local motor = Instance.new("Motor6D")
+		motor.Name = joint.Name
+		motor.Part0 = parent
+		motor.Part1 = child
+		motor.C0 = c0
+		motor.C1 = c1
+		motor.Parent = parent
+	end
+
+	for _, bone in rig.Bones do
+		local at = restAt[bone.Name]
+		if at ~= nil then
+			reach(at, bone.Size * scale)
+		end
+		-- A capsule is a block with a ball on each end. A cylinder would need rotating
+		-- ninety degrees to stand up, which would take the joint's own axes with it;
+		-- capping a block keeps joint space upright and still reads as flesh rather than
+		-- as a plank. The technique is MuscleIcons'.
+		local piece = bones[bone.Name]
+		if bone.Shape == "Capsule" and piece ~= nil then
+			local size = bone.Size * scale
+			local cap = Vector3.new(size.X, size.X, size.Z)
+			for _, side in { 1, -1 } do
+				local ball = makePart(
+					`{bone.Name}Cap`,
+					"Ball",
+					cap,
+					MobRigConfig.Shade(skin, bone.Shade),
+					bone.Material
+				)
+				ball.Parent = model
+				weldTo(piece, ball, CFrame.new(0, size.Y / 2 * side, 0))
+				if at ~= nil then
+					reach(at * CFrame.new(0, size.Y / 2 * side, 0), cap)
+				end
+			end
+		end
+	end
+
+	for _, decor in rig.Decor do
+		local parent = bones[decor.Parent]
+		if parent == nil then
+			continue
+		end
+		local piece = makePart(
+			decor.Name,
+			decor.Shape,
+			decor.Size * scale,
+			MobRigConfig.Shade(skin, decor.Shade),
+			decor.Material
+		)
+		piece.Parent = model
+
+		local rotation = decor.Rotation or Vector3.zero
+		local offset = CFrame.new(decor.Offset * scale)
+			* CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+		weldTo(parent, piece, offset)
+
+		local at = restAt[decor.Parent]
+		if at ~= nil then
+			reach(at * offset, decor.Size * scale)
+		end
 	end
 
 	local humanoid = Instance.new("Humanoid")
-	-- The root is the only collidable part and the legs below it are decoration, so the
-	-- humanoid has to be told how far the drawn feet hang past the collidable body —
-	-- otherwise it holds the root's *bottom* at floor level and buries the legs. At a
-	-- boss's 2.1 scale that is nearly three studs of body inside a 0.3-stud arena disc,
-	-- which is where a humanoid's ground ray starts missing and it never stands up.
-	humanoid.HipHeight = FOOT_DROP * scale
+	humanoid.RigType = Enum.HumanoidRigType.R15
+	-- Measured, not assumed: the drop from the root's underside to the lowest thing on
+	-- the body. A hard-coded value was only ever right for one set of leg offsets, and
+	-- was three studs wrong on a boss.
+	humanoid.HipHeight = math.max(0, -(rig.RootSize.Y / 2 * scale) - lowest)
 	humanoid.MaxHealth = definition.Health
 	humanoid.Health = definition.Health
 	humanoid.WalkSpeed = definition.WalkSpeed
@@ -172,30 +297,7 @@ local function buildMob(definition: MobConfig.Mob): (Model, Humanoid, BasePart)
 	humanoid.Parent = model
 
 	model.PrimaryPart = root
-	return model, humanoid, torso
-end
-
---[[
-	Welds the body to the root so the whole model moves as one rigid thing. Cheaper and
-	far more predictable than motorised limbs, which nothing here needs: the mob walks
-	and swings, it does not animate.
-]]
-local function assemble(model: Model, root: BasePart)
-	for _, piece in model:GetChildren() do
-		if not piece:IsA("BasePart") or piece == root then
-			continue
-		end
-		local offset = piece:GetAttribute("LocalOffset")
-		if typeof(offset) ~= "Vector3" then
-			continue
-		end
-		piece.CFrame = root.CFrame * CFrame.new(offset)
-
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = root
-		weld.Part1 = piece
-		weld.Parent = root
-	end
+	return model, humanoid, bones.UpperTorso or root
 end
 
 function MobService:_spawn(definition: MobConfig.Mob, home: Vector3, radius: number, at: Vector3): Model
@@ -205,8 +307,10 @@ function MobService:_spawn(definition: MobConfig.Mob, home: Vector3, radius: num
 	CollectionService:AddTag(model, MobConfig.MOB_TAG)
 
 	local root = model.PrimaryPart :: BasePart
-	root.CFrame = CFrame.new(at)
-	assemble(model, root)
+	-- Pivot rather than place the root alone: the body hangs off the root through
+	-- joints and welds now, and moving one part of a jointed assembly leaves the rest
+	-- of it standing where it was.
+	model:PivotTo(CFrame.new(at))
 	model.Parent = mobFolder
 
 	-- Load-bearing, and invisible when missing.
