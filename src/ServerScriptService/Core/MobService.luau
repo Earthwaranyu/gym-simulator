@@ -578,6 +578,27 @@ function MobService:Start()
 
 			return bestModel, bestRoot
 		end,
+		-- Without this, GetTargetsInRadius falls back to FindNearest and every area
+		-- attack in the game hits exactly one monster while hitting every player in
+		-- the blast. Ground Slam into a pack of three killed one of them.
+		FindAllInRadius = function(
+			origin: Vector3,
+			radius: number,
+			_forPlayer: Player
+		): { { Model: Model, Root: BasePart } }
+			local found: { { Model: Model, Root: BasePart } } = {}
+
+			for model, record in live do
+				if record.Humanoid.Health <= 0 or model.Parent == nil then
+					continue
+				end
+				if (origin - record.Root.Position).Magnitude <= radius then
+					table.insert(found, { Model = model, Root = record.Root })
+				end
+			end
+
+			return found
+		end,
 		ApplyDamage = function(attacker: Player, model: Model, damage: number): (number, boolean)
 			return self:_damage(attacker, model, damage)
 		end,
