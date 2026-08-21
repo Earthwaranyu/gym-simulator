@@ -993,7 +993,12 @@ function CombatService:_applyVitals(player: Player)
 	local legs = StatService:GetStat(player, "Legs")
 	local character = player.Character
 	local training = character ~= nil and character:GetAttribute("TrainingPose") ~= nil
-	local walkSpeed = if training
+	-- AppearanceService sets Customizing while the first-join creator is open. It is
+	-- checked here rather than written as a WalkSpeed from that file, because the
+	-- reconciliation pass below reasserts this number from the Legs stat and would
+	-- undo any speed written anywhere else.
+	local customizing = character ~= nil and character:GetAttribute("Customizing") == true
+	local walkSpeed = if training or customizing
 		then 0
 		else if sprinting[player] == true then Formulas.SprintSpeed(legs) else Formulas.WalkSpeed(legs)
 	if math.abs(humanoid.WalkSpeed - walkSpeed) > 0.01 then
@@ -1033,9 +1038,15 @@ function CombatService:Start()
 	end)
 
 	Players.PlayerAdded:Connect(function(player: Player)
-		player.CharacterAdded:Connect(function()
+		player.CharacterAdded:Connect(function(character: Model)
 			cooldowns[player] = {}
 			sprinting[player] = false
+			-- Leaving the appearance creator has to give the player their speed back
+			-- now, not on the next reconciliation pass — a second of paralysis after
+			-- pressing Apply reads as a broken button.
+			character:GetAttributeChangedSignal("Customizing"):Connect(function()
+				self:_applyVitals(player)
+			end)
 			-- Wait a beat for the Humanoid to finish setting itself up.
 			task.defer(function()
 				self:_applyVitals(player)
