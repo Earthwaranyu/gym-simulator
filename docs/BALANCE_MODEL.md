@@ -124,15 +124,25 @@ bargain. The 18 upgrade costs are 100, 200, 400, 800, 1.6K, 3.2K, 6.4K, 12.8K, 2
 Both currencies double per tier. A goblin pays Fight Tokens, spent on transformations;
 a boss pays Tokens, spent on multipliers, and is the only combat source of them.
 
-| Tier | Goblin (Fight Tokens) | Boss (Tokens) |
-|---|---:|---:|
-| Garage | 1 | 10 |
-| Iron | 2 | 20 |
-| Powerhouse | 4 | 40 |
-| Strongman | 8 | 80 |
-| Titan | 16 | 160 |
-| Skydeck | 32 | 320 |
-| Storm | 64 | 640 |
+The killer's physique class multiplies the payout, but never past what the tier is
+itself worth. The class bonus doubles nine times and tier rewards only seven, so without
+that ceiling the cheapest content on the map would be the best paid: a Titan-class player
+farming 120-HP Garage goblins would fund the rest of the class chain in seconds. Capped,
+the reward for fighting above your level is real and the reward for farming below it is
+exactly what it always was.
+
+| Tier | Goblin (Fight Tokens) | Boss (Tokens) | Max class bonus |
+|---|---:|---:|---:|
+| Garage | 1 | 10 | x1 |
+| Iron | 2 | 20 | x2 |
+| Powerhouse | 4 | 40 | x4 |
+| Strongman | 8 | 80 | x8 |
+| Titan | 16 | 160 | x16 |
+| Skydeck | 32 | 320 | x32 |
+| Storm | 64 | 640 | x64 |
+
+A Storm boss killed by a class-6 Beast therefore pays 640 x 64 = 40,960 Tokens; the same
+kill by a Natural pays 640. PvP knockouts and bounties are not scaled.
 
 ## Known limits
 
