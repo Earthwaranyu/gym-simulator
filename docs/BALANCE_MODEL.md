@@ -124,14 +124,19 @@ bargain. The 18 upgrade costs are 100, 200, 400, 800, 1.6K, 3.2K, 6.4K, 12.8K, 2
 Both currencies double per tier. A goblin pays Fight Tokens, spent on transformations;
 a boss pays Tokens, spent on multipliers, and is the only combat source of them.
 
-The killer's physique class multiplies the payout, but never past what the tier is
+The killer's physique class multiplies **boss** payouts, but never past what the tier is
 itself worth. The class bonus doubles nine times and tier rewards only seven, so without
-that ceiling the cheapest content on the map would be the best paid: a Titan-class player
-farming 120-HP Garage goblins would fund the rest of the class chain in seconds. Capped,
-the reward for fighting above your level is real and the reward for farming below it is
-exactly what it always was.
+that ceiling a late class could sit on the starter boss and out-earn anyone fighting at
+their own level.
 
-| Tier | Goblin (Fight Tokens) | Boss (Tokens) | Max class bonus |
+Goblins are deliberately not scaled. They pay Fight Tokens, and Fight Tokens buy the
+physique classes themselves, so a class that multiplied them would fund its own ladder:
+a class-2 player one-shots Powerhouse goblins, and at a scaled rate six of them on a
+twelve-second respawn cover the whole 2,555 chain in about five minutes. The tier cap
+does not catch that, because a player farms the tier their class is capped at. Fight
+Token income is therefore tied to where you fight, not to what you already are.
+
+| Tier | Goblin (Fight Tokens, flat) | Boss (Tokens) | Max boss class bonus |
 |---|---:|---:|---:|
 | Garage | 1 | 10 | x1 |
 | Iron | 2 | 20 | x2 |
