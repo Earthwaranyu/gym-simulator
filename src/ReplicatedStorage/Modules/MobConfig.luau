@@ -35,6 +35,9 @@
 ]]
 
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
 
 export type MobKind = "Normal" | "Boss"
 
@@ -68,6 +71,32 @@ export type Mob = {
 	Color: Color3,
 	-- Multiplies the base goblin build. Bosses are visibly bigger from across the arena.
 	Scale: number,
+	-- The highest physique-class bonus this monster's reward will accept. See TIER_CAP.
+	RewardCap: number,
+}
+
+--[[
+	How far a physique class may multiply this tier's reward.
+
+	The class multiplier doubles nine times; monster rewards double seven times across
+	the tiers. Multiplied together without a limit, the cheapest content in the game
+	becomes the best paid: a Titan-class player farming 120-HP Garage goblins would earn
+	a few hundred Fight Tokens a kill against a 2,555 cost for the whole class chain,
+	and the prestige ladder would fund itself off the safest thing on the map.
+
+	So the bonus stops at what the tier is itself worth — the same doubling the rewards
+	use. A Garage mob pays Garage rates to everyone forever; a Storm mob will pay up to
+	sixty-four times. Killing things at your own level is what pays, which is the job the
+	tier ladder already exists to do.
+]]
+local TIER_CAP: { [string]: number } = {
+	Garage = 1,
+	Iron = 2,
+	Powerhouse = 4,
+	Strongman = 8,
+	Titan = 16,
+	Skydeck = 32,
+	Storm = 64,
 }
 
 local GOBLIN_GREEN = Color3.fromRGB(96, 138, 61)
@@ -97,6 +126,7 @@ local function goblin(
 		FightTokenReward = fightTokens,
 		Color = GOBLIN_GREEN,
 		Scale = 1,
+		RewardCap = TIER_CAP[zoneId] or 1,
 	}
 end
 
@@ -119,6 +149,7 @@ local function boss(zoneId: string, displayName: string, health: number, damage:
 		DespawnSeconds = 600,
 		Color = BOSS_RED,
 		Scale = 2.1,
+		RewardCap = TIER_CAP[zoneId] or 1,
 	}
 end
 
@@ -183,6 +214,18 @@ for _, mob in mobs do
 		error(`[MobConfig] Zone "{mob.ZoneId}" already has a {mob.Kind} mob`)
 	end
 	zone[mob.Kind] = mob
+end
+
+--[[
+	What one kill is worth right now, as a multiplier on the reward written in the row.
+
+	Both currencies go through here so they cannot drift apart, and both the server that
+	pays the reward and the map card that promises it call the same function — a card
+	that quoted a different number from the one the kill pays would be worse than a card
+	that quoted nothing.
+]]
+function MobConfig.RewardMultiplier(mob: Mob, classLevel: number): number
+	return math.min(MuscleClassConfig.Get(classLevel).TokenMultiplier, mob.RewardCap)
 end
 
 function MobConfig.Get(mobId: string): Mob?
