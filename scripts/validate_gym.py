@@ -30,6 +30,8 @@ POSE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "PoseConfig.
 MOVEMENT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MovementConfig.luau"
 MOB_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MobConfig.luau"
 FORMULAS_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "Formulas.luau"
+MOB_RIG_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "MobRigConfig.luau"
+STRIKE_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "StrikeConfig.luau"
 WEIGHT_CONFIG_PATH = ROOT / "src" / "ReplicatedStorage" / "Modules" / "WeightConfig.luau"
 CITY_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "City.model.json"
 DISTRICTS_PATH = ROOT / "src" / "Workspace" / "Gym" / "Structure" / "Districts.model.json"
@@ -1590,6 +1592,91 @@ def read_weight_gates() -> dict[str, tuple[float, float]]:
     return gates
 
 
+def validate_mob_rig(validator: Validator) -> None:
+    """The monster skeleton hangs together, and speaks the joint names poses use.
+
+    A rig is only useful if every joint chains back to the root and every ornament
+    hangs off a part that exists -- a typo in either is silent at runtime, because a
+    joint whose parent is missing is simply skipped and the limb never appears.
+    """
+    source = MOB_RIG_CONFIG_PATH.read_text(encoding="utf-8")
+
+    bones = re.findall(r'\{ Name = "(\w+)", Shape = "(\w+)", Size', source)
+    bone_names = {name for name, _ in bones}
+    joints = re.findall(
+        r'Name = "(\w+)",\s*\n?\s*Part0 = "(\w+)",\s*\n?\s*Part1 = "(\w+)"', source
+    )
+    decor = re.findall(r'Name = "(\w+)",\s*\n?\s*Parent = "(\w+)"', source)
+
+    validator.check(bool(bones), "the mob rig defines no bones")
+    validator.check(bool(joints), "the mob rig defines no joints")
+
+    # Every joint's parent must already exist, and every bone must be reachable from
+    # the root -- an unreachable bone floats at the origin.
+    reachable = {"HumanoidRootPart"}
+    for name, part0, part1 in joints:
+        validator.check(
+            part0 in reachable or part0 in bone_names,
+            f"joint {name} hangs off {part0}, which is not a part of the rig",
+        )
+        validator.check(part1 in bone_names, f"joint {name} moves {part1}, which is not a bone")
+        reachable.add(part1)
+
+    stranded = bone_names - reachable
+    validator.check(not stranded, f"bones no joint ever moves: {sorted(stranded)}")
+
+    for name, parent in decor:
+        validator.check(
+            parent in bone_names or parent == "HumanoidRootPart",
+            f"ornament {name} hangs off {parent}, which is not a part of the rig",
+        )
+
+    # The point of using the stock R15 names is that the player's gait drives a goblin
+    # untranslated. If a rename ever breaks that, the mob simply stops walking.
+    gait_source = ROOT / "src" / "ReplicatedStorage" / "Modules" / "GaitConfig.luau"
+    listed = re.search(r"GaitConfig\.Joints = \{(.*?)\n\}", gait_source.read_text(encoding="utf-8"), re.S)
+    if listed is not None:
+        wanted = set(re.findall(r'"(\w+)"', listed.group(1)))
+        have = {name for name, _, _ in joints}
+        # Ankles are deliberately absent; PosePlayback skips a joint a rig lacks.
+        missing = wanted - have - {"LeftAnkle", "RightAnkle"}
+        validator.check(
+            not missing,
+            f"the mob rig cannot be driven by the shared gait, missing {sorted(missing)}",
+        )
+
+
+def validate_mob_strikes(validator: Validator) -> None:
+    """A monster's two swings are whole clips.
+
+    StrikeConfig carries its own RunSelfTest asserting exactly this, but it reaches
+    ReplicatedStorage through game:GetService and so cannot run headless. The stage
+    portions have to total one or the clip runs short or long, which is precisely the
+    arithmetic slip hand-authored poses invite.
+    """
+    source = STRIKE_CONFIG_PATH.read_text(encoding="utf-8")
+    for strike_id in ("MobSwing", "MobUltimate"):
+        block = re.search(
+            r'Id = "' + strike_id + r'",(.*?)\n\t\},\n', source, re.S
+        )
+        if block is None:
+            validator.fail(f"{strike_id} is missing from StrikeConfig")
+            continue
+        portions = [float(p) for p in re.findall(r"transition\(([\d.]+),", block.group(1))]
+        validator.check(bool(portions), f"{strike_id} has no stages")
+        total = sum(portions)
+        validator.check(
+            abs(total - 1) < 1e-6,
+            f"{strike_id} stage portions total {total:g}, not 1 -- the clip runs "
+            f"{'short' if total < 1 else 'long'}",
+        )
+        contacts = [float(c) for c in re.findall(r"Contacts = \{ ([\d.]+)", block.group(1))]
+        for contact in contacts:
+            validator.check(
+                0 < contact < 1, f"{strike_id} lands its contact at {contact:g}, outside the clip"
+            )
+
+
 def validate_mob_roster(validator: Validator) -> None:
     """Every monster, normal and boss, against the rules the curve is built from.
 
@@ -1600,6 +1687,7 @@ def validate_mob_roster(validator: Validator) -> None:
     """
     rows, tier_cap, tier_attack = read_mob_rows()
     gates = read_weight_gates()
+    source_for_factories = MOB_CONFIG_PATH.read_text(encoding="utf-8")
 
     tiers = [zone for zone in gates if zone in tier_cap]
     validator.check(
@@ -1671,6 +1759,22 @@ def validate_mob_roster(validator: Validator) -> None:
         validator.check(
             boss["damage"] == goblin["damage"] * 3,
             f"{zone} boss hits for {boss['damage']:g}, not triple its goblin's {goblin['damage']:g}",
+        )
+
+    # The boss heavy. The wind-up has to be shorter than the cooldown or a boss would
+    # start the next one before finishing the last, and its reach has to beat its normal
+    # swing or standing still would be the safest place to be.
+    boss_body = re.search(r"local function boss\(.*?\n\treturn \{(.*?)\n\t\}", source_for_factories, re.S)
+    if boss_body is None:
+        validator.fail("could not read the boss factory")
+    else:
+        ult = {k: _luau_number(v) for k, v in re.findall(r"(Ultimate\w+) = ([\d_.e+]+),", boss_body.group(1))}
+        for field in ("UltimateCooldown", "UltimateWindup", "UltimateRadius", "UltimateMultiplier"):
+            validator.check(ult.get(field, 0) > 0, f"a boss has no {field}")
+        validator.check(
+            ult.get("UltimateWindup", 0) < ult.get("UltimateCooldown", 0),
+            f"the boss wind-up {ult.get('UltimateWindup')} must fit inside its cooldown "
+            f"{ult.get('UltimateCooldown')}",
         )
 
     # Shared behaviour, read off the two factories rather than the rows.
@@ -2447,6 +2551,8 @@ def run() -> int:
         validate_station_zone_volumes(validator, builder, first_structure, station_by_id)
         validate_hostile_scatter(validator, builder)
         validate_mob_roster(validator)
+        validate_mob_rig(validator)
+        validate_mob_strikes(validator)
         validate_roof_access(validator, first_structure)
         instance_count, base_part_count = validate_instance_budgets(
             validator,
