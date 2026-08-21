@@ -1013,18 +1013,41 @@ local effects: { Effect } = {
 				Color = IMPACT_HOT,
 				Easing = "Snap" :: "Snap",
 			},
+			{
+				-- A jab is the most frequent hit in the game and it used to touch the
+				-- camera not at all, which made the most common thing a player does the
+				-- one that felt like nothing. Small enough that three a second does not
+				-- turn into seasickness — a seventh of what a solid hit does.
+				Kind = "Shake" :: "Shake",
+				Delay = 0,
+				Seconds = 0.09,
+				Amplitude = 0.12,
+				Roughness = 30,
+				FalloffRadius = 32,
+			},
 		},
 	},
 
 	--[[
-		A cross landing. The first hit that touches the camera at all — a small, short
-		shake, and a ring so there is something with an edge to it.
+		A cross landing. A shake with some body to it, a ring so there is an edge to
+		read, and the first hitch of the camera — the escalation into the finisher's
+		full stop starts here rather than arriving from nothing.
 	]]
 	{
 		Id = "ImpactSolid",
 		Radius = 3,
 		CullDistance = 160,
 		Elements = {
+			{
+				-- Half the length of the crushing hold and gentler with it. A camera
+				-- hold rather than an animation freeze, for the reason in this file's
+				-- header: the strike runs off os.clock() and slowing it would drift
+				-- away from the server's damage timing.
+				Kind = "HitStop" :: "HitStop",
+				Delay = 0,
+				Seconds = 0.035,
+				TimeScale = 0.35,
+			},
 			{
 				Kind = "Shake" :: "Shake",
 				Delay = 0,
