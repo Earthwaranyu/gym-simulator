@@ -35,6 +35,7 @@ local SUITES = {
 		Module = require("../src/ReplicatedStorage/Modules/TokenMultiplierConfig"),
 	},
 	{ Name = "QuestCycleConfig", Module = require("../src/ReplicatedStorage/Modules/QuestCycleConfig") },
+	{ Name = "ShopConfig", Module = require("../src/ReplicatedStorage/Modules/ShopConfig") },
 	{ Name = "Migrations", Module = require("../src/ServerScriptService/Core/_Migrations") },
 }
 

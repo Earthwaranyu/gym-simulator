@@ -1,76 +1,59 @@
 --!strict
 --[[
-	ShopConfig — everything buyable with cash.
+	ShopConfig — the two supplements, described in one place.
 
-	Cash items are consumables and unlocks, never permanent power: permanent multipliers
-	cost Tokens, which are earned by time rather than by grinding reps. Keeping those
-	economies separate is what stops a long AFK session from buying its way to the top.
+	These used to be bought with cash alongside three other items. Cash is gone; they are
+	buyable with Tokens, and with Robux through PurchaseService/Products/. The product
+	file owns the Robux transaction, this owns the effect and the token price, and both
+	read the same multiplier and duration so they cannot disagree about what a Protein
+	Shake is.
 
-	Effect is declared as data, not as a function, so this table stays a pure
-	description and ShopService owns all the granting. Adding an item is one entry;
-	adding a new *kind* of effect is one branch in ShopService's applier.
+	**Prices are stored in minutes, not tokens.** Token income doubles with every physique
+	class — TokenService multiplies the tick by MuscleClassConfig's TokenMultiplier — so a
+	flat price decays to nothing: a hundred tokens is twenty-five minutes of work to a
+	Natural and about three seconds to a Mythic. Storing what an item costs you in *time*
+	and deriving the number keeps a Protein Shake the same purchase for the whole game.
+
+	This file deliberately requires nothing. That is what lets it run under the bare luau
+	CLI in scripts/selftest.luau, and it is why PriceFor takes the class multiplier rather
+	than the class level — the caller looks the multiplier up, and this stays pure.
 ]]
 
-local Types = require(script.Parent.Types)
-
-export type ShopEffect =
-	-- Multiply every stat for a while.
-	{ Kind: "GlobalBoost", Multiplier: number, Duration: number }
-	-- Multiply one stat for a while.
-	| { Kind: "StatBoost", StatId: Types.StatId, Multiplier: number, Duration: number }
-	-- Permanently unlock a machine regardless of power requirement.
-	| { Kind: "UnlockEquipment", EquipmentId: Types.EquipmentId }
+export type ShopEffect = { Kind: "GlobalBoost", Multiplier: number, Duration: number }
 
 export type ShopItem = {
 	Id: string,
 	DisplayName: string,
 	Description: string,
-	Price: number,
-	-- True for one-shot permanent purchases, which are refused if already owned.
-	OneTime: boolean,
+	-- What this costs, in minutes of token income. See the header.
+	PriceMinutes: number,
 	Effect: ShopEffect,
 }
 
 local items: { ShopItem } = {
 	{
-		Id = "ProteinShake",
-		DisplayName = "Protein Shake",
-		Description = "2x all stats for 10 minutes.",
-		Price = 2500,
-		OneTime = false,
-		Effect = { Kind = "GlobalBoost", Multiplier = 2, Duration = 600 },
-	},
-	{
 		Id = "PreWorkout",
 		DisplayName = "Pre-Workout",
 		Description = "3x all stats for 3 minutes. Burns fast.",
-		Price = 4000,
-		OneTime = false,
+		PriceMinutes = 11,
 		Effect = { Kind = "GlobalBoost", Multiplier = 3, Duration = 180 },
 	},
 	{
-		Id = "ArmDayFocus",
-		DisplayName = "Arm Day Focus",
-		Description = "4x Arms for 15 minutes.",
-		Price = 3000,
-		OneTime = false,
-		Effect = { Kind = "StatBoost", StatId = "Arms", Multiplier = 4, Duration = 900 },
+		Id = "ProteinShake",
+		DisplayName = "Protein Shake",
+		Description = "2x all stats for 10 minutes.",
+		PriceMinutes = 15,
+		Effect = { Kind = "GlobalBoost", Multiplier = 2, Duration = 600 },
 	},
 	{
-		Id = "UnlockPullUpBar",
-		DisplayName = "Pull-Up Bar Pass",
-		Description = "Use the Pull-Up Bar without meeting the power requirement.",
-		Price = 10000,
-		OneTime = true,
-		Effect = { Kind = "UnlockEquipment", EquipmentId = "PullUpBar" },
-	},
-	{
-		Id = "UnlockTreadmill",
-		DisplayName = "Treadmill Pass",
-		Description = "Use the Treadmill without meeting the power requirement.",
-		Price = 25000,
-		OneTime = true,
-		Effect = { Kind = "UnlockEquipment", EquipmentId = "Treadmill" },
+		-- The sustain option. Weaker than either supplement and running longer than both
+		-- put together, so the shop is a decision — burn bright before a session, or set
+		-- something up and go train — rather than a list where one row is simply best.
+		Id = "MealPrep",
+		DisplayName = "Meal Prep",
+		Description = "1.5x all stats for 45 minutes. Slow and steady.",
+		PriceMinutes = 25,
+		Effect = { Kind = "GlobalBoost", Multiplier = 1.5, Duration = 2700 },
 	},
 }
 
@@ -88,6 +71,53 @@ end
 
 function ShopConfig.Get(itemId: string): ShopItem?
 	return byId[itemId]
+end
+
+--[[
+	What this item costs a player whose physique class multiplies their income by
+	`classMultiplier`.
+
+	Both the server that takes the tokens and the card that quotes the price call this,
+	so the shop cannot promise one number and charge another — the same rule
+	MobConfig.RewardMultiplier follows for the other direction of the same economy.
+
+	`tokensPerMinute` is passed in rather than imported for the reason in the header:
+	this file stays free of requires so it can be self-tested headlessly.
+]]
+function ShopConfig.PriceFor(item: ShopItem, classMultiplier: number, tokensPerMinute: number): number
+	local minutes = if item.PriceMinutes > 0 then item.PriceMinutes else 0
+	local multiplier = if classMultiplier > 0 then classMultiplier else 1
+	local rate = if tokensPerMinute > 0 then tokensPerMinute else 1
+	return math.max(1, math.floor(minutes * rate * multiplier))
+end
+
+function ShopConfig.RunSelfTest(): { string }
+	local failures: { string } = {}
+	local function check(condition: boolean, message: string)
+		if not condition then
+			table.insert(failures, message)
+		end
+	end
+
+	local seen: { [string]: boolean } = {}
+	for _, item in items do
+		check(not seen[item.Id], `duplicate shop item id "{item.Id}"`)
+		seen[item.Id] = true
+		check(item.PriceMinutes > 0, `{item.Id} costs nothing`)
+		check(item.Effect.Multiplier > 1, `{item.Id} boosts nothing`)
+		check(item.Effect.Duration > 0, `{item.Id} lasts no time`)
+	end
+
+	local sample = items[1]
+	local natural = ShopConfig.PriceFor(sample, 1, 4)
+	check(natural == sample.PriceMinutes * 4, "a price is its minutes times the rate")
+	-- The whole point: income doubles with a class, so the price has to as well, or the
+	-- shop stops meaning anything by the middle of the game.
+	check(ShopConfig.PriceFor(sample, 2, 4) == natural * 2, "a price doubles when the class multiplier does")
+	check(ShopConfig.PriceFor(sample, 512, 4) == natural * 512, "a price scales to the last class")
+	check(ShopConfig.PriceFor(sample, 0, 4) == natural, "a nonsense multiplier is treated as Natural")
+
+	return failures
 end
 
 return ShopConfig

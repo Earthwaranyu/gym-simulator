@@ -121,6 +121,17 @@ function Formulas.TokensPerTick(): number
 	return 1
 end
 
+--[[
+	The same income expressed per minute, which is the unit prices are quoted in.
+
+	Derived rather than written down a second time: a shop price and the tick it is
+	measured against drifting apart is exactly the sort of thing nobody notices until an
+	item costs a suspiciously round number of hours.
+]]
+function Formulas.TokensPerMinute(): number
+	return Formulas.TokensPerTick() * (60 / Formulas.TOKEN_TICK_SECONDS)
+end
+
 -- === Muscle deformation =====================================================
 
 -- Nothing may exceed this many times its original size, or limbs detach from their
@@ -1150,6 +1161,7 @@ function Formulas.RunSelfTest(): { string }
 	check("impact tiers survive bad input", Formulas.ImpactTier(0 / 0) == "Light")
 
 	check("total power sums", Formulas.TotalPower({ a = 2, b = 3 }) == 5)
+	check("a minute of play is four tokens", Formulas.TokensPerMinute() == 4)
 
 	-- Monster damage: Core never applies, and Back can never zero the hit.
 	local outmatched = Formulas.ResolveEnvironmentDamage(100, 1e9, 10)
