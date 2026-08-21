@@ -24,14 +24,16 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 
 local AppearanceConfig = require(ReplicatedStorage.Modules.AppearanceConfig)
 local FaceConfig = require(ReplicatedStorage.Modules.FaceConfig)
 local HairConfig = require(ReplicatedStorage.Modules.HairConfig)
 local Loader = require(ReplicatedStorage.Modules.Loader)
+local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local Net = require(ReplicatedStorage.Modules.Net)
+local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
 local UI = require(ReplicatedStorage.Modules.UI)
 
 local CustomizerController = {
@@ -44,27 +46,31 @@ local PANEL_SIZE = Vector2.new(380, 470)
 local ROW_HEIGHT = 46
 local SWATCH_SIZE = 30
 
--- Where the camera stands relative to the character while the panel is open: back,
--- up a little, and looking at the chest rather than the feet.
-local CAMERA_BACK = 11
-local CAMERA_UP = 2.6
-local CAMERA_FOCUS_UP = 1.6
+-- How far the panel slides in from, and how long each row waits behind the one above
+-- it. The stagger is the whole entrance: six rows arriving together is a pop-up, six
+-- rows arriving in sequence is a deal being laid out.
+local SLIDE_FROM = 90
+local ROW_STAGGER = 0.045
 
 local player = Players.LocalPlayer
 
 local AppearanceController: any = nil
+local CustomizerStageController: any = nil
 local EffectsController: any = nil
 local ProfileController: any = nil
 local ToastController: any = nil
 
 local screen: ScreenGui
+local panelFrame: Frame
 local rows: Frame
 local applyButton: TextButton
 local closeButton: TextButton
 local titleLabel: TextLabel
+local rankLabel: TextLabel
+local nameLabel: TextLabel
+local powerLabel: TextLabel
 
 local isOpen = false
-local cameraConnection: RBXScriptConnection? = nil
 local choice = {
 	SkinId = "Tan",
 	PantId = "Charcoal",
@@ -313,6 +319,7 @@ function CustomizerController:_build()
 	-- No scrim. The whole point of this page is looking at the character behind it,
 	-- so the world stays bright and the panel stays out of the middle of the screen.
 	local panel = UI.Panel("Customizer", screen)
+	panelFrame = panel
 	panel.AnchorPoint = Vector2.new(0, 0.5)
 	panel.Position = UDim2.new(0, 34, 0.5, 0)
 	panel.Size = UDim2.fromOffset(PANEL_SIZE.X, PANEL_SIZE.Y)
@@ -322,6 +329,46 @@ function CustomizerController:_build()
 	local aspect = Instance.new("UIAspectRatioConstraint")
 	aspect.AspectRatio = PANEL_SIZE.X / PANEL_SIZE.Y
 	aspect.Parent = panel
+
+	--[[
+		The name block, centred over the figure like a fighter select.
+
+		It is deliberately not inside the panel: the panel is controls, and this is the
+		player. Putting a rank the size of a headline over the body is the cheapest way
+		to make a menu feel like it is about someone.
+	]]
+	local header = Instance.new("Frame")
+	header.Name = "Header"
+	header.AnchorPoint = Vector2.new(0.5, 0)
+	header.Position = UDim2.fromScale(0.5, 0.06)
+	header.Size = UDim2.fromOffset(520, 116)
+	header.BackgroundTransparency = 1
+	header.Parent = screen
+
+	rankLabel = UI.Label("Rank", header)
+	rankLabel.Size = UDim2.new(1, 0, 0, 28)
+	rankLabel.Font = UI.Font.Heading
+	rankLabel.TextSize = 22
+	rankLabel.TextXAlignment = Enum.TextXAlignment.Center
+	rankLabel.Text = ""
+
+	nameLabel = UI.Label("Name", header)
+	nameLabel.Position = UDim2.fromOffset(0, 26)
+	nameLabel.Size = UDim2.new(1, 0, 0, 54)
+	nameLabel.Font = UI.Font.Heading
+	nameLabel.TextSize = 44
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+	nameLabel.TextColor3 = UI.Dark.Text
+	nameLabel.Text = player.DisplayName
+
+	powerLabel = UI.Label("Power", header)
+	powerLabel.Position = UDim2.fromOffset(0, 82)
+	powerLabel.Size = UDim2.new(1, 0, 0, 22)
+	powerLabel.Font = UI.Font.Heading
+	powerLabel.TextSize = 14
+	powerLabel.TextXAlignment = Enum.TextXAlignment.Center
+	powerLabel.TextColor3 = UI.Dark.TextMuted
+	powerLabel.Text = ""
 
 	titleLabel = UI.Label("Title", panel)
 	titleLabel.Size = UDim2.new(1, -44, 0, 34)
@@ -362,11 +409,42 @@ function CustomizerController:_build()
 	rows.Parent = panel
 	UI.VerticalList(rows, 8)
 
+	local randomButton = Instance.new("TextButton")
+	randomButton.Name = "Randomize"
+	randomButton.AnchorPoint = Vector2.new(0, 1)
+	randomButton.Position = UDim2.fromScale(0, 1)
+	randomButton.Size = UDim2.fromOffset(104, 46)
+	randomButton.BackgroundColor3 = UI.Palette.SurfaceRaised
+	randomButton.BackgroundTransparency = 0.1
+	randomButton.BorderSizePixel = 0
+	randomButton.AutoButtonColor = false
+	randomButton.Font = UI.Font.Heading
+	randomButton.TextSize = 14
+	randomButton.TextColor3 = UI.Palette.Text
+	randomButton.Text = "RANDOM"
+	UI.Role(randomButton, { Ink = "Text", Fill = "SurfaceRaised" })
+	randomButton.Parent = panel
+
+	local randomCorner = Instance.new("UICorner")
+	randomCorner.CornerRadius = UDim.new(0, 9)
+	randomCorner.Parent = randomButton
+
+	UI.Pressable(randomButton, {
+		PressScale = 0.95,
+		OnPress = function()
+			EffectsController:Play("UiClick")
+		end,
+	})
+
+	randomButton.Activated:Connect(function()
+		self:_randomize()
+	end)
+
 	applyButton = Instance.new("TextButton")
 	applyButton.Name = "Apply"
-	applyButton.AnchorPoint = Vector2.new(0.5, 1)
-	applyButton.Position = UDim2.fromScale(0.5, 1)
-	applyButton.Size = UDim2.new(1, 0, 0, 46)
+	applyButton.AnchorPoint = Vector2.new(1, 1)
+	applyButton.Position = UDim2.fromScale(1, 1)
+	applyButton.Size = UDim2.new(1, -112, 0, 46)
 	applyButton.BackgroundColor3 = UI.Palette.Success
 	applyButton.BorderSizePixel = 0
 	applyButton.AutoButtonColor = false
@@ -395,9 +473,75 @@ function CustomizerController:_build()
 	-- The panel floats over the world rather than inside a menu page, so it takes the
 	-- dark chrome the HUD uses instead of the cream menu paper.
 	UI.ApplyTheme(screen, UI.Dark)
+	-- The rank colour is set per player and must survive the theme pass.
+	self:_refreshHeader()
+end
+
+--[[
+	Fills the name block from the profile. Rank supplies both the word and the colour,
+	so a Titan's screen is lit and titled in the same orange as their nameplate.
+]]
+function CustomizerController:_refreshHeader()
+	local data = ProfileController:Get()
+	local selected = if data ~= nil then RankConfig.GetById(data.SelectedTitleId) else nil
+	-- A title that no longer exists in the config falls back to the first rank rather
+	-- than leaving the headline blank.
+	local rank = selected or RankConfig.List[1]
+
+	rankLabel.Text = string.upper(rank.DisplayName)
+	rankLabel.TextColor3 = rank.Color
+	nameLabel.Text = player.DisplayName
+
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+	powerLabel.Text = `{NumberFormat.Format(power)} POWER`
+end
+
+--[[
+	Slides the panel in and deals the rows out one after another.
+
+	The rows are tweened from their own laid-out position rather than animated by the
+	layout, because a UIListLayout owns Position: anything this function wrote there
+	would be overwritten the moment the layout next ran. Offsetting a UIScale and a
+	transparency leaves the layout alone.
+]]
+function CustomizerController:_playEntrance()
+	panelFrame.Position = UDim2.new(0, 34 - SLIDE_FROM, 0.5, 0)
+	panelFrame.BackgroundTransparency = 1
+
+	local slide = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	TweenService:Create(panelFrame, slide, {
+		Position = UDim2.new(0, 34, 0.5, 0),
+		BackgroundTransparency = 0.06,
+	}):Play()
+
+	local index = 0
+	for _, child in rows:GetChildren() do
+		if not child:IsA("GuiObject") then
+			continue
+		end
+		index += 1
+
+		local scale = child:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+		scale.Scale = 0.86
+		scale.Parent = child
+
+		local wasTransparent = child.BackgroundTransparency
+		child.BackgroundTransparency = 1
+
+		task.delay(index * ROW_STAGGER, function()
+			if child.Parent == nil then
+				return
+			end
+			local step = TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			TweenService:Create(scale, step, { Scale = 1 }):Play()
+			TweenService:Create(child, TweenInfo.new(0.28), { BackgroundTransparency = wasTransparent })
+				:Play()
+		end)
+	end
 end
 
 function CustomizerController:_apply()
+	local saving = applyButton.Text
 	applyButton.Text = "SAVING…"
 
 	local ok, message = Net.Function("SetAppearance"):InvokeServer({
@@ -407,50 +551,36 @@ function CustomizerController:_apply()
 		FaceId = choice.FaceId,
 	})
 
-	applyButton.Text = "APPLY"
-	ToastController:Show(message, if ok then UI.Palette.Vital else UI.Palette.Danger)
-
-	if ok then
-		self:Close()
+	applyButton.Text = saving
+	if not ok then
+		ToastController:Show(message, UI.Palette.Danger)
+		return
 	end
+
+	EffectsController:Play("RankUp")
+	-- The stage comes down behind black. Dropping the lights and the letterbox in
+	-- plain sight is the one moment that would give away that this was a menu.
+	CustomizerStageController:Curtain(function()
+		self:Close()
+	end)
+	ToastController:Show(message, UI.Palette.Vital)
 end
 
 --[[
-	Points the camera at the player's own body.
+	Rolls a whole look at once.
 
-	Bound to a render step rather than set once: the character keeps breathing, the
-	gait system keeps moving it, and the muscle system rescales it. A single CFrame
-	written at open time drifts off the body within a few seconds.
+	It rolls every field rather than one at a time because the button is for players
+	who do not want to make four decisions, and handing them a random hairstyle on
+	their own careful colours is neither their look nor a random one.
 ]]
-local function holdCamera()
-	local camera = Workspace.CurrentCamera
-	if camera == nil then
-		return
-	end
-	camera.CameraType = Enum.CameraType.Scriptable
+function CustomizerController:_randomize()
+	choice.SkinId = AppearanceConfig.SkinTones[math.random(#AppearanceConfig.SkinTones)].Id
+	choice.PantId = AppearanceConfig.PantColors[math.random(#AppearanceConfig.PantColors)].Id
+	choice.HairId = HairConfig.Styles[math.random(#HairConfig.Styles)].Id
+	choice.FaceId = FaceConfig.Faces[math.random(#FaceConfig.Faces)].Id
 
-	cameraConnection = RunService.RenderStepped:Connect(function()
-		local character = currentCharacter()
-		local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
-		if root == nil or not root:IsA("BasePart") then
-			return
-		end
-
-		local focus = root.Position + Vector3.new(0, CAMERA_FOCUS_UP, 0)
-		local from = root.CFrame * CFrame.new(0, CAMERA_UP, -CAMERA_BACK)
-		camera.CFrame = CFrame.lookAt(from.Position, focus)
-	end)
-end
-
-local function releaseCamera()
-	if cameraConnection ~= nil then
-		cameraConnection:Disconnect()
-		cameraConnection = nil
-	end
-	local camera = Workspace.CurrentCamera
-	if camera ~= nil then
-		camera.CameraType = Enum.CameraType.Custom
-	end
+	self:_rebuild()
+	preview()
 end
 
 function CustomizerController:IsOpen(): boolean
@@ -485,7 +615,9 @@ function CustomizerController:Open(isFirstTime: boolean)
 
 	self:_rebuild()
 	preview()
-	holdCamera()
+	self:_refreshHeader()
+	CustomizerStageController:Enter()
+	self:_playEntrance()
 end
 
 function CustomizerController:Close()
@@ -494,7 +626,7 @@ function CustomizerController:Close()
 	end
 	isOpen = false
 	screen.Enabled = false
-	releaseCamera()
+	CustomizerStageController:Exit()
 
 	-- Anything left unapplied is undone by repainting from what the server still says
 	-- this character looks like.
@@ -545,6 +677,7 @@ end
 
 function CustomizerController:Init()
 	AppearanceController = Loader.Get("AppearanceController")
+	CustomizerStageController = Loader.Get("CustomizerStageController")
 	EffectsController = Loader.Get("EffectsController")
 	ProfileController = Loader.Get("ProfileController")
 	ToastController = Loader.Get("ToastController")
