@@ -636,7 +636,12 @@ function FullMapController:_renderHostile(parent: Frame, data: any?, hostile: Ho
 		powerLabel.Text = `POWER LOCKED\nNEED {NumberFormat.Format(shortfall)} MORE`
 	else
 		powerLabel.TextColor3 = UI.Palette.Vital
-		powerLabel.Text = `OPEN TO YOU\nPAYS {NumberFormat.Format(hostile.Reward)} FIGHT TOKENS`
+		-- Two different currencies, and the row cannot tell you which without being
+		-- told: goblins pay Fight Tokens, which buy physique transformations, and
+		-- bosses pay Tokens, which buy stat multipliers. Naming the wrong one sends a
+		-- player to farm for something they cannot spend on what they are saving for.
+		local currency = if hostile.Kind == "Boss" then "TOKENS" else "FIGHT TOKENS"
+		powerLabel.Text = `OPEN TO YOU\nPAYS {NumberFormat.Format(hostile.Reward)} {currency}`
 	end
 
 	local rule = Instance.new("Frame")

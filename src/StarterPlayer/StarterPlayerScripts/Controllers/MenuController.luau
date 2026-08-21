@@ -24,11 +24,13 @@ local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
 local ReputationConfig = require(ReplicatedStorage.Modules.ReputationConfig)
 local Icons = require(ReplicatedStorage.Modules.Icons)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
-local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
+local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
+local TokenMultiplierConfig = require(ReplicatedStorage.Modules.TokenMultiplierConfig)
+local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
 
 local MenuController = {
 	Name = "MenuController",
@@ -111,6 +113,14 @@ local tabs: { Tab } = {}
 
 local wash = MapRender.Tint
 
+local function statValue(data: any?, statId: string): number
+	return if data ~= nil then (data.Stats[statId] or 0) else 0
+end
+
+local function destinationUnlocked(data: any?, destination: Destination): boolean
+	return statValue(data, destination.StatId) >= destination.RequiredStat
+end
+
 local function row(parent: Frame, height: number, order: number): Frame
 	local frame = Instance.new("Frame")
 	frame.BackgroundColor3 = UI.Palette.Backdrop
@@ -141,7 +151,7 @@ local function button(parent: Frame, text: string, color: Color3, onClick: () ->
 	btn.Size = UDim2.fromOffset(104, 28)
 	btn.Font = UI.Font.Heading
 	btn.TextSize = 14
-	btn.TextColor3 = UI.Palette.Backdrop
+	btn.TextColor3 = UI.Palette.OnAccent
 	btn.Text = text
 	btn.AutoButtonColor = true
 	btn.Parent = parent
@@ -181,6 +191,14 @@ function MenuController:Init()
 			end,
 		},
 		{
+			Id = "Muscles",
+			DisplayName = "Muscles",
+			Icon = "Train",
+			Render = function(parent)
+				self:_renderMuscleClasses(parent)
+			end,
+		},
+		{
 			Id = "Shop",
 			DisplayName = "Shop",
 			Render = function(parent)
@@ -200,6 +218,15 @@ function MenuController:Init()
 			OnBar = false,
 			Render = function(parent)
 				self:_renderQuests(parent)
+			end,
+		},
+		{
+			Id = "Titles",
+			DisplayName = "Titles",
+			Icon = "Rank",
+			OnBar = false,
+			Render = function(parent)
+				self:_renderTitles(parent)
 			end,
 		},
 		{
@@ -225,11 +252,10 @@ function MenuController:_renderMap(parent: Frame)
 	self:_fetchDestinations()
 
 	local data = ProfileController:Get()
-	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
 
 	if selectedDestination == nil then
 		for _, destination in destinations do
-			if power >= destination.RequiredPower then
+			if destinationUnlocked(data, destination) then
 				selectedDestination = destination.Id
 			end
 		end
@@ -272,7 +298,7 @@ function MenuController:_renderMap(parent: Frame)
 	local viewport = Instance.new("ScrollingFrame")
 	viewport.Name = "MapViewport"
 	viewport.Active = true
-	viewport.BackgroundColor3 = Color3.fromRGB(20, 24, 25)
+	viewport.BackgroundColor3 = UI.Palette.Backdrop
 	viewport.BorderSizePixel = 0
 	viewport.Size = UDim2.fromScale(1, 1)
 	viewport.CanvasSize = UDim2.fromScale(mapZoom, mapZoom)
@@ -317,7 +343,7 @@ function MenuController:_renderMap(parent: Frame)
 	hub.Size = UDim2.fromOffset(74, 16)
 	hub.TextXAlignment = Enum.TextXAlignment.Center
 	hub.TextSize = 11
-	hub.TextColor3 = Color3.fromRGB(0, 118, 160)
+	hub.TextColor3 = UI.Palette.Token
 	hub.Text = "SPAWN"
 	hub.ZIndex = 24
 
@@ -328,7 +354,7 @@ function MenuController:_renderMap(parent: Frame)
 			continue
 		end
 
-		local unlocked = power >= destination.RequiredPower
+		local unlocked = destinationUnlocked(data, destination)
 		if unlocked then
 			unlockedCount += 1
 		end
@@ -606,7 +632,7 @@ function MenuController:_renderMap(parent: Frame)
 	count.TextColor3 = UI.Palette.TextMuted
 	count.Text = `{unlockedCount} of {#destinations} training locations open  ·  all locations shown`
 
-	self:_renderDestination(parent, power)
+	self:_renderDestination(parent, data)
 
 	-- Point of sale for the pass that lifts the "from the plaza only" rule. The
 	-- price is left to Roblox's own prompt rather than repeated here: the product
@@ -633,7 +659,7 @@ function MenuController:_renderMap(parent: Frame)
 end
 
 -- The selected machine, its stat, tier multiplier and travel button.
-function MenuController:_renderDestination(parent: Frame, power: number)
+function MenuController:_renderDestination(parent: Frame, data: any?)
 	local destination = if selectedDestination ~= nil
 		then MapRender.GetDestination(selectedDestination)
 		else nil
@@ -671,9 +697,9 @@ function MenuController:_renderDestination(parent: Frame, power: number)
 	detail.Size = UDim2.new(1, -120, 1, 0)
 	detail.TextSize = 13
 
-	local shortfall = destination.RequiredPower - power
+	local shortfall = destination.RequiredStat - statValue(data, destination.StatId)
 	if shortfall > 0 then
-		detail.Text = `<font color="#FF5C5C">Needs {NumberFormat.Format(shortfall)} more power</font>`
+		detail.Text = `<font color="#FF5C5C">Needs {NumberFormat.Format(shortfall)} more {stat.DisplayName}</font>`
 			.. `  ·  x{NumberFormat.Format(destination.GainMultiplier)} gains`
 		local locked = UI.Label("Locked", action)
 		locked.AnchorPoint = Vector2.new(1, 0.5)
@@ -799,7 +825,6 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 	self:_fetchDestinations()
 
 	local data = ProfileController:Get()
-	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
 
 	if selectedMuscle == nil then
 		-- Default to the muscle the player is furthest behind on, which is the reason
@@ -843,7 +868,7 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 		chip.AutoButtonColor = false
 		chip.Font = UI.Font.Heading
 		chip.TextSize = 13
-		chip.TextColor3 = if selected then UI.Palette.Backdrop else definition.Color
+		chip.TextColor3 = if selected then UI.Palette.OnAccent else definition.Color
 		chip.Text = string.upper(definition.DisplayName)
 		chip.Parent = chips
 		UI.Pressable(chip)
@@ -881,7 +906,7 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 			Destination = destination,
 			Equipment = equipment,
 			PerSecond = perSecond,
-			Unlocked = power >= destination.RequiredPower,
+			Unlocked = destinationUnlocked(data, destination),
 		})
 	end
 
@@ -898,7 +923,7 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 			-- puts the one entry you cannot use for twenty hours where your eye lands.
 			return a.PerSecond < b.PerSecond
 		end
-		return a.Destination.RequiredPower < b.Destination.RequiredPower
+		return a.Destination.RequiredStat < b.Destination.RequiredStat
 	end)
 
 	local summary = UI.Label("Summary", parent)
@@ -970,8 +995,8 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 				self:_goTo(destination, `{spot.Equipment.DisplayName} · {zoneName}`, stat.Color)
 			end)
 		else
-			local shortfall = destination.RequiredPower - power
-			detail.Text = `<font color="#FF5C5C">needs {NumberFormat.Format(shortfall)} more power</font>`
+			local shortfall = destination.RequiredStat - statValue(data, destination.StatId)
+			detail.Text = `<font color="#FF5C5C">needs {NumberFormat.Format(shortfall)} more {stat.DisplayName}</font>`
 				.. `  ·  {NumberFormat.Format(spot.PerSecond)}/s  ·  {access}`
 
 			local locked = UI.Label("Locked", line)
@@ -1020,7 +1045,7 @@ function MenuController:_renderInfo(parent: Frame)
 	portrait.AnchorPoint = Vector2.new(0, 0.5)
 	portrait.Position = UDim2.new(0, 8, 0.5, 0)
 	portrait.Size = UDim2.fromOffset(48, 48)
-	portrait.BackgroundColor3 = UI.Palette.CartoonCream
+	portrait.BackgroundColor3 = UI.Palette.Backdrop
 	portrait.BorderSizePixel = 0
 	portrait.ScaleType = Enum.ScaleType.Crop
 	portrait.Parent = header
@@ -1030,12 +1055,12 @@ function MenuController:_renderInfo(parent: Frame)
 	portraitAspect.Parent = portrait
 
 	local portraitCorner = Instance.new("UICorner")
-	portraitCorner.CornerRadius = UDim.new(0, 10)
+	portraitCorner.CornerRadius = UDim.new(0, 6)
 	portraitCorner.Parent = portrait
 
 	local portraitStroke = Instance.new("UIStroke")
-	portraitStroke.Color = UI.Palette.CartoonInk
-	portraitStroke.Thickness = 3
+	portraitStroke.Color = rank.Color
+	portraitStroke.Thickness = 1
 	portraitStroke.Parent = portrait
 
 	task.spawn(function()
@@ -1056,7 +1081,7 @@ function MenuController:_renderInfo(parent: Frame)
 	name.Position = UDim2.fromOffset(68, 6)
 	name.Font = Enum.Font.GothamBold
 	name.TextSize = 17
-	name.TextColor3 = UI.Palette.CartoonCream
+	name.TextColor3 = UI.Palette.Text
 	name.Text = Players.LocalPlayer.DisplayName
 
 	local rankLabel = UI.Label("Rank", header)
@@ -1064,7 +1089,7 @@ function MenuController:_renderInfo(parent: Frame)
 	rankLabel.Position = UDim2.fromOffset(68, 27)
 	rankLabel.Font = UI.Font.Heading
 	rankLabel.TextSize = 12
-	rankLabel.TextColor3 = Color3.new(1, 1, 1)
+	rankLabel.TextColor3 = UI.Palette.Text
 	rankLabel.Text = `{rank.DisplayName}  ·  {reputation.DisplayName}`
 
 	local record = UI.Label("Record", header)
@@ -1072,7 +1097,7 @@ function MenuController:_renderInfo(parent: Frame)
 	record.Position = UDim2.fromOffset(68, 44)
 	record.Font = UI.Font.Heading
 	record.TextSize = 11
-	record.TextColor3 = UI.Palette.CartoonCream
+	record.TextColor3 = UI.Palette.Text
 	record.Text =
 		`{if data ~= nil then data.Kills else 0} KOs  ·  {if data ~= nil then data.Deaths else 0} downs`
 
@@ -1084,17 +1109,27 @@ function MenuController:_renderInfo(parent: Frame)
 	heroPower.TextSize = 21
 	heroPower.TextXAlignment = Enum.TextXAlignment.Right
 	heroPower.TextColor3 = UI.Palette.Power
-	heroPower.Text = `{NumberFormat.Format(power)} POWER`
+	heroPower.Text = `{NumberFormat.FormatGain(power)} POWER`
 
 	local heroTokens = UI.Label("Tokens", header)
 	heroTokens.AnchorPoint = Vector2.new(1, 0)
-	heroTokens.Position = UDim2.new(1, -12, 0, 36)
-	heroTokens.Size = UDim2.new(0.48, -10, 0, 20)
+	heroTokens.Position = UDim2.new(1, -12, 0, 32)
+	heroTokens.Size = UDim2.new(0.48, -10, 0, 15)
 	heroTokens.Font = Enum.Font.GothamBold
-	heroTokens.TextSize = 12
+	heroTokens.TextSize = 11
 	heroTokens.TextXAlignment = Enum.TextXAlignment.Right
 	heroTokens.TextColor3 = UI.Palette.Token
-	heroTokens.Text = `{NumberFormat.Format(if data ~= nil then data.Tokens else 0)} TOKENS READY`
+	heroTokens.Text = `{NumberFormat.Format(if data ~= nil then data.Tokens else 0)} TRAINING TOKENS`
+
+	local heroFightTokens = UI.Label("FightTokens", header)
+	heroFightTokens.AnchorPoint = Vector2.new(1, 0)
+	heroFightTokens.Position = UDim2.new(1, -12, 0, 47)
+	heroFightTokens.Size = UDim2.new(0.48, -10, 0, 15)
+	heroFightTokens.Font = Enum.Font.GothamBold
+	heroFightTokens.TextSize = 11
+	heroFightTokens.TextXAlignment = Enum.TextXAlignment.Right
+	heroFightTokens.TextColor3 = UI.Palette.FightToken
+	heroFightTokens.Text = `{NumberFormat.Format(if data ~= nil then data.FightTokens else 0)} FIGHT TOKENS`
 
 	-- Five equal rows mirror the five-slot training dock. They deliberately fit in the
 	-- fixed body height, so the character sheet never hides Legs below a scrollbar.
@@ -1110,17 +1145,16 @@ function MenuController:_renderInfo(parent: Frame)
 
 	local function statCard(definition: StatConfig.StatDefinition, index: number)
 		local level = if data ~= nil then (data.MultiplierLevels[definition.Id] or 0) else 0
-		local cost = Formulas.MultiplierCost(level)
-		local current = Formulas.MultiplierValue(level)
-		local next = Formulas.MultiplierValue(level + 1)
+		local currentMultiplier = TokenMultiplierConfig.Get(level)
+		local nextMultiplier = TokenMultiplierConfig.Next(level)
 		local card = UI.CartoonCard(definition.Id, definition.Color, statList)
 		card.LayoutOrder = index
 		card.Size = UDim2.new(1, 0, 0, 63)
 
 		local glyphHolder = Instance.new("Frame")
 		glyphHolder.Name = "Glyph"
-		glyphHolder.BackgroundColor3 = UI.Palette.CartoonInk
-		glyphHolder.BackgroundTransparency = 0.18
+		glyphHolder.BackgroundColor3 = UI.Palette.Backdrop
+		glyphHolder.BackgroundTransparency = 0.3
 		glyphHolder.BorderSizePixel = 0
 		glyphHolder.AnchorPoint = Vector2.new(0, 0.5)
 		glyphHolder.Position = UDim2.new(0, 8, 0.5, 0)
@@ -1128,7 +1162,7 @@ function MenuController:_renderInfo(parent: Frame)
 		glyphHolder.Parent = card
 
 		local glyphCorner = Instance.new("UICorner")
-		glyphCorner.CornerRadius = UDim.new(1, 0)
+		glyphCorner.CornerRadius = UDim.new(0, 6)
 		glyphCorner.Parent = glyphHolder
 
 		local glyphAspect = Instance.new("UIAspectRatioConstraint")
@@ -1141,88 +1175,242 @@ function MenuController:_renderInfo(parent: Frame)
 		glyphPadding.PaddingLeft = UDim.new(0, 8)
 		glyphPadding.PaddingRight = UDim.new(0, 8)
 		glyphPadding.Parent = glyphHolder
-		Icons.Draw(definition.Icon, glyphHolder, UI.Palette.CartoonCream, UI.Palette.CartoonInk)
+		Icons.Draw(definition.Icon, glyphHolder, definition.Color, UI.Palette.Backdrop)
 
 		local label = UI.Label("Name", card)
 		label.Position = UDim2.fromOffset(68, 6)
-		label.Size = UDim2.fromOffset(132, 20)
+		label.Size = UDim2.fromOffset(146, 20)
 		label.Font = Enum.Font.GothamBold
 		label.TextSize = 14
-		label.TextColor3 = UI.Palette.CartoonCream
-		label.Text = `{string.upper(definition.DisplayName)}  ·  x{NumberFormat.Format(current)}`
+		label.TextColor3 = definition.Color
+		label.Text = string.upper(definition.DisplayName)
 
 		local value = UI.Label("Value", card)
 		value.Position = UDim2.fromOffset(68, 26)
 		value.Size = UDim2.fromOffset(132, 32)
 		value.Font = UI.Font.Numeric
 		value.TextSize = 20
-		value.TextColor3 = Color3.new(1, 1, 1)
-		value.Text = NumberFormat.Format(stats[definition.Id] or 0)
+		value.TextColor3 = UI.Palette.Text
+		value.Text = NumberFormat.FormatGain(stats[definition.Id] or 0)
 
 		local effect = UI.Label("Effect", card)
 		effect.AnchorPoint = Vector2.new(0, 0.5)
 		effect.Position = UDim2.new(0, 210, 0.5, 0)
-		effect.Size = UDim2.new(1, -416, 0, 30)
+		effect.Size = UDim2.new(1, -360, 0, 30)
 		effect.Font = UI.Font.Heading
 		effect.TextSize = 13
-		effect.TextColor3 = Color3.new(1, 1, 1)
+		effect.TextColor3 = UI.Palette.Text
 		effect.TextTruncate = Enum.TextTruncate.AtEnd
 		effect.Text = definition.Effect(stats)
+
+		local multiplier = UI.Label("Multiplier", card)
+		multiplier.AnchorPoint = Vector2.new(1, 0.5)
+		multiplier.Position = UDim2.new(1, -60, 0.5, 0)
+		multiplier.Size = UDim2.fromOffset(82, 30)
+		multiplier.Font = UI.Font.Numeric
+		multiplier.TextSize = 18
+		multiplier.TextXAlignment = Enum.TextXAlignment.Right
+		multiplier.TextColor3 = UI.Palette.Token
+		multiplier.Text = `×{NumberFormat.FormatGain(currentMultiplier.Multiplier)}`
 
 		local upgrade = Instance.new("TextButton")
 		upgrade.Name = "Upgrade"
 		upgrade.AnchorPoint = Vector2.new(1, 0.5)
-		upgrade.Position = UDim2.new(1, -9, 0.5, 0)
-		upgrade.Size = UDim2.fromOffset(188, 42)
-		upgrade.BackgroundColor3 = UI.Palette.Token
+		upgrade.Position = UDim2.new(1, -10, 0.5, 0)
+		upgrade.Size = UDim2.fromOffset(38, 38)
+		upgrade.BackgroundColor3 = if nextMultiplier ~= nil
+			then UI.Palette.FightToken
+			else UI.Palette.Backdrop
 		upgrade.BorderSizePixel = 0
 		upgrade.AutoButtonColor = false
 		upgrade.Font = Enum.Font.GothamBold
-		upgrade.TextSize = 13
-		upgrade.TextColor3 = UI.Palette.CartoonInk
-		upgrade.Text = `UPGRADE TO x{NumberFormat.Format(next)}  ·  {NumberFormat.Format(cost)} TOKENS`
+		upgrade.TextSize = 24
+		upgrade.TextColor3 = UI.Palette.OnAccent
+		upgrade.Text = if nextMultiplier ~= nil then "+" else "✓"
+		upgrade.Active = nextMultiplier ~= nil
 		upgrade.Parent = card
 
 		local upgradeCorner = Instance.new("UICorner")
-		upgradeCorner.CornerRadius = UDim.new(0, 10)
+		upgradeCorner.CornerRadius = UDim.new(1, 0)
 		upgradeCorner.Parent = upgrade
 
 		local upgradeStroke = Instance.new("UIStroke")
-		upgradeStroke.Color = UI.Palette.CartoonInk
-		upgradeStroke.Thickness = 3
+		upgradeStroke.Color = if nextMultiplier ~= nil then UI.Palette.Accent else UI.Palette.GlassStroke
+		upgradeStroke.Thickness = 1
 		upgradeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		upgradeStroke.Parent = upgrade
 
-		local upgradeGradient = Instance.new("UIGradient")
-		upgradeGradient.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(165, 245, 255)),
-			ColorSequenceKeypoint.new(1, UI.Palette.Token),
-		})
-		upgradeGradient.Rotation = 90
-		upgradeGradient.Parent = upgrade
-
-		UI.Pressable(upgrade, { PressScale = 0.94, HoverScale = 1.03 })
-		upgrade.Activated:Connect(function()
-			UI.Confirm(screen, {
-				Title = `Upgrade {definition.DisplayName} Multiplier`,
-				Body = `Raise your {definition.DisplayName} multiplier from ` .. `x{NumberFormat.Format(
-					current
-				)} to x{NumberFormat.Format(next)} ` .. `for {NumberFormat.Format(cost)} tokens?`,
-				ConfirmText = "Confirm",
-				CancelText = "Cancel",
-				OnConfirm = function()
-					local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)
-					toast(message)
-					if ok then
-						self:_refresh()
-					end
-				end,
-			})
-		end)
+		if nextMultiplier ~= nil then
+			UI.Pressable(upgrade, { PressScale = 0.94, HoverScale = 1.03 })
+			upgrade.Activated:Connect(function()
+				UI.Confirm(screen, {
+					Title = `Upgrade {definition.DisplayName} Multiplier`,
+					Body = `Spend {NumberFormat.Format(nextMultiplier.CostToUnlock)} tokens to raise {definition.DisplayName} gains from ×{NumberFormat.FormatGain(
+						currentMultiplier.Multiplier
+					)} to ×{NumberFormat.FormatGain(nextMultiplier.Multiplier)}?`,
+					ConfirmText = `UPGRADE TO ×{NumberFormat.FormatGain(nextMultiplier.Multiplier)}`,
+					CancelText = "Cancel",
+					OnConfirm = function()
+						local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)
+						toast(message)
+						if ok then
+							self:_refresh()
+						end
+					end,
+				})
+			end)
+		end
 	end
 
 	for index, definition in StatConfig.List do
 		statCard(definition, index)
+	end
+end
+
+function MenuController:_renderMuscleClasses(parent: Frame)
+	local data = ProfileController:Get()
+	local currentLevel =
+		math.clamp(if data ~= nil then data.MuscleClassLevel else 0, 0, MuscleClassConfig.MAX_LEVEL)
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+	local fightTokens = if data ~= nil then data.FightTokens else 0
+	local nextClass = MuscleClassConfig.Next(currentLevel)
+
+	local intro = UI.Label("Intro", parent)
+	intro.Size = UDim2.new(1, 0, 0, 58)
+	intro.LayoutOrder = 1
+	intro.TextWrapped = true
+	intro.TextSize = 13
+	intro.TextColor3 = UI.Palette.TextMuted
+	intro.Text =
+		`PHYSIQUE TRANSFORMATION · YOU HAVE {NumberFormat.Format(fightTokens)} FIGHT TOKENS · Every stat, token and multiplier stays. Your body takes the new class colour and returns lean, ready to visibly build each muscle again.`
+
+	for _, class in MuscleClassConfig.List do
+		local current = class.Level == currentLevel
+		local previouslyUnlocked = class.Level < currentLevel
+		local isNext = nextClass ~= nil and class.Level == nextClass.Level
+		local powerReady = power >= class.RequiredPower
+		local tokensReady = fightTokens >= class.FightTokenCost
+		local eligible = isNext and powerReady and tokensReady
+		local accent = MuscleClassConfig.Color(class.Level)
+		-- The class colours are the physique tints the avatar itself is painted with,
+		-- so they are chosen to read on a body rather than as type on paper, and the
+		-- early ones are pale enough to vanish on the cream card. Darkened here, at
+		-- the one place they are used as text, rather than in the config — moving them
+		-- there would repaint every dummy in the game.
+		local accentInk = accent:Lerp(UI.Palette.Text, 0.45)
+		local card = UI.CartoonCard(`Class{class.Level}`, accent, parent)
+		card.LayoutOrder = 10 + class.Level
+		-- Taller than the quest cards beside it because it carries one line more: the
+		-- token rate the class earns, under the power and the price it costs.
+		card.Size = UDim2.new(1, 0, 0, 118)
+		card.BackgroundTransparency = 0.04
+
+		local preview = Instance.new("Frame")
+		preview.Name = "Preview"
+		preview.Position = UDim2.fromOffset(8, 8)
+		preview.Size = UDim2.fromOffset(88, 88)
+		preview.BackgroundColor3 = UI.Palette.Backdrop
+		preview.BackgroundTransparency = 0.2
+		preview.BorderSizePixel = 0
+		preview.Parent = card
+		local previewCorner = Instance.new("UICorner")
+		previewCorner.CornerRadius = UDim.new(0, 9)
+		previewCorner.Parent = preview
+		local figure = MuscleIcons.Build(preview, "Overall", accent)
+		if figure ~= nil then
+			figure.SetFlex(class.Level / MuscleClassConfig.MAX_LEVEL)
+		end
+
+		local title = UI.Label("ClassName", card)
+		title.Position = UDim2.fromOffset(108, 12)
+		title.Size = UDim2.new(1, -300, 0, 24)
+		title.Font = UI.Font.Heading
+		title.TextSize = 16
+		title.TextColor3 = accentInk
+		title.Text = `CLASS {class.Level + 1} · {string.upper(class.DisplayName)}`
+
+		local multiplier = UI.Label("Multiplier", card)
+		multiplier.Position = UDim2.fromOffset(108, 39)
+		multiplier.Size = UDim2.new(1, -300, 0, 23)
+		multiplier.Font = UI.Font.Numeric
+		multiplier.TextSize = 19
+		multiplier.TextColor3 = UI.Palette.Text
+		multiplier.Text = if class.Level == 0
+			then "STARTING PHYSIQUE"
+			else `{NumberFormat.Format(class.RequiredPower)} POWER · {NumberFormat.Format(
+				class.FightTokenCost
+			)} FIGHT TOKENS`
+
+		-- The reason to buy one. A class doubles the playtime token tick, and none of
+		-- this screen said so — it read as a price for a colour.
+		local rate = UI.Label("Rate", card)
+		rate.Position = UDim2.fromOffset(108, 90)
+		rate.Size = UDim2.new(1, -300, 0, 18)
+		rate.Font = UI.Font.Heading
+		rate.TextSize = 11
+		rate.TextColor3 = accentInk
+		rate.Text = `×{NumberFormat.Format(class.TokenMultiplier)} TOKENS WHILE YOU PLAY`
+
+		local detail = UI.Label("Detail", card)
+		detail.Position = UDim2.fromOffset(108, 67)
+		detail.Size = UDim2.new(1, -300, 0, 20)
+		detail.TextSize = 12
+		detail.TextColor3 = UI.Palette.TextMuted
+		detail.Text = if current
+			then "CURRENT · permanent physique class"
+			elseif previouslyUnlocked then "COMPLETED · permanent"
+			elseif isNext and eligible then "READY · token multipliers will be kept"
+			elseif
+				isNext and not powerReady
+			then `NEED {NumberFormat.Format(class.RequiredPower - power)} MORE POWER`
+			elseif
+				isNext
+			then `NEED {NumberFormat.Format(class.FightTokenCost - fightTokens)} MORE FIGHT TOKENS`
+			else `LOCKED · transform into class {class.Level} first`
+
+		local action = Instance.new("TextButton")
+		action.Name = "Action"
+		action.AnchorPoint = Vector2.new(1, 0.5)
+		action.Position = UDim2.new(1, -10, 0.5, 0)
+		action.Size = UDim2.fromOffset(178, 48)
+		action.BackgroundColor3 = if eligible then UI.Palette.Token else UI.Palette.Backdrop
+		action.BackgroundTransparency = if eligible then 0 else 0.35
+		action.BorderSizePixel = 0
+		action.Font = UI.Font.Heading
+		action.TextSize = 12
+		action.TextColor3 = if eligible then UI.Palette.CartoonInk else UI.Palette.TextMuted
+		action.Text = if current
+			then "CURRENT"
+			elseif previouslyUnlocked then "COMPLETED"
+			elseif eligible then "TRANSFORM"
+			elseif isNext and not powerReady then "POWER LOCKED"
+			elseif isNext then "TOKEN LOCKED"
+			else "ORDER LOCKED"
+		action.Active = eligible
+		action.Parent = card
+		local actionCorner = Instance.new("UICorner")
+		actionCorner.CornerRadius = UDim.new(0, 9)
+		actionCorner.Parent = action
+		if action.Active then
+			UI.Pressable(action)
+			action.Activated:Connect(function()
+				UI.Confirm(screen, {
+					Title = `Transform into {class.DisplayName}?`,
+					Body = `Spend {NumberFormat.Format(class.FightTokenCost)} Fight Tokens to unlock the {class.DisplayName} physique? You will earn ×{NumberFormat.Format(
+						class.TokenMultiplier
+					)} tokens for time played from then on. Your power is safe. Your appearance becomes lean in the new class colour, then Arms, Chest, Back, Core and Legs grow again only when you train that group.`,
+					ConfirmText = "TRANSFORM",
+					CancelText = "Cancel",
+					OnConfirm = function()
+						local ok, message = Net.Function("SelectPhysiqueClass"):InvokeServer(class.Level)
+						toast(message)
+						if ok then
+							self:_refresh()
+						end
+					end,
+				})
+			end)
+		end
 	end
 end
 
@@ -1275,14 +1463,14 @@ function MenuController:_renderQuests(parent: Frame)
 		name.Size = UDim2.new(1, -238, 0, 24)
 		name.Font = UI.Font.Heading
 		name.TextSize = 16
-		name.TextColor3 = UI.Palette.CartoonCream
+		name.TextColor3 = UI.Palette.Text
 		name.Text = string.upper(tostring(quest.DisplayName))
 
 		local detail = UI.Label("Description", card)
 		detail.Position = UDim2.fromOffset(76, 31)
 		detail.Size = UDim2.new(1, -88, 0, 32)
 		detail.TextSize = 13
-		detail.TextColor3 = Color3.new(1, 1, 1)
+		detail.TextColor3 = UI.Palette.Text
 		detail.TextWrapped = true
 		detail.Text = tostring(quest.Description)
 
@@ -1294,7 +1482,9 @@ function MenuController:_renderQuests(parent: Frame)
 		reward.BackgroundTransparency = 0
 		reward.Font = UI.Font.Heading
 		reward.TextSize = 12
-		reward.TextColor3 = UI.Palette.CartoonInk
+		-- Completed fills the chip with the dark Vital green, so the label has to
+		-- flip to the light ink or it disappears into its own badge.
+		reward.TextColor3 = if complete then UI.Palette.OnAccent else UI.Palette.CartoonInk
 		reward.TextXAlignment = Enum.TextXAlignment.Center
 		reward.Text = if complete then "COMPLETED" else `+{quest.TokenReward} TOKENS`
 
@@ -1316,8 +1506,7 @@ function MenuController:_renderQuests(parent: Frame)
 end
 
 --[[
-	Shop — Robux products first, then the cash catalogue, in headed sections you
-	scroll through.
+	Shop — the Robux catalogue, in headed sections you scroll through.
 
 	The Robux rows come from the server's product registry rather than from a table
 	here, so a new file in PurchaseService/Products appears in this list with no
@@ -1346,7 +1535,7 @@ function MenuController:_renderShop(parent: Frame)
 
 	-- VIP is the game's flagship pass and should be read first. Catalogue prices are
 	-- sorted server-side, which otherwise puts the cheaper Fast Travel card before it.
-	local gamepassOrder: { [string]: number } = { Vip = 1, FastTravel = 2 }
+	local gamepassOrder: { [string]: number } = { Vip = 1, AutoLoad = 2, FastTravel = 3 }
 	table.sort(sections.Gamepass, function(left, right): boolean
 		local leftOrder = gamepassOrder[tostring(left.Id)] or 100
 		local rightOrder = gamepassOrder[tostring(right.Id)] or 100
@@ -1402,7 +1591,7 @@ function MenuController:_renderShop(parent: Frame)
 		name.Size = UDim2.new(1, -92, 0, 22)
 		name.Font = UI.Font.Heading
 		name.TextSize = 14
-		name.TextColor3 = UI.Palette.CartoonCream
+		name.TextColor3 = UI.Palette.Text
 		name.TextTruncate = Enum.TextTruncate.AtEnd
 		name.Text = string.upper(title)
 
@@ -1410,7 +1599,7 @@ function MenuController:_renderShop(parent: Frame)
 		detail.Position = UDim2.fromOffset(82, 32)
 		detail.Size = UDim2.new(1, -92, 0, 38)
 		detail.TextSize = 11
-		detail.TextColor3 = Color3.new(1, 1, 1)
+		detail.TextColor3 = UI.Palette.Text
 		detail.TextWrapped = true
 		detail.TextYAlignment = Enum.TextYAlignment.Top
 		detail.TextTruncate = Enum.TextTruncate.AtEnd
@@ -1542,33 +1731,80 @@ function MenuController:_renderShop(parent: Frame)
 		end)
 	end
 
-	section(
-		"SUPPLEMENTS",
-		"Temporary boosts bought with earned cash",
-		UI.Palette.CartoonLime,
-		#ShopConfig.List,
-		function(grid)
-			for index, item in ShopConfig.List do
-				productCard(
-					grid,
-					index,
-					item.DisplayName,
-					item.Description,
-					"Train",
-					UI.Palette.CartoonLime,
-					`BUY  ·  $ {NumberFormat.Format(item.Price)}`,
-					true,
-					function()
-						local bought, message = Net.Function("PurchaseShopItem"):InvokeServer(item.Id)
-						toast(message)
-						if bought then
-							self:_refresh()
-						end
-					end
-				)
-			end
+	-- The supplements used to have their own section here, priced in cash. They are
+	-- Robux products now, so the registry loop above already lists them and a second
+	-- section would show each one twice.
+end
+
+function MenuController:_renderTitles(parent: Frame)
+	local data = ProfileController:Get()
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+	local selectedId = if data ~= nil then data.SelectedTitleId else "Newbie"
+
+	local intro = UI.Label("Intro", parent)
+	intro.Size = UDim2.new(1, 0, 0, 38)
+	intro.LayoutOrder = 1
+	intro.TextSize = 13
+	intro.TextWrapped = true
+	intro.TextColor3 = UI.Palette.TextMuted
+	intro.Text =
+		"Power unlocks titles permanently. Select any unlocked title to display it above your player."
+
+	for index, rank in RankConfig.List do
+		local unlocked = power >= rank.MinPower
+		local selected = selectedId == rank.Id
+		local line = row(parent, 64, index + 1)
+		line.BackgroundColor3 = if selected
+			then rank.Color:Lerp(UI.Palette.Backdrop, 0.68)
+			else UI.Palette.Backdrop
+
+		local name = UI.Label("Name", line)
+		name.Position = UDim2.fromOffset(4, 6)
+		name.Size = UDim2.new(0.45, 0, 0, 24)
+		name.Font = UI.Font.Heading
+		name.TextSize = 17
+		name.TextColor3 = rank.Color
+		name.Text = string.upper(rank.DisplayName)
+
+		local requirement = UI.Label("Requirement", line)
+		requirement.Position = UDim2.fromOffset(4, 32)
+		requirement.Size = UDim2.new(0.62, 0, 0, 19)
+		requirement.TextSize = 12
+		requirement.TextColor3 = UI.Palette.TextMuted
+		requirement.Text = if unlocked
+			then `{NumberFormat.Format(rank.MinPower)} POWER · UNLOCKED`
+			else `NEED {NumberFormat.Format(rank.MinPower - power)} MORE POWER`
+
+		local choose = Instance.new("TextButton")
+		choose.AnchorPoint = Vector2.new(1, 0.5)
+		choose.Position = UDim2.new(1, -8, 0.5, 0)
+		choose.Size = UDim2.fromOffset(150, 40)
+		choose.BackgroundColor3 = if selected
+			then UI.Palette.Vital
+			elseif unlocked then rank.Color
+			else UI.Palette.Glass
+		choose.BackgroundTransparency = if unlocked then 0 else 0.5
+		choose.BorderSizePixel = 0
+		choose.Font = UI.Font.Heading
+		choose.TextSize = 12
+		choose.TextColor3 = if unlocked then UI.Palette.OnAccent else UI.Palette.TextMuted
+		choose.Text = if selected then "EQUIPPED" elseif unlocked then "SELECT TITLE" else "LOCKED"
+		choose.Active = unlocked and not selected
+		choose.Parent = line
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 8)
+		corner.Parent = choose
+		if choose.Active then
+			UI.Pressable(choose)
+			choose.Activated:Connect(function()
+				local ok, message = Net.Function("SelectTitle"):InvokeServer(rank.Id)
+				toast(message)
+				if ok then
+					self:_refresh()
+				end
+			end)
 		end
-	)
+	end
 end
 
 function MenuController:_renderLeaderboard(parent: Frame)
@@ -1690,7 +1926,7 @@ function MenuController:_refresh()
 		local selected = tabId == activeTab
 		tabButton.BackgroundColor3 = if selected then UI.Palette.Accent else UI.Palette.Backdrop
 		tabButton.BackgroundTransparency = if selected then 0 else 0.2
-		tabButton.TextColor3 = if selected then UI.Palette.Backdrop else UI.Palette.TextMuted
+		tabButton.TextColor3 = if selected then UI.Palette.OnAccent else UI.Palette.TextMuted
 		local stroke = tabButton:FindFirstChildOfClass("UIStroke")
 		if stroke ~= nil then
 			stroke.Transparency = if selected then 0.05 else 0.75
@@ -1701,7 +1937,10 @@ function MenuController:_refresh()
 	-- Info, Shop and Settings form the menu. Quests and Ranks are standalone HUD
 	-- destinations, so showing the menu strip above them falsely implies a hierarchy
 	-- they do not belong to and wastes a full row of usable space.
-	local hasMenuTabs = activeTab == "Info" or activeTab == "Shop" or activeTab == "Settings"
+	local hasMenuTabs = activeTab == "Info"
+		or activeTab == "Muscles"
+		or activeTab == "Shop"
+		or activeTab == "Settings"
 	tabStrip.Visible = hasMenuTabs
 	bodyScroll.Position = if hasMenuTabs then UDim2.fromOffset(0, 82) else UDim2.fromOffset(0, 28)
 	bodyScroll.Size = if hasMenuTabs then UDim2.new(1, 0, 1, -82) else UDim2.new(1, 0, 1, -28)
@@ -1897,11 +2136,12 @@ function MenuController:_build()
 	tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	tabLayout.Parent = tabStrip
 
-	for index, tabId in { "Info", "Shop", "Settings" } do
+	local menuTabIds = { "Info", "Muscles", "Shop", "Settings" }
+	for index, tabId in menuTabIds do
 		local tabButton = Instance.new("TextButton")
 		tabButton.Name = tabId
 		tabButton.LayoutOrder = index
-		tabButton.Size = UDim2.new(1 / 3, -6, 1, 0)
+		tabButton.Size = UDim2.new(1 / #menuTabIds, -6, 1, 0)
 		tabButton.BackgroundColor3 = UI.Palette.Backdrop
 		tabButton.BackgroundTransparency = 0.2
 		tabButton.BorderSizePixel = 0
@@ -1957,7 +2197,16 @@ function MenuController:Start()
 	end)
 
 	ProfileController.Changed:Connect(function()
-		if isOpen and (activeTab == "Info" or activeTab == "Shop" or activeTab == "Settings") then
+		if
+			isOpen
+			and (
+				activeTab == "Info"
+				or activeTab == "Muscles"
+				or activeTab == "Titles"
+				or activeTab == "Shop"
+				or activeTab == "Settings"
+			)
+		then
 			self:_refresh()
 		end
 	end)
