@@ -41,6 +41,18 @@ local AI_INTERVAL = 1 / 4
 local FIELD_WAKE_RADIUS = 400
 -- One full boss cycle, and the seeded stagger between tiers.
 local BOSS_PERIOD = 1800
+--[[
+	The share of a boss's health a player must deal to be paid for the kill.
+
+	A boss is a long fight and often a shared one. Paying only the last hit turned that
+	into a race to snipe the finish and gave nothing to a player who did half the work,
+	which is precisely backwards for the one piece of content the game wants people to
+	travel to together.
+
+	Ten percent is low enough that genuine help always counts and high enough that
+	tagging a boss once and standing back does not.
+]]
+local BOSS_CREDIT_FRACTION = 0.1
 -- How often the boss countdown is pushed to clients while nothing else changes.
 local BOSS_BROADCAST_INTERVAL = 30
 
@@ -60,6 +72,8 @@ type Live = {
 	NextAttackAt: number,
 	-- Boss only: when an unfought boss gives up and leaves.
 	DespawnAt: number?,
+	-- Boss only: total damage each player has put into it, for shared kill credit.
+	Damage: { [Player]: number }?,
 }
 
 local live: { [Model]: Live } = {}
@@ -193,6 +207,10 @@ function MobService:_spawn(definition: MobConfig.Mob, home: Vector3, radius: num
 		DespawnAt = if definition.Kind == "Boss" and definition.DespawnSeconds ~= nil
 			then os.clock() + definition.DespawnSeconds
 			else nil,
+		-- Goblins keep last-hit credit and carry no table: they die in a punch or two,
+		-- so every contributor would clear any threshold and the bookkeeping would buy
+		-- nothing.
+		Damage = if definition.Kind == "Boss" then {} else nil,
 	}
 
 	return model
@@ -423,13 +441,42 @@ function MobService:_damage(attacker: Player, model: Model, damage: number): (nu
 	record.Humanoid:TakeDamage(damage)
 	local killed = record.Humanoid.Health <= 0
 
+	local tally = record.Damage
+	if tally ~= nil then
+		tally[attacker] = (tally[attacker] or 0) + dealt
+	end
+
 	if killed then
 		local definition = record.Definition
-		MobService.MobKilled:Fire(attacker, definition)
+
+		if tally == nil then
+			MobService.MobKilled:Fire(attacker, definition)
+		else
+			-- Everyone who put in a real share is paid in full, and the reward services
+			-- scale each one by that player's own physique class. Firing per player is
+			-- what keeps every listener — rewards, quests — unchanged.
+			--
+			-- The killer always qualifies, even below the share. Without that, eleven
+			-- players each dealing nine percent could fell a boss and the game would pay
+			-- nobody: the floor exists to deny a tap-and-wait, not to invent a boss that
+			-- is worth nothing.
+			local floor = definition.Health * BOSS_CREDIT_FRACTION
+			for player, contributed in tally do
+				if player.Parent == nil then
+					continue
+				end
+				if player == attacker or contributed >= floor then
+					MobService.MobKilled:Fire(player, definition)
+					Net.Event("Notify"):FireClient(player, `You felled {definition.DisplayName}.`)
+				else
+					Net.Event("Notify")
+						:FireClient(player, `{definition.DisplayName} fell without your share of the fight.`)
+				end
+			end
+		end
 
 		if definition.Kind == "Boss" then
 			nextBossAt[definition.ZoneId] = os.clock() + BOSS_PERIOD
-			Net.Event("Notify"):FireClient(attacker, `You felled {definition.DisplayName}.`)
 		end
 
 		-- Leave the corpse for a beat so the kill reads, then clear it. The respawn
