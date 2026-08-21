@@ -31,6 +31,7 @@ local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
+local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
 
 local GYM_ZONE_TAG = "GymZone"
 
@@ -159,7 +160,11 @@ function TokenService:Start()
 		if mob.Kind ~= "Boss" then
 			return
 		end
-		local reward = mob.TokenReward or 0
+		-- Same class scaling and same tier cap the goblins use, through the same
+		-- function, so the two currencies cannot drift apart.
+		local data = DataService:GetData(killer)
+		local classLevel = if data ~= nil then data.MuscleClassLevel else 0
+		local reward = (mob.TokenReward or 0) * MobConfig.RewardMultiplier(mob, classLevel)
 		if reward > 0 then
 			self:AwardTokens(killer, reward)
 		end
