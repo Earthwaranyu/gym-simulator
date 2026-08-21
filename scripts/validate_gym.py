@@ -1526,11 +1526,20 @@ def validate_station_zone_volumes(
 
 
 # What a monster's swing is worth, as a share of the health a player at that tier
-# actually has. Garage was always tuned this way and nothing above it was -- every
-# other tier sat near 0.04%, about two thousand swings, so nothing past the starter
-# field could kill anybody. These are the shares the rows are now written from.
-GOBLIN_DAMAGE_SHARE = 0.06
-BOSS_DAMAGE_SHARE = 0.18
+# actually has. These are the shares the rows are written from.
+GOBLIN_DAMAGE_SHARE = 0.08
+BOSS_DAMAGE_SHARE = 0.25
+
+# How many punches a monster is worth, against a player entering its tier.
+#
+# This is the only unit that means anything for monster health: a punch does damage
+# equal to the attacker's Arms, and a tier's entry stat IS their Arms at that point.
+# Health used to be the tier gate over twenty, which sounds like a difficulty curve and
+# is not -- it made every goblin above the starter field die in a single punch and every
+# boss in three.
+GOBLIN_PUNCHES = 8
+BOSS_PUNCHES = 60
+PUNCH_TOLERANCE = 0.15
 # Rounded rows will not hit the share exactly; this is wide enough for that and far
 # too narrow to let a tier drift back to a different curve.
 DAMAGE_SHARE_TOLERANCE = 0.005
@@ -1742,24 +1751,34 @@ def validate_mob_roster(validator: Validator) -> None:
             f"{tier_cap.get(previous)}",
         )
 
-    # A boss is meant to read as roughly a dozen field goblins with a much heavier
-    # swing, which is what makes it a thing you come back for rather than clear on the
-    # way past.
+    # Health, counted in punches. Garage is exempt: its entry stat is zero, and no
+    # multiple of zero says anything about how long a fight lasts. It is checked against
+    # its own literals instead, because the starter tier spans Arms 0 to 10,000 and no
+    # single number is right across all of it -- it is hand-picked to be beatable at one
+    # damage a punch.
     for zone in tiers:
         goblin = next((r for r in rows if r["zone"] == zone and r["kind"] == "Normal"), None)
         boss = next((r for r in rows if r["zone"] == zone and r["kind"] == "Boss"), None)
         if goblin is None or boss is None:
             validator.fail(f"{zone} is missing a goblin or a boss")
             continue
-        ratio = boss["health"] / goblin["health"]
-        validator.check(
-            10 <= ratio <= 15,
-            f"{zone} boss has {ratio:.1f}x its goblin's health, wanted roughly 12x",
-        )
-        validator.check(
-            boss["damage"] == goblin["damage"] * 3,
-            f"{zone} boss hits for {boss['damage']:g}, not triple its goblin's {goblin['damage']:g}",
-        )
+
+        entry_stat = gates[zone][0]
+        if entry_stat <= 0:
+            validator.check(
+                goblin["health"] <= 30,
+                f"the starter goblin has {goblin['health']:g} health, too much to beat at "
+                f"one damage a punch",
+            )
+            continue
+
+        for row, wanted in ((goblin, GOBLIN_PUNCHES), (boss, BOSS_PUNCHES)):
+            punches = row["health"] / entry_stat
+            validator.check(
+                abs(punches - wanted) <= wanted * PUNCH_TOLERANCE,
+                f"{row['name']} takes {punches:.1f} punches from a player entering "
+                f"{zone}, wanted about {wanted}",
+            )
 
     # The boss heavy. The wind-up has to be shorter than the cooldown or a boss would
     # start the next one before finishing the last, and its reach has to beat its normal
