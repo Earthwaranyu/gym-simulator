@@ -87,6 +87,20 @@ local mapCenter = Vector2.new(0.5, 0.5)
 
 -- The map's paper palette lives in MapRender, so the minimap in the HUD and this board
 -- cannot drift into being two different-looking maps of the same city.
+--[[
+	The panel's header band, in pixels.
+
+	CLOSE_SIZE is the close button, which sits in the top-right corner; HEADER_BAND is
+	how far down a page's content has to start to clear it. They were bare numbers
+	inside the layout code, and the standalone pages were using the button's height as
+	their content offset — which put the first card's corner flush against the button
+	with no gap at all.
+]]
+local CLOSE_SIZE = 28
+local HEADER_BAND = CLOSE_SIZE + 10
+-- Tabbed pages clear the header and the tab strip under it.
+local TABBED_BAND = 82
+
 local MAP_PAPER = MapRender.Paper
 local MAP_INK = MapRender.Ink
 
@@ -2010,8 +2024,12 @@ function MenuController:_refresh()
 		or activeTab == "Shop"
 		or activeTab == "Settings"
 	tabStrip.Visible = hasMenuTabs
-	bodyScroll.Position = if hasMenuTabs then UDim2.fromOffset(0, 82) else UDim2.fromOffset(0, 28)
-	bodyScroll.Size = if hasMenuTabs then UDim2.new(1, 0, 1, -82) else UDim2.new(1, 0, 1, -28)
+	-- The standalone pages are full width, so they pass under the close button rather
+	-- than stopping short of it the way the tab strip does. They start below the header
+	-- band instead, or the first card's corner sits under the button.
+	local band = if hasMenuTabs then TABBED_BAND else HEADER_BAND
+	bodyScroll.Position = UDim2.fromOffset(0, band)
+	bodyScroll.Size = UDim2.new(1, 0, 1, -band)
 
 	local fixedPage = activeTab == "Info"
 	bodyScroll.ScrollingEnabled = not fixedPage
@@ -2177,7 +2195,7 @@ function MenuController:_build()
 	-- No OnPress: nothing else on this page makes a sound, and one control that clicks
 	-- while its neighbours are silent reads as a bug rather than as polish.
 	local close = Icons.CloseButton(panel, {
-		Size = 28,
+		Size = CLOSE_SIZE,
 		OnActivated = function()
 			self:Toggle()
 		end,
@@ -2238,8 +2256,8 @@ function MenuController:_build()
 	scroll.Name = "Body"
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
-	scroll.Position = UDim2.fromOffset(0, 82)
-	scroll.Size = UDim2.new(1, 0, 1, -82)
+	scroll.Position = UDim2.fromOffset(0, TABBED_BAND)
+	scroll.Size = UDim2.new(1, 0, 1, -TABBED_BAND)
 	scroll.CanvasSize = UDim2.new()
 	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	scroll.ScrollBarThickness = 4
