@@ -1425,35 +1425,58 @@ function FullMapController:_render()
 		endConnection:Disconnect()
 	end)
 
-	local function mapControl(name: string, caption: string, right: number, onClick: () -> ())
+	--[[
+		The zoom controls, along the bottom edge.
+
+		They used to sit at the top right, which is where the muscle filter bar was
+		later put: that bar spans the board's whole width and draws above them, so all
+		three buttons have been buried underneath it and unclickable. Down here they are
+		opposite the status pill and cannot collide with anything.
+
+		The glyphs are drawn rather than typed for the reason the close button is —
+		minus was U+2212, which Gotham does not have, and it had been a box for as long
+		as it was hidden.
+	]]
+	local function mapControl(name: string, icon: string, right: number, onClick: () -> ())
 		local control = Instance.new("TextButton")
 		control.Name = name
-		control.AnchorPoint = Vector2.new(1, 0)
-		control.Position = UDim2.new(1, -right, 0, 10)
+		control.AnchorPoint = Vector2.new(1, 1)
+		control.Position = UDim2.new(1, -right, 1, -10)
 		control.Size = UDim2.fromOffset(38, 38)
 		control.BackgroundColor3 = UI.Palette.Glass
 		control.BackgroundTransparency = 0.03
 		control.BorderSizePixel = 0
 		control.AutoButtonColor = false
-		control.Font = UI.Font.Heading
-		control.TextSize = 20
-		control.TextColor3 = UI.Palette.Text
-		control.Text = caption
+		control.Text = ""
 		control.ZIndex = 60
 		control.Parent = board
 		addCorner(control, 7)
 		addBorder(control, UI.Palette.GlassStroke, 0.35, 2)
+
+		local glyph = Instance.new("Frame")
+		glyph.Name = "Glyph"
+		glyph.AnchorPoint = Vector2.new(0.5, 0.5)
+		glyph.Position = UDim2.fromScale(0.5, 0.5)
+		glyph.Size = UDim2.fromScale(0.5, 0.5)
+		glyph.BackgroundTransparency = 1
+		glyph.ZIndex = 61
+		glyph.Parent = control
+
+		-- The button's own fill is the hole colour, so Recenter's knockout reads as a
+		-- window rather than as a smear of whatever the palette's tile colour is.
+		Icons.Draw(icon, glyph, UI.Palette.Text, UI.Palette.Glass)
+
 		UI.Pressable(control)
 		control.Activated:Connect(onClick)
 	end
 
-	mapControl("ZoomIn", "+", 10, function()
+	mapControl("ZoomIn", "Plus", 10, function()
 		zoomAt(mapZoom * ZOOM_STEP)
 	end)
-	mapControl("ZoomOut", "−", 54, function()
+	mapControl("ZoomOut", "Minus", 54, function()
 		zoomAt(mapZoom / ZOOM_STEP)
 	end)
-	mapControl("Reset", "⌂", 98, function()
+	mapControl("Reset", "Recenter", 98, function()
 		mapZoom = 1
 		mapCenter = Vector2.new(0.5, 0.5)
 		canvas.Size = UDim2.fromScale(1, 1)
@@ -1463,7 +1486,9 @@ function FullMapController:_render()
 
 	local legend = Instance.new("Frame")
 	legend.Name = "Legend"
-	legend.Position = UDim2.fromOffset(10, 10)
+	-- Below the muscle filter bar, which spans the board's full width across y 12..52
+	-- and was drawing straight over this.
+	legend.Position = UDim2.fromOffset(10, 60)
 	legend.Size = UDim2.fromOffset(326, 38)
 	legend.BackgroundColor3 = UI.Palette.Glass
 	legend.BackgroundTransparency = 0.03
@@ -1481,13 +1506,38 @@ function FullMapController:_render()
 	legendLayout.Padding = UDim.new(0, 4)
 	legendLayout.Parent = legend
 	for _, definition in StatConfig.List do
-		local key = UI.Label(definition.Id, legend)
+		local key = Instance.new("Frame")
+		key.Name = definition.Id
 		key.Size = UDim2.fromOffset(59, 24)
-		key.Font = UI.Font.Heading
-		key.TextSize = 9
-		key.TextColor3 = definition.Color
-		key.Text = `● {string.upper(definition.DisplayName)}`
+		key.BackgroundTransparency = 1
 		key.ZIndex = 61
+		key.Parent = legend
+
+		-- A real circle rather than the U+25CF this used to print. The map's own
+		-- destinations are coloured discs, so the key should be one too, and a
+		-- geometric-shape character is the same bet that lost on the close button.
+		local dot = Instance.new("Frame")
+		dot.Name = "Dot"
+		dot.AnchorPoint = Vector2.new(0, 0.5)
+		dot.Position = UDim2.fromScale(0, 0.5)
+		dot.Size = UDim2.fromOffset(8, 8)
+		dot.BackgroundColor3 = definition.Color
+		dot.BorderSizePixel = 0
+		dot.ZIndex = 62
+		dot.Parent = key
+
+		local dotCorner = Instance.new("UICorner")
+		dotCorner.CornerRadius = UDim.new(1, 0)
+		dotCorner.Parent = dot
+
+		local label = UI.Label("Name", key)
+		label.Position = UDim2.fromOffset(12, 0)
+		label.Size = UDim2.new(1, -12, 1, 0)
+		label.Font = UI.Font.Heading
+		label.TextSize = 9
+		label.TextColor3 = definition.Color
+		label.Text = string.upper(definition.DisplayName)
+		label.ZIndex = 62
 	end
 
 	local status = UI.Label("Status", board)

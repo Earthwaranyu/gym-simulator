@@ -286,6 +286,35 @@ local function drawClose(parent: GuiObject, color: Color3, _hole: Color3)
 end
 
 --[[
+	Plus and Minus — the map's zoom controls.
+
+	Typed, these were `+` and `−`, and the second one is U+2212, which Gotham does not
+	have. It had been rendering as a box for as long as it existed and nobody could
+	report it, because the muscle filter bar was drawn on top of both buttons.
+]]
+local function drawMinus(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "Bar", 0.5, 0.5, 0.66, 0.15, color, 0, 0.5)
+end
+
+local function drawPlus(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "BarH", 0.5, 0.5, 0.66, 0.15, color, 0, 0.5)
+	shape(parent, "BarV", 0.5, 0.5, 0.15, 0.66, color, 0, 0.5)
+end
+
+--[[
+	Recenter — put the map back where it started.
+
+	A viewfinder: a frame with a dot in the middle. Not the map pin, even though one
+	already exists and would have been free — a pin on a reset button reads as "go
+	somewhere", which is the opposite of what this does.
+]]
+local function drawRecenter(parent: GuiObject, color: Color3, hole: Color3)
+	local frame = shape(parent, "Frame", 0.5, 0.5, 0.76, 0.66, color, 0, 0.16)
+	knockout(frame, "Window", 0.5, 0.5, 0.76, 0.7, hole, 0, 0.14)
+	shape(parent, "Centre", 0.5, 0.5, 0.2, 0.2, color, 0, 1)
+end
+
+--[[
 	Potion — a flask: narrow neck, round body. Reads as "drink this" without needing
 	the bubbles that vanish at tile size.
 ]]
@@ -366,6 +395,9 @@ local ICONS: { [string]: Builder } = {
 	Legs = drawLegs,
 	Arrow = drawArrow,
 	Close = drawClose,
+	Plus = drawPlus,
+	Minus = drawMinus,
+	Recenter = drawRecenter,
 	Potion = drawPotion,
 	Vip = drawVip,
 	Quest = drawQuest,
