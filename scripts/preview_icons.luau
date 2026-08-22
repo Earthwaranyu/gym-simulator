@@ -87,7 +87,8 @@ end
 
 -- The five training-dock glyphs come first, because they are the row that has to read
 -- apart from each other at 28 pixels while sitting side by side.
-local names = { "Fist", "Chest", "Back", "Core", "Legs", "Map", "Upgrades", "Shop", "Top", "Settings" }
+local names =
+	{ "Fist", "Chest", "Back", "Core", "Legs", "Map", "Upgrades", "Shop", "Top", "Settings", "Close" }
 local report = {}
 
 for index, name in names do

@@ -2174,19 +2174,16 @@ function MenuController:_build()
 	titleLabel.TextColor3 = UI.Palette.TextMuted
 	titleLabel.Text = "GYM NETWORK"
 
-	local close = Instance.new("TextButton")
+	-- No OnPress: nothing else on this page makes a sound, and one control that clicks
+	-- while its neighbours are silent reads as a bug rather than as polish.
+	local close = Icons.CloseButton(panel, {
+		Size = 28,
+		OnActivated = function()
+			self:Toggle()
+		end,
+	})
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position = UDim2.fromScale(1, 0)
-	close.Size = UDim2.fromOffset(28, 28)
-	close.BackgroundTransparency = 1
-	close.Font = UI.Font.Heading
-	close.TextSize = 20
-	close.TextColor3 = UI.Palette.TextMuted
-	close.Text = "✕"
-	close.Parent = panel
-	close.Activated:Connect(function()
-		self:Toggle()
-	end)
 
 	-- The user's three top-level menu pages live together here. Direct HUD routes such
 	-- as Quests hide this strip in _refresh, so they read as their own surfaces.

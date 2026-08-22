@@ -1572,26 +1572,15 @@ function FullMapController:_build()
 	subtitle.Text = "SELECT A CIRCLE · TRACK FREE · TELEPORT WITH PASS"
 	subtitle.ZIndex = 5
 
-	local close = Instance.new("TextButton")
-	close.Name = "Close"
+	local close = Icons.CloseButton(panel, {
+		Size = 38,
+		OnActivated = function()
+			self:Close()
+		end,
+	})
 	close.AnchorPoint = Vector2.new(1, 0.5)
 	close.Position = UDim2.new(1, 0, 0, HEADER_HEIGHT / 2)
-	close.Size = UDim2.fromOffset(38, 38)
-	close.BackgroundColor3 = UI.Palette.Backdrop
-	close.BackgroundTransparency = 0.2
-	close.BorderSizePixel = 0
-	close.AutoButtonColor = false
-	close.Font = UI.Font.Heading
-	close.TextSize = 18
-	close.TextColor3 = UI.Palette.TextMuted
-	close.Text = "✕"
 	close.ZIndex = 6
-	close.Parent = panel
-	addCorner(close, 8)
-	UI.Pressable(close)
-	close.Activated:Connect(function()
-		self:Close()
-	end)
 
 	content = Instance.new("Frame")
 	content.Name = "Content"

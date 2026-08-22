@@ -29,6 +29,7 @@ local TweenService = game:GetService("TweenService")
 local AppearanceConfig = require(ReplicatedStorage.Modules.AppearanceConfig)
 local FaceConfig = require(ReplicatedStorage.Modules.FaceConfig)
 local HairConfig = require(ReplicatedStorage.Modules.HairConfig)
+local Icons = require(ReplicatedStorage.Modules.Icons)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local Net = require(ReplicatedStorage.Modules.Net)
@@ -376,30 +377,17 @@ function CustomizerController:_build()
 	titleLabel.TextSize = 18
 	titleLabel.Text = "APPEARANCE"
 
-	closeButton = Instance.new("TextButton")
-	closeButton.Name = "Close"
+	closeButton = Icons.CloseButton(panel, {
+		Size = 32,
+		OnPress = function()
+			EffectsController:Play("UiClick")
+		end,
+		OnActivated = function()
+			self:Close()
+		end,
+	})
 	closeButton.AnchorPoint = Vector2.new(1, 0)
 	closeButton.Position = UDim2.fromScale(1, 0)
-	closeButton.Size = UDim2.fromOffset(32, 32)
-	closeButton.BackgroundColor3 = UI.Palette.Backdrop
-	closeButton.BackgroundTransparency = 0.2
-	closeButton.BorderSizePixel = 0
-	closeButton.AutoButtonColor = false
-	closeButton.Font = UI.Font.Heading
-	closeButton.TextSize = 16
-	closeButton.TextColor3 = UI.Palette.TextMuted
-	closeButton.Text = "X"
-	UI.Role(closeButton, { Ink = "TextMuted", Fill = "Backdrop" })
-	closeButton.Parent = panel
-
-	local closeCorner = Instance.new("UICorner")
-	closeCorner.CornerRadius = UDim.new(0, 8)
-	closeCorner.Parent = closeButton
-
-	UI.Pressable(closeButton)
-	closeButton.Activated:Connect(function()
-		self:Close()
-	end)
 
 	rows = Instance.new("Frame")
 	rows.Name = "Rows"

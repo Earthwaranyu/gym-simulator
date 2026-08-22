@@ -269,6 +269,23 @@ local function drawArrow(parent: GuiObject, color: Color3, _hole: Color3)
 end
 
 --[[
+	Close — the cross on every panel's corner.
+
+	This one is here because the typed version was broken in a way nobody could see
+	from the code: the buttons carried the text `✕` (U+2715), and Roblox's Gotham faces
+	do not have that character, so every close control in the game rendered as an empty
+	box. The `×` those same panels use for multipliers is a different character from
+	Latin-1, which is why only this one was affected and why the bug survived so long.
+
+	Drawn from two Frames, it cannot go missing on a font that lacks a glyph, and it
+	scales with its tile like everything else here.
+]]
+local function drawClose(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "BarA", 0.5, 0.5, 0.74, 0.15, color, 45, 0.5)
+	shape(parent, "BarB", 0.5, 0.5, 0.74, 0.15, color, -45, 0.5)
+end
+
+--[[
 	Potion — a flask: narrow neck, round body. Reads as "drink this" without needing
 	the bubbles that vanish at tile size.
 ]]
@@ -300,6 +317,40 @@ local function drawQuest(parent: GuiObject, color: Color3, hole: Color3)
 	knockout(parent, "TickLong", 0.56, 0.48, 0.1, 0.46, hole, -40, 1)
 end
 
+--[[
+	Goblin — a head with pointed ears and two knocked-out eyes.
+
+	Everything here is chosen to survive being 28 pixels wide on a map. The ears are
+	rotated squares rather than real triangles, because at that size a triangle and a
+	tilted square are the same picture and one of them is a single frame. The eyes are
+	knockouts rather than dark shapes so the glyph reads on a light paper map and on a
+	dark HUD tile without being redrawn.
+]]
+local function drawGoblin(parent: GuiObject, color: Color3, hole: Color3)
+	-- Ears first, so the head overlaps their inner corners and they read as attached.
+	shape(parent, "EarLeft", 0.16, 0.38, 0.26, 0.26, color, 45, 0.12)
+	shape(parent, "EarRight", 0.84, 0.38, 0.26, 0.26, color, 45, 0.12)
+
+	local head = shape(parent, "Head", 0.5, 0.5, 0.62, 0.58, color, 0, 0.32)
+	knockout(head, "EyeLeft", 0.32, 0.4, 0.18, 0.22, hole, 0, 1)
+	knockout(head, "EyeRight", 0.68, 0.4, 0.18, 0.22, hole, 0, 1)
+	-- One wide gap for the mouth. A row of separate teeth vanishes at map size.
+	knockout(head, "Mouth", 0.5, 0.74, 0.44, 0.1, hole, 0, 0.4)
+end
+
+--[[
+	Boss goblin — the same head, horned.
+
+	Deliberately built from the goblin rather than beside it: the two icons have to be
+	recognisably the same creature, or the map stops saying "this is the big one" and
+	starts saying "this is something else".
+]]
+local function drawGoblinBoss(parent: GuiObject, color: Color3, hole: Color3)
+	shape(parent, "HornLeft", 0.22, 0.14, 0.16, 0.3, color, 20, 0.3)
+	shape(parent, "HornRight", 0.78, 0.14, 0.16, 0.3, color, -20, 0.3)
+	drawGoblin(parent, color, hole)
+end
+
 local ICONS: { [string]: Builder } = {
 	Map = drawMap,
 	Train = drawTrain,
@@ -314,9 +365,12 @@ local ICONS: { [string]: Builder } = {
 	Core = drawCore,
 	Legs = drawLegs,
 	Arrow = drawArrow,
+	Close = drawClose,
 	Potion = drawPotion,
 	Vip = drawVip,
 	Quest = drawQuest,
+	Goblin = drawGoblin,
+	GoblinBoss = drawGoblinBoss,
 	-- The dumbbell is the token mark throughout the HUD, and Train already is one.
 	-- Aliased rather than copied so the two cannot drift apart in a restyle.
 	Token = drawTrain,
@@ -361,6 +415,77 @@ function Icons.Draw(name: string, parent: GuiObject, color: Color3, hole: Color3
 
 	builder(holder, color, hole)
 	return holder
+end
+
+export type CloseOptions = {
+	-- Side of the square button in pixels.
+	Size: number?,
+	-- The page this closes.
+	OnActivated: (() -> ())?,
+	-- Fires on the way down, for the click sound. Icons is a shared module and cannot
+	-- reach EffectsController, so the caller hands it in like every other Pressable.
+	OnPress: (() -> ())?,
+}
+
+--[[
+	The close button every page corner gets.
+
+	It lives in Icons rather than UI because the dependency only runs one way: UI
+	requires nothing at all and this file requires UI, so a `UI.CloseButton` that drew a
+	glyph would close the loop and fail at load. The button is the glyph plus the chrome
+	that makes it pressable, so this is the end of the arrow it belongs on.
+
+	The cross is hardcoded white rather than given an Ink role, which matters more than
+	it looks: `OnAccent` is the obvious choice and is cream in the light palette and
+	near-black in the dark one, so a themed page would turn the cross black on red. It
+	sits on a red fill in both palettes, so it is white in both.
+]]
+function Icons.CloseButton(parent: Instance, options: CloseOptions?): TextButton
+	-- Annotated, not inferred, for the reason UI.Pressable records: `options or {}`
+	-- widens to `CloseOptions | {}` and every field read below fails on the empty half.
+	local settings: CloseOptions = options or {}
+	local side = settings.Size or 32
+
+	local button = Instance.new("TextButton")
+	button.Name = "Close"
+	button.Size = UDim2.fromOffset(side, side)
+	button.BackgroundColor3 = UI.Palette.Danger
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = false
+	button.Text = ""
+	UI.Role(button, { Fill = "Danger" })
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = button
+
+	-- The glyph sits inside the circle rather than filling it, or the bars run off the
+	-- curve at the corners.
+	local holder = Instance.new("Frame")
+	holder.Name = "Glyph"
+	holder.AnchorPoint = Vector2.new(0.5, 0.5)
+	holder.Position = UDim2.fromScale(0.5, 0.5)
+	holder.Size = UDim2.fromScale(0.52, 0.52)
+	holder.BackgroundTransparency = 1
+	holder.Parent = button
+
+	local white = Color3.new(1, 1, 1)
+	Icons.Draw("Close", holder, white, white)
+
+	button.Parent = parent
+
+	UI.Pressable(button, {
+		PressScale = 0.9,
+		HoverScale = 1.08,
+		OnPress = settings.OnPress,
+	})
+
+	local activated = settings.OnActivated
+	if activated ~= nil then
+		button.Activated:Connect(activated)
+	end
+
+	return button
 end
 
 --[[
