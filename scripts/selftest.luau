@@ -24,6 +24,14 @@ local SUITES = {
 	{ Name = "PhysiqueConfig", Module = require("../src/ReplicatedStorage/Modules/PhysiqueConfig") },
 	{ Name = "BodyMeshConfig", Module = require("../src/ReplicatedStorage/Modules/BodyMeshConfig") },
 	{
+		Name = "BodySkinConfig",
+		Module = require("../src/ReplicatedStorage/Modules/BodySkinConfig"),
+	},
+	{
+		Name = "BodyLoftConfig",
+		Module = require("../src/ReplicatedStorage/Modules/BodyLoftConfig"),
+	},
+	{
 		Name = "MuscleDefinitionConfig",
 		Module = require("../src/ReplicatedStorage/Modules/MuscleDefinitionConfig"),
 	},
