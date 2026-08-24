@@ -19,7 +19,7 @@
 local Types = require(script.Parent.Types)
 
 -- Bump alongside a new entry in Core/_Migrations.luau.
-local SCHEMA_VERSION = 8
+local SCHEMA_VERSION = 9
 
 local ProfileTemplate: Types.ProfileData = {
 	SchemaVersion = SCHEMA_VERSION,
@@ -68,8 +68,9 @@ local ProfileTemplate: Types.ProfileData = {
 	},
 
 	Settings = {
-		MusicEnabled = true,
-		SfxEnabled = true,
+		MasterVolume = 100,
+		MusicVolume = 70,
+		SfxVolume = 100,
 	},
 }
 

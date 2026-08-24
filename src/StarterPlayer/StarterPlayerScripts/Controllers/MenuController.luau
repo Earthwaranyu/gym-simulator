@@ -1269,6 +1269,7 @@ function MenuController:_renderInfo(parent: Frame)
 						local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)
 						toast(message)
 						if ok then
+							Loader.Get("EffectsController"):Play("Purchase")
 							self:_refresh()
 						end
 					end,
@@ -1738,6 +1739,7 @@ function MenuController:_renderShop(parent: Frame)
 					-- nothing to say it happened but this.
 					toast(message)
 					if bought then
+						Loader.Get("EffectsController"):Play("Purchase")
 						self:_refresh()
 					end
 				end
@@ -1921,30 +1923,50 @@ end
 
 function MenuController:_renderSettings(parent: Frame)
 	local data = ProfileController:Get()
-	local settings = if data ~= nil then data.Settings else { MusicEnabled = true, SfxEnabled = true }
+	local settings = if data ~= nil
+		then data.Settings
+		else { MasterVolume = 100, MusicVolume = 70, SfxVolume = 100 }
 	local order = 0
 
-	local function toggleRow(settingName: string, displayName: string, detail: string, enabled: boolean)
+	--[[
+		A volume row. The mix follows the handle live and only the release is sent.
+
+		Two separate reasons, both learned the hard way elsewhere in this file: `Net` rate
+		limits the settings remote to four calls, so a per-frame invoke during a drag
+		would spend a player's whole budget and start failing mid-slide; and `_refresh`
+		rebuilds this whole page, which would destroy the slider under the finger still
+		dragging it. So the drag writes straight to SoundBus and nothing is redrawn until
+		the player lets go.
+	]]
+	local function volumeRow(settingName: string, displayName: string, detail: string, colour: Color3)
 		order += 1
-		local line = row(parent, 58, order)
+		local line = row(parent, 64, order)
 
 		local label = UI.Label("Text", line)
-		label.Size = UDim2.new(1, -132, 1, 0)
+		label.Size = UDim2.fromScale(0.46, 1)
 		label.TextSize = 14
 		label.Text = `<b>{displayName}</b>\n<font color="#8A93A8">{detail}</font>`
 
-		button(
-			line,
-			if enabled then "ON" else "OFF",
-			if enabled then UI.Palette.Vital else UI.Palette.Danger,
-			function()
-				local ok, message = Net.Function("UpdateSetting"):InvokeServer(settingName, not enabled)
-				toast(message)
-				if ok then
-					self:_refresh()
+		local current = (settings :: any)[settingName]
+		local slider = UI.Slider(settingName, line, {
+			Value = if type(current) == "number" then current else 100,
+			Colour = colour,
+			OnChanged = function(value: number)
+				local live = ProfileController:Get()
+				if live ~= nil then
+					(live.Settings :: any)[settingName] = value
+					Loader.Get("EffectsController"):_applyVolumes()
 				end
-			end
-		)
+			end,
+			OnCommitted = function(value: number)
+				local ok, message = Net.Function("UpdateSetting"):InvokeServer(settingName, value)
+				if not ok then
+					toast(message)
+				end
+			end,
+		})
+		slider.Root.Size = UDim2.new(0.5, -12, 0, 22)
+		slider.Root.Position = UDim2.new(0.5, 12, 0.5, -11)
 	end
 
 	order += 1
@@ -1962,8 +1984,9 @@ function MenuController:_renderSettings(parent: Frame)
 		Loader.Get("CustomizerController"):Open(false)
 	end)
 
-	toggleRow("MusicEnabled", "Music", "Background soundtrack", settings.MusicEnabled)
-	toggleRow("SfxEnabled", "Sound effects", "Training, combat, and menu feedback", settings.SfxEnabled)
+	volumeRow("MasterVolume", "Master", "Everything the game plays", UI.Palette.Accent)
+	volumeRow("MusicVolume", "Music", "Soundtrack and world ambience", UI.Palette.Token)
+	volumeRow("SfxVolume", "Sound effects", "Training, combat, and menu feedback", UI.Palette.Power)
 
 	order += 1
 	local claim = row(parent, 58, order)

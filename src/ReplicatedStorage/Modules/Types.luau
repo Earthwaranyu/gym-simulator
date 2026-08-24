@@ -94,9 +94,12 @@ export type ProfileData = {
 		Chosen: boolean,
 	},
 
+	-- Volumes are 0-100 because that is what a slider shows. Zero is the mute that the
+	-- MusicEnabled/SfxEnabled booleans used to be; see _Migrations for the conversion.
 	Settings: {
-		MusicEnabled: boolean,
-		SfxEnabled: boolean,
+		MasterVolume: number,
+		MusicVolume: number,
+		SfxVolume: number,
 	},
 }
 

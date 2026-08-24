@@ -131,6 +131,26 @@ local Steps: { (data: any) -> () } = {
 			data.Appearance.Chosen = true
 		end
 	end,
+	-- v9 replaces the two on/off audio toggles with three 0-100 volumes.
+	--
+	-- Like Cash in v6, the old booleans have to be cleared explicitly: Reconcile only
+	-- adds missing template keys, so `MusicEnabled` would ride along in every save
+	-- forever and the next person to read it would reasonably assume it still meant
+	-- something. An "off" toggle carries over as a zero volume, which is the same
+	-- silence the player chose; an "on" toggle takes the template default rather than
+	-- 100, because the authored mix has music sitting below effects and a migrating
+	-- player should hear the game as designed rather than louder than everyone else.
+	[8] = function(data)
+		if type(data.Settings) ~= "table" then
+			return
+		end
+		local settings = data.Settings
+		settings.MasterVolume = 100
+		settings.MusicVolume = if settings.MusicEnabled == false then 0 else 70
+		settings.SfxVolume = if settings.SfxEnabled == false then 0 else 100
+		settings.MusicEnabled = nil
+		settings.SfxEnabled = nil
+	end,
 }
 
 -- A profile that has run every step sits at this version.
@@ -172,8 +192,8 @@ function Migrations.RunSelfTest(): { string }
 		MuscleClassLevel = 6,
 		MultiplierLevels = {},
 	}
-	check(Migrations.Apply(shared) == 4, "v4 profile runs the four outstanding migrations")
-	check(shared.SchemaVersion == 8, "split migration chain stamps schema version 8")
+	check(Migrations.Apply(shared) == 5, "v4 profile runs the five outstanding migrations")
+	check(shared.SchemaVersion == 9, "split migration chain stamps schema version 9")
 	check(shared.MuscleClassLevel == 6, "split migration preserves selected physique")
 	for _, statId in { "Arms", "Chest", "Back", "Core", "Legs" } do
 		check(shared.MultiplierLevels[statId] == 6, `split migration preserves level for {statId}`)
@@ -193,10 +213,10 @@ function Migrations.RunSelfTest(): { string }
 		QuestCompletions = { DailyKnockouts = "2026-08-15" },
 	}
 	check(
-		Migrations.Apply(cashEra) == 3,
-		"v5 profile runs cash removal, visual baseline and appearance migrations"
+		Migrations.Apply(cashEra) == 4,
+		"v5 profile runs cash removal, visual baseline, appearance and audio migrations"
 	)
-	check(cashEra.SchemaVersion == 8, "cash-era profile reaches schema version 8")
+	check(cashEra.SchemaVersion == 9, "cash-era profile reaches schema version 9")
 	check(cashEra.Cash == nil, "cash removal clears the retired currency")
 	check(cashEra.Tokens == 40 and cashEra.FightTokens == 3, "cash removal keeps the surviving currencies")
 	check(cashEra.MuscleClassLevel == 2, "cash removal preserves physique progress")
@@ -212,8 +232,11 @@ function Migrations.RunSelfTest(): { string }
 		SchemaVersion = 6,
 		Stats = { Arms = 1200, Chest = 800, Back = 400, Core = 200, Legs = 100 },
 	}
-	check(Migrations.Apply(visualEra) == 2, "v6 profile runs the visual baseline and appearance migrations")
-	check(visualEra.SchemaVersion == 8, "visual baseline migration stamps schema version 8")
+	check(
+		Migrations.Apply(visualEra) == 3,
+		"v6 profile runs the visual baseline, appearance and audio migrations"
+	)
+	check(visualEra.SchemaVersion == 9, "visual baseline migration stamps schema version 9")
 	check(visualEra.PhysiqueStatBaselines.Arms == 1200, "visual baseline preserves Arms lifetime total")
 	check(visualEra.PhysiqueStatBaselines.Legs == 100, "visual baseline preserves Legs lifetime total")
 
@@ -224,7 +247,7 @@ function Migrations.RunSelfTest(): { string }
 		MuscleClassLevel = 1,
 		MultiplierLevels = { Arms = 2, Chest = 4, Back = 3 },
 	}
-	check(Migrations.Apply(older) == 5, "v3 profile runs all five outstanding migrations")
+	check(Migrations.Apply(older) == 6, "v3 profile runs all six outstanding migrations")
 	check(older.MuscleClassLevel == 4, "chained migration preserves strongest old purchase")
 	for _, statId in { "Arms", "Chest", "Back", "Core", "Legs" } do
 		check(older.MultiplierLevels[statId] == 4, `chained migration grants level to {statId}`)
@@ -243,8 +266,8 @@ function Migrations.RunSelfTest(): { string }
 			Chosen = false,
 		},
 	}
-	check(Migrations.Apply(veteran) == 1, "v7 profile runs exactly the appearance migration")
-	check(veteran.SchemaVersion == 8, "appearance migration stamps schema version 8")
+	check(Migrations.Apply(veteran) == 2, "v7 profile runs the appearance and audio migrations")
+	check(veteran.SchemaVersion == 9, "appearance migration stamps schema version 9")
 	check(veteran.Appearance.Chosen, "a player with playtime is not sent back to the creator")
 
 	local unplayed: any = {
@@ -260,6 +283,35 @@ function Migrations.RunSelfTest(): { string }
 	}
 	Migrations.Apply(unplayed)
 	check(not unplayed.Appearance.Chosen, "a save with no playtime still owes a first-join pick")
+
+	-- The audio step converts two booleans into three volumes, and both sides matter: a
+	-- player who muted the game must stay muted, and a player who did not must not be
+	-- left at zero. Retiring the old keys is asserted too — Reconcile only adds, so a
+	-- key this step forgets would ride along in every save forever.
+	local muted: any = {
+		SchemaVersion = 8,
+		Settings = { MusicEnabled = false, SfxEnabled = false },
+	}
+	Migrations.Apply(muted)
+	check(muted.SchemaVersion == 9, "audio migration stamps schema version 9")
+	check(muted.Settings.MusicVolume == 0, "a muted soundtrack stays muted")
+	check(muted.Settings.SfxVolume == 0, "muted effects stay muted")
+	check(
+		muted.Settings.MusicEnabled == nil and muted.Settings.SfxEnabled == nil,
+		"audio migration retires the old boolean toggles"
+	)
+
+	local audible: any = {
+		SchemaVersion = 8,
+		Settings = { MusicEnabled = true, SfxEnabled = true },
+	}
+	Migrations.Apply(audible)
+	check(audible.Settings.SfxVolume == 100, "effects that were on migrate to full volume")
+	check(
+		audible.Settings.MusicVolume > 0 and audible.Settings.MusicVolume < 100,
+		"music that was on migrates to the authored mix rather than to full volume"
+	)
+	check(audible.Settings.MasterVolume == 100, "master starts at full for everyone")
 
 	return failures
 end
