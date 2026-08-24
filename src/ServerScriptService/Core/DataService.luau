@@ -102,7 +102,17 @@ function DataService:_loadProfile(player: Player)
 	profile:AddUserId(player.UserId)
 	profile:Reconcile()
 
-	local applied = Migrations.Apply(profile.Data)
+	local applied, failure = Migrations.Apply(profile.Data)
+	if failure ~= nil then
+		-- Half-migrated data must never reach gameplay. The profile was left unstamped,
+		-- so it will retry on the next join; what must not happen is this session running
+		-- on it and saving the partial result back over a good save. One lost session
+		-- beats one destroyed profile, and the warning is how we hear about it at all.
+		warn(`[DataService] Migration failed for {player.Name}: {failure}`)
+		profile:EndSession()
+		player:Kick("Could not load your data. Please rejoin.")
+		return
+	end
 	if applied > 0 then
 		print(`[DataService] Migrated {player.Name} through {applied} schema step(s)`)
 	end

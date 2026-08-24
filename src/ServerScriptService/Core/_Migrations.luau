@@ -157,18 +157,67 @@ local Steps: { (data: any) -> () } = {
 Migrations.CurrentVersion = #Steps + 1
 
 --[[
-	Brings a profile up to the current schema version. Returns how many steps ran, so
-	the caller can log migrations without inspecting the data itself.
+	Runs one step, returning the error text if it threw and nil if it did not.
+
+	A wrapper rather than a bare `xpcall` at the call site because a step is typed as
+	returning nothing, so strict mode reads `xpcall`'s arity as a single boolean and the
+	error value is unreachable. Capturing it in the handler's closure sidesteps that
+	without loosening the type of `Steps`.
+]]
+local function runStep(step: (data: any) -> (), data: any): string?
+	local captured: string? = nil
+	local ok = xpcall(step, function(err)
+		captured = debug.traceback(tostring(err), 2)
+	end, data)
+	if ok then
+		return nil
+	end
+	return captured or "unknown error"
+end
+
+--[[
+	Brings a profile up to the current schema version.
+
+	Returns `(applied, failure)` — how many steps ran, and the error from the step that
+	stopped the chain if one did. A caller that gets a failure must **not** let the
+	session continue: see DataService.
+
+	Three things this guards, all of which are what a real DataStore eventually hands you
+	and none of which the mock store in Studio has ever produced:
+
+	  1. **A nonsense version.** `SchemaVersion` arrives from storage, so it can be zero,
+	     negative, fractional or a string. The loop used to run `for version = from, #Steps`
+	     straight off `tonumber(...)`, so a `0` or a `3.5` indexed a step that does not
+	     exist and threw inside the join path. It is floored and clamped now: anything
+	     below the first step means "migrate from the beginning", which is also the right
+	     answer for a profile that predates versioning.
+
+	  2. **A step that throws.** Steps run over data written by older builds, and the one
+	     assumption that turns out to be wrong takes the player's whole session with it.
+	     Each is isolated, and a failure stops the chain.
+
+	  3. **Being marked done when it is not.** This is the half that matters. A profile
+	     stamped at the current version with only half its steps applied is corrupt
+	     *permanently* — every later join skips the steps it still needs. Leaving it
+	     unstamped means the next join retries from exactly where it stopped, so a bad
+	     deploy costs sessions rather than saves.
 
 	A profile stamped newer than this server knows about is left alone rather than
 	downgraded, which keeps a rolled-back server from corrupting newer saves.
 ]]
-function Migrations.Apply(data: any): number
-	local from = tonumber(data.SchemaVersion) or 1
+function Migrations.Apply(data: any): (number, string?)
+	local stored = tonumber(data.SchemaVersion)
+	local from = if stored ~= nil then math.floor(stored) else 1
+	from = math.clamp(from, 1, #Steps + 1)
+
 	local applied = 0
 
 	for version = from, #Steps do
-		Steps[version](data)
+		local err = runStep(Steps[version], data)
+		if err ~= nil then
+			-- Deliberately not stamped: see (3) above.
+			return applied, `step {version} failed: {err}`
+		end
 		applied += 1
 	end
 
@@ -176,7 +225,7 @@ function Migrations.Apply(data: any): number
 		data.SchemaVersion = Migrations.CurrentVersion
 	end
 
-	return applied
+	return applied, nil
 end
 
 function Migrations.RunSelfTest(): { string }
@@ -312,6 +361,69 @@ function Migrations.RunSelfTest(): { string }
 		"music that was on migrates to the authored mix rather than to full volume"
 	)
 	check(audible.Settings.MasterVolume == 100, "master starts at full for everyone")
+
+	-- Everything below is data a real DataStore can hand back and the Studio mock store
+	-- never has. Each of these used to throw inside the join path, which meant the player
+	-- could not get in at all.
+	-- Note the absent version is tested separately below: a trailing nil in a table
+	-- literal simply shortens the array, so listing it here would silently test nothing.
+	local corruptVersions: { any } = { 0, -3, 3.5, "banana" }
+	for _, broken in corruptVersions do
+		local corrupt: any = { SchemaVersion = broken, Settings = {} }
+		local result = table.pack(pcall(Migrations.Apply, corrupt))
+		check(result[1] == true, `a SchemaVersion of {tostring(broken)} does not throw`)
+		if result[1] == true then
+			check(result[3] == nil, `a SchemaVersion of {tostring(broken)} migrates cleanly`)
+			check(result[2] > 0, `a SchemaVersion of {tostring(broken)} runs the chain from the start`)
+			check(
+				corrupt.SchemaVersion == Migrations.CurrentVersion,
+				`a SchemaVersion of {tostring(broken)} ends up current`
+			)
+		end
+	end
+
+	-- A server rolled back to an older build must leave a newer save exactly as it found
+	-- it rather than dragging it backwards.
+	local future: any = { SchemaVersion = Migrations.CurrentVersion + 5, Tokens = 99 }
+	local futureApplied, futureFailure = Migrations.Apply(future)
+	check(futureApplied == 0, "a newer profile runs no steps")
+	check(futureFailure == nil, "a newer profile is not an error")
+	check(future.SchemaVersion == Migrations.CurrentVersion + 5, "a newer profile keeps its own version")
+	check(future.Tokens == 99, "a newer profile is otherwise untouched")
+
+	-- An already-current profile is a no-op, which is the common case on every join.
+	local current: any = { SchemaVersion = Migrations.CurrentVersion }
+	check(Migrations.Apply(current) == 0, "an up-to-date profile runs no steps")
+
+	-- No SchemaVersion at all: a profile predating versioning, which must run everything.
+	local ancient: any = { Settings = {} }
+	local ancientResult = table.pack(pcall(Migrations.Apply, ancient))
+	check(ancientResult[1] == true, "a profile with no SchemaVersion does not throw")
+	if ancientResult[1] == true then
+		check(ancientResult[2] == #Steps, "a profile with no SchemaVersion runs every step")
+		check(ancient.SchemaVersion == Migrations.CurrentVersion, "an unversioned profile ends up current")
+	end
+
+	-- The v9 step reads data.Settings; a profile that somehow has none must survive it.
+	local settingless: any = { SchemaVersion = 8 }
+	local settinglessOk = pcall(Migrations.Apply, settingless)
+	check(settinglessOk, "a profile with no Settings table survives the audio step")
+
+	-- The behaviour the whole design rests on: a step that throws must stop the chain and
+	-- leave the version alone, so the next join retries instead of skipping what it still
+	-- owes. Asserted with a temporarily swapped step rather than by trusting the comment.
+	local realStep = Steps[#Steps]
+	Steps[#Steps] = function()
+		error("deliberate failure")
+	end
+	local broken: any = { SchemaVersion = #Steps, Tokens = 7 }
+	local brokenApplied, brokenFailure = Migrations.Apply(broken)
+	Steps[#Steps] = realStep
+
+	check(brokenApplied == 0, "a failing step reports that it did not run")
+	check(brokenFailure ~= nil, "a failing step returns the failure to the caller")
+	check(broken.SchemaVersion == #Steps, "a failing step leaves the version unstamped for a retry")
+	check(broken.Tokens == 7, "a failing step does not discard the rest of the profile")
 
 	return failures
 end
