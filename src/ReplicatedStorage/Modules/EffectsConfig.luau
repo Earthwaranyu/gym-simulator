@@ -56,6 +56,18 @@ export type SoundSpec = {
 	Cooldown: number?,
 	-- Played together with the parent, for weight the parent file does not have.
 	Layers: { SoundSpec }?,
+	-- DSP applied to this sound alone. See EffectsConfig.EFFECT_CLASSES.
+	Effects: { EffectSpec }?,
+}
+
+--[[
+	One DSP unit. `Class` is the Roblox class name without the "SoundEffect" suffix, and
+	`Props` is applied verbatim, so anything the class exposes is reachable from config
+	without this file growing a case per property.
+]]
+export type EffectSpec = {
+	Class: string,
+	Props: { [string]: number },
 }
 
 local EffectsConfig = {}
@@ -63,12 +75,72 @@ local EffectsConfig = {}
 -- Mix buses. Declared as instances in default.project.json under SoundService.
 EffectsConfig.GROUPS = { "Master", "Music", "Sfx", "Ambience", "Ui" }
 
--- Built-in client sounds, named so the table below reads as intent rather than paths.
-local CLICK = "rbxasset://sounds/switch.wav"
-local PING = "rbxasset://sounds/electronicpingshort.wav"
-local FANFARE = "rbxasset://sounds/victory.wav"
-local LOW_SWELL = "rbxasset://sounds/bass.wav"
-local STEP = "rbxasset://sounds/action_jump_land.mp3"
+--[[
+	The DSP units a spec may ask for, and the whole reason this pass sounds different.
+
+	A single recording of an ordinary object is never a convincing superhero impact, and no
+	amount of searching the catalogue fixes that — Roblox's licensed library is foley
+	(props, doors, vehicles, room tone), not impact design. Expensive game audio is not one
+	perfect file anyway; it is ordinary recordings stacked and then *shaped*. These are the
+	shaping tools, and until now the game used none of them.
+
+	The two that do most of the work:
+
+	  - **Distortion** adds harmonic bite. It is the difference between a thud and a hit,
+	    and it is what makes a punch read as violent rather than as a dropped box.
+	  - **PitchShift** drops the body of a sound *without* slowing it, which
+	    `PlaybackSpeed` cannot do. A heavy punch pitched down with PlaybackSpeed also gets
+	    sluggish; pitched down with this, the transient stays snappy and only the weight
+	    changes — which is exactly the "same fist, hitting harder" read.
+
+	Cost note: these are instances created per play, so they belong only on the rare, big
+	moments. Anything that can fire several times a second — Footfall, Rep, UiClick,
+	BlockAbsorb — must stay clean, and `RunSelfTest` enforces that rather than trusting it.
+]]
+EffectsConfig.EFFECT_CLASSES = {
+	"Distortion",
+	"Reverb",
+	"PitchShift",
+	"Echo",
+	"Equalizer",
+	"Compressor",
+	"Chorus",
+	"Flange",
+	"Tremolo",
+}
+
+-- Sounds that fire fast enough that per-play DSP instances would be a real cost.
+EffectsConfig.NO_EFFECTS_ALLOWED = {
+	Footfall = true,
+	Rep = true,
+	UiClick = true,
+	BlockAbsorb = true,
+}
+
+--[[
+	Raw material, named for what it is used as rather than what it was recorded from.
+
+	The recorded source is in the comment because it matters when swapping one out: these
+	are foley recordings doing a job they were not made for, and knowing that a slam is a
+	steel door is what tells you why it needs pitching down and saturating.
+
+	The four legacy `rbxasset://sounds/` defaults that used to live here — victory.wav,
+	bass.wav, electronicpingshort.wav, switch.wav — are gone. They are free and safe, but
+	every Roblox player has heard them a thousand times, and nothing makes a game read as
+	unfinished faster than its menu clicking like the 2010 default.
+]]
+local CLICK = "rbxassetid://9118826892" -- scissors snap: short, crisp, dry, metallic
+local STEP = "rbxasset://sounds/action_jump_land.mp3" -- the one default worth keeping: a bare thud
+
+-- Steel door impacts: big hits, deep hollow thuds, long rattling decay. The heaviest
+-- honest impact in the catalogue and the backbone of every big moment below.
+local STEEL_BIG = "rbxassetid://9119630180"
+local STEEL_MID = "rbxassetid://9119630452"
+local STEEL_SHORT = "rbxassetid://9119630548"
+-- Metal impacts, multiple hits, rattles. Brighter and busier than the doors.
+local METAL_RATTLE = "rbxassetid://9116684884"
+-- Grit thrown up by an impact.
+local DEBRIS = "rbxassetid://9118687051"
 
 -- Pro Sound Effects "Rumbles" — deep, soft, reverberant booms. Never played alone; these
 -- are the sub layer that gives an impact its weight.
@@ -83,7 +155,8 @@ local NEAR, FAR = 10, 120
 
 EffectsConfig.Sounds = {
 	-- An exercise motion landing. TrainingGain fires it on the completed-rep beat.
-	-- Three metal variants so a long set does not turn into a metronome.
+	-- Three metal variants so a long set does not turn into a metronome. No DSP: this is
+	-- the second most frequent sound in the game.
 	Rep = {
 		Variants = { "rbxassetid://9125672726", "rbxassetid://9125781214", "rbxassetid://9117197627" },
 		Volume = 0.35,
@@ -94,18 +167,23 @@ EffectsConfig.Sounds = {
 		RollOffMaxDistance = 70,
 	} :: SoundSpec,
 
-	-- You landed a punch. The jab: fast, mid-weight, no sub.
+	-- M1. The jab: fast, mid-weight, no sub. A touch of distortion is what stops it
+	-- sounding like a dropped bag — the bite is the violence.
 	Hit = {
 		Variants = { "rbxassetid://9116486763", "rbxassetid://9116487992", "rbxassetid://9116490515" },
 		Volume = 0.6,
-		Pitch = 1,
+		Pitch = 1.05,
 		PitchJitter = 0.1,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = FAR,
+		Effects = {
+			{ Class = "Distortion", Props = { Level = 0.18 } } :: EffectSpec,
+		},
 	} :: SoundSpec,
 
-	-- You took a punch.
+	-- You took a punch. Duller and darker than the hit you land, so the two are
+	-- distinguishable in a fast exchange without looking.
 	Hurt = {
 		Variants = { "rbxassetid://9116488391", "rbxassetid://9116488211", "rbxassetid://9116488618" },
 		Volume = 0.7,
@@ -114,25 +192,34 @@ EffectsConfig.Sounds = {
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = FAR,
+		Effects = {
+			{ Class = "Equalizer", Props = { LowGain = 2, MidGain = -3, HighGain = -8 } } :: EffectSpec,
+		},
 	} :: SoundSpec,
 
-	-- Someone was knocked out. A body hitting the floor, with a sub under it so a KO
-	-- reads as final rather than as one more hit that happened to be last.
+	-- Someone was knocked out. A body hitting the floor, a steel slam under it and a real
+	-- reverb tail, because a KO is the end of something and should ring out rather than
+	-- stop dead like one more hit that happened to be last.
 	Knockout = {
 		SoundId = "rbxassetid://9113472000",
 		Volume = 0.8,
-		Pitch = 1,
+		Pitch = 0.92,
 		PitchJitter = 0,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = 160,
 		Layers = {
 			{ SoundId = SUB_TIGHT, Volume = 0.5, Pitch = 0.85 } :: SoundSpec,
+			{ SoundId = STEEL_SHORT, Volume = 0.35, Pitch = 0.7 } :: SoundSpec,
+		},
+		Effects = {
+			{ Class = "PitchShift", Props = { Octave = 0.75 } } :: EffectSpec,
+			{ Class = "Reverb", Props = { DecayTime = 1.8, WetLevel = -9, DryLevel = 0, Density = 1 } } :: EffectSpec,
 		},
 	} :: SoundSpec,
 
-	-- Ground Slam winding up: the crouch and the leap. Quiet and rising, so the
-	-- impact that follows has somewhere to come from.
+	-- Q, winding up: the crouch and the leap. Quiet and rising, so the impact that
+	-- follows has somewhere to come from.
 	--
 	-- Named for the StrikeConfig cue rather than for the move, and that is the whole
 	-- trick: VfxController plays the sound whose name matches the cue it is already
@@ -141,73 +228,101 @@ EffectsConfig.Sounds = {
 	SlamCharge = {
 		SoundId = "rbxassetid://9120972444",
 		Volume = 0.5,
-		Pitch = 0.9,
+		Pitch = 0.75,
 		PitchJitter = 0.05,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = FAR,
+		Effects = {
+			{ Class = "Reverb", Props = { DecayTime = 1.2, WetLevel = -12, DryLevel = 0 } } :: EffectSpec,
+		},
 	} :: SoundSpec,
 
-	-- Hard Punch winding up. Shorter and tighter than the slam's crouch.
+	-- R, winding up. Shorter and tighter than the slam's crouch, and pitched up so the
+	-- two charges are never mistaken for each other.
 	HeavyCharge = {
 		SoundId = "rbxassetid://9120972321",
 		Volume = 0.35,
-		Pitch = 1.2,
+		Pitch = 1.25,
 		PitchJitter = 0.06,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = 80,
 	} :: SoundSpec,
 
-	-- Ground Slam landing. The loudest thing in the game on purpose, and the fullest:
-	-- concrete transient, sub, and grit thrown up by it.
+	-- Q landing. The loudest thing in the game on purpose, and the most built: a steel
+	-- slam for the crack, a sub for the weight, and grit thrown up after it.
+	--
+	-- This used to be a recording of a table falling over, which is exactly the problem
+	-- with picking audio by reading descriptions. A ground slam is not a *thing falling*;
+	-- it is something enormous arriving, and it needs saturation and a tail to say so.
 	SlamImpact = {
-		SoundId = "rbxassetid://9126090979",
+		SoundId = STEEL_BIG,
 		Volume = 1,
-		Pitch = 0.85,
-		PitchJitter = 0.06,
+		Pitch = 0.62,
+		PitchJitter = 0.05,
 		Spatial = true,
 		RollOffMinDistance = 14,
 		RollOffMaxDistance = 220,
 		Layers = {
-			{ SoundId = SUB_MID, Volume = 0.85, Pitch = 0.8 } :: SoundSpec,
-			{ SoundId = "rbxassetid://9118687051", Volume = 0.45, Pitch = 1, PitchJitter = 0.12 } :: SoundSpec,
+			{ SoundId = SUB_MID, Volume = 0.9, Pitch = 0.7 } :: SoundSpec,
+			{ SoundId = DEBRIS, Volume = 0.5, Pitch = 0.9, PitchJitter = 0.12 } :: SoundSpec,
+			{ SoundId = "rbxassetid://9126090979", Volume = 0.5, Pitch = 0.8 } :: SoundSpec,
+		},
+		Effects = {
+			{ Class = "Distortion", Props = { Level = 0.3 } } :: EffectSpec,
+			{ Class = "PitchShift", Props = { Octave = 0.5 } } :: EffectSpec,
+			{
+				Class = "Reverb",
+				Props = { DecayTime = 2.6, WetLevel = -6, DryLevel = 0, Density = 1, Diffusion = 1 },
+			} :: EffectSpec,
 		},
 	} :: SoundSpec,
 
-	-- Hard Punch connecting. Lower and heavier than Hit, which is the jab — the same
-	-- family pitched down with a sub under it, so it reads as the same fist hitting
-	-- harder rather than as a different weapon.
+	-- R connecting. The same fist as the jab, hitting harder — so it is the same Fight
+	-- family, pitch-shifted down rather than swapped for a different sound. PitchShift
+	-- rather than PlaybackSpeed keeps the transient fast while the body drops; slowing
+	-- the file instead would make the heaviest punch also the sloppiest.
 	HeavyHit = {
 		SoundId = "rbxassetid://9116488784",
 		Volume = 0.85,
-		Pitch = 0.8,
-		PitchJitter = 0.08,
+		Pitch = 0.95,
+		PitchJitter = 0.06,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = 150,
 		Layers = {
-			{ SoundId = SUB_SHORT, Volume = 0.55, Pitch = 0.9 } :: SoundSpec,
+			{ SoundId = SUB_SHORT, Volume = 0.6, Pitch = 0.85 } :: SoundSpec,
+			{ SoundId = STEEL_SHORT, Volume = 0.3, Pitch = 0.65 } :: SoundSpec,
+		},
+		Effects = {
+			{ Class = "PitchShift", Props = { Octave = 0.7 } } :: EffectSpec,
+			{ Class = "Distortion", Props = { Level = 0.32 } } :: EffectSpec,
+			{ Class = "Reverb", Props = { DecayTime = 1.4, WetLevel = -10, DryLevel = 0 } } :: EffectSpec,
 		},
 	} :: SoundSpec,
 
-	-- A guard going up.
+	-- F. A guard coming up: a bright metal rattle, short and high, so it reads as
+	-- something being *raised* rather than something being hit.
 	BlockRaise = {
-		SoundId = "rbxassetid://9118269934",
-		Volume = 0.55,
-		Pitch = 1.15,
+		SoundId = METAL_RATTLE,
+		Volume = 0.5,
+		Pitch = 1.35,
 		PitchJitter = 0.04,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = 80,
+		Effects = {
+			{ Class = "Equalizer", Props = { LowGain = -12, MidGain = -2, HighGain = 3 } } :: EffectSpec,
+		},
 	} :: SoundSpec,
 
-	-- A hit stopped by a guard. Jittered and varied because it can happen several
-	-- times a second.
+	-- A hit stopped by a guard. Can happen several times a second, so it stays clean of
+	-- DSP and leans on variation and jitter instead.
 	BlockAbsorb = {
-		Variants = { "rbxassetid://9116487032", "rbxassetid://9116486763" },
+		Variants = { "rbxassetid://9116487032", "rbxassetid://9116486763", METAL_RATTLE },
 		Volume = 0.6,
-		Pitch = 1.05,
+		Pitch = 1.1,
 		PitchJitter = 0.12,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
@@ -223,31 +338,44 @@ EffectsConfig.Sounds = {
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = FAR,
+		Effects = {
+			{ Class = "Reverb", Props = { DecayTime = 1, WetLevel = -14, DryLevel = 0 } } :: EffectSpec,
+		},
 	} :: SoundSpec,
 
 	-- Coming back down. Softer than a slam landing, which is the point of both.
 	FlightLanding = {
-		SoundId = "rbxassetid://9126090621",
+		SoundId = STEEL_SHORT,
 		Volume = 0.5,
-		Pitch = 0.95,
+		Pitch = 0.85,
 		PitchJitter = 0.06,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = FAR,
+		Layers = {
+			{ SoundId = DEBRIS, Volume = 0.3, Pitch = 1, PitchJitter = 0.1 } :: SoundSpec,
+		},
 	} :: SoundSpec,
 
-	-- Crossing into top speed. Fires once per flight, so it can afford to be loud and
-	-- to carry much further than a punch.
+	-- Crossing into top speed. Fires once per flight, so it can afford to be loud and to
+	-- carry much further than a punch. Rebuilt from a short transient and a deep sub: the
+	-- previous 6.8s distant artillery recording read as weather, not as you breaking the
+	-- sound barrier.
 	FlightBoom = {
-		SoundId = "rbxassetid://9113169432",
-		Volume = 0.9,
-		Pitch = 0.9,
+		SoundId = STEEL_MID,
+		Volume = 0.85,
+		Pitch = 0.55,
 		PitchJitter = 0,
 		Spatial = true,
 		RollOffMinDistance = 20,
 		RollOffMaxDistance = 400,
 		Layers = {
-			{ SoundId = SUB_LONG, Volume = 0.7, Pitch = 0.8 } :: SoundSpec,
+			{ SoundId = SUB_LONG, Volume = 0.8, Pitch = 0.6 } :: SoundSpec,
+		},
+		Effects = {
+			{ Class = "PitchShift", Props = { Octave = 0.5 } } :: EffectSpec,
+			{ Class = "Distortion", Props = { Level = 0.22 } } :: EffectSpec,
+			{ Class = "Reverb", Props = { DecayTime = 3, WetLevel = -8, DryLevel = 0, Density = 1 } } :: EffectSpec,
 		},
 	} :: SoundSpec,
 
@@ -255,9 +383,9 @@ EffectsConfig.Sounds = {
 	-- quiet, heavily jittered, two-variant and cooldown-guarded — an unjittered footstep
 	-- four times a second is the fastest way to make a game unbearable. It also has the
 	-- shortest range of anything here: your own steps should not announce you across a
-	-- car park.
+	-- car park. No DSP, deliberately.
 	Footfall = {
-		Variants = { STEP, "rbxassetid://9118687051" },
+		Variants = { STEP, DEBRIS },
 		Volume = 0.22,
 		Pitch = 1,
 		PitchJitter = 0.18,
@@ -271,7 +399,7 @@ EffectsConfig.Sounds = {
 	SprintBurst = {
 		SoundId = "rbxassetid://9120972321",
 		Volume = 0.45,
-		Pitch = 1,
+		Pitch = 0.95,
 		PitchJitter = 0.08,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
@@ -279,41 +407,76 @@ EffectsConfig.Sounds = {
 		Cooldown = 0.4,
 	} :: SoundSpec,
 
-	-- The guard shattering. Distinct from BlockAbsorb because it is the moment the
-	-- player has to react to, and it must not sound like one more absorbed hit.
+	-- The guard shattering. Distinct from BlockAbsorb because it is the moment the player
+	-- has to react to, and it must not sound like one more absorbed hit — so it is the
+	-- full steel slam with a broken, rattling tail rather than a tidy clank.
 	BlockBreak = {
-		SoundId = "rbxassetid://9116460378",
+		SoundId = STEEL_MID,
 		Volume = 0.9,
-		Pitch = 0.95,
+		Pitch = 0.8,
 		PitchJitter = 0,
 		Spatial = true,
 		RollOffMinDistance = NEAR,
 		RollOffMaxDistance = 130,
 		Layers = {
-			{ SoundId = SUB_SHORT, Volume = 0.4, Pitch = 1.1 } :: SoundSpec,
+			{ SoundId = METAL_RATTLE, Volume = 0.55, Pitch = 1.2 } :: SoundSpec,
+			{ SoundId = SUB_SHORT, Volume = 0.4, Pitch = 1 } :: SoundSpec,
+		},
+		Effects = {
+			{ Class = "Distortion", Props = { Level = 0.25 } } :: EffectSpec,
+			{ Class = "Reverb", Props = { DecayTime = 1.6, WetLevel = -8, DryLevel = 0 } } :: EffectSpec,
 		},
 	} :: SoundSpec,
 
-	-- Crossed into a new rank. On the Ui bus: this is feedback about you, not an event
-	-- in the world, and it should not be quieter because you happen to be running away.
-	RankUp = { SoundId = FANFARE, Volume = 0.9, Pitch = 1, PitchJitter = 0, Group = "Ui" } :: SoundSpec,
+	-- Crossed into a new rank. On the Ui bus: this is feedback about you, not an event in
+	-- the world, and it should not be quieter because you happen to be running away.
+	-- A bright metal hit rung out with a long reverb, which reads as an achievement
+	-- without being the 2010 Roblox victory jingle.
+	RankUp = {
+		SoundId = METAL_RATTLE,
+		Volume = 0.8,
+		Pitch = 1.5,
+		PitchJitter = 0,
+		Group = "Ui",
+		Effects = {
+			{ Class = "Equalizer", Props = { LowGain = -10, MidGain = 0, HighGain = 4 } } :: EffectSpec,
+			{ Class = "Reverb", Props = { DecayTime = 2.4, WetLevel = -6, DryLevel = 0, Density = 1 } } :: EffectSpec,
+		},
+	} :: SoundSpec,
 
-	-- Bought a multiplier or a shop item.
-	Purchase = { SoundId = PING, Volume = 0.7, Pitch = 1, PitchJitter = 0, Group = "Ui" } :: SoundSpec,
+	-- Bought a multiplier or a shop item. Short, bright and final.
+	Purchase = {
+		SoundId = "rbxassetid://9118827069",
+		Volume = 0.7,
+		Pitch = 1.3,
+		PitchJitter = 0,
+		Group = "Ui",
+		Effects = {
+			{ Class = "Equalizer", Props = { LowGain = -8, MidGain = 1, HighGain = 3 } } :: EffectSpec,
+			{ Class = "Reverb", Props = { DecayTime = 1.2, WetLevel = -10, DryLevel = 0 } } :: EffectSpec,
+		},
+	} :: SoundSpec,
 
 	-- The character creator taking over the screen. One long low swell rather than a
 	-- click, because it plays under a camera move rather than on a button.
 	CustomizerReveal = {
-		SoundId = LOW_SWELL,
-		Volume = 0.55,
-		Pitch = 0.8,
+		SoundId = SUB_LONG,
+		Volume = 0.6,
+		Pitch = 0.5,
 		PitchJitter = 0,
 		Group = "Ui",
+		Effects = {
+			{
+				Class = "Reverb",
+				Props = { DecayTime = 4, WetLevel = -4, DryLevel = -6, Density = 1, Diffusion = 1 },
+			} :: EffectSpec,
+		},
 	} :: SoundSpec,
 
 	-- A menu button was pressed. Quieter than anything in the world, and jittered,
-	-- because this is the one sound a player can trigger as fast as they can tap.
-	UiClick = { SoundId = CLICK, Volume = 0.25, Pitch = 1.1, PitchJitter = 0.05, Group = "Ui" } :: SoundSpec,
+	-- because this is the one sound a player can trigger as fast as they can tap. No DSP
+	-- for that same reason.
+	UiClick = { SoundId = CLICK, Volume = 0.22, Pitch = 1.6, PitchJitter = 0.06, Group = "Ui" } :: SoundSpec,
 }
 
 --[[
@@ -394,6 +557,24 @@ local function checkSpec(name: string, spec: SoundSpec, failures: { string }, de
 		table.insert(failures, `{name}: Ui sounds cannot be Spatial`)
 	end
 
+	if spec.Effects ~= nil then
+		for _, effect in spec.Effects :: { EffectSpec } do
+			local known = false
+			for _, className in EffectsConfig.EFFECT_CLASSES do
+				if className == effect.Class then
+					known = true
+					break
+				end
+			end
+			if not known then
+				table.insert(failures, `{name}: unknown DSP class "{effect.Class}"`)
+			end
+			if next(effect.Props) == nil then
+				table.insert(failures, `{name}: {effect.Class} sets no properties, so it does nothing`)
+			end
+		end
+	end
+
 	if spec.Layers ~= nil then
 		for index, layer in spec.Layers :: { SoundSpec } do
 			checkSpec(`{name}.Layers[{index}]`, layer, failures, depth + 1)
@@ -405,6 +586,13 @@ function EffectsConfig.RunSelfTest(): { string }
 	local failures: { string } = {}
 	for name, spec in EffectsConfig.Sounds :: { [string]: SoundSpec } do
 		checkSpec(name, spec, failures, 0)
+
+		-- Enforced rather than trusted. Every DSP unit is an Instance created per play,
+		-- and these are the sounds that fire many times a second — a chain added to one
+		-- of them in a hurry would be a frame-rate bug nobody would connect to audio.
+		if EffectsConfig.NO_EFFECTS_ALLOWED[name] and spec.Effects ~= nil then
+			table.insert(failures, `{name}: fires too often to carry per-play DSP`)
+		end
 	end
 	return failures
 end

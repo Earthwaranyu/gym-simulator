@@ -123,6 +123,25 @@ local function playSpec(spec: EffectsConfig.SoundSpec, emitter: BasePart?)
 		sound.Parent = SoundService
 	end
 
+	-- DSP, parented to the Sound so it dies with it. Order matters and is the config's:
+	-- saturating before a reverb colours the whole tail, saturating after only dirties
+	-- the dry signal.
+	if spec.Effects ~= nil then
+		for _, effect in spec.Effects do
+			local ok, instance = pcall(Instance.new, effect.Class .. "SoundEffect")
+			if ok then
+				local unit = instance :: SoundEffect
+				for property, value in effect.Props do
+					-- Per property, so one bad name costs that setting and not the sound.
+					pcall(function()
+						(unit :: any)[property] = value
+					end)
+				end
+				unit.Parent = sound
+			end
+		end
+	end
+
 	sound.Ended:Connect(function()
 		sound:Destroy()
 	end)
@@ -138,7 +157,29 @@ local function playSpec(spec: EffectsConfig.SoundSpec, emitter: BasePart?)
 
 	if spec.Layers ~= nil then
 		for _, layer in spec.Layers do
-			playSpec(layer, emitter)
+			-- A layer inherits the parent's placement unless it overrides it. Without this
+			-- a spatial impact plays its transient from the character and its sub flat
+			-- from the listener, which pulls the two apart in the stereo field and is
+			-- exactly the smearing the layering exists to avoid. Layers are written as
+			-- bare `{ SoundId, Volume, Pitch }` on purpose — repeating the rolloff on
+			-- every one would be noise nobody keeps in sync.
+			local placed: EffectsConfig.SoundSpec = layer
+			if layer.Spatial == nil and spec.Spatial == true then
+				placed = {
+					SoundId = layer.SoundId,
+					Variants = layer.Variants,
+					Volume = layer.Volume,
+					Pitch = layer.Pitch,
+					PitchJitter = layer.PitchJitter,
+					Group = layer.Group or spec.Group,
+					Spatial = true,
+					RollOffMinDistance = layer.RollOffMinDistance or spec.RollOffMinDistance,
+					RollOffMaxDistance = layer.RollOffMaxDistance or spec.RollOffMaxDistance,
+					Effects = layer.Effects,
+					Layers = layer.Layers,
+				}
+			end
+			playSpec(placed, emitter)
 		end
 	end
 end
