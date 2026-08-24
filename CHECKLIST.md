@@ -1870,3 +1870,38 @@ traffic exists:
       outside Roblox, where `SoundGroup` does not exist. The lesson is the process one —
       a green static check is not evidence that the game starts, and this pass is verified
       by `Ignited 38 systems / 0 failures` and a bus assertion over every configured sound.
+
+- [x] 154. **The combat audio stops being foley and starts being designed.** The sounds
+      were bad, and for a specific reason worth recording: they were chosen by reading
+      catalogue descriptions, because whoever writes this config cannot hear it. That
+      produced a ground slam that was **a recording of a table falling over**, a block
+      that was **a golf club hitting a pipe**, a block break that was **medieval
+      manacles**, and four legacy `rbxasset://sounds/` defaults — `victory.wav`,
+      `bass.wav`, `electronicpingshort.wav`, `switch.wav` — which every Roblox player
+      recognises instantly and which made the whole game read as unfinished.
+      **The real constraint, now named.** Roblox's free Pro Sound Effects catalogue is a
+      *foley* library: props, doors, vehicles, room tone. There is no explosion set, no
+      impact-design set, no UI set. Searching it harder was never going to produce a
+      better ground slam, because a better ground slam is not in it. What it does have is
+      good raw material — the "Fight – Hits / Meaty Thud" family is genuinely the right
+      recording for a punch, and the Steel Door family (big hollow slams with long
+      rattling decay) is the right one for everything heavy.
+      **So the jump came from processing, which is how expensive audio is made anyway.**
+      A `SoundSpec` now carries an `Effects` chain, and the game had been using none of
+      the nine DSP units Roblox exposes. Two do most of the work: `Distortion` adds the
+      harmonic bite that separates a hit from a thud, and `PitchShift` drops the body of a
+      sound *without* slowing it — `PlaybackSpeed` does both, which is why the heavy punch
+      used to be the sluggish one. Chains are restricted to the rare big moments and
+      `RunSelfTest` refuses them on Footfall, Rep, UiClick and BlockAbsorb rather than
+      trusting nobody adds one.
+      **A layering bug only running it could find.** Layers do not declare `Spatial`, so a
+      spatial impact was emitting its transient from the character and its sub flat from
+      the listener — pulling the two apart in the stereo field, which is exactly the
+      smearing the layering exists to prevent. Layers now inherit the parent's placement
+      unless they override it. Verified live: a Hard Punch emits three sounds from the
+      root at matching rolloff, and instance counts return to baseline afterwards.
+      **And the actual fix for the root cause.** `AuditionController` (F9, Studio-only,
+      gated like DevService) lists every sound with its layers and DSP, plays it exactly
+      as the game does, and plays each alternate from `SoundCandidates` dry so a recording
+      can be judged as itself rather than through a chain. The guessing loop failed twice;
+      this puts someone who can hear inside it.
