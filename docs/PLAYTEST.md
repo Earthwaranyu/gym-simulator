@@ -35,23 +35,45 @@ session, so the hold-E mount path has **never** been exercised by any automated 
 bounties), real DataStore persistence, Robux purchases, flight and Fast Travel at scale,
 and whether any balance number feels right.
 
+### 2026-08-24 — section 1 verified by machine
+
+Section 1 is ticked, and only section 1. Every box there was read out of a live Studio
+session rather than inferred: server ignition at 32 systems and client at 39, three
+combat abilities loaded, the DevService and MOCK-store warnings present, exactly eleven
+AssetId-0 warnings, zero station warnings, zero non-DataStore errors, 35 tagged gym zones,
+`./scripts/check.sh` green and `validate_gym.py` reporting 35/35 against build
+`319220b972df`.
+
+Also exercised in that session, though it is not a box here: `Migrations.Apply` was fed
+the profile shapes a real DataStore can return and the Studio mock never produces — a
+`SchemaVersion` of zero, negative, fractional, a string, a boolean, absent, and one
+stamped far in the future. Before this session six of those threw inside the join path.
+All now migrate cleanly or are correctly left alone.
+
+**What that run still does not tell you.** No box outside section 1 was touched, because
+nothing outside it can be settled without a human: proximity prompts do not render in an
+MCP-driven session so the hold-E mount path remains unexercised, poses are still measured
+rather than watched, and PvP, real persistence, Robux and balance feel all remain
+untested. A machine can confirm the game boots correctly. It cannot confirm the game is
+any good.
+
 ---
 
 ## 1. It boots
 
-- [ ] `wally install` then `./scripts/check.sh` — all checks pass.
-- [ ] `python3 scripts/validate_gym.py` reports **35 destinations / 35 usable stations, 7 tiers × 5 muscles / 35 unique exercises** and a build hash.
-- [ ] `rojo serve`, connect the Studio plugin, press Play.
-- [ ] Output shows `[Loader/Server] Ignited 32 systems` and `[Loader/Client] Ignited 37
+- [x] `wally install` then `./scripts/check.sh` — all checks pass.
+- [x] `python3 scripts/validate_gym.py` reports **35 destinations / 35 usable stations, 7 tiers × 5 muscles / 35 unique exercises** and a build hash.
+- [x] `rojo serve`, connect the Studio plugin, press Play.
+- [x] Output shows `[Loader/Server] Ignited 32 systems` and `[Loader/Client] Ignited 39
       systems`. A lower number means a system failed to load silently.
-- [ ] Output shows `[DevService] Studio session — dev commands are ACTIVE`. This warning
+- [x] Output shows `[DevService] Studio session — dev commands are ACTIVE`. This warning
       must **never** appear on a live server.
-- [ ] Output shows `[CombatService] Loaded 3 abilities` — Punch, Ground Slam and Hard
+- [x] Output shows `[CombatService] Loaded 3 abilities` — Punch, Ground Slam and Hard
       Punch. Dash is its own service, not an ability.
-- [ ] No red errors in Output. No station warnings — every one of the 35 destination
+- [x] No red errors in Output. No station warnings — every one of the 35 destination
       models must resolve its definition, all three physical copies, their `TrainAnchor`
       spots, and one prompt per copy.
-- [ ] Expected warnings, and only these:
+- [x] Expected warnings, and only these:
   - `[DataService] Studio session using the MOCK store` — see step 7 before launch.
   - `[PurchaseService] "..." has AssetId 0` — one per product, eleven total, see step 8.
   - `[LeaderboardService] Studio session` — global boards need API access.
