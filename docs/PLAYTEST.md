@@ -40,7 +40,7 @@ and whether any balance number feels right.
 ## 1. It boots
 
 - [ ] `wally install` then `./scripts/check.sh` — all checks pass.
-- [ ] `python3 scripts/validate_gym.py` reports **35 destinations / 105 usable stations, 7 tiers × 5 muscles / 35 unique exercises** and a build hash.
+- [ ] `python3 scripts/validate_gym.py` reports **35 destinations / 35 usable stations, 7 tiers × 5 muscles / 35 unique exercises** and a build hash.
 - [ ] `rojo serve`, connect the Studio plugin, press Play.
 - [ ] Output shows `[Loader/Server] Ignited 32 systems` and `[Loader/Client] Ignited 37
       systems`. A lower number means a system failed to load silently.

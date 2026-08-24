@@ -223,7 +223,7 @@ function BodySkinPainter.Get(palette: Palette, progress: number): EditableImage?
 	local stage = math.floor(math.clamp(progress, 0, 1) * BodySkinConfig.STAGES + 0.5)
 	local id = key(palette, stage)
 	local existing = cache[id]
-	if existing ~= nil then
+	if existing then
 		return existing
 	end
 	local image = paint(palette, stage)

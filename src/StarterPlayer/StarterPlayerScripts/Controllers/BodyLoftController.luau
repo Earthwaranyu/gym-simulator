@@ -280,7 +280,7 @@ local function follow(character: Model, entry: Dressed)
 	local inverseRoot = root.CFrame:Inverse()
 	for _, definition in BodyLoftConfig.BONES do
 		local bone = entry.bones[definition.Name]
-		if bone == nil or definition.Name == "Root" then
+		if not bone or definition.Name == "Root" then
 			continue
 		end
 		local limb = character:FindFirstChild(definition.Part)

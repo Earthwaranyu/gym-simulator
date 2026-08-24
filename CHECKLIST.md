@@ -1759,3 +1759,11 @@ traffic exists:
       (actually eleven), and quest ids that had been deleted. A launch gate that fails on
       its own stale facts teaches you to ignore it, which is worse than not having one.
       `PRODUCT_TRUTH.md` and `ALPHA_PROTOCOL.md` carried the same claims.
+
+- [x] 147. **`./scripts/check.sh` passes again.** Step 1 of `PLAYTEST.md` is "all checks
+      pass", and it had not been true for a while: six `--!strict` errors and a shadowed
+      local survived in `UI`, `BodySkinConfig`, `BodySkinPainter`, `BodyLoftController` and
+      `FullMapController`. All six were annotation gaps rather than logic bugs — an
+      untyped `ROLE_ATTRIBUTES` and `validRegions`, `x ~= nil` against a non-nilable type,
+      an unannotated `bounds` parameter — but a gate that always fails is a gate nobody
+      reads, and it would have hidden a real error the day one appeared.

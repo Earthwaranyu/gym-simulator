@@ -161,7 +161,7 @@ end
 ]]
 local MAP_BOARD_WIDTH_PX = 900
 
-local function overlapDistance(bounds): number
+local function overlapDistance(bounds: { Width: number }): number
 	return bounds.Width * (PIN_SIZE / MAP_BOARD_WIDTH_PX)
 end
 
@@ -1161,15 +1161,15 @@ function FullMapController:_render()
 		if unlocked then
 			unlockedCount += 1
 		end
-		local selected = selectedDestination == destination.Id
+		local isSelected = selectedDestination == destination.Id
 		local currentTier = destination.GainMultiplier == self:_currentMultiplier(data, destination.StatId)
 		local pin = Instance.new("TextButton")
 		pin.Name = destination.Id
 		pin.AnchorPoint = Vector2.new(0.5, 0.5)
 		pin.Position = pinPositions[destination.Id]
 		pin.Size = UDim2.fromOffset(
-			if selected then SELECTED_PIN_SIZE else PIN_SIZE,
-			if selected then SELECTED_PIN_SIZE else PIN_SIZE
+			if isSelected then SELECTED_PIN_SIZE else PIN_SIZE,
+			if isSelected then SELECTED_PIN_SIZE else PIN_SIZE
 		)
 		pin.BackgroundColor3 = if currentTier
 			then stat.Color
@@ -1185,7 +1185,7 @@ function FullMapController:_render()
 		pin.Text = `{string.sub(string.upper(stat.DisplayName), 1, 2)}\n×{NumberFormat.Format(
 			destination.GainMultiplier
 		)}`
-		pin.ZIndex = if selected then 25 else 22
+		pin.ZIndex = if isSelected then 25 else 22
 		pin.Parent = viewport
 		registerMapItem(pin)
 		addCorner(pin, 20)
@@ -1194,7 +1194,7 @@ function FullMapController:_render()
 		textLimit.MaxTextSize = 10
 		textLimit.Parent = pin
 		local pinStroke =
-			addBorder(pin, if selected then MAP_PAPER else MAP_INK, 0, if selected then 2 else 1)
+			addBorder(pin, if isSelected then MAP_PAPER else MAP_INK, 0, if isSelected then 2 else 1)
 		pinRecords[destination.Id] = { Button = pin, Stroke = pinStroke }
 		UI.Pressable(pin, { PressScale = 0.9, HoverScale = 1.12 })
 		pin.Activated:Connect(function()

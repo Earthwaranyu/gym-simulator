@@ -229,7 +229,7 @@ end
 function BodySkinConfig.RunSelfTest(): { string }
 	local failures: { string } = {}
 	local validStats = { Arms = true, Chest = true, Back = true, Core = true, Legs = true }
-	local validRegions = {
+	local validRegions: { [string]: boolean } = {
 		Torso = true,
 		LeftArm = true,
 		RightArm = true,

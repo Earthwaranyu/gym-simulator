@@ -202,7 +202,7 @@ export type Roles = {
 	Opacity: string?,
 }
 
-local ROLE_ATTRIBUTES = {
+local ROLE_ATTRIBUTES: { [string]: string } = {
 	Ink = "UIRoleInk",
 	Fill = "UIRoleFill",
 	Stroke = "UIRoleStroke",
@@ -250,7 +250,7 @@ function UI.ApplyTheme(root: Instance, theme: { [string]: any })
 		local ink = lookup(object, "Ink")
 		if ink ~= nil then
 			if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
-				object.TextColor3 = ink
+				(object :: TextLabel).TextColor3 = ink
 			elseif object:IsA("UIStroke") then
 				object.Color = ink
 			elseif object:IsA("GuiObject") then
