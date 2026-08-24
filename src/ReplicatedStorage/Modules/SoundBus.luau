@@ -26,11 +26,15 @@
 	## Why this is code and not `default.project.json`
 
 	The lighting stack next door *is* declared in Rojo, and this deliberately is not.
-	Both the bus tree and the sidechain are **instance references** — `SoundGroup.SoundGroup`
-	and `CompressorSoundEffect.SideChain` point at other instances — and a Rojo project
-	file cannot express a reference to a sibling it also creates. Building it here keeps
-	the wiring in one readable place instead of splitting it between a JSON file that can
-	declare the boxes and a script that has to connect them anyway.
+	`CompressorSoundEffect.SideChain` is an **instance reference** — it points at the Sfx
+	group — and a Rojo project file cannot express a reference to a sibling it also
+	creates. Rojo could declare the tree, but then the boxes would live in a JSON file and
+	the one wire between them in a script, which is worse than having both here.
+
+	Note that the tree itself is plain parenting: a SoundGroup routes into whichever
+	SoundGroup it is a *child* of. There is no `SoundGroup.SoundGroup` property — the class
+	has exactly one member, `Volume` — and assuming otherwise is what broke the client the
+	first time this file was written.
 
 	`Ensure` is idempotent and take-or-create: it adopts anything already present rather
 	than replacing it, so a saved place file that happens to contain a `Master` group does
@@ -89,19 +93,16 @@ function SoundBus.Ensure()
 	local master = ensure("SoundGroup", "Master", SoundService) :: SoundGroup
 	master.Volume = DEFAULTS.Master
 
+	-- Parented to master, which is the whole of the routing.
 	for _, name in CHILDREN do
-		local group = ensure("SoundGroup", name, SoundService) :: SoundGroup
+		local group = ensure("SoundGroup", name, master) :: SoundGroup
 		group.Volume = DEFAULTS[name]
-		-- Cast: SoundGroup nests inside another SoundGroup, but the generated API types
-		-- do not describe the property on the class itself.
-		local nested: any = group
-		nested.SoundGroup = master
 	end
 
-	local sfx = SoundService:FindFirstChild("Sfx") :: SoundGroup
+	local sfx = master:FindFirstChild("Sfx") :: SoundGroup
 
 	for _, name in { "Music", "Ambience" } do
-		local group = SoundService:FindFirstChild(name) :: SoundGroup
+		local group = master:FindFirstChild(name) :: SoundGroup
 		local duck = ensure("CompressorSoundEffect", "DuckUnderSfx", group) :: CompressorSoundEffect
 		duck.Threshold = DUCK_THRESHOLD
 		duck.Ratio = DUCK_RATIO
@@ -111,7 +112,7 @@ function SoundBus.Ensure()
 	end
 
 	-- Carve the impact range out of the music rather than turning the music down.
-	local music = SoundService:FindFirstChild("Music") :: SoundGroup
+	local music = master:FindFirstChild("Music") :: SoundGroup
 	local eq = ensure("EqualizerSoundEffect", "MakeRoomForImpacts", music) :: EqualizerSoundEffect
 	eq.LowGain = -6
 	eq.MidGain = -1
@@ -125,12 +126,19 @@ end
 ]]
 function SoundBus.Get(name: string?): SoundGroup
 	SoundBus.Ensure()
+	local master = SoundService:FindFirstChild("Master") :: SoundGroup
+	-- Sfx is the default, not Master. A spec that names no bus is a world sound, and a
+	-- world sound has to be on Sfx or the compressors have nothing to duck against —
+	-- routing it to Master would silently disable the ducking for almost everything.
 	local wanted = name or "Sfx"
-	local group = SoundService:FindFirstChild(wanted)
+	if wanted == "Master" then
+		return master
+	end
+	local group = master:FindFirstChild(wanted)
 	if group ~= nil and group:IsA("SoundGroup") then
 		return group
 	end
-	return SoundService:FindFirstChild("Master") :: SoundGroup
+	return master
 end
 
 --[[
@@ -140,8 +148,8 @@ end
 function SoundBus.SetVolumes(master: number, music: number, sfx: number)
 	SoundBus.Ensure()
 	local function set(name: string, scale: number)
-		local group = SoundService:FindFirstChild(name)
-		if group ~= nil and group:IsA("SoundGroup") then
+		local group = SoundBus.Get(name)
+		if group.Name == name then
 			group.Volume = DEFAULTS[name] * math.clamp(scale, 0, 1)
 		end
 	end

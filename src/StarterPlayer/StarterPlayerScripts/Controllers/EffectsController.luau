@@ -68,10 +68,16 @@ local GAIN_HOLD = 0.5
 -- outstayed its welcome would be a permanent red frame in any real fight.
 local HURT_FLASH_SECONDS = 0.34
 
--- Last play time per effect name, for the specs that declare a Cooldown. Footfalls and
--- sprint bursts fire off continuous state rather than discrete events, so without this a
--- single frame of jitter at the threshold retriggers them.
-local lastPlayed: { [string]: number } = {}
+-- Last play time per effect, per emitter, for the specs that declare a Cooldown.
+-- Footfalls and sprint bursts fire off continuous state rather than discrete events, so
+-- without this a single frame of jitter at the threshold retriggers them.
+--
+-- Keyed by the emitter Instance itself. The inner tables are weak-keyed so a character
+-- that despawns is collected instead of being held for the session, and an Instance key
+-- avoids building a string on every footstep — the highest-frequency sound in the game.
+local lastPlayed: { [string]: { [Instance]: number } } = {}
+-- The 2D case still needs a slot; SoundService stands in as "no emitter".
+local NO_EMITTER: Instance = SoundService
 
 --[[
 	Resolves the one id this play will use. `Variants` is picked uniformly at random so a
@@ -192,15 +198,21 @@ function EffectsController:Play(name: string, emitter: BasePart?)
 
 	if spec.Cooldown ~= nil then
 		-- Keyed per emitter, not per effect. These handlers run for every visible
-		-- character, so a single global key would let the nearest runner's footsteps
+		-- character, so a single shared key would let the nearest runner's footsteps
 		-- swallow everybody else's — the cooldown is there to stop one character
 		-- machine-gunning, not to ration the sound across a crowd.
-		local key = if emitter ~= nil then `{name}|{emitter:GetDebugId()}` else name
+		local perEmitter = lastPlayed[name]
+		if perEmitter == nil then
+			perEmitter = setmetatable({}, { __mode = "k" }) :: any
+			lastPlayed[name] = perEmitter
+		end
+
+		local key: Instance = emitter or NO_EMITTER
 		local now = os.clock()
-		if now - (lastPlayed[key] or -math.huge) < spec.Cooldown then
+		if now - (perEmitter[key] or -math.huge) < spec.Cooldown then
 			return
 		end
-		lastPlayed[key] = now
+		perEmitter[key] = now
 	end
 
 	playSpec(spec, emitter)

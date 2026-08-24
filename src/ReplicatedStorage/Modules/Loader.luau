@@ -159,12 +159,26 @@ function Loader.Ignite()
 		return a.name < b.name
 	end)
 
+	--[[
+		A failed Init costs that system, not the realm.
+
+		This used to `error`, which aborted Ignite before the Start loop below ever ran —
+		so one broken controller meant *no* controller was started: no HUD, no lighting
+		grade, no body mesh, just a default avatar on a default baseplate. A cosmetic
+		system taking the whole client down with it is far worse than that system being
+		missing, and Start already took the other view two loops down.
+
+		The cost is real and accepted: a system whose Init half-completed carries on, so a
+		dependency it never resolved can resurface later as a confusing nil rather than as
+		this loud failure. The warning below is what keeps that findable — it names the
+		system and carries the traceback, at the moment it happens.
+	]]
 	for _, entry in entries do
 		local init = entry.system.Init
 		if init then
 			local ok, err = xpcall(init, debug.traceback, entry.system)
 			if not ok then
-				error(`[Loader/{REALM}] {entry.name}:Init() failed:\n{err}`)
+				warn(`[Loader/{REALM}] {entry.name}:Init() failed:\n{err}`)
 			end
 		end
 	end

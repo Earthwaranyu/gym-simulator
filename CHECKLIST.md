@@ -1840,3 +1840,33 @@ traffic exists:
       limits the settings remote to four calls, and `_refresh` would destroy the slider
       under the finger still dragging it — so the drag writes straight to the mix and only
       the release reaches the server.
+
+- [x] 153. **A cosmetic controller could blank the whole client, and did.** Pressing Play
+      gave a default blocky avatar, a default blue sky and no HUD — not a sound bug in
+      effect, but the entire client failing to start.
+      **The mistake.** `SoundBus` set `SoundGroup.SoundGroup` to nest the buses. That
+      property does not exist: the class has exactly one member, `Volume`, and groups nest
+      by *parenting*. `luau-lsp` reported it and it was silenced with a `:: any` cast —
+      overriding the type checker to make a build go green is what turned a compile error
+      into a runtime one. The cast is gone and nothing in that file needs `any`.
+      **Why it cost the whole game.** `Loader.Ignite` called `error()` on any failed
+      `Init`, which aborted ignition before the `Start` loop ran — so every controller was
+      initialised and *none* was started: no UI built, no lighting grade applied, no body
+      mesh. `Start` failures were already isolated with `warn`; `Init` now matches. A
+      broken system loses its own feature and nothing else. The tradeoff is accepted and
+      recorded in the file: a half-initialised system carries on, so a dependency it never
+      resolved can resurface later as a confusing nil instead of as one loud failure.
+      **A second bug found while auditing for the same class of error.**
+      `emitter:GetDebugId()` in the footfall cooldown is PluginSecurity and cannot be
+      called from a LocalScript; it had never executed only because MusicController
+      (priority 6) died before EffectsController (priority 5) reached `Start`. The
+      cooldown is now a weak-keyed table indexed by the emitter Instance, which is legal,
+      collects despawned characters, and builds no string on the most frequent sound in
+      the game.
+      **And one caught only by running it.** Rewriting `SoundBus.Get` lost its `or "Sfx"`
+      default, so every world sound routed to Master — where the sidechain compressors
+      have nothing to duck against, silently disabling the ducking for sixteen of the
+      twenty sounds. `check.sh` was green throughout all of this: the self-tests run
+      outside Roblox, where `SoundGroup` does not exist. The lesson is the process one —
+      a green static check is not evidence that the game starts, and this pass is verified
+      by `Ignited 38 systems / 0 failures` and a bus assertion over every configured sound.
