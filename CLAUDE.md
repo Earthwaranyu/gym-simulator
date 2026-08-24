@@ -38,6 +38,13 @@ No Toolbox models, no third-party meshes, no uploaded animations. Nothing in the
 may be someone else's copyrighted work. Machines are built from Roblox primitives and
 training animations are generated from joint angles in `PoseConfig.luau`.
 
+Audio is the one category we do not generate, since Roblox cannot synthesise sound at
+runtime. It comes from Roblox's own licensed library only — `ProSoundEffects` and other
+verified first-party catalogues, free for use in any experience. Community audio uploads
+are off-limits for the same reason Toolbox models are: much of that pool is ripped from
+commercial games, and an asset that gets moderated takes the sound with it. See the
+header of `EffectsConfig.luau`.
+
 The one mesh asset is the player's body, generated for this project by Studio's mesh
 generator and cut into R15 parts by `BodyMeshConfig`/`BodyMeshBuilder`. It is allowed
 because it is ours, not because meshes in general are: a mesh from the Toolbox or an

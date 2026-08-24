@@ -2,14 +2,24 @@
 --[[
 	EffectsConfig — sound and visual presets, declared as data.
 
-	SoundIds are intentionally left blank. Roblox asset ids have to come from real
-	uploaded or Marketplace assets; inventing plausible-looking numbers would produce
-	silent failures or, worse, play whatever unrelated asset happens to own that id.
-	EffectsController skips any entry with an empty SoundId, so the game runs fine
-	without them and starts making noise the moment you paste ids in.
+	Every filled SoundId comes from Roblox's own licensed library — the `ProSoundEffects`
+	catalogue, whose entries carry "Courtesy of Pro Sound Effects" and are free to use in
+	any experience. That is not a convenience, it is the assets rule: the community audio
+	pool is full of ripped game audio (searching for a footstep returns Half-Life 2 and
+	CS:GO clips; searching for an explosion returns one credited to Santa Monica Studio),
+	and a moderated-away asset takes the sound with it. Verified-creator, first-party audio
+	cannot do either.
 
-	To fill these in: find a sound on the Creator Marketplace, copy its asset id, and
-	set SoundId to "rbxassetid://<id>".
+	Six ids are still blank, and deliberately so rather than filled with something close
+	enough: FlightBoom, Footfall, RankUp, Purchase, CustomizerReveal and UiClick. The
+	licensed catalogue is a foley and impact library — it has no clean UI click, no musical
+	sting and no isolated footstep, and the community results for those are exactly the
+	ripped audio described above. EffectsController skips an empty SoundId, so these six
+	are silent rather than broken.
+
+	To fill one in: find a sound whose creator is Roblox or ProSoundEffects, copy its asset
+	id, and set SoundId to "rbxassetid://<id>". Do not paste an id from an unverified
+	uploader without checking what it actually is.
 ]]
 
 export type SoundSpec = {
@@ -24,28 +34,28 @@ local EffectsConfig = {}
 
 EffectsConfig.Sounds = {
 	-- An exercise motion landing. TrainingGain fires it on the completed-rep beat.
-	Rep = { SoundId = "", Volume = 0.35, Pitch = 1, PitchJitter = 0.08 } :: SoundSpec,
+	Rep = { SoundId = "rbxassetid://9125672726", Volume = 0.35, Pitch = 1, PitchJitter = 0.08 } :: SoundSpec,
 	-- You landed a punch.
-	Hit = { SoundId = "", Volume = 0.6, Pitch = 1, PitchJitter = 0.1 } :: SoundSpec,
+	Hit = { SoundId = "rbxassetid://9116486763", Volume = 0.6, Pitch = 1, PitchJitter = 0.1 } :: SoundSpec,
 	-- You took a punch.
-	Hurt = { SoundId = "", Volume = 0.7, Pitch = 0.95, PitchJitter = 0.1 } :: SoundSpec,
+	Hurt = { SoundId = "rbxassetid://9116488391", Volume = 0.7, Pitch = 0.95, PitchJitter = 0.1 } :: SoundSpec,
 	-- Someone was knocked out.
-	Knockout = { SoundId = "", Volume = 0.8, Pitch = 1, PitchJitter = 0 } :: SoundSpec,
+	Knockout = { SoundId = "rbxassetid://9113472000", Volume = 0.8, Pitch = 1, PitchJitter = 0 } :: SoundSpec,
 	-- Ground Slam winding up: the crouch and the leap. Quiet and rising, so the
 	-- impact that follows has somewhere to come from.
-	SlamWindup = { SoundId = "", Volume = 0.5, Pitch = 0.9, PitchJitter = 0.05 } :: SoundSpec,
+	SlamWindup = { SoundId = "rbxassetid://9120972444", Volume = 0.5, Pitch = 0.9, PitchJitter = 0.05 } :: SoundSpec,
 	-- Ground Slam landing. The loudest thing in the game on purpose.
-	SlamImpact = { SoundId = "", Volume = 1, Pitch = 0.85, PitchJitter = 0.06 } :: SoundSpec,
+	SlamImpact = { SoundId = "rbxassetid://9126090979", Volume = 1, Pitch = 0.85, PitchJitter = 0.06 } :: SoundSpec,
 	-- Hard Punch connecting. Lower and heavier than Hit, which is the jab.
-	HeavyHit = { SoundId = "", Volume = 0.85, Pitch = 0.8, PitchJitter = 0.08 } :: SoundSpec,
+	HeavyHit = { SoundId = "rbxassetid://9116488784", Volume = 0.85, Pitch = 0.8, PitchJitter = 0.08 } :: SoundSpec,
 	-- A guard going up.
-	BlockRaise = { SoundId = "", Volume = 0.55, Pitch = 1.15, PitchJitter = 0.04 } :: SoundSpec,
+	BlockRaise = { SoundId = "rbxassetid://9118269934", Volume = 0.55, Pitch = 1.15, PitchJitter = 0.04 } :: SoundSpec,
 	-- A hit stopped by a guard. Jittered because it can happen several times a second.
-	BlockAbsorb = { SoundId = "", Volume = 0.6, Pitch = 1.05, PitchJitter = 0.12 } :: SoundSpec,
+	BlockAbsorb = { SoundId = "rbxassetid://9116487032", Volume = 0.6, Pitch = 1.05, PitchJitter = 0.12 } :: SoundSpec,
 	-- Leaving the ground.
-	FlightTakeoff = { SoundId = "", Volume = 0.6, Pitch = 1.05, PitchJitter = 0.05 } :: SoundSpec,
+	FlightTakeoff = { SoundId = "rbxassetid://9120972724", Volume = 0.6, Pitch = 1.05, PitchJitter = 0.05 } :: SoundSpec,
 	-- Coming back down. Softer than a slam landing, which is the point of both.
-	FlightLanding = { SoundId = "", Volume = 0.5, Pitch = 0.95, PitchJitter = 0.06 } :: SoundSpec,
+	FlightLanding = { SoundId = "rbxassetid://9126090621", Volume = 0.5, Pitch = 0.95, PitchJitter = 0.06 } :: SoundSpec,
 	-- Crossing into top speed. Fires once per flight, so it can afford to be loud.
 	FlightBoom = { SoundId = "", Volume = 0.9, Pitch = 0.9, PitchJitter = 0 } :: SoundSpec,
 	-- A foot landing. By far the most frequently played sound in the game once ids are
@@ -53,10 +63,10 @@ EffectsConfig.Sounds = {
 	-- a second is the fastest way to make a game unbearable.
 	Footfall = { SoundId = "", Volume = 0.22, Pitch = 1, PitchJitter = 0.18 } :: SoundSpec,
 	-- Committing to a sprint.
-	SprintBurst = { SoundId = "", Volume = 0.45, Pitch = 1, PitchJitter = 0.08 } :: SoundSpec,
+	SprintBurst = { SoundId = "rbxassetid://9120972321", Volume = 0.45, Pitch = 1, PitchJitter = 0.08 } :: SoundSpec,
 	-- The guard shattering. Distinct from BlockAbsorb because it is the moment the
 	-- player has to react to, and it must not sound like one more absorbed hit.
-	BlockBreak = { SoundId = "", Volume = 0.9, Pitch = 0.95, PitchJitter = 0 } :: SoundSpec,
+	BlockBreak = { SoundId = "rbxassetid://9116460378", Volume = 0.9, Pitch = 0.95, PitchJitter = 0 } :: SoundSpec,
 	-- Crossed into a new rank.
 	RankUp = { SoundId = "", Volume = 0.9, Pitch = 1, PitchJitter = 0 } :: SoundSpec,
 	-- Bought a multiplier or a shop item.
