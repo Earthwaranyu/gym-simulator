@@ -198,9 +198,9 @@ function EffectsController:_applyVolumes()
 	end
 	local settings = data.Settings
 	SoundBus.SetVolumes(
-		(settings.MasterVolume or 100) / 100,
-		(settings.MusicVolume or 100) / 100,
-		(settings.SfxVolume or 100) / 100
+		SoundBus.ReadVolume(settings, "MasterVolume", 100),
+		SoundBus.ReadVolume(settings, "MusicVolume", 70),
+		SoundBus.ReadVolume(settings, "SfxVolume", 100)
 	)
 end
 
@@ -228,7 +228,7 @@ function EffectsController:Play(name: string, emitter: BasePart?)
 	local data = if ProfileController ~= nil then ProfileController:Get() else nil
 	-- Cheap gate. The Sfx bus is already at zero volume, but a muted player should not
 	-- pay to decode a sound they will not hear.
-	if data ~= nil and (data.Settings.SfxVolume or 100) <= 0 then
+	if data ~= nil and SoundBus.ReadVolume(data.Settings, "SfxVolume", 100) <= 0 then
 		return
 	end
 

@@ -103,7 +103,7 @@ function MusicController:_readSettings()
 	if data == nil then
 		return
 	end
-	enabled = (data.Settings.MusicVolume or 0) > 0
+	enabled = SoundBus.ReadVolume(data.Settings, "MusicVolume", 70) > 0
 end
 
 function MusicController:Start()

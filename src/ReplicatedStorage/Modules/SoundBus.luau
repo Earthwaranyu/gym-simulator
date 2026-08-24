@@ -142,6 +142,26 @@ function SoundBus.Get(name: string?): SoundGroup
 end
 
 --[[
+	One saved volume, as a number between 0 and 1.
+
+	Profile data comes back from a DataStore, so a volume can be a string, a NaN, absent,
+	or wildly out of range — from a corrupt write, a rolled-back build, or someone who
+	found a way to poke the settings remote. Every read site used to do raw arithmetic
+	(`(settings.MusicVolume or 100) / 100`) or a raw comparison (`... <= 0`), and both
+	*throw* on a non-number rather than falling back, which would have taken audio down on
+	exactly the profiles least able to afford another problem.
+
+	Centralised because there were three such sites and the fourth would have got it wrong.
+]]
+function SoundBus.ReadVolume(settings: any, key: string, default: number): number
+	local value = if type(settings) == "table" then settings[key] else nil
+	if type(value) ~= "number" or value ~= value then
+		return math.clamp(default, 0, 100) / 100
+	end
+	return math.clamp(value, 0, 100) / 100
+end
+
+--[[
 	Applies the player's saved volumes. Values are 0-1; the stored defaults are the
 	ceiling, so a slider at maximum is the mix as authored rather than louder than it.
 ]]
