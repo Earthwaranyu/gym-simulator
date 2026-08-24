@@ -30,16 +30,19 @@ function MenuBarController:Init()
 	EffectsController = Loader.Get("EffectsController")
 end
 
+-- The bar repaints itself on every open and close, so it reads the dark table
+-- directly rather than going through UI.ApplyTheme: an applicator run once at build
+-- time would be undone by the very next state change.
 local function paint(open: boolean)
-	menuButton.BackgroundColor3 = if open then UI.Palette.Accent else UI.Palette.Glass
+	menuButton.BackgroundColor3 = if open then UI.Dark.Accent else UI.Dark.Glass
 	menuButton.BackgroundTransparency = if open then 0.02 else 0.08
-	menuButton.TextColor3 = if open then UI.Palette.Backdrop else UI.Palette.Text
-	iconTile.BackgroundColor3 = if open then UI.Palette.Backdrop else UI.Palette.Accent
-	buttonStroke.Color = if open then UI.Palette.Accent else UI.Palette.GlassStroke
+	menuButton.TextColor3 = if open then UI.Dark.OnAccent else UI.Dark.Text
+	iconTile.BackgroundColor3 = if open then UI.Dark.Backdrop else UI.Dark.Accent
+	buttonStroke.Color = if open then UI.Dark.Accent else UI.Dark.GlassStroke
 	buttonStroke.Transparency = if open then 0.05 else 0.45
 
 	for _, bar in iconBars do
-		bar.BackgroundColor3 = if open then UI.Palette.Accent else UI.Palette.Backdrop
+		bar.BackgroundColor3 = if open then UI.Dark.Accent else UI.Dark.Backdrop
 	end
 end
 
@@ -61,13 +64,13 @@ function MenuBarController:_build()
 		then UDim2.new(1, -18, 1, -146)
 		else UDim2.new(1, -18, 1, -18)
 	menuButton.Size = UDim2.fromOffset(132, 54)
-	menuButton.BackgroundColor3 = UI.Palette.Glass
+	menuButton.BackgroundColor3 = UI.Dark.Glass
 	menuButton.BackgroundTransparency = 0.08
 	menuButton.BorderSizePixel = 0
 	menuButton.AutoButtonColor = false
 	menuButton.Font = UI.Font.Heading
 	menuButton.TextSize = 17
-	menuButton.TextColor3 = UI.Palette.Text
+	menuButton.TextColor3 = UI.Dark.Text
 	menuButton.TextXAlignment = Enum.TextXAlignment.Right
 	menuButton.Text = "MENU   "
 	menuButton.Parent = screen
@@ -77,7 +80,7 @@ function MenuBarController:_build()
 	buttonCorner.Parent = menuButton
 
 	buttonStroke = Instance.new("UIStroke")
-	buttonStroke.Color = UI.Palette.GlassStroke
+	buttonStroke.Color = UI.Dark.GlassStroke
 	buttonStroke.Thickness = 2
 	buttonStroke.Transparency = 0.45
 	buttonStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -88,7 +91,7 @@ function MenuBarController:_build()
 	iconTile.AnchorPoint = Vector2.new(0, 0.5)
 	iconTile.Position = UDim2.new(0, 7, 0.5, 0)
 	iconTile.Size = UDim2.fromOffset(40, 40)
-	iconTile.BackgroundColor3 = UI.Palette.Accent
+	iconTile.BackgroundColor3 = UI.Dark.Accent
 	iconTile.BorderSizePixel = 0
 	iconTile.Parent = menuButton
 
@@ -106,7 +109,7 @@ function MenuBarController:_build()
 		bar.AnchorPoint = Vector2.new(0.5, 0.5)
 		bar.Position = UDim2.fromOffset(20, 12 + (index - 1) * 8)
 		bar.Size = UDim2.fromOffset(width, 3)
-		bar.BackgroundColor3 = UI.Palette.Backdrop
+		bar.BackgroundColor3 = UI.Dark.Backdrop
 		bar.BorderSizePixel = 0
 		bar.Parent = iconTile
 

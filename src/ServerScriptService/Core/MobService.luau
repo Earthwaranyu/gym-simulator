@@ -89,6 +89,20 @@ type Live = {
 }
 
 local live: { [Model]: Live } = {}
+--[[
+	When each killed mob's slot is allowed to refill, keyed by mob id.
+
+	`_maintainFields` counts *living* mobs and tops the field back up to Population,
+	and a corpse has zero health — so a kill freed its slot on the very next AI tick,
+	a quarter of a second later. `RespawnSeconds` has been sitting in MobConfig since
+	the beginning read by nothing, which made a mob field a conveyor belt for anyone
+	able to clear it faster than they could walk between spawns.
+
+	A kill parks a timestamp here; the field treats that as an occupied slot until it
+	matures. Timers keep maturing while a field is asleep, so walking back into range
+	still finds it full, which is the behaviour the wake radius always intended.
+]]
+local respawnAt: { [string]: { number } } = {}
 local mobFolder: Folder
 -- Zone id -> os.clock() at which that tier's boss may next appear.
 local nextBossAt: { [string]: number } = {}
@@ -580,6 +594,34 @@ function MobService:_broadcastBossState()
 	lastBroadcastAt = now
 end
 
+--[[
+	How many of a field's slots are still cooling down, dropping any that have matured.
+
+	Pure, and exposed rather than local, because it cannot be exercised through the
+	game: a mob only queues a respawn when `_damage` kills it, so a test that sets
+	`Humanoid.Health = 0` from a console bypasses the whole path — no respawn is
+	queued, no corpse is cleaned up, and the field refills instantly, which looks
+	exactly like this function being broken. It is not, and proving that needs to be
+	possible without landing a real punch.
+
+	Maturing here rather than on a timer means a field asleep for ten minutes settles
+	its entire backlog the first time somebody walks back into range.
+]]
+function MobService.CoolingSlots(queue: { number }?, now: number): number
+	if queue == nil then
+		return 0
+	end
+	local index = 1
+	while index <= #queue do
+		if now >= queue[index] then
+			table.remove(queue, index)
+		else
+			index += 1
+		end
+	end
+	return #queue
+end
+
 function MobService:_maintainFields()
 	for _, site in MobConfig.Sites("Normal") do
 		local definition = site.Mob
@@ -600,7 +642,10 @@ function MobService:_maintainFields()
 			end
 		end
 
-		for _ = alive + 1, population do
+		-- Slots still cooling down count as occupied.
+		local waiting = MobService.CoolingSlots(respawnAt[definition.Id], os.clock())
+
+		for _ = alive + waiting + 1, population do
 			self:_spawn(
 				definition,
 				home,
@@ -725,8 +770,21 @@ function MobService:_damage(attacker: Player, model: Model, damage: number): (nu
 			nextBossAt[definition.ZoneId] = os.clock() + BOSS_PERIOD
 		end
 
+		if definition.Kind ~= "Boss" then
+			local cooldown = definition.RespawnSeconds
+			if cooldown ~= nil and cooldown > 0 then
+				local queue = respawnAt[definition.Id]
+				if queue == nil then
+					queue = {}
+					respawnAt[definition.Id] = queue
+				end
+				table.insert(queue, os.clock() + cooldown)
+			end
+		end
+
 		-- Leave the corpse for a beat so the kill reads, then clear it. The respawn
-		-- loop counts living mobs, so the field refills on its own schedule.
+		-- loop counts living mobs and cooling slots, so the field refills on its own
+		-- schedule rather than the moment the health hits zero.
 		task.delay(3, function()
 			if live[model] ~= nil then
 				self:_despawn(model)

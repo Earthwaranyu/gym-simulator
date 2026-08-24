@@ -171,7 +171,11 @@ end
 COMMANDS["/unlockall"] = function(player: Player, _args: { string })
 	local needed = 0
 	for _, tier in WeightConfig.List do
-		needed = math.max(needed, tier.RequiredStat)
+		-- MaxRequiredStat, not RequiredStat: the latter is only the price of admission
+		-- to a district, and clearing it leaves every plate above the lightest still
+		-- locked. Storm opens at 50M and its heaviest plate wants 500M, so keying off
+		-- the entry gate unlocked the district and none of its loads.
+		needed = math.max(needed, tier.MaxRequiredStat)
 	end
 	for _, definition in EquipmentConfig.List do
 		needed = math.max(needed, definition.UnlockPower)
@@ -243,11 +247,10 @@ end
 COMMANDS["/autoload"] = function(player: Player, _args: { string })
 	local enabled = player:GetAttribute("AutoLoadOwned") ~= true
 	player:SetAttribute("AutoLoadOwned", enabled)
-	local data = DataService:GetData(player)
-	if data ~= nil then
-		data.AutoLoadEnabled = enabled
-		DataService:MarkDirty(player)
-	end
+	-- Through TrainingService rather than by writing the saved flag here, so a player
+	-- already on a machine sees the bar reload. Setting the flag alone left the command
+	-- looking broken from a seat: the setting changed and nothing else did.
+	Loader.Get("TrainingService"):SetAutoLoad(player, enabled)
 	notify(player, if enabled then "Auto Load Studio override ON" else "Auto Load Studio override OFF")
 end
 

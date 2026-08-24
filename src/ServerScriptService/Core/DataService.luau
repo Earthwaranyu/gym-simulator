@@ -193,7 +193,7 @@ end
 
 --[[
 	Convenience for the common read-modify-mark cycle:
-		DataService:Update(player, function(data) data.Cash += 100 end)
+		DataService:Update(player, function(data) data.Tokens += 100 end)
 	Returns false if the player has no loaded profile.
 ]]
 function DataService:Update(player: Player, mutator: (Types.ProfileData) -> ()): boolean

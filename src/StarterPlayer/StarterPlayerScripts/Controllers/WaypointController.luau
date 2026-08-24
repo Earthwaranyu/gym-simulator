@@ -49,7 +49,7 @@ local screen: ScreenGui? = nil
 
 local target: Vector3? = nil
 local targetName = ""
-local targetColor = Color3.new(1, 1, 1)
+local targetColor = UI.Palette.Accent
 local connection: RBXScriptConnection? = nil
 
 local ToastController: any = nil

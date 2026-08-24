@@ -31,7 +31,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
-local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local TokenMultiplierConfig = require(ReplicatedStorage.Modules.TokenMultiplierConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local AnalyticsSchema = require(ReplicatedStorage.Modules.AnalyticsSchema)
 
@@ -246,6 +246,7 @@ function AnalyticsService:Start()
 	local StatService = Loader.Get("StatService")
 	local CombatService = Loader.Get("CombatService")
 	local TokenService = Loader.Get("TokenService")
+	local FightTokenService = Loader.Get("FightTokenService")
 	local TrainingService = Loader.Get("TrainingService")
 	local MultiplierService = Loader.Get("MultiplierService")
 	local PurchaseService = Loader.Get("PurchaseService")
@@ -383,11 +384,20 @@ function AnalyticsService:Start()
 		-- The token sink. Cost is re-derived from the level that was just bought rather
 		-- than passed along, so the sink can never disagree with the price the player
 		-- actually paid.
-		logEconomy(player, "Sink", "Tokens", Formulas.MultiplierCost(level - 1), `Multiplier_{statId}`)
+		local purchased = TokenMultiplierConfig.Get(level)
+		logEconomy(player, "Sink", "Tokens", purchased.CostToUnlock, `MuscleMultiplier_{statId}`)
 	end)
 
 	TokenService.TokensAwarded:Connect(function(player: Player, amount: number)
 		logEconomy(player, "Source", "Tokens", amount, "Accrual")
+	end)
+
+	FightTokenService.TokensAwarded:Connect(function(player: Player, amount: number)
+		logEconomy(player, "Source", "FightTokens", amount, "RewardedKO")
+	end)
+
+	FightTokenService.TokensSpent:Connect(function(player: Player, amount: number)
+		logEconomy(player, "Sink", "FightTokens", amount, "PhysiqueTransformation")
 	end)
 
 	QuestService.QuestCompleted:Connect(function(player: Player, quest: any)
