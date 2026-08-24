@@ -989,6 +989,13 @@ function VfxController:_playStrike(character: Model, strikeId: string)
 				return
 			end
 
+			-- The cue's own name is the sound's name. A cue with no matching entry in
+			-- EffectsConfig is silent rather than an error, so the visual and the audio
+			-- can be authored independently and still land on the same frame.
+			if EffectsController ~= nil then
+				EffectsController:Play(scheduled.Effect, root)
+			end
+
 			local attach = scheduled.Attach
 			if attach == "Ground" then
 				local radius = character:GetAttribute(SLAM_RADIUS_ATTRIBUTE)
@@ -1010,6 +1017,20 @@ function VfxController:_playStrike(character: Model, strikeId: string)
 end
 
 function VfxController:_watch(character: Model)
+	-- A knockout is heard on every character for the same reason the guard is seen on
+	-- every character: a kill happening near you is information, and #5 of the design
+	-- rules makes dying the only thing that breaks a set. Driven off the humanoid rather
+	-- than off a new remote, because the death already replicates.
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid ~= nil then
+		humanoid.Died:Connect(function()
+			local root = rootOf(character)
+			if root ~= nil and EffectsController ~= nil then
+				EffectsController:Play("Knockout", root)
+			end
+		end)
+	end
+
 	character:GetAttributeChangedSignal(StrikeConfig.STRIKE_ATTRIBUTE):Connect(function()
 		local at = character:GetAttribute(StrikeConfig.STRIKE_ATTRIBUTE)
 		if type(at) ~= "number" then
@@ -1034,7 +1055,7 @@ function VfxController:_watch(character: Model)
 			-- state. Both fire from the same attribute so they cannot disagree.
 			self:Play("BlockRaise", root.CFrame, root, nil, character)
 			if EffectsController ~= nil then
-				EffectsController:Play("BlockRaise")
+				EffectsController:Play("BlockRaise", root)
 			end
 		else
 			dropGuard(character)
@@ -1075,7 +1096,7 @@ function VfxController:_watch(character: Model)
 		)
 
 		if EffectsController ~= nil then
-			EffectsController:Play(if tier == "Crushing" then "HeavyHit" else "Hit")
+			EffectsController:Play(if tier == "Crushing" then "HeavyHit" else "Hit", root)
 		end
 	end)
 
@@ -1101,7 +1122,7 @@ function VfxController:_watch(character: Model)
 					character
 				)
 				if EffectsController ~= nil then
-					EffectsController:Play("FlightTakeoff")
+					EffectsController:Play("FlightTakeoff", root)
 				end
 			end
 			raiseContrail(character)
@@ -1115,7 +1136,7 @@ function VfxController:_watch(character: Model)
 				character
 			)
 			if EffectsController ~= nil then
-				EffectsController:Play("FlightLanding")
+				EffectsController:Play("FlightLanding", root)
 			end
 		end
 	end)
@@ -1196,7 +1217,7 @@ function VfxController:_updateFlight()
 				boomArmed = true
 				self:Play("FlightBoom", root.CFrame, root, nil, localCharacter)
 				if EffectsController ~= nil then
-					EffectsController:Play("FlightBoom")
+					EffectsController:Play("FlightBoom", root)
 				end
 			end
 		end
@@ -1225,6 +1246,9 @@ function VfxController:PlayFootfall(character: Model, root: BasePart, blend: num
 	end
 	-- On the floor, not on the hips. The dust belongs where the foot is.
 	self:Play("Footfall", CFrame.new(root.Position - Vector3.yAxis * ROOT_TO_FLOOR), root, nil, character)
+	if EffectsController ~= nil then
+		EffectsController:Play("Footfall", root)
+	end
 end
 
 --[[
@@ -1279,7 +1303,7 @@ function VfxController:_updateSprint()
 				character
 			)
 			if EffectsController ~= nil then
-				EffectsController:Play("SprintBurst")
+				EffectsController:Play("SprintBurst", root)
 			end
 		end
 	elseif blend < SPRINT_BURST_BLEND * 0.85 then
@@ -1316,7 +1340,7 @@ function VfxController:Start()
 			pulseGuard(character)
 			self:Play("BlockAbsorb", root.CFrame, root, nil, character)
 			if EffectsController ~= nil then
-				EffectsController:Play("BlockAbsorb")
+				EffectsController:Play("BlockAbsorb", root)
 			end
 		elseif payload.Kind == "Break" then
 			-- Dropped here as well as on the attribute. The break and the attribute
@@ -1326,7 +1350,7 @@ function VfxController:Start()
 			dropGuard(character)
 			self:Play("BlockBreak", root.CFrame, root, nil, character)
 			if EffectsController ~= nil then
-				EffectsController:Play("BlockBreak")
+				EffectsController:Play("BlockBreak", root)
 			end
 		end
 	end)
