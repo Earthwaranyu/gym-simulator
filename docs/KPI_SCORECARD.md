@@ -114,7 +114,8 @@ incomplete or unvalidated · **NOT WIRED** = must be added by #98.
 
 | Metric | Definition | Source | Status |
 |---|---|---|---|
-| Token source/sink balance | tokens granted vs spent per player-hour | `LogEconomy` | PARTIAL (accrual source and multiplier sink wired; cash sinks still missing) |
+| Token source/sink balance | tokens granted vs spent per player-hour | `LogEconomy` | PARTIAL (accrual, quest and boss sources wired; multiplier sink wired) |
+| Fight Token source/sink balance | Fight Tokens earned vs spent per player-hour | `LogEconomy` | PARTIAL (mob, KO and bounty sources wired under `RewardedKO`; physique sink wired). Prices target ~12 minutes of farming per class — see BALANCE_MODEL. Watch for players stalled with the Power for a class but not the tokens |
 | First purchase | time and step of first paid conversion | funnel `FirstPurchase` | WIRED (`PurchaseResolved`) — untestable until an AssetId is set |
 | Payer rate / ARPDAU / 7-day spend days | standard payer metrics | Dashboard | external |
 | Grant idempotency | granted-exactly-once rate; target **100%** | receipt journal (#105) | NOT WIRED |

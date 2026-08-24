@@ -34,9 +34,14 @@
   `scripts/build_gym.py` — edit the script, not the JSON.
 
 ## Assets
-No Toolbox models, no imported meshes, no uploaded animations. Machines are built from
-Roblox primitives and training animations are generated from joint angles in
-`PoseConfig.luau`, so nothing in the game is someone else's copyrighted work.
+No Toolbox models, no third-party meshes, no uploaded animations. Nothing in the game
+may be someone else's copyrighted work. Machines are built from Roblox primitives and
+training animations are generated from joint angles in `PoseConfig.luau`.
+
+The one mesh asset is the player's body, generated for this project by Studio's mesh
+generator and cut into R15 parts by `BodyMeshConfig`/`BodyMeshBuilder`. It is allowed
+because it is ours, not because meshes in general are: a mesh from the Toolbox or an
+outside artist still is not.
 
 
 ## Git
