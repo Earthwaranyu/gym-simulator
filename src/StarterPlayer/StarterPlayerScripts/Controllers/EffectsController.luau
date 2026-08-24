@@ -3,13 +3,18 @@
 	EffectsController — sound and screen feedback.
 
 	Everything is driven off events the game already fires, so no system had to be
-	modified to make noise. Entries with a blank SoundId are skipped, which is why the
-	game is silent but functional until real asset ids are pasted into EffectsConfig.
+	modified to make noise.
+
+	Playback lives here; what a sound *is* lives in EffectsConfig. This file knows how to
+	pick a variant, stack layers, route to a mix bus and emit from a part in the world —
+	it does not know that a slam is louder than a jab. That split is what lets the whole
+	game be re-mixed without touching a controller.
 
 	The authoritative TrainingGain event lands on the completed-rep beat. It drives
 	both the popup and rep sound, so neither can drift away from the procedural pose.
 ]]
 
+local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -20,6 +25,7 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
 local EffectsConfig = require(ReplicatedStorage.Modules.EffectsConfig)
+local SoundBus = require(ReplicatedStorage.Modules.SoundBus)
 local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local Icons = require(ReplicatedStorage.Modules.Icons)
@@ -62,36 +68,180 @@ local GAIN_HOLD = 0.5
 -- outstayed its welcome would be a permanent red frame in any real fight.
 local HURT_FLASH_SECONDS = 0.34
 
---[[
-	Plays a configured sound, or does nothing if it has no asset id yet.
-	Sounds are one-shot and clean themselves up, so nothing accumulates in SoundService.
-]]
-function EffectsController:Play(name: string)
-	local data = if ProfileController ~= nil then ProfileController:Get() else nil
-	if data ~= nil and data.Settings.SfxEnabled == false then
-		return
-	end
+-- Last play time per effect name, for the specs that declare a Cooldown. Footfalls and
+-- sprint bursts fire off continuous state rather than discrete events, so without this a
+-- single frame of jitter at the threshold retriggers them.
+local lastPlayed: { [string]: number } = {}
 
-	local spec = (EffectsConfig.Sounds :: any)[name] :: EffectsConfig.SoundSpec?
-	if spec == nil or spec.SoundId == "" then
+--[[
+	Resolves the one id this play will use. `Variants` is picked uniformly at random so a
+	long set of reps does not turn into a metronome; `SoundId` is the single-file case.
+]]
+local function pickId(spec: EffectsConfig.SoundSpec): string?
+	local variants = spec.Variants
+	if variants ~= nil and #variants > 0 then
+		return variants[math.random(#variants)]
+	end
+	if spec.SoundId ~= nil and spec.SoundId ~= "" then
+		return spec.SoundId
+	end
+	return nil
+end
+
+--[[
+	Builds and plays one spec. Layers recurse through here, which is why the emitter and
+	the bus are passed down: a sub layer has to come from the same place in the world as
+	the transient it is underneath, or the impact smears across the stereo field.
+]]
+local function playSpec(spec: EffectsConfig.SoundSpec, emitter: BasePart?)
+	local id = pickId(spec)
+	if id == nil then
 		return
 	end
 
 	local sound = Instance.new("Sound")
-	sound.SoundId = spec.SoundId
+	sound.SoundId = id
 	sound.Volume = spec.Volume
-	sound.PlaybackSpeed = spec.Pitch + (math.random() * 2 - 1) * spec.PitchJitter
-	sound.Parent = SoundService
+	sound.PlaybackSpeed = (spec.Pitch or 1) + (math.random() * 2 - 1) * (spec.PitchJitter or 0)
+	sound.SoundGroup = SoundBus.Get(spec.Group)
+
+	-- A spatial sound is parented to the part that caused it, which is what makes an
+	-- attacker behind you sound like they are behind you. Without an emitter there is no
+	-- position to play from, so it falls back to flat rather than to silence.
+	if spec.Spatial == true and emitter ~= nil then
+		sound.RollOffMode = Enum.RollOffMode.InverseTapered
+		sound.RollOffMinDistance = spec.RollOffMinDistance or 10
+		sound.RollOffMaxDistance = spec.RollOffMaxDistance or 120
+		sound.Parent = emitter
+	else
+		sound.Parent = SoundService
+	end
 
 	sound.Ended:Connect(function()
 		sound:Destroy()
 	end)
 	sound:Play()
 
-	-- Belt and braces: a sound that never fires Ended (failed load) still goes away.
+	-- Belt and braces: a sound that never fires Ended (failed load, or an emitter that
+	-- was destroyed mid-play) still goes away.
 	task.delay(10, function()
 		if sound.Parent ~= nil then
 			sound:Destroy()
+		end
+	end)
+
+	if spec.Layers ~= nil then
+		for _, layer in spec.Layers do
+			playSpec(layer, emitter)
+		end
+	end
+end
+
+--[[
+	Pushes the player's saved volumes onto the mix buses.
+
+	Called on Start and again whenever the profile changes, so moving a slider is audible
+	before the menu has finished redrawing. Settings are stored 0-100 because that is what
+	a slider shows; the bus takes 0-1.
+]]
+function EffectsController:_applyVolumes()
+	local data = if ProfileController ~= nil then ProfileController:Get() else nil
+	if data == nil then
+		return
+	end
+	local settings = data.Settings
+	SoundBus.SetVolumes(
+		(settings.MasterVolume or 100) / 100,
+		(settings.MusicVolume or 100) / 100,
+		(settings.SfxVolume or 100) / 100
+	)
+end
+
+--[[
+	The local character's root, or nil while respawning. The default emitter for anything
+	the local player does themselves.
+]]
+local function localRoot(): BasePart?
+	local character = Players.LocalPlayer.Character
+	if character == nil then
+		return nil
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	return if root ~= nil and root:IsA("BasePart") then root else nil
+end
+
+--[[
+	Plays a configured sound.
+
+	`emitter` is optional and is the part the sound comes from — the acting character's
+	root, normally. Specs that are not `Spatial` ignore it, so callers can pass it
+	unconditionally rather than knowing which sounds are positional.
+]]
+function EffectsController:Play(name: string, emitter: BasePart?)
+	local data = if ProfileController ~= nil then ProfileController:Get() else nil
+	-- Cheap gate. The Sfx bus is already at zero volume, but a muted player should not
+	-- pay to decode a sound they will not hear.
+	if data ~= nil and (data.Settings.SfxVolume or 100) <= 0 then
+		return
+	end
+
+	local spec = (EffectsConfig.Sounds :: any)[name] :: EffectsConfig.SoundSpec?
+	if spec == nil then
+		return
+	end
+
+	if spec.Cooldown ~= nil then
+		-- Keyed per emitter, not per effect. These handlers run for every visible
+		-- character, so a single global key would let the nearest runner's footsteps
+		-- swallow everybody else's — the cooldown is there to stop one character
+		-- machine-gunning, not to ration the sound across a crowd.
+		local key = if emitter ~= nil then `{name}|{emitter:GetDebugId()}` else name
+		local now = os.clock()
+		if now - (lastPlayed[key] or -math.huge) < spec.Cooldown then
+			return
+		end
+		lastPlayed[key] = now
+	end
+
+	playSpec(spec, emitter)
+end
+
+--[[
+	Warms every configured id so the first punch of a session is not silent while the
+	asset streams in. Fire-and-forget on a thread: a slow or failed preload must never
+	hold up ignition.
+]]
+function EffectsController:_preload()
+	local seen: { [string]: boolean } = {}
+	local probes: { Instance } = {}
+
+	local function collect(spec: EffectsConfig.SoundSpec)
+		local ids: { string? } = spec.Variants or { spec.SoundId }
+		for _, id in ids do
+			if id ~= nil and id ~= "" and not seen[id] then
+				seen[id] = true
+				local probe = Instance.new("Sound")
+				probe.SoundId = id
+				table.insert(probes, probe)
+			end
+		end
+		if spec.Layers ~= nil then
+			for _, layer in spec.Layers do
+				collect(layer)
+			end
+		end
+	end
+
+	for _, spec in EffectsConfig.Sounds do
+		collect(spec :: EffectsConfig.SoundSpec)
+	end
+
+	task.spawn(function()
+		pcall(function()
+			ContentProvider:PreloadAsync(probes)
+		end)
+		for _, probe in probes do
+			probe:Destroy()
 		end
 	end)
 end
@@ -469,6 +619,16 @@ function EffectsController:Init()
 	ProfileController = Loader.Get("ProfileController")
 	CombatController = Loader.Get("CombatController")
 	ToastController = Loader.Get("ToastController")
+
+	SoundBus.Ensure()
+
+	-- Every button in the game clicks, from one place. UI lives in ReplicatedStorage and
+	-- must not depend on a controller, so it exposes a hook and we fill it in rather than
+	-- it reaching for us. The alternative — a Play call hand-wired onto each button — is
+	-- what left most of the menu silent before.
+	UI.SetPressListener(function()
+		self:Play("UiClick")
+	end)
 end
 
 function EffectsController:_build()
@@ -528,6 +688,8 @@ end
 
 function EffectsController:Start()
 	self:_build()
+	self:_preload()
+	self:_applyVolumes()
 
 	Net.Event("TrainingGain").OnClientEvent:Connect(function(payload: Types.TrainingGain)
 		if
@@ -542,7 +704,7 @@ function EffectsController:Start()
 		then
 			return
 		end
-		self:Play("Rep")
+		self:Play("Rep", localRoot())
 		self:_showTrainingGain(payload)
 	end)
 
@@ -603,6 +765,8 @@ function EffectsController:Start()
 		if data == nil then
 			return
 		end
+
+		self:_applyVolumes()
 
 		local rank = RankConfig.Get(Formulas.TotalPower(data.Stats))
 		if lastRankId ~= nil and rank.Id ~= lastRankId then
