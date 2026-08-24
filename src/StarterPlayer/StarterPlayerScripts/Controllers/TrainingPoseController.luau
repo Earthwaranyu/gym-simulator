@@ -654,7 +654,7 @@ function TrainingPoseController:_sync(character: Model)
 	-- again, and two writers on one joint is exactly the fight this avoids.
 	releasing[character] = nil
 
-	active[character] = {
+	local entry: Entry = {
 		pose = pose,
 		interval = interval :: number,
 		joints = joints,
@@ -664,6 +664,18 @@ function TrainingPoseController:_sync(character: Model)
 		seed = seedFor(character),
 		peakAlpha = 0,
 	}
+	active[character] = entry
+
+	-- Draw the load this character is already carrying.
+	--
+	-- The anchor value and the weight ratio both land before this entry exists -- the
+	-- server parents the anchor and publishes the ratio, then sets the pose -- so the two
+	-- handlers that would have drawn the plates each found no entry and returned. This
+	-- was the one that arrived last, and it built the props without ever showing them:
+	-- the machine stayed bare until the player picked a different weight, because only a
+	-- *change* in the ratio fired anything. Whichever lands second completes the picture,
+	-- and here that is us.
+	applyLoadVisuals(character, entry)
 end
 
 --[[

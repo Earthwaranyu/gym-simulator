@@ -6,19 +6,18 @@
 	a city of the same primitives, so a bench four studs away reads as more scenery.
 	The billboard above it only helps once you already know to look up there.
 
-	Two marks, both client-side and both cheap:
-
-	  * an **outline** in the muscle group's colour, so the machine separates from the
-	    slab under it, and
-	  * a **floor ring** at its base, which is what you actually see first when running
-	    past at Legs speed — the outline is a silhouette, the ring is a target.
+	One restrained client-side mark: an **outline** in the muscle group's colour, so
+	the machine separates from the slab under it. Earlier builds also painted a large
+	neon disc under every nearby machine. Those discs covered mats, players and props
+	and were regularly mistaken for broken equipment geometry, so findability now stays
+	on the silhouette and the existing billboard/map.
 
 	Locked machines are marked too, in grey. A player needs to see the thing they
 	cannot use yet: that is the entire reason to keep training.
 
 	Only the nearest handful are marked at a time. `Highlight` is a real per-instance
 	renderer cost and Roblox stops honouring them past a few dozen, so lighting up all
-	55 would mean the ones near you silently stopping working. Distance is re-checked
+	35 courts would mean the ones near you silently stopping working. Distance is re-checked
 	on a timer rather than per frame, because a machine does not move and neither does
 	a player fast enough to notice a quarter-second of lag in an outline.
 ]]
@@ -48,13 +47,12 @@ local RANGE = 260
 local REFRESH_SECONDS = 0.35
 
 -- Grey for locked. Deliberately not red: locked is "not yet", not "wrong".
-local LOCKED_COLOR = Color3.fromRGB(150, 158, 175)
+local LOCKED_COLOR = UI.Palette.TextMuted
 
 local player = Players.LocalPlayer
 
 type Mark = {
 	highlight: Highlight,
-	ring: Part,
 	definition: EquipmentConfig.EquipmentDefinition,
 }
 
@@ -65,52 +63,12 @@ function StationHighlightController:Init()
 	ProfileController = Loader.Get("ProfileController")
 end
 
---[[
-	The floor ring, sized to the machine's own footprint so a squat rack gets a wider
-	one than a dumbbell rack.
-]]
-local function buildRing(station: Instance, base: BasePart): Part?
-	local width = base.Size.X
-	local depth = base.Size.Z
-	local floorY = base.Position.Y - base.Size.Y / 2
-
-	if station:IsA("Model") then
-		local boundsCFrame, boundsSize = station:GetBoundingBox()
-		width = boundsSize.X
-		depth = boundsSize.Z
-		floorY = boundsCFrame.Position.Y - boundsSize.Y / 2
-	end
-
-	local ring = Instance.new("Part")
-	ring.Name = "StationRing"
-	ring.Shape = Enum.PartType.Cylinder
-	ring.Anchored = true
-	ring.CanCollide = false
-	ring.CanQuery = false
-	ring.CanTouch = false
-	ring.CastShadow = false
-	ring.Material = Enum.Material.Neon
-	ring.Transparency = 0.55
-	-- A cylinder's height runs along X, so it has to be laid on its side to become a
-	-- disc on the floor.
-	local diameter = math.max(width, depth) * 1.5
-	ring.Size = Vector3.new(0.12, diameter, diameter)
-	ring.CFrame = CFrame.new(base.Position.X, floorY + 0.08, base.Position.Z)
-		* CFrame.Angles(0, 0, math.rad(90))
-
-	-- Under the camera so it never replicates and never survives into another
-	-- player's world; each client draws its own.
-	ring.Parent = Workspace.CurrentCamera
-	return ring
-end
-
 local function unmark(station: Instance)
 	local mark = marks[station]
 	if mark == nil then
 		return
 	end
 	mark.highlight:Destroy()
-	mark.ring:Destroy()
 	marks[station] = nil
 end
 
@@ -119,29 +77,22 @@ local function mark(station: Instance, definition: EquipmentConfig.EquipmentDefi
 		return
 	end
 
-	local base = EquipmentConfig.GetBase(station)
-	if base == nil then
+	if EquipmentConfig.GetBase(station) == nil then
 		return
 	end
 
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "StationOutline"
 	-- Occluded, not AlwaysOnTop: an outline that shines through the building in front
-	-- of it turns a city into a christmas tree. The floor ring and the map are what
-	-- find a machine you cannot see; this only separates one you can.
+	-- of it turns a city into a christmas tree. The map finds a machine you cannot
+	-- see; this only separates one you can.
 	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
 	highlight.FillTransparency = 0.85
 	highlight.OutlineTransparency = 0
 	highlight.Adornee = station
 	highlight.Parent = Workspace.CurrentCamera
 
-	local ring = buildRing(station, base)
-	if ring == nil then
-		highlight:Destroy()
-		return
-	end
-
-	marks[station] = { highlight = highlight, ring = ring, definition = definition }
+	marks[station] = { highlight = highlight, definition = definition }
 end
 
 --[[
@@ -214,8 +165,6 @@ function StationHighlightController:_refresh()
 		entry.highlight.OutlineColor = color
 		entry.highlight.FillColor = color
 		entry.highlight.FillTransparency = if unlocked then 0.85 else 0.93
-		entry.ring.Color = color
-		entry.ring.Transparency = if unlocked then 0.55 else 0.8
 	end
 end
 
@@ -240,7 +189,7 @@ function StationHighlightController:Start()
 	end)
 
 	-- Streaming can remove a station out from under a mark; drop it rather than
-	-- leaving a ring glowing over empty ground.
+	-- leaving a stale outline behind.
 	CollectionService:GetInstanceRemovedSignal(EquipmentConfig.STATION_TAG):Connect(unmark)
 
 	if RunService:IsStudio() then
