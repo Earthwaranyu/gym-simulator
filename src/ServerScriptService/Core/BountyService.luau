@@ -10,6 +10,10 @@
 	Streaks and bounties are session-only and deliberately not saved: a bounty is a
 	live invitation to the players currently in the server, and carrying it across
 	rejoins would let someone bank one and log off.
+
+	Bounties pay Fight Tokens. They used to pay cash, which no longer exists; the
+	numbers had to shrink by two orders of magnitude rather than convert, because
+	Fight Tokens buy physique transformations and nothing else.
 ]]
 
 local Players = game:GetService("Players")
@@ -19,8 +23,10 @@ local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 
--- Cash added to a player's head per kill in their current streak.
-local BOUNTY_PER_KILL = 60
+-- Fight Tokens added to a player's head per kill in their current streak. A five-kill
+-- outlaw is worth 7, against a physique class costing tens — a real prize for one
+-- fight, and still a long way from being the main way anyone earns them.
+local BOUNTY_PER_KILL = 1
 -- Streak needed before a bounty is announced to the server.
 local ANNOUNCE_AT_STREAK = 3
 -- Outlaws are worth more, which is what makes hunting Criminals pay.
@@ -33,14 +39,14 @@ local BountyService = {
 
 local streaks: { [Player]: number } = {}
 
-local CurrencyService: any = nil
+local FightTokenService: any = nil
 local ReputationService: any = nil
 
 -- (player, streak, bounty)
 BountyService.BountyChanged = Signal.new()
 
 function BountyService:Init()
-	CurrencyService = Loader.Get("CurrencyService")
+	FightTokenService = Loader.Get("FightTokenService")
 	ReputationService = Loader.Get("ReputationService")
 end
 
@@ -49,7 +55,7 @@ function BountyService:GetStreak(player: Player): number
 end
 
 --[[
-	Cash on a player's head right now. Zero until they start a streak.
+	Fight Tokens on a player's head right now. Zero until they start a streak.
 ]]
 function BountyService:GetBounty(player: Player): number
 	local streak = self:GetStreak(player)
@@ -70,7 +76,8 @@ function BountyService:_announce(player: Player)
 	local streak = self:GetStreak(player)
 
 	for _, other in Players:GetPlayers() do
-		Net.Event("Notify"):FireClient(other, `{player.Name} is on a {streak} streak — ${bounty} bounty!`)
+		Net.Event("Notify")
+			:FireClient(other, `{player.Name} is on a {streak} streak — {bounty} Fight Token bounty!`)
 	end
 end
 
@@ -91,15 +98,15 @@ function BountyService:Start()
 		-- it would punish the wrong player.
 		local bounty = self:GetBounty(victim)
 		if bounty > 0 then
-			CurrencyService:Add(killer, bounty)
-			Net.Event("Notify"):FireClient(killer, `Claimed ${bounty} bounty on {victim.Name}.`)
-			Net.Event("Notify"):FireClient(victim, `{killer.Name} claimed your ${bounty} bounty.`)
+			FightTokenService:AwardTokens(killer, bounty)
+			Net.Event("Notify"):FireClient(killer, `Claimed {bounty} Fight Token bounty on {victim.Name}.`)
+			Net.Event("Notify"):FireClient(victim, `{killer.Name} claimed your {bounty} Fight Token bounty.`)
 		end
 
 		self:_reset(victim)
 
 		-- Streaks only grow on fresh targets, so camping one player cannot inflate a
-		-- bounty into an infinite cash loop with a friend.
+		-- bounty into an infinite Fight Token loop with a friend.
 		if isRepeatKill then
 			return
 		end
