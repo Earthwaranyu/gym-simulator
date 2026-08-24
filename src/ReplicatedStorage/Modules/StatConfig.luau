@@ -49,11 +49,14 @@ local definitions: { StatDefinition } = {
 		Id = "Arms",
 		DisplayName = "Arms",
 		Icon = "Fist",
-		Color = Color3.fromRGB(239, 83, 80),
-		Description = "Every Arms point adds exactly 1 raw punch damage.",
+		Color = Color3.fromRGB(198, 48, 45),
+		Description = "Your punch deals exactly your Arms in damage, and never less than 1.",
 		Effect = function(stats)
+			-- One number, because damage and Arms are now the same number. Showing
+			-- "+N damage · N total" beside each other only invited the question of
+			-- what the difference was.
 			local arms = Formulas.SanitizeStat(get(stats, "Arms"))
-			return `+{NumberFormat.Format(arms)} damage · {NumberFormat.Format(Formulas.AttackDamage(arms))} total`
+			return `{NumberFormat.Format(Formulas.AttackDamage(arms))} damage a hit`
 		end,
 		BodyScales = {
 			LeftUpperArm = 1.0,
@@ -66,11 +69,12 @@ local definitions: { StatDefinition } = {
 		Id = "Chest",
 		DisplayName = "Chest",
 		Icon = "Chest",
-		Color = Color3.fromRGB(255, 167, 38),
-		Description = "Every Chest point adds exactly 1 current and max health.",
+		Color = Color3.fromRGB(200, 112, 10),
+		Description = "Every Chest point adds exactly 10 current and max health.",
 		Effect = function(stats)
 			local chest = Formulas.SanitizeStat(get(stats, "Chest"))
-			return `+{NumberFormat.Format(chest)} health · {NumberFormat.Format(Formulas.MaxHealth(chest))} total`
+			local total = Formulas.MaxHealth(chest)
+			return `+{NumberFormat.Format(total - Formulas.BASE_HEALTH)} health · {NumberFormat.Format(total)} total`
 		end,
 		BodyScales = {
 			UpperTorso = 1.0,
@@ -80,17 +84,11 @@ local definitions: { StatDefinition } = {
 		Id = "Back",
 		DisplayName = "Back",
 		Icon = "Back",
-		Color = Color3.fromRGB(102, 187, 106),
-		Description = "Diminishing resistance against Arms below your Back. Hard-capped at 50%; never immunity.",
+		Color = Color3.fromRGB(52, 130, 58),
+		Description = "SPTS-style guard: greater Back blocks 10%; 10x enemy Arms blocks everything.",
 		Effect = function(stats)
-			-- Resistance is contested, so there is no single number for it. Quoted
-			-- against an attacker with nothing in Arms, which is the ceiling, and
-			-- labelled as such rather than pretending it applies to everyone.
-			local best = Formulas.DamageResistance(get(stats, "Back"), 0)
-			return `up to {string.format("%.1f", best * 100)}% resist · {string.format(
-				"%.0f",
-				Formulas.MAX_BACK_RESISTANCE * 100
-			)}% cap`
+			local back = get(stats, "Back")
+			return `{NumberFormat.Format(back)} guard · 10% above enemy Arms · full at 10×`
 		end,
 		BodyScales = {
 			UpperTorso = 0.6,
@@ -100,14 +98,12 @@ local definitions: { StatDefinition } = {
 		Id = "Core",
 		DisplayName = "Core",
 		Icon = "Core",
-		Description = "Reflects part of each surviving hit with diminishing returns. Hard-capped at 35%.",
+		Description = "SPTS-style counter: greater Core reflects 10%; 10x nullifies and returns a lethal counter.",
 		Effect = function(stats)
-			return `{string.format("%.1f", Formulas.RetaliationRate(get(stats, "Core")) * 100)}% reflect · {string.format(
-				"%.0f",
-				Formulas.MAX_CORE_REFLECTION * 100
-			)}% cap`
+			local core = get(stats, "Core")
+			return `{NumberFormat.Format(core)} counter · 10% above enemy Arms · lethal at 10×`
 		end,
-		Color = Color3.fromRGB(66, 165, 245),
+		Color = Color3.fromRGB(26, 110, 180),
 		BodyScales = {
 			LowerTorso = 1.0,
 		},
@@ -116,7 +112,7 @@ local definitions: { StatDefinition } = {
 		Id = "Legs",
 		DisplayName = "Legs",
 		Icon = "Legs",
-		Color = Color3.fromRGB(171, 71, 188),
+		Color = Color3.fromRGB(126, 42, 140),
 		Description = "Each Legs point adds 1 sprint and flight speed until the safe velocity caps.",
 		Effect = function(stats)
 			local legs = get(stats, "Legs")

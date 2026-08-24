@@ -97,18 +97,39 @@ window grant none.
 Each class also doubles the playtime token tick, which is what keeps income in step
 with multiplier costs that double eighteen times over only nine transformations.
 
-| Class | Total Power | Fight Tokens | Token rate |
-|---|---:|---:|---:|
-| Natural | 0 | 0 | x1 |
-| Conditioned | 10K | 5 | x2 |
-| Defined | 100K | 10 | x4 |
-| Shredded | 1M | 20 | x8 |
-| Powerbuilt | 10M | 40 | x16 |
-| Elite | 100M | 80 | x32 |
-| Beast | 1B | 160 | x64 |
-| Monster | 10B | 320 | x128 |
-| Titan | 100B | 640 | x256 |
-| Mythic | 1T | 1,280 | x512 |
+Fight Token prices are derived, not chosen. The simulator computes what a field pays
+at the power each class unlocks at, and each price is about twelve minutes of farming.
+They no longer double, because income stops doubling: the mob roster ends at Storm
+while the classes run on to a trillion Power, so the top four rise only gently.
+
+| Class | Total Power | Fight Tokens | Minutes of farming | Token rate |
+|---|---:|---:|---:|---:|
+| Natural | 0 | 0 | — | x1 |
+| Conditioned | 10K | 350 | 11.7 | x2 |
+| Defined | 100K | 650 | 12.1 | x4 |
+| Shredded | 1M | 1,500 | 12.4 | x8 |
+| Powerbuilt | 10M | 5,000 | 11.6 | x16 |
+| Elite | 100M | 11,500 | 12.0 | x32 |
+| Beast | 1B | 23,000 | 12.0 | x64 |
+| Monster | 10B | 25,000 | 13.0 | x128 |
+| Titan | 100B | 27,000 | 14.1 | x256 |
+| Mythic | 1T | 29,000 | 15.1 | x512 |
+
+### Where the income figure comes from
+
+A punch deals the attacker's Arms one for one, and a balanced player's Arms is a fifth
+of their total Power, so time-to-kill follows from the goblin health in `MobConfig`. A
+field holds six on a twelve-second respawn, which caps a cleared field at thirty kills
+a minute however hard the player hits — and above the starter tiers a player is always
+hitting hard enough to be capped, because they enter zones gated far below their power
+and one-shot them.
+
+That cap is the whole model: **thirty kills a minute times the tier's reward**, from
+1 a kill in Garage to 64 in Storm.
+
+The previous prices — 5 doubling to 1,280, 2,555 for the whole ladder — worked out at
+**about two minutes of fighting in total**. `MobConfig`'s header had predicted roughly
+that and it had never been checked.
 
 ## Per-muscle token multipliers
 
@@ -155,9 +176,13 @@ kill by a Natural pays 640. PvP knockouts and bounties are not scaled.
 - The Active policy is unusually disciplined; real retention cohorts should replace
   these assumptions once enough telemetry exists.
 - Cash, quests, and Robux boosts are not modeled.
-- Fight Token acquisition is not modeled; transformation times assume the required
-  Fight Tokens have already been earned. This mattered little at a flat +5 per class
-  and matters more now the full path costs 2,555.
+- Fight Token *income* is now modeled and prices are derived from it, but the main
+  simulation loop still transforms on the Power gate alone — it does not withhold a
+  transformation until the tokens are earned. Since a class costs about twelve minutes
+  of fighting while the Power behind it takes far longer to train, the timestamps are
+  still a fair lower bound; that stops being true if prices rise much further.
+- Income assumes a player who fights without interruption at the best field open to
+  them. Nobody plays like that, so treat the minutes as a floor.
 - The district table above still uses the old campus names. Zones were renamed to
   tiers and the machines scattered across the city; the rates and gates are current,
   the names are not.

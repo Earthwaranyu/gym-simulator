@@ -521,6 +521,92 @@ for _, class in MuscleClassConfig.List do
 	end
 end
 
+--[[
+	Fight Token income, and what a physique class really costs in fighting time.
+
+	BALANCE_MODEL listed this as its known gap — transformation timestamps assumed the
+	Fight Tokens were simply available — and that assumption hid the fact that the whole
+	2,555-token ladder was worth about four minutes of farming.
+
+	The chain is: a punch deals the attacker's Arms one-for-one, a balanced player's Arms
+	is a fifth of their total Power, and a goblin's health is set per tier. That gives
+	time-to-kill; population and respawn give how many are available; the tier's reward
+	gives the rate.
+]]
+local PUNCH_CHAIN_SECONDS = 0.38 + 0.4 + 0.52
+local PUNCHES_PER_CHAIN = 3
+local RETARGET_SECONDS = 0.5
+local TARGET_MINUTES = 12
+
+local function goblinFor(zoneId: string)
+	for _, row in Inputs.Goblins do
+		if row.ZoneId == zoneId then
+			return row
+		end
+	end
+	return nil
+end
+
+-- The richest field a player of this Power is allowed into.
+local function bestFieldAt(power: number)
+	local best, bestZone = nil, nil
+	for _, zone in Inputs.Zones do
+		if power >= zone.RequiredPower then
+			local row = goblinFor(zone.Id)
+			if row ~= nil and (best == nil or row.FightTokenReward > best.FightTokenReward) then
+				best, bestZone = row, zone
+			end
+		end
+	end
+	return best, bestZone
+end
+
+local function tokensPerMinute(power: number): (number, string, number)
+	local row, zone = bestFieldAt(power)
+	if row == nil then
+		return 0, "none", 0
+	end
+	local damage = Formulas.AttackDamage(power / 5)
+	local punches = math.max(1, math.ceil(row.Health / damage))
+	local killSeconds = punches / PUNCHES_PER_CHAIN * PUNCH_CHAIN_SECONDS + RETARGET_SECONDS
+	-- With six in a field a kill is normally limited by how fast you can swing. The
+	-- respawn only binds once you clear the field faster than it refills, which is
+	-- exactly the case a player who has out-levelled a tier is in.
+	local fieldCycle = Inputs.GOBLIN_RESPAWN_SECONDS / Inputs.GOBLIN_POPULATION
+	local perKill = math.max(killSeconds, fieldCycle)
+	return 60 / perKill * row.FightTokenReward, zone.Id, perKill
+end
+
+header("Fight Token income, and what a class-up costs in fighting time")
+print(
+	string.format(
+		"  %-12s %-11s %10s %9s %8s %10s",
+		"class",
+		"field",
+		"tokens/min",
+		"cost",
+		"minutes",
+		`for {TARGET_MINUTES}min`
+	)
+)
+for _, class in MuscleClassConfig.List do
+	if class.Level > 0 then
+		local rate, zoneId = tokensPerMinute(class.RequiredPower)
+		local minutes = if rate > 0 then class.FightTokenCost / rate else math.huge
+		print(
+			string.format(
+				"  %-12s %-11s %10s %9s %8.1f %10s",
+				class.DisplayName,
+				zoneId,
+				short(rate),
+				short(class.FightTokenCost),
+				minutes,
+				short(math.floor(rate * TARGET_MINUTES))
+			)
+		)
+	end
+end
+
 header("Cost of being killed (lifetime Power persists through physique changes)")
 for _, result in results do
 	if result.Deaths > 0 then

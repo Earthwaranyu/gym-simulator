@@ -105,6 +105,15 @@ function NumberFormat.Format(value: number, decimals: number?): string
 	return `{sign}{mantissa}{SUFFIXES[tier]}`
 end
 
+-- Training gains below 1,000 retain one decimal so a load bonus is visible instead of
+-- being earned in the profile while the popup misleadingly repeats the same integer.
+function NumberFormat.FormatGain(value: number): string
+	if math.abs(value) < THRESHOLD then
+		return trim(string.format("%.1f", value))
+	end
+	return NumberFormat.Format(value)
+end
+
 --[[
 	Full number with thousands separators: 1234567 -> "1,234,567".
 	For tooltips and detail panels where the exact figure matters.
@@ -174,6 +183,8 @@ function NumberFormat.RunSelfTest(): { string }
 	expect("tier boundary rounds up", NumberFormat.Format(999999), "1M")
 	expect("exact power of 1000", NumberFormat.Format(1e9), "1B")
 	expect("decimals arg", NumberFormat.Format(1234, 1), "1.2K")
+	expect("fractional gain", NumberFormat.FormatGain(1.44), "1.4")
+	expect("whole gain", NumberFormat.FormatGain(2), "2")
 	expect("top of table", NumberFormat.Format(1e63), "1Vg")
 
 	expect("comma", NumberFormat.Comma(1234567), "1,234,567")
