@@ -52,6 +52,8 @@ local CustomizerStageController = {
 
 local FOLDER_NAME = "CustomizerStage"
 local DOF_NAME = "CustomizerDepth"
+-- Its own grade layer, stacked over the world's. See the Enter comment.
+local GRADE_NAME = "CustomizerGrade"
 
 -- Framing, in multiples of the character's own height. Everything here scales with
 -- the body: a Titan is several times the size of a newbie, and a fixed stud distance
@@ -140,7 +142,6 @@ local NAMEPLATE_NAME = "GymNameplate"
 local restoreCamera: Enum.CameraType? = nil
 local hidden: { ScreenGui } = {}
 local hiddenPlate: BillboardGui? = nil
-local restoreColor: { Brightness: number, Contrast: number, Saturation: number }? = nil
 
 --[[
 	The height of the figure being framed. Read once per frame from the head rather
@@ -533,19 +534,28 @@ function CustomizerStageController:Enter()
 	dof.Parent = Lighting
 	TweenService:Create(dof, TweenInfo.new(0.7), { FarIntensity = 0.78 }):Play()
 
-	local color = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
-	if color ~= nil then
-		restoreColor = {
-			Brightness = color.Brightness,
-			Contrast = color.Contrast,
-			Saturation = color.Saturation,
-		}
-		TweenService:Create(color, TweenInfo.new(0.6), {
-			Brightness = color.Brightness - 0.12,
-			Contrast = color.Contrast + 0.1,
-			Saturation = -0.45,
-		}):Play()
-	end
+	--[[
+		A grade of our own, layered over the world's rather than borrowed from it.
+
+		This used to reach for `FindFirstChildOfClass("ColorCorrectionEffect")`, stash
+		the values it found, and put them back on the way out. That worked only while
+		exactly one grade existed and never changed underneath it. AtmosphereController
+		now drives the world grade per district, so the saved values would go stale the
+		moment a player crossed a boundary with the creator open, and leaving would
+		paint the wrong district's colour back over the right one. Two layers compose;
+		one layer taking turns does not.
+	]]
+	local grade = Instance.new("ColorCorrectionEffect")
+	grade.Name = GRADE_NAME
+	grade.Brightness = 0
+	grade.Contrast = 0
+	grade.Saturation = 0
+	grade.Parent = Lighting
+	TweenService:Create(grade, TweenInfo.new(0.6), {
+		Brightness = -0.12,
+		Contrast = 0.1,
+		Saturation = -0.45,
+	}):Play()
 
 	-- Only what was actually on screen is remembered, so leaving does not switch on a
 	-- HUD the player had hidden for their own reasons.
@@ -599,16 +609,20 @@ function CustomizerStageController:Exit()
 		dof:Destroy()
 	end
 
-	local color = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
-	local previous = restoreColor
-	if color ~= nil and previous ~= nil then
-		TweenService:Create(color, TweenInfo.new(0.4), {
-			Brightness = previous.Brightness,
-			Contrast = previous.Contrast,
-			Saturation = previous.Saturation,
-		}):Play()
+	-- Faded to neutral and then dropped, so nothing of ours outlives the stage. The
+	-- world grade underneath was never touched and needs no restoring.
+	local grade = Lighting:FindFirstChild(GRADE_NAME)
+	if grade ~= nil then
+		local fade = TweenService:Create(grade, TweenInfo.new(0.4), {
+			Brightness = 0,
+			Contrast = 0,
+			Saturation = 0,
+		})
+		fade.Completed:Once(function()
+			grade:Destroy()
+		end)
+		fade:Play()
 	end
-	restoreColor = nil
 
 	local bars = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
 	TweenService:Create(topBar, bars, { Size = UDim2.fromScale(1, 0) }):Play()

@@ -258,18 +258,27 @@ function BodyLoftBuilder.Build(
 		]]
 		-- Light touch: the painted texture is doing the definition now, and a strong
 		-- vertex tint on top of it reads as blotches rather than muscle.
-		local SHADE_DEPTH = 0.12
-		local HIGHLIGHT = 0.06
-		local function shadeFor(base: Color3, relief: number, reach: number): number
-			if reach <= 1e-4 then
-				return mesh:AddColor(base, 1)
+		--[[
+			The vertex tint is a shading multiplier, never a colour.
+
+			It used to start from the palette, which meant the skin tone was applied
+			twice — once here and once baked into the texture — and Roblox multiplies
+			the two. A body picked as 236,200,168 rendered as 218,157,111 while the
+			head, painted once through BodyColors, stayed correct. That is what put a
+			pale face on a tan torso.
+
+			White is the identity for that multiply, so flat skin now renders as
+			exactly the texture and matches the head. Only grooves darken; see
+			BodyLoftConfig.ReliefTint.
+		]]
+		local WHITE = Color3.new(1, 1, 1)
+		local neutral = mesh:AddColor(WHITE, 1)
+		local function shadeFor(relief: number, reach: number): number
+			local tint = BodyLoftConfig.ReliefTint(relief, reach)
+			if tint >= 1 then
+				return neutral
 			end
-			-- -1 in the deepest groove, +1 on the highest point of a muscle.
-			local t = math.clamp(relief / reach, -1, 1)
-			local shaded = if t >= 0
-				then base:Lerp(Color3.new(1, 1, 1), t * HIGHLIGHT)
-				else base:Lerp(Color3.new(0, 0, 0), -t * SHADE_DEPTH)
-			return mesh:AddColor(shaded, 1)
+			return mesh:AddColor(WHITE:Lerp(Color3.new(0, 0, 0), 1 - tint), 1)
 		end
 
 		for _, tube in BodyLoftConfig.TUBES do
@@ -290,7 +299,6 @@ function BodyLoftBuilder.Build(
 			local positions: { { Vector3 } } = {}
 			local pushGrid: { { number } } = {}
 			local colorGrid: { { number } } = {}
-			local slotOfRow: { string } = {}
 			local reach = 0
 
 			--[[
@@ -433,19 +441,18 @@ function BodyLoftBuilder.Build(
 				-- UV instead runs the texture backwards across that one strip, which
 				-- shows as a smeared band down the spine.
 				uvRow[sides] = mesh:AddUV(Vector2.new(tube.U1, sample.T))
-				slotOfRow[rowIndex] = sample.Slot
 				grid[rowIndex] = row
 				uvGrid[rowIndex] = uvRow
 				positions[rowIndex] = posRow
 				pushGrid[rowIndex] = pushRow
 			end
 
-			-- Shading needs the tube's peak displacement, so it is a second pass.
+			-- Shading needs the tube's peak relief, so it is a second pass. Skin and
+			-- shorts are not consulted here at all any more: the texture owns colour.
 			for rowIndex = 1, #samples do
-				local base = if slotOfRow[rowIndex] == "Pants" then palette.Pants else palette.Skin
 				local colorRow = {}
 				for side = 0, sides - 1 do
-					colorRow[side] = shadeFor(base, pushGrid[rowIndex][side], reach)
+					colorRow[side] = shadeFor(pushGrid[rowIndex][side], reach)
 				end
 				colorGrid[rowIndex] = colorRow
 			end

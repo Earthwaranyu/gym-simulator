@@ -233,7 +233,35 @@ local function buildLegs(model: Model): (alpha: number) -> ()
 	end
 end
 
+-- Overall physique — a compact complete athlete used by the prestige transformation page.
+-- One figure is both clearer and much cheaper than rendering five tiny independent
+-- ViewportFrames for every class card.
+local function buildOverall(model: Model): (alpha: number) -> ()
+	local head = ball(model, "Head", Vector3.new(0.72, 0.72, 0.72), CFrame.new(0, 1.55, 0))
+	local torso = block(model, "Torso", Vector3.new(1.55, 1.55, 0.78), CFrame.new(0, 0.5, 0))
+	local waist = block(model, "Waist", Vector3.new(1.1, 0.55, 0.68), CFrame.new(0, -0.5, 0))
+	local leftArm = block(model, "LeftArm", Vector3.new(0.48, 1.75, 0.48), CFrame.new(-1.05, 0.35, 0))
+	local rightArm = block(model, "RightArm", Vector3.new(0.48, 1.75, 0.48), CFrame.new(1.05, 0.35, 0))
+	local leftLeg = block(model, "LeftLeg", Vector3.new(0.58, 1.75, 0.62), CFrame.new(-0.36, -1.62, 0))
+	local rightLeg = block(model, "RightLeg", Vector3.new(0.58, 1.75, 0.62), CFrame.new(0.36, -1.62, 0))
+
+	return function(alpha: number)
+		local definition = 1 + 0.34 * alpha
+		torso.Size = Vector3.new(1.55 * definition, 1.55, 0.78 * definition)
+		waist.Size = Vector3.new(1.1 + 0.08 * alpha, 0.55, 0.68 + 0.05 * alpha)
+		leftArm.Size = Vector3.new(0.48 * definition, 1.75, 0.48 * definition)
+		rightArm.Size = leftArm.Size
+		leftArm.CFrame = CFrame.new(-1.05 - 0.18 * alpha, 0.35, 0)
+			* CFrame.Angles(0, 0, math.rad(-10 * alpha))
+		rightArm.CFrame = CFrame.new(1.05 + 0.18 * alpha, 0.35, 0) * CFrame.Angles(0, 0, math.rad(10 * alpha))
+		leftLeg.Size = Vector3.new(0.58 * definition, 1.75, 0.62 * definition)
+		rightLeg.Size = leftLeg.Size
+		head.Size = Vector3.new(0.72, 0.72, 0.72)
+	end
+end
+
 local FIGURES: { [string]: Builder } = {
+	Overall = buildOverall,
 	Fist = buildArms,
 	Chest = buildChest,
 	Back = buildBack,

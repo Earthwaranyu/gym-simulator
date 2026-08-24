@@ -42,7 +42,7 @@ local classes: { MuscleClass } = {
 		Level = 1,
 		DisplayName = "Conditioned",
 		RequiredPower = 10e3,
-		FightTokenCost = 5,
+		FightTokenCost = 350,
 		TokenMultiplier = 2,
 		R = 126,
 		G = 211,
@@ -52,7 +52,7 @@ local classes: { MuscleClass } = {
 		Level = 2,
 		DisplayName = "Defined",
 		RequiredPower = 100e3,
-		FightTokenCost = 10,
+		FightTokenCost = 650,
 		TokenMultiplier = 4,
 		R = 84,
 		G = 188,
@@ -62,7 +62,7 @@ local classes: { MuscleClass } = {
 		Level = 3,
 		DisplayName = "Shredded",
 		RequiredPower = 1e6,
-		FightTokenCost = 20,
+		FightTokenCost = 1500,
 		TokenMultiplier = 8,
 		R = 66,
 		G = 165,
@@ -72,7 +72,7 @@ local classes: { MuscleClass } = {
 		Level = 4,
 		DisplayName = "Powerbuilt",
 		RequiredPower = 10e6,
-		FightTokenCost = 40,
+		FightTokenCost = 5000,
 		TokenMultiplier = 16,
 		R = 83,
 		G = 118,
@@ -82,7 +82,7 @@ local classes: { MuscleClass } = {
 		Level = 5,
 		DisplayName = "Elite",
 		RequiredPower = 100e6,
-		FightTokenCost = 80,
+		FightTokenCost = 11500,
 		TokenMultiplier = 32,
 		R = 139,
 		G = 92,
@@ -92,7 +92,7 @@ local classes: { MuscleClass } = {
 		Level = 6,
 		DisplayName = "Beast",
 		RequiredPower = 1e9,
-		FightTokenCost = 160,
+		FightTokenCost = 23000,
 		TokenMultiplier = 64,
 		R = 183,
 		G = 81,
@@ -102,7 +102,7 @@ local classes: { MuscleClass } = {
 		Level = 7,
 		DisplayName = "Monster",
 		RequiredPower = 10e9,
-		FightTokenCost = 320,
+		FightTokenCost = 25000,
 		TokenMultiplier = 128,
 		R = 239,
 		G = 92,
@@ -112,7 +112,7 @@ local classes: { MuscleClass } = {
 		Level = 8,
 		DisplayName = "Titan",
 		RequiredPower = 100e9,
-		FightTokenCost = 640,
+		FightTokenCost = 27000,
 		TokenMultiplier = 256,
 		R = 255,
 		G = 155,
@@ -122,7 +122,7 @@ local classes: { MuscleClass } = {
 		Level = 9,
 		DisplayName = "Mythic",
 		RequiredPower = 1e12,
-		FightTokenCost = 1280,
+		FightTokenCost = 29000,
 		TokenMultiplier = 512,
 		R = 255,
 		G = 211,
@@ -188,16 +188,26 @@ function MuscleClassConfig.RunSelfTest(): { string }
 		check(class.Level == index - 1, `class {index} level is sequential`)
 		if index > 1 then
 			check(class.RequiredPower > classes[index - 1].RequiredPower, `class {index} Power rises`)
-			-- Conditioned is the seed of both ladders: nothing doubles from Natural's zero
-			-- cost, so it is checked against its literal and the rest against each other.
-			if index == 2 then
-				check(class.FightTokenCost == 5, "Conditioned costs five Fight Tokens")
-			else
-				check(
-					class.FightTokenCost == classes[index - 1].FightTokenCost * 2,
-					`class {index} Fight Token cost doubles`
-				)
-			end
+			--[[
+				Cost rises, but no longer doubles.
+
+				It used to, and the assertion here checked exactly that — which was a
+				restatement of the table rather than a property worth defending. The
+				doubling had never been measured against what fighting actually pays:
+				at 5 to 1280 the whole ladder was about two minutes of farming, a
+				figure MobConfig's own header had predicted and nobody had checked.
+
+				Prices are now set from `scripts/simulate.luau`'s income model at
+				roughly twelve minutes of farming each. They stop doubling because
+				income stops doubling — the mob roster ends at Storm while the classes
+				run on to a trillion Power — so the top four rise only gently. Rerun
+				the simulator after changing any of these; it prints the implied
+				minutes per class.
+			]]
+			check(
+				class.FightTokenCost > classes[index - 1].FightTokenCost,
+				`class {index} costs more than the one before it`
+			)
 			check(
 				class.TokenMultiplier == classes[index - 1].TokenMultiplier * 2,
 				`class {index} token rate doubles`

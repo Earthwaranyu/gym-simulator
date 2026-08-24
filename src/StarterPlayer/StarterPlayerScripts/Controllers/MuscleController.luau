@@ -42,15 +42,44 @@ local baseSizes: { [BasePart]: Vector3? } = {}
 local baseJoints: { [Motor6D]: { c0: CFrame, c1: CFrame }? } = {}
 local baseHipHeights: { [Humanoid]: number? } = {}
 
-local function getBaseSize(part: BasePart): Vector3
-	local stored = baseSizes[part]
-	if stored ~= nil then
+--[[
+	A per-axis multiplier on a part's resting size, written by `BodyMeshController`
+	so the rig takes on the generated body's proportions rather than R15's default
+	ones. The two disagree sharply, and a mesh limb welded to a differently-shaped
+	block does not meet it at the joint.
+
+	It folds into the *resting* size, so a reshaped part is what "unscaled" means
+	for it from then on: growth compounds from the new build rather than from the
+	stock R15 one, and a part at no growth reports a scale of exactly 1.
+]]
+local PROPORTION_ATTRIBUTE = "RigProportion"
+--[[
+	Joint offsets for a reshaped rig, written by `BodyMeshController` alongside the
+	proportions. Sizes alone are not enough: re-seating a joint by scaling R15's own
+	offset can only ever place a shoulder proportionally to where R15 put it, and
+	the generated body does not carry its arms where R15 does. These say where the
+	joint actually belongs, and growth scales them from there.
+]]
+local BASE_C0_ATTRIBUTE = "RigBaseC0"
+local BASE_C1_ATTRIBUTE = "RigBaseC1"
+
+local function getProportion(part: BasePart): Vector3
+	local stored = part:GetAttribute(PROPORTION_ATTRIBUTE)
+	if typeof(stored) == "Vector3" then
 		return stored
 	end
+	return Vector3.one
+end
 
-	local captured = part.Size
-	baseSizes[part] = captured
-	return captured
+local function getBaseSize(part: BasePart): Vector3
+	local stored = baseSizes[part]
+	if stored == nil then
+		-- Captured stock, before any reshaping: the proportion is applied on the way
+		-- out so that revising it later re-reads cleanly instead of compounding.
+		stored = part.Size
+		baseSizes[part] = stored
+	end
+	return (stored :: Vector3) * getProportion(part)
 end
 
 --[[
@@ -89,6 +118,18 @@ local function refitJoints(character: Model)
 
 		local c0 = (stored :: { c0: CFrame, c1: CFrame }).c0
 		local c1 = (stored :: { c0: CFrame, c1: CFrame }).c1
+
+		-- A reshaped rig says where its own joints belong; the cached stock offsets
+		-- only describe where R15 put them. Joints without an override — the neck
+		-- and the root, whose parts the generated body does not cover — keep theirs.
+		local overrideC0 = descendant:GetAttribute(BASE_C0_ATTRIBUTE)
+		local overrideC1 = descendant:GetAttribute(BASE_C1_ATTRIBUTE)
+		if typeof(overrideC0) == "CFrame" then
+			c0 = overrideC0
+		end
+		if typeof(overrideC1) == "CFrame" then
+			c1 = overrideC1
+		end
 
 		descendant.C0 = CFrame.new(c0.Position * currentScale(part0)) * (c0 - c0.Position)
 		descendant.C1 = CFrame.new(c1.Position * currentScale(part1)) * (c1 - c1.Position)

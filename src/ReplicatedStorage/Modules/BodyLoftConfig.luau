@@ -77,6 +77,10 @@ BodyLoftConfig.BONES = BONES
 -- "More skinning elements than allowed".
 BodyLoftConfig.MAX_INFLUENCES = 4
 
+-- How dark the deepest groove goes, as a fraction toward black. Only grooves are
+-- tinted at all; see ReliefTint.
+BodyLoftConfig.GROOVE_SHADE = 0.18
+
 -- The widest authored torso half-width. Arm spread is measured against this, so a
 -- chest that grows by 65% pushes the arms out by 65% of this, not of their own girth.
 BodyLoftConfig.TORSO_HALF_WIDTH = 1.0
@@ -398,18 +402,7 @@ for _, side in { "Left", "Right" } do
 	-- The deltoid wraps the outside of the shoulder: +pi/2 is the character's right,
 	-- -pi/2 their left.
 	local outward = if side == "Left" then -PI / 2 else PI / 2
-	--[[
-		Three deltoid heads rather than one ball. A single sphere on the point of the
-		shoulder reads as a rounded corner; what makes a shoulder look capped is the
-		anterior and posterior heads wrapping round to meet the chest and the back.
-		The posterior head is also the one that gives the shoulder a silhouette from
-		behind, which one lobe never did.
-	]]
-	local frontDelt = outward * 0.55
-	local rearDelt = if side == "Left" then -(PI / 2 + 0.68) else PI / 2 + 0.68
-	lobe(`{side}Deltoid`, "Arms", arm, 0.11, outward, 0.56, 0.72, 0.11, 0.08, 0.72, { 1, 0.92, 1 })
-	lobe(`{side}DeltFront`, "Arms", arm, 0.14, frontDelt, 0.54, 0.54, 0.12, 0.10, 0.76)
-	lobe(`{side}DeltRear`, "Arms", arm, 0.14, rearDelt, 0.54, 0.52, 0.12, 0.12, 0.80)
+	lobe(`{side}Deltoid`, "Arms", arm, 0.11, outward, 0.50, 0.58, 0.16, 0.08, 0.72)
 	lobe(`{side}Bicep`, "Arms", arm, 0.33, 0, 0.46, 0.52, 0.14, 0.12, 0.82)
 	lobe(`{side}Tricep`, "Arms", arm, 0.37, PI, 0.46, 0.46, 0.17, 0.22, 0.95)
 	lobe(`{side}Forearm`, "Arms", arm, 0.64, 0, 0.44, 0.34, 0.13, 0.30, 1.00)
@@ -417,12 +410,7 @@ for _, side in { "Left", "Right" } do
 	local leg = `{side}Leg`
 	lobe(`{side}Glute`, "Legs", leg, 0.05, PI, 0.46, 0.60, 0.20, 0.10, 0.80)
 	lobe(`{side}Quad`, "Legs", leg, 0.33, 0, 0.46, 0.58, 0.17, 0.12, 0.84)
-	-- Two hamstring heads with a channel between them, the same trick that makes the
-	-- abs read as six blocks rather than one belly.
-	local hamOut = PI + (if side == "Left" then 0.30 else -0.30)
-	local hamIn = PI + (if side == "Left" then -0.26 else 0.26)
-	lobe(`{side}HamOuter`, "Legs", leg, 0.34, hamOut, 0.50, 0.48, 0.15, 0.25, 0.95, { 1, 1.15, 1 })
-	lobe(`{side}HamInner`, "Legs", leg, 0.39, hamIn, 0.50, 0.44, 0.15, 0.28, 0.98, { 1, 1.15, 1 })
+	lobe(`{side}Hamstring`, "Legs", leg, 0.36, PI, 0.46, 0.52, 0.19, 0.25, 0.95)
 	lobe(`{side}Calf`, "Legs", leg, 0.72, PI, 0.42, 0.44, 0.15, 0.28, 1.00)
 end
 
@@ -431,70 +419,9 @@ end
 for _, sign in { -1, 1 } do
 	local side = if sign < 0 then "Left" else "Right"
 	lobe(`{side}Pec`, "Chest", "Torso", 0.735, sign * 0.42, 0.58, 0.62, 0.15, 0.10, 0.80)
-	--[[
-		The back, as sheets rather than beads.
-
-		The lat is the muscle that decides whether a back reads as dense, and it was
-		the worst offender: a sphere where the real thing is a broad flat sheet, and
-		carrying the softest blend on the whole body at 0.22 — which is exactly the
-		setting that stops a muscle looking like it comes out of the skin. It is now
-		stretched tall and shallow and blended hard, with a lower flare beneath it to
-		carry the V down to the waist.
-	]]
-	lobe(`{side}Lat`, "Back", "Torso", 0.54, sign * (PI / 2), 0.62, 0.74, 0.14, 0.16, 0.88, { 1, 1.45, 0.72 })
-	lobe(
-		`{side}LatFlare`,
-		"Back",
-		"Torso",
-		0.40,
-		sign * (PI / 2 + 0.42),
-		0.60,
-		0.46,
-		0.16,
-		0.22,
-		0.92,
-		{ 1, 1.2, 0.8 }
-	)
-	lobe(`{side}Teres`, "Back", "Torso", 0.62, sign * (PI / 2 + 0.72), 0.64, 0.46, 0.13, 0.26, 0.92)
-	lobe(
-		`{side}Rhomboid`,
-		"Back",
-		"Torso",
-		0.68,
-		PI - sign * 0.34,
-		0.56,
-		0.46,
-		0.14,
-		0.24,
-		0.90,
-		{ 1, 1.1, 0.85 }
-	)
-	lobe(
-		`{side}Trap`,
-		"Back",
-		"Torso",
-		0.86,
-		sign * 0.55 + PI,
-		0.58,
-		0.58,
-		0.13,
-		0.24,
-		0.90,
-		{ 1, 1.15, 0.9 }
-	)
-	lobe(
-		`{side}Erector`,
-		"Back",
-		"Torso",
-		0.44,
-		sign * 0.30 + PI,
-		0.60,
-		0.44,
-		0.12,
-		0.30,
-		0.95,
-		{ 1, 1.35, 0.85 }
-	)
+	lobe(`{side}Lat`, "Back", "Torso", 0.52, sign * (PI / 2), 0.56, 0.58, 0.22, 0.16, 0.88)
+	lobe(`{side}Trap`, "Back", "Torso", 0.86, sign * 0.55 + PI, 0.50, 0.44, 0.19, 0.24, 0.90)
+	lobe(`{side}Erector`, "Back", "Torso", 0.44, sign * 0.30 + PI, 0.54, 0.36, 0.16, 0.30, 0.95)
 	lobe(`{side}Oblique`, "Core", "Torso", 0.34, sign * 1.05, 0.58, 0.34, 0.14, 0.42, 1.00)
 end
 
@@ -555,13 +482,8 @@ for _, sign in { -1, 1 } do
 	groove(`PecUnder{tag}`, "Chest", "Torso", 0.665, sign * 0.34, 0.035, 0.30, 0.17, 0.15, 0.78)
 	-- The flank, separating lat from oblique.
 	groove(`Flank{tag}`, "Back", "Torso", 0.45, sign * 1.35, 0.13, 0.20, 0.13, 0.25, 0.90)
-	-- The spine channel, deepened: on a dense back this is the deepest line on the
-	-- body, and a shallow one leaves the two halves looking like a single slab.
-	groove(`Spine{tag}`, "Back", "Torso", 0.55, PI + sign * 0.06, 0.24, 0.11, 0.17, 0.25, 0.88)
-	-- Between the shoulder blade and the lat below it, and where the trap meets the
-	-- lat. Density on a back is as much about the cuts as the volumes.
-	groove(`Scapula{tag}`, "Back", "Torso", 0.62, PI - sign * 0.62, 0.09, 0.16, 0.13, 0.28, 0.92)
-	groove(`TrapSeam{tag}`, "Back", "Torso", 0.76, PI - sign * 0.30, 0.07, 0.20, 0.12, 0.30, 0.92)
+	-- The spine channel.
+	groove(`Spine{tag}`, "Back", "Torso", 0.55, PI + sign * 0.06, 0.20, 0.10, 0.12, 0.25, 0.88)
 end
 groove("PecCleft", "Chest", "Torso", 0.72, 0, 0.09, 0.14, 0.18, 0.12, 0.70)
 
@@ -581,8 +503,6 @@ for _, side in { "Left", "Right" } do
 	groove(`{side}QuadGap`, "Legs", leg, 0.36, 0, 0.15, 0.18, 0.13, 0.15, 0.84)
 	groove(`{side}KneeGap`, "Legs", leg, 0.60, 0, 0.030, 2.4, 0.11, 0.25, 0.88)
 	groove(`{side}CalfGap`, "Legs", leg, 0.74, PI, 0.13, 0.20, 0.12, 0.28, 0.95)
-	-- Down the middle of the hamstring, between its two heads.
-	groove(`{side}HamGap`, "Legs", leg, 0.36, PI, 0.15, 0.15, 0.13, 0.26, 0.95)
 end
 
 BodyLoftConfig.GROOVES = grooves
@@ -744,6 +664,30 @@ function BodyLoftConfig.BaseRadius(tube: Tube, t: number, angle: number): number
 	return math.sqrt(sx * sx + cz * cz)
 end
 
+--[[
+	How much darker a vertex is than the plain surface, as a plain multiplier.
+
+	The rule that matters is the first line: a flat or raised surface returns
+	**exactly** 1, never 0.98. The body's colour comes from its texture, and any
+	tint at all on flat skin multiplies into that texture and shifts the whole body
+	away from the head — which is precisely the bug this replaced. The body once
+	rendered its skin tone twice and came out at 218,157,111 against a head of
+	236,200,168, and nothing short of comparing pixels would have shown it.
+
+	So only grooves darken. Muscle peaks are left to the mesh's own normals and the
+	world's lighting, which brighten a bulge perfectly well without help.
+
+	Lives here rather than in the builder so it loads under the bare `luau` CLI and
+	can be asserted, like SmoothMax and RayExit before it.
+]]
+function BodyLoftConfig.ReliefTint(relief: number, reach: number): number
+	if reach <= 1e-4 or relief >= 0 then
+		return 1
+	end
+	local depth = math.clamp(-relief / reach, 0, 1)
+	return 1 - depth * BodyLoftConfig.GROOVE_SHADE
+end
+
 function BodyLoftConfig.RunSelfTest(): { string }
 	local failures: { string } = {}
 	local validStats = { Arms = true, Chest = true, Back = true, Core = true, Legs = true }
@@ -899,6 +843,33 @@ function BodyLoftConfig.RunSelfTest(): { string }
 		local justAbove = BodyLoftConfig.Displacement(f, f.T, 0.05, 1)
 		if math.abs(justBelow - justAbove) > 1e-6 then
 			table.insert(failures, "Displacement does not wrap around the 0/2pi seam")
+		end
+	end
+
+	--[[
+		The tint must not touch flat skin.
+
+		The body's colour lives in its texture, so a tint of even 0.98 on a flat
+		surface multiplies in and pulls the whole body away from the head. Checking
+		for exactly 1 rather than approximately 1 is deliberate.
+	]]
+	do
+		if BodyLoftConfig.ReliefTint(0, 0.5) ~= 1 then
+			table.insert(failures, "ReliefTint darkens flat skin")
+		end
+		if BodyLoftConfig.ReliefTint(0.3, 0.5) ~= 1 then
+			table.insert(failures, "ReliefTint darkens a raised muscle")
+		end
+		if BodyLoftConfig.ReliefTint(-0.5, 0.5) >= 1 then
+			table.insert(failures, "ReliefTint does not darken the deepest groove")
+		end
+		if BodyLoftConfig.ReliefTint(-0.5, 0.5) <= 0 then
+			table.insert(failures, "ReliefTint drives a groove to black or beyond")
+		end
+		-- Reach of zero means nothing on this tube moved; it must be a no-op, not a
+		-- division by zero.
+		if BodyLoftConfig.ReliefTint(0, 0) ~= 1 then
+			table.insert(failures, "ReliefTint mishandles a body with no relief")
 		end
 	end
 
