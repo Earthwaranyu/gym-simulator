@@ -17,20 +17,33 @@ export type Rank = {
 }
 
 local ranks: { Rank } = {
-	{ Id = "Newbie", DisplayName = "Newbie", MinPower = 0, Color = Color3.fromRGB(158, 168, 190) },
-	{ Id = "Beginner", DisplayName = "Beginner", MinPower = 2.5e3, Color = Color3.fromRGB(126, 211, 155) },
-	{ Id = "Lifter", DisplayName = "Lifter", MinPower = 5e4, Color = Color3.fromRGB(102, 187, 106) },
-	{ Id = "Athlete", DisplayName = "Athlete", MinPower = 1e6, Color = Color3.fromRGB(66, 165, 245) },
-	{ Id = "Beast", DisplayName = "Beast", MinPower = 5e7, Color = Color3.fromRGB(126, 231, 255) },
-	{ Id = "Monster", DisplayName = "Monster", MinPower = 1e9, Color = Color3.fromRGB(171, 71, 188) },
-	{ Id = "Colossus", DisplayName = "Colossus", MinPower = 5e10, Color = Color3.fromRGB(255, 167, 38) },
-	{ Id = "Titan", DisplayName = "Titan", MinPower = 1e12, Color = Color3.fromRGB(255, 196, 61) },
-	{ Id = "Godlike", DisplayName = "Godlike", MinPower = 1e15, Color = Color3.fromRGB(255, 92, 92) },
+	{ Id = "Newbie", DisplayName = "Newbie", MinPower = 0, Color = Color3.fromRGB(104, 114, 136) },
+	{ Id = "Beginner", DisplayName = "Beginner", MinPower = 2.5e3, Color = Color3.fromRGB(66, 146, 96) },
+	{ Id = "Lifter", DisplayName = "Lifter", MinPower = 5e4, Color = Color3.fromRGB(52, 130, 58) },
+	{ Id = "Athlete", DisplayName = "Athlete", MinPower = 1e6, Color = Color3.fromRGB(26, 110, 180) },
+	{ Id = "Beast", DisplayName = "Beast", MinPower = 5e7, Color = Color3.fromRGB(16, 128, 156) },
+	{ Id = "Monster", DisplayName = "Monster", MinPower = 1e9, Color = Color3.fromRGB(126, 42, 140) },
+	{ Id = "Colossus", DisplayName = "Colossus", MinPower = 5e10, Color = Color3.fromRGB(200, 112, 10) },
+	{ Id = "Titan", DisplayName = "Titan", MinPower = 1e12, Color = Color3.fromRGB(178, 108, 12) },
+	{ Id = "Godlike", DisplayName = "Godlike", MinPower = 1e15, Color = Color3.fromRGB(190, 42, 42) },
 }
 
 local RankConfig = {}
 
 RankConfig.List = ranks
+local byId: { [string]: Rank } = {}
+for _, rank in ranks do
+	byId[rank.Id] = rank
+end
+
+function RankConfig.GetById(id: string): Rank?
+	return byId[id]
+end
+
+function RankConfig.IsUnlocked(id: string, totalPower: number): boolean
+	local rank = byId[id]
+	return rank ~= nil and totalPower >= rank.MinPower
+end
 
 -- Fail loudly at load rather than silently mis-ranking players later.
 for index = 2, #ranks do

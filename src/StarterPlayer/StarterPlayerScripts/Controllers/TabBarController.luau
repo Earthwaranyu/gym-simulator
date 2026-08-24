@@ -66,6 +66,7 @@ function TabBarController:_build()
 	newHeader.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
 	newHeader.Font = UI.Font.Heading
 	newHeader.TextColor3 = UI.Palette.TextMuted
+	UI.Role(newHeader, { Ink = "TextMuted" })
 	newHeader.TextSize = 13
 	newHeader.Text = "PLAYER                 POWER        REPUTATION"
 
@@ -81,11 +82,12 @@ function TabBarController:_build()
 	-- Rank belongs to the roster cluster: immediately left of the player list at the
 	-- top-right, sharing its top edge and disappearing with it when Tab hides the list.
 	local newRankButton = Instance.new("TextButton")
-	newRankButton.Name = "OpenRanks"
+	newRankButton.Name = "OpenTitles"
 	newRankButton.AnchorPoint = Vector2.new(1, 0)
 	newRankButton.Position = UDim2.new(1, -326, 0, 16)
 	newRankButton.Size = UDim2.fromOffset(88, 72)
 	newRankButton.BackgroundColor3 = UI.Palette.Accent
+	UI.Role(newRankButton, { Fill = "Accent" })
 	newRankButton.BackgroundTransparency = 0
 	newRankButton.BorderSizePixel = 0
 	newRankButton.AutoButtonColor = false
@@ -98,6 +100,7 @@ function TabBarController:_build()
 
 	local rankStroke = Instance.new("UIStroke")
 	rankStroke.Color = UI.Palette.CartoonInk
+	UI.Role(rankStroke, { Ink = "OnAccent" })
 	rankStroke.Thickness = 3
 	rankStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	rankStroke.Parent = newRankButton
@@ -113,7 +116,7 @@ function TabBarController:_build()
 	local rankAspect = Instance.new("UIAspectRatioConstraint")
 	rankAspect.AspectRatio = 1
 	rankAspect.Parent = rankIcon
-	Icons.Draw("Rank", rankIcon, UI.Palette.CartoonInk, UI.Palette.Accent)
+	Icons.Draw("Rank", rankIcon, UI.Dark.OnAccent, UI.Dark.Accent)
 
 	local rankLabel = UI.Label("Label", newRankButton)
 	rankLabel.AnchorPoint = Vector2.new(0.5, 1)
@@ -122,13 +125,19 @@ function TabBarController:_build()
 	rankLabel.Font = Enum.Font.GothamBold
 	rankLabel.TextSize = 12
 	rankLabel.TextColor3 = UI.Palette.CartoonInk
+	UI.Role(rankLabel, { Ink = "OnAccent" })
 	rankLabel.TextXAlignment = Enum.TextXAlignment.Center
-	rankLabel.Text = "RANK"
+	rankLabel.Text = "TITLE"
 
 	UI.Pressable(newRankButton, { PressScale = 0.95, HoverScale = 1.03 })
 	newRankButton.Activated:Connect(function()
-		MenuController:Open("Ranks")
+		MenuController:Open("Titles")
 	end)
+
+	-- Chrome, not content: this sits over the world permanently, so it takes the dark
+	-- theme while the menu tabs stay cream.
+	UI.ApplyTheme(newPanel, UI.Dark)
+	UI.ApplyTheme(newRankButton, UI.Dark)
 
 	panel = newPanel
 	header = newHeader
@@ -167,7 +176,12 @@ function TabBarController:_render(roster: { any })
 		local name = UI.Label("Name", row)
 		name.Size = UDim2.fromScale(0.46, 1)
 		name.TextSize = 14
-		name.TextColor3 = entry.RankColor or UI.Palette.Text
+		-- Rank and reputation colours are tuned to carry on the cream menu, so on this
+		-- dark panel they come out muddy. Lifting them toward the panel's own ink keeps
+		-- each one identifiable without repainting the shared config for one surface.
+		name.TextColor3 = if entry.RankColor ~= nil
+			then entry.RankColor:Lerp(UI.Dark.Text, 0.45)
+			else UI.Dark.Text
 
 		-- Markers earned rather than decorative: a bounty and immunity both change
 		-- how other players should treat this person.
@@ -185,7 +199,7 @@ function TabBarController:_render(roster: { any })
 		power.Position = UDim2.fromScale(0.46, 0)
 		power.TextSize = 14
 		power.Font = UI.Font.Numeric
-		power.TextColor3 = UI.Palette.Power
+		power.TextColor3 = UI.Dark.Power
 		local shownPower = entry.Power
 		if entry.UserId == Players.LocalPlayer.UserId then
 			local data = ProfileController:Get()
@@ -200,7 +214,9 @@ function TabBarController:_render(roster: { any })
 		reputation.Position = UDim2.fromScale(0.74, 0)
 		reputation.TextSize = 13
 		reputation.TextXAlignment = Enum.TextXAlignment.Right
-		reputation.TextColor3 = entry.ReputationColor or UI.Palette.TextMuted
+		reputation.TextColor3 = if entry.ReputationColor ~= nil
+			then entry.ReputationColor:Lerp(UI.Dark.Text, 0.45)
+			else UI.Dark.TextMuted
 		reputation.Text = entry.ReputationName or ""
 	end
 end
