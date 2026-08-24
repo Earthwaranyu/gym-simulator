@@ -1905,3 +1905,41 @@ traffic exists:
       as the game does, and plays each alternate from `SoundCandidates` dry so a recording
       can be judged as itself rather than through a chain. The guessing loop failed twice;
       this puts someone who can hear inside it.
+
+- [x] 155. **A corrupt schema version could lock a player out of their own save.**
+      `Migrations.Apply` read `tonumber(data.SchemaVersion) or 1` and looped straight off
+      it, so a stored version of `0`, a negative, a fraction like `3.5`, a string or a
+      boolean indexed a step that does not exist and **threw inside the join path** — at
+      `DataService.luau:105`, after the profile loaded but before it was registered. That
+      player could not get in, repeatedly, with their profile still sitting in the
+      datastore. The version is floored and clamped now, so anything below the first step
+      means "migrate from the beginning" — which is also the right answer for a profile
+      that predates versioning.
+      **Steps are isolated, and a failed one is deliberately not stamped.** That second
+      half is the one that matters: a profile marked current with only half its steps
+      applied is corrupt *permanently*, because every later join skips what it still
+      owes. Leaving it unstamped means the next join retries from where it stopped, so a
+      bad deploy costs sessions rather than saves. DataService now kicks rather than
+      letting a session run on half-migrated data and write the partial result back over
+      a good save.
+      **None of this was reachable in Studio**, which is the point: `USE_MOCK_IN_STUDIO`
+      means every save in this project's history died with its session, so the live path
+      had never once executed. Verified by feeding `Apply` the eight profile shapes a real
+      DataStore can return — six of them used to throw, and a rollback case stamped far in
+      the future is correctly left untouched.
+
+- [x] 156. **A bad volume in a save no longer takes the audio down.** The three volume
+      reads used raw arithmetic and comparison — `(settings.MasterVolume or 100) / 100`
+      and `... <= 0` — both of which *throw* on a non-number rather than falling back. A
+      corrupt or tampered profile would have broken audio init on exactly the saves least
+      able to afford another problem. `SoundBus.ReadVolume` centralises it because there
+      were three such sites and the fourth would have got it wrong.
+
+- [x] 157. **The playtest gate records what was actually verified, not what was assumed.**
+      Its client ignition count was stale again (37, actually 39 after MusicController and
+      AuditionController). Section 1 is now ticked — and only section 1 — with every box
+      read out of a live session rather than inferred: 32 server systems, 39 client, three
+      abilities, eleven AssetId-0 warnings, zero station warnings, zero non-DataStore
+      errors, 35 tagged zones, `check.sh` green and `validate_gym` at 35/35 against build
+      `319220b972df`. The evidence block says plainly what that run does *not* prove: a
+      machine can confirm the game boots correctly, and cannot confirm it is any good.
