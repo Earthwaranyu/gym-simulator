@@ -1767,3 +1767,76 @@ traffic exists:
       untyped `ROLE_ATTRIBUTES` and `validRegions`, `x ~= nil` against a non-nilable type,
       an unannotated `bounds` parameter — but a gate that always fails is a gate nobody
       reads, and it would have hidden a real error the day one appeared.
+
+- [x] 148. **Impacts get layers, variants and a mix that ducks for them.** The previous
+      pass filled thirteen ids and called it audio; one file per event is what makes a
+      game sound cheap. A `SoundSpec` now carries `Variants` (several ids, one picked per
+      play — reps and footsteps machine-gun otherwise, however much pitch jitter they
+      get), `Layers` (sub-specs played together: a slam is a concrete transient, a sub you
+      feel rather than hear, and the grit it throws up), `Group`, `Spatial` with rolloff,
+      and `Cooldown`.
+      **The mix is the part that does the real work.** `SoundBus` builds
+      Master → Music / Ambience / Sfx / Ui once, and hangs a `CompressorSoundEffect` on
+      Music and Ambience whose `SideChain` is the Sfx bus. Combat now pushes the music
+      down by itself — nothing scripts it, nothing knows a fight is happening, and no
+      sound had to be made louder to be heard over another. An `EqualizerSoundEffect` does
+      the same job in frequency, giving up the music's low-mids so impacts have somewhere
+      to sit. It is code rather than `default.project.json` because both the bus tree and
+      the sidechain are instance references, which a Rojo project file cannot express.
+      Also: `ContentProvider:PreloadAsync` on every id at startup, because the first punch
+      of a session was silent while the asset streamed. `ContentProvider` had never been
+      used in this codebase at all.
+
+- [x] 149. **Every button in the game clicks, not the six that opted in.** `UiClick` was
+      hand-wired onto six buttons across two controllers, so every other button in the
+      game was mute — being heard was opt-in and nobody opted in. `UI.Pressable` is the
+      one choke point every button already goes through, so the click belongs there.
+      `UI.luau` lives in ReplicatedStorage and must not depend on a client controller, so
+      it exposes `SetPressListener` and EffectsController fills it in; the six hand-wired
+      calls are gone, along with MenuBarController's now-unused EffectsController handle.
+
+- [x] 150. **The five sounds nothing was playing now play.** `Knockout`, `SlamWindup`,
+      `SlamImpact`, `Purchase` and `Footfall` were fully configured and had **zero call
+      sites** — pasting ids into them would have changed nothing.
+      `SlamWindup` is renamed `SlamCharge` to match the cue name in `StrikeConfig`, and
+      that rename is the mechanism rather than tidying: VfxController now plays the sound
+      whose name matches the cue it is already drawing, so audio and visuals can be
+      authored independently and still land on the same frame, and a future cue is audible
+      for free. Footfall rides beside its dust in `PlayFootfall`; Purchase fires on the two
+      buy paths in MenuController; Knockout comes off `humanoid.Died`.
+      **This is also what made combat audible from outside.** Those handlers were already
+      watching *every* character, because hit, guard and flight are attribute-driven and
+      attributes replicate — so passing an emitter to each call was enough to hear an
+      attacker behind you. The planned server broadcast turned out to be unnecessary: the
+      replication needed already existed, and reusing it costs no new remote, no bandwidth
+      and no trust surface. The Footfall cooldown is keyed per emitter for the same
+      reason — a global key would let the nearest runner swallow everybody else's steps.
+
+- [x] 151. **A soundtrack, and combat music that warns you.** `MusicEnabled` had been in
+      the profile, the settings menu and the save file for months, wired to nothing —
+      worse than a missing feature, because the player concludes the game is broken.
+      One exploration track, one combat track that takes over on any hit and hands back
+      six seconds after the last one, and a global ambience bed. Combat gets a whole track
+      rather than a layer because fights here start without warning: a player locked into
+      a machine cannot see who is behind them, and the music changing *is* the warning.
+      Both tracks are created once and left playing for the session; a switch moves their
+      volumes past each other and never starts or stops a Sound, so the combat track is
+      already in its own bar when it fades up and the theme does not restart on the way
+      back. The fade is a **Heartbeat clock, not TweenService** — a direct reading of the
+      warning in `EffectsController:_showTrainingGain`: a tween captures its start value at
+      `Play()` and a second tween on the same property cancels the first, which is exactly
+      what "fade A down, fade B up, get interrupted halfway" does. Stepping toward a target
+      each frame is interruptible by construction.
+
+- [x] 152. **Three volume sliders replace two toggles that half worked.** `MusicEnabled`
+      and `SfxEnabled` become `MasterVolume` / `MusicVolume` / `SfxVolume`, 0-100, driving
+      the SoundGroup volumes so the mix is tunable live without a republish. Migration v9
+      carries the old choices over — off becomes zero, on becomes the *authored* level
+      rather than 100, so a returning player hears the game as designed rather than louder
+      than everyone else — and explicitly clears the retired booleans, because Reconcile
+      only ever adds keys and a forgotten one rides along in every save forever.
+      `UI.Slider` is new and shared, shaped like `UI.Bar`. Its `OnChanged`/`OnCommitted`
+      split is the load-bearing part of the API: dragging fires every frame, `Net` rate
+      limits the settings remote to four calls, and `_refresh` would destroy the slider
+      under the finger still dragging it — so the drag writes straight to the mix and only
+      the release reaches the server.
