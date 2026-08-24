@@ -1392,7 +1392,7 @@ punches for a whole phase, so the game had two answers to one question.
       with zero remaining after stop. Selene has zero warnings, all pure self-tests and
       world validation pass, and strict analysis reports only existing UI/FullMap issues.
 
-- [ ] 128. **Combat gets a framework the abilities can be config in.** Abilities were
+- [x] 128. **Combat gets a framework the abilities can be config in.** Abilities were
       already open/closed on the server — a file in `CombatService/Abilities/` is
       discovered at startup — but the client was not: `CombatController` hardcoded one
       ability id, one cooldown mirror and one bind, so the second ability would have
@@ -1409,7 +1409,7 @@ punches for a whole phase, so the game had two answers to one question.
       registry so a defensive move can have the last word on damage without a branch
       inside `ApplyDamage`. Dash moves from Q to C to free the key.
 
-- [ ] 129. **A procedural VFX system, because the game had none.** Nothing in the
+- [x] 129. **A procedural VFX system, because the game had none.** Nothing in the
       workspace had ever flashed, cracked or shaken — `EffectsController` was damage
       numbers and silent sounds. `VfxConfig` declares effects as layered data (ring,
       flash, shards, burst, shake, impact beat, scorch, trail) and `VfxController`
@@ -1424,7 +1424,7 @@ punches for a whole phase, so the game had two answers to one question.
       shards, 2 rings, 2 bursts and a scorch; the first pass was retuned after a
       screenshot showed dinner-plate slabs and dust thick enough to hide the fight.
 
-- [ ] 130. **Ground Slam, Hard Punch and Block.** Q is a leap and a smash: one contact
+- [x] 130. **Ground Slam, Hard Punch and Block.** Q is a leap and a smash: one contact
       two thirds through a 1.15s clip, damage falling off linearly to the rim, and
       everybody inside launched. R is one telegraphed heavy — nearly half its clip is
       wind-up, which is the entire reason Block has something to react to; the self-test
@@ -1440,7 +1440,7 @@ punches for a whole phase, so the game had two answers to one question.
       fire from their keys, the bar sweeps, the meter drains red and breaks, and the
       dome renders around the character.
 
-- [ ] 131. **Flight gets an animation, and the body earns the right to tilt.** Flight
+- [x] 131. **Flight gets an animation, and the body earns the right to tilt.** Flight
       had none: FlightController puts the humanoid on PlatformStand and drives a
       LinearVelocity, so Roblox's freefall clip kept playing and the avatar read as a
       standing body sliding through the air. That is also why the controller held the
@@ -1470,7 +1470,7 @@ punches for a whole phase, so the game had two answers to one question.
       eases back upright, landing releases every joint and every trail, and contrails
       sit disabled at rest and near-maximum at speed.
 
-- [ ] 132. **Walking and running stop being Roblox's.** Locomotion was the last
+- [x] 132. **Walking and running stop being Roblox's.** Locomotion was the last
       animation in the game that was not ours — the stock Animate script playing
       Roblox's uploaded walk and run clips — and it is the animation players see most:
       training is a pose at a machine, flying is occasional, fighting is bursts, and
@@ -1506,7 +1506,7 @@ punches for a whole phase, so the game had two answers to one question.
       `Formulas.RunLean` exactly, footfall and sprint effects spawning, and the gait
       standing down for flight, training and strikes and releasing to Roblox's idle.
 
-- [ ] 133. **The punch lands on somebody.** `Punch` was the only strike in the game with
+- [x] 133. **The punch lands on somebody.** `Punch` was the only strike in the game with
       no VFX at all, and the victim of one showed no sign of being hit — a number
       appeared on their screen and their body did not move a joint. In a game whose hook
       is interrupting somebody mid-training, the person being interrupted was the one
@@ -1544,7 +1544,7 @@ punches for a whole phase, so the game had two answers to one question.
       only on the last, jabs and crosses lose to your own swing while a finisher
       interrupts it, and a full combo peaks at 14 effect parts.
 
-- [ ] 134. **One click, one punch.** The normal punch was one click that played a
+- [x] 134. **One click, one punch.** The normal punch was one click that played a
       0.9-second clip landing all three contacts by itself: the player pressed once and
       watched. The three-hit combo the HUD advertised was something the game did to you
       rather than something you did. Now each click is one swing, and clicking again
@@ -1582,7 +1582,7 @@ punches for a whole phase, so the game had two answers to one question.
       0.80/Crushing, and a chained click reads 91° → 102° → 94° on the shoulder instead
       of snapping to zero.
 
-- [ ] 135. **The sprint was leaning backwards and windmilling.** #132 was authored blind —
+- [x] 135. **The sprint was leaning backwards and windmilling.** #132 was authored blind —
       Studio's screen capture has been unresponsive all session, so every angle was
       reasoned from `PoseConfig`'s documented axes and verified only numerically. The
       numbers were right; two of the conventions behind them were not.
@@ -1608,7 +1608,7 @@ punches for a whole phase, so the game had two answers to one question.
       with |Z| 6.33. Screen capture is still unresponsive, so this is confirmed consistent
       with the working poses rather than confirmed to look right.
 
-- [ ] 136. **The gait becomes anime.** Re-authored from "heavy gym-bruiser" to an anime
+- [x] 136. **The gait becomes anime.** Re-authored from "heavy gym-bruiser" to an anime
       walk and run, in three parts.
       **Timing first.** `StrikeConfig`'s header already says "the anime read comes from
       the timing far more than the angles" — a cartoon motion holds at full extension and
@@ -1691,3 +1691,71 @@ traffic exists:
 | Discovery | qPTR at or above benchmark with honest, meaningfully different creatives; judge each source by downstream D7, not clicks alone |
 | Monetization | 100% idempotent grants; no statistically meaningful D1/D7 or non-payer/PvP-victim regression after a store change |
 | Reliability | crash-free sessions ≥99.5%; OOM exits <0.1%; p95 join→interactive ≤10s; p50 ≥55 FPS on the chosen low-end mobile tier; healthy server heartbeat at capacity |
+
+- [x] 137. **Build artifacts stop being version-controlled.** `scripts/__pycache__` was
+      tracked, so every run of a build script produced a spurious diff, and `default.rbxl`
+      was sitting untracked in the root waiting to be committed by accident. Both are now
+      ignored and the `.pyc` is untracked.
+
+- [x] 138. **Your rank becomes a title people can read above your head.** `TitleService`
+      turns the ranks in `RankConfig` into a *selectable* label rather than an automatic
+      one: earning a rank unlocks its title, and the player picks which unlocked title to
+      wear. It replicates as three plain Player attributes (`TitleId`, `TitleName`,
+      `TitleColor`) so `NameplateController` and `TabBarController` render it without
+      either of them requiring the service, and NPCs get the same attributes so a
+      nameplate never has to ask whether it is looking at a player.
+
+- [x] 139. **You pick the weight on the bar, and it decides the set.** Training was one
+      fixed rate per machine; `WeightConfig` gives every district a bare-bar 0 kg state
+      and ten authored increases above it. The world multiplier still owns the exponential
+      curve — load is a smaller within-district bonus, so a heavier plate is never a way
+      to skip a zone. Each step has its own stat requirement, and mastering a muscle's
+      final load opens *that same muscle* in the next district, never a different one.
+
+- [x] 140. **Legs buy you a dash, not just a top speed.** The dash is real physics at 78
+      studs a second, which meant dashing through a crowd scattered it — a way to fling
+      people off machines without throwing a punch, which is exactly the interruption rule
+      #5 exists to prevent. `DashService` fixes it with a collision group rather than
+      anything in the mover: dashing parts move to `Dashing`, which collides with the
+      world and with nothing alive. It has to be server-side because collision groups
+      replicate from the server and the shove is simulated on both machines. The client
+      declares its own dash state, which is safe because the flag grants nothing except
+      the ability to *not* push people.
+
+- [x] 141. **Each district gets its own sky and light.** `LightingConfig` makes the grade
+      data. The look was a warm, saturated, high-noon grade that washed distance to white
+      and left asphalt reading as light grey; it is now GTA V — desaturated, cold shadows
+      against warm light, blacks that reach black, and haze with weight rather than milk.
+      `AtmosphereController` applies it per zone at runtime and is the authority, with the
+      `Lighting` block in `default.project.json` mirroring `Base` so the Studio edit view
+      and the first frame of a session are not a different game.
+
+- [x] 142. **Quests become one endless rotation instead of a daily log.** Upper body,
+      lower body, monsters, repeat forever — exactly one active at a time, with goals and
+      rewards growing 1.6x a loop (the kill step more slowly, since a kill costs travel and
+      a fight rather than time on a machine). This made the engine *smaller*: the daily
+      model needed a UTC-midnight reset, a completions table and a "once" marker, all of
+      which existed to answer "is this available again yet". A cycle never asks that — the
+      active step is a position, not a date. Every quest's listener stays wired including
+      the inactive ones, and `report` discards anything that is not the active quest, which
+      is the single place the one-at-a-time rule lives.
+
+- [x] 143. **Tokens live in MultiplierService, so CurrencyService goes.** A separate
+      service holding one balance that only one system spent was indirection with no
+      second caller. `BountyService` now credits through `MultiplierService` directly.
+
+- [x] 144. **The muscle you are working lights up while you train it.** A highlight driven
+      off `EquipmentConfig`'s muscle mapping, so a new machine gets the effect from its
+      config row and `TrainingMuscleHighlightController` never learns another exercise.
+
+- [x] 145. **The balance model catches up with the weights and the cycle.** The simulator
+      and its extracted inputs were still modelling a game with no selectable load and
+      three fixed daily quests, so every projection it produced was for a build that no
+      longer existed.
+
+- [x] 146. **The truth files describe the game that actually exists.** `PLAYTEST.md` was
+      the launch gate and could not be run as written: it asserted 26 server systems and 20
+      controllers (actually 32 and 37), one combat ability (actually three), four products
+      (actually eleven), and quest ids that had been deleted. A launch gate that fails on
+      its own stale facts teaches you to ignore it, which is worse than not having one.
+      `PRODUCT_TRUTH.md` and `ALPHA_PROTOCOL.md` carried the same claims.
