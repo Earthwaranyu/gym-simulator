@@ -1444,8 +1444,8 @@ function MenuController:_renderQuests(parent: Frame)
 		local complete = quest.Complete == true
 		local accent = if complete
 			then UI.Palette.Vital
-			elseif quest.Id == "DailyKnockouts" then UI.Palette.Danger
-			elseif quest.Id == "FirstMillion" then UI.Palette.Power
+			elseif quest.Id == "CycleMobHunt" then UI.Palette.Danger
+			elseif quest.Id == "CycleUpperBody" then UI.Palette.Power
 			else UI.Palette.Token
 
 		local card = UI.CartoonCard(tostring(quest.Id), accent, parent)
