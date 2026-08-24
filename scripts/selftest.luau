@@ -46,6 +46,7 @@ local SUITES = {
 	{ Name = "ShopConfig", Module = require("../src/ReplicatedStorage/Modules/ShopConfig") },
 	{ Name = "EffectsConfig", Module = require("../src/ReplicatedStorage/Modules/EffectsConfig") },
 	{ Name = "MusicConfig", Module = require("../src/ReplicatedStorage/Modules/MusicConfig") },
+	{ Name = "SoundCandidates", Module = require("../src/ReplicatedStorage/Modules/SoundCandidates") },
 	{ Name = "Migrations", Module = require("../src/ServerScriptService/Core/_Migrations") },
 }
 
