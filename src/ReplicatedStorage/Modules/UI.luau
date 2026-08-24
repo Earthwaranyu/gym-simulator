@@ -12,6 +12,7 @@
 ]]
 
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local UI = {}
 
@@ -472,6 +473,161 @@ function UI.Bar(name: string, color: Color3, parent: Instance?, emptyColor: Colo
 	return bar
 end
 
+export type Slider = {
+	Root: TextButton,
+	-- Moves the handle without firing OnChanged. For pushing saved state in.
+	Set: (value: number) -> (),
+}
+
+export type SliderOptions = {
+	-- Inclusive whole-number range. Defaults to 0..100.
+	Min: number?,
+	Max: number?,
+	Value: number?,
+	Colour: Color3?,
+	-- Fired continuously while dragging, with the whole-number value.
+	OnChanged: ((value: number) -> ())?,
+	-- Fired once when the drag ends. This is the one to persist from: OnChanged can
+	-- fire every frame, and a remote call per frame is a rate-limit ban.
+	OnCommitted: ((value: number) -> ())?,
+}
+
+--[[
+	A draggable 0-100 track, shaped like `UI.Bar` so a slider and a readout read as the
+	same control family.
+
+	The split between `OnChanged` and `OnCommitted` is the important part of the API and
+	exists because of `Net`'s rate limits: dragging fires on every frame the pointer
+	moves, so the *local* mix follows the handle live while only the release writes to
+	the server. A single callback would force every caller to rediscover that, and the
+	first one to forget would spend a player's whole budget in one drag.
+
+	It is a TextButton rather than a Frame so the whole track is one input target — a
+	press anywhere on it jumps the handle there, which is what a player expects and what
+	a handle-only hit area does not give you on a phone.
+]]
+function UI.Slider(name: string, parent: Instance?, options: SliderOptions?): Slider
+	local settings: SliderOptions = options or {}
+	local minimum = settings.Min or 0
+	local maximum = settings.Max or 100
+	local colour = settings.Colour or UI.Palette.Accent
+
+	local root = Instance.new("TextButton")
+	root.Name = name
+	root.AutoButtonColor = false
+	root.Text = ""
+	root.BackgroundColor3 = UI.Palette.Backdrop
+	root.BackgroundTransparency = UI.Surfaces.BarTrackTransparency
+	root.BorderSizePixel = 0
+	root.Size = UDim2.new(1, 0, 0, 22)
+	UI.Role(root, { Ink = "Backdrop", Opacity = "BarTrackTransparency" })
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = root
+
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.BackgroundColor3 = colour
+	fill.BorderSizePixel = 0
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.Parent = root
+
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0, 6)
+	fillCorner.Parent = fill
+
+	local caption = UI.Label("Caption", root)
+	caption.Size = UDim2.new(1, -16, 1, 0)
+	caption.Position = UDim2.fromOffset(8, 0)
+	caption.Font = UI.Font.Numeric
+	caption.TextSize = 13
+	caption.TextXAlignment = Enum.TextXAlignment.Right
+	caption.ZIndex = 2
+
+	root.Parent = parent
+
+	local current = math.clamp(settings.Value or minimum, minimum, maximum)
+	local dragging = false
+
+	local function render()
+		local span = math.max(1, maximum - minimum)
+		fill.Size = UDim2.fromScale((current - minimum) / span, 1)
+		caption.Text = tostring(current)
+	end
+
+	local function valueAt(x: number): number
+		local left = root.AbsolutePosition.X
+		local width = math.max(1, root.AbsoluteSize.X)
+		local ratio = math.clamp((x - left) / width, 0, 1)
+		return math.round(minimum + ratio * (maximum - minimum))
+	end
+
+	local function moveTo(x: number)
+		local value = valueAt(x)
+		if value == current then
+			return
+		end
+		current = value
+		render()
+		if settings.OnChanged ~= nil then
+			settings.OnChanged(current)
+		end
+	end
+
+	root.InputBegan:Connect(function(input: InputObject)
+		if
+			input.UserInputType ~= Enum.UserInputType.MouseButton1
+			and input.UserInputType ~= Enum.UserInputType.Touch
+		then
+			return
+		end
+		dragging = true
+		moveTo(input.Position.X)
+	end)
+
+	root.InputChanged:Connect(function(input: InputObject)
+		if not dragging then
+			return
+		end
+		if
+			input.UserInputType ~= Enum.UserInputType.MouseMovement
+			and input.UserInputType ~= Enum.UserInputType.Touch
+		then
+			return
+		end
+		moveTo(input.Position.X)
+	end)
+
+	-- Released anywhere, not just over the track. A drag that ends off the side of the
+	-- control still has to commit, or the value silently reverts on the next redraw.
+	UserInputService.InputEnded:Connect(function(input: InputObject)
+		if not dragging then
+			return
+		end
+		if
+			input.UserInputType ~= Enum.UserInputType.MouseButton1
+			and input.UserInputType ~= Enum.UserInputType.Touch
+		then
+			return
+		end
+		dragging = false
+		if settings.OnCommitted ~= nil then
+			settings.OnCommitted(current)
+		end
+	end)
+
+	render()
+
+	return {
+		Root = root,
+		Set = function(value: number)
+			current = math.clamp(math.round(value), minimum, maximum)
+			render()
+		end,
+	}
+end
+
 --[[
 	Stacks children vertically with consistent spacing. Used instead of manual
 	positioning so a row can be added or removed without re-laying-out its siblings.
@@ -498,6 +654,23 @@ export type PressableOptions = {
 
 local PRESS_IN = TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local PRESS_OUT = TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+-- Called once per press, for whoever wants to make a noise about it.
+local pressListener: (() -> ())? = nil
+
+--[[
+	Registers the one thing that happens on every button press in the game — in practice
+	EffectsController, playing the click.
+
+	It is a hook rather than a direct call because UI lives in ReplicatedStorage and must
+	not depend on a client controller. Inverting it this way keeps UI free of that
+	dependency while still meaning a new button is audible the moment it exists: the
+	previous arrangement hand-wired a click onto individual buttons, which is why most of
+	the menu was silent — being heard was opt-in, and nobody opted in.
+]]
+function UI.SetPressListener(listener: (() -> ())?)
+	pressListener = listener
+end
 
 --[[
 	Makes a button feel like one: it grows slightly under the pointer and shrinks
@@ -560,6 +733,10 @@ function UI.Pressable(button: GuiButton, options: PressableOptions?): UIScale
 		end
 		pressing = true
 		settle()
+		if pressListener ~= nil then
+			-- A listener that throws must never stop the button working.
+			pcall(pressListener :: () -> ())
+		end
 		if settings.OnPress ~= nil then
 			settings.OnPress()
 		end

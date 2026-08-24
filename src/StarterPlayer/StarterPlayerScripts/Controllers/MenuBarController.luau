@@ -19,7 +19,6 @@ local MenuBarController = {
 }
 
 local MenuController: any = nil
-local EffectsController: any = nil
 local menuButton: TextButton
 local iconTile: Frame
 local iconBars: { Frame } = {}
@@ -27,7 +26,6 @@ local buttonStroke: UIStroke
 
 function MenuBarController:Init()
 	MenuController = Loader.Get("MenuController")
-	EffectsController = Loader.Get("EffectsController")
 end
 
 -- The bar repaints itself on every open and close, so it reads the dark table
@@ -122,9 +120,6 @@ function MenuBarController:_build()
 	UI.Pressable(menuButton, {
 		PressScale = 0.95,
 		HoverScale = 1.02,
-		OnPress = function()
-			EffectsController:Play("UiClick")
-		end,
 	})
 
 	menuButton.Activated:Connect(function()

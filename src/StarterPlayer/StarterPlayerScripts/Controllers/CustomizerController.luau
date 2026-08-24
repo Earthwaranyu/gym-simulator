@@ -217,9 +217,6 @@ local function swatchRow(order: number, title: string, list: { AppearanceConfig.
 		UI.Pressable(button, {
 			PressScale = 0.9,
 			HoverScale = 1.08,
-			OnPress = function()
-				EffectsController:Play("UiClick")
-			end,
 		})
 
 		button.Activated:Connect(function()
@@ -284,9 +281,6 @@ local function stepperRow(order: number, title: string, ids: { string }, names: 
 
 		UI.Pressable(button, {
 			PressScale = 0.9,
-			OnPress = function()
-				EffectsController:Play("UiClick")
-			end,
 		})
 
 		button.Activated:Connect(function()
@@ -379,9 +373,6 @@ function CustomizerController:_build()
 
 	closeButton = Icons.CloseButton(panel, {
 		Size = 32,
-		OnPress = function()
-			EffectsController:Play("UiClick")
-		end,
 		OnActivated = function()
 			self:Close()
 		end,
@@ -419,9 +410,6 @@ function CustomizerController:_build()
 
 	UI.Pressable(randomButton, {
 		PressScale = 0.95,
-		OnPress = function()
-			EffectsController:Play("UiClick")
-		end,
 	})
 
 	randomButton.Activated:Connect(function()
@@ -449,9 +437,6 @@ function CustomizerController:_build()
 
 	UI.Pressable(applyButton, {
 		PressScale = 0.97,
-		OnPress = function()
-			EffectsController:Play("UiClick")
-		end,
 	})
 
 	applyButton.Activated:Connect(function()
