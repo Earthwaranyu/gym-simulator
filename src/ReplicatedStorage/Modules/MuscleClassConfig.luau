@@ -146,6 +146,20 @@ function MuscleClassConfig.Get(level: number): MuscleClass
 	return classes[safeLevel(level) + 1]
 end
 
+--[[
+	What a Natural-quoted token amount is worth at this class.
+
+	Every token figure in the game is written as what it means to a Natural and scaled
+	here: income ticks, mob and quest payouts, and the shop packs. The server grants
+	through TokenService:ClassScaled and the shop card quotes the same function, so a
+	card cannot promise a number the grant would not credit — and because it lives on
+	the config rather than on a service, the client can scale a figure for display
+	without a round trip.
+]]
+function MuscleClassConfig.ScaleTokens(level: number, baseAmount: number): number
+	return baseAmount * MuscleClassConfig.Get(level).TokenMultiplier
+end
+
 function MuscleClassConfig.Next(level: number): MuscleClass?
 	return classes[safeLevel(level) + 2]
 end

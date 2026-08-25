@@ -2106,3 +2106,22 @@ traffic exists:
       Quoted server-side because the server owns the class; the client only formats it,
       with the same `NumberFormat.Format` the HUD counter uses, so `384K` means the same
       thing in both places.
+
+- [x] 169. **A pack's quoted payout follows the class the frame it changes.** #168 quoted
+      the figure server-side, which meant it was only as fresh as the last catalogue round
+      trip. The row now carries the Natural-quoted `TokenGrant` and the client scales it
+      through `MuscleClassConfig.ScaleTokens` — the same function `TokenService:ClassScaled`
+      now calls, so the quote and the grant still cannot disagree. The shop already
+      re-renders on every `ProfileChanged` push, so a physique transformation moves the
+      number with no RPC in between.
+      That re-render exposed a fault worth more than the feature: `GetProductCatalogue`
+      called `UserOwnsGamePassAsync` once per gamepass with no caching, and it runs on
+      every profile push — a token tick, a rep. A player who left the shop open while
+      training was firing three uncached web requests a tick at Roblox's rate limiter.
+      Ownership is now cached for 60 seconds per player per pass, cleared outright when a
+      purchase completes so a fresh buyer sees `OWNED` immediately, and dropped on
+      `PlayerRemoving` so the table does not grow with the session. A *failed* lookup is
+      deliberately not cached: holding a VIP out of their own pass for a minute because one
+      request timed out is worse than asking again.
+      Measured: a catalogue call after the TTL lapses costs 84ms, the one immediately after
+      it 50ms.

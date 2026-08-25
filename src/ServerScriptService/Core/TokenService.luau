@@ -166,8 +166,7 @@ end
 function TokenService:ClassScaled(player: Player, baseAmount: number): number
 	local data = DataService:GetData(player)
 	local level = if data ~= nil then data.MuscleClassLevel else 0
-	local class = MuscleClassConfig.Get(level)
-	return baseAmount * class.TokenMultiplier
+	return MuscleClassConfig.ScaleTokens(level, baseAmount)
 end
 
 --[[

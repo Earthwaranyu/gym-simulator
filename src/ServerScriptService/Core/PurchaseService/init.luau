@@ -107,17 +107,60 @@ end
 	Whether the player owns a gamepass. Wrapped in pcall because the Roblox call is a
 	network request that genuinely fails, and a failure must read as "not owned"
 	rather than erroring the caller.
+
+	Cached for OWNERSHIP_TTL seconds, because the shop screen re-renders on every
+	profile push — a token tick, a rep — and each render asked this question once per
+	gamepass. A player who left the shop open while training was firing three uncached
+	web requests a tick at the rate limiter.
+
+	The TTL stays short and a purchase clears the entry outright, so the two ways
+	ownership changes are both covered: buying in-game is immediate, and buying on the
+	website or in another server shows up within the minute.
 ]]
+local OWNERSHIP_TTL = 60
+
+type OwnershipEntry = { Owns: boolean, ReadAt: number }
+local ownership: { [Player]: { [number]: OwnershipEntry } } = {}
+
+local function forgetOwnership(player: Player, assetId: number?)
+	local byAsset = ownership[player]
+	if byAsset == nil then
+		return
+	end
+	if assetId == nil then
+		ownership[player] = nil
+	else
+		byAsset[assetId] = nil
+	end
+end
+
 function PurchaseService:OwnsGamepass(player: Player, assetId: number): boolean
 	if assetId == 0 then
 		return false
+	end
+
+	local byAsset = ownership[player]
+	if byAsset == nil then
+		byAsset = {}
+		ownership[player] = byAsset
+	end
+
+	local entry = byAsset[assetId]
+	if entry ~= nil and os.clock() - entry.ReadAt < OWNERSHIP_TTL then
+		return entry.Owns
 	end
 
 	local ok, owns = pcall(function()
 		return MarketplaceService:UserOwnsGamePassAsync(player.UserId, assetId)
 	end)
 
-	return ok and owns == true
+	local answer = ok and owns == true
+	-- A failed call is not cached as "not owned": that would hold a VIP out of their
+	-- own pass for a minute because one request timed out.
+	if ok then
+		byAsset[assetId] = { Owns = answer, ReadAt = os.clock() }
+	end
+	return answer
 end
 
 --[[
@@ -207,12 +250,6 @@ function PurchaseService:Start()
 			-- yields and falls back to product.RobuxPrice, so a rate-limited or offline
 			-- lookup still returns a shop.
 			local info = ProductInfo.Get(product)
-			-- Quoted from the same function that will do the granting, so a card can
-			-- never promise a figure the grant would not credit.
-			local tokens: number? = nil
-			if product.TokenGrant ~= nil then
-				tokens = Loader.Get("TokenService"):ClassScaled(player, product.TokenGrant)
-			end
 			table.insert(rows, {
 				Id = product.Id,
 				Kind = product.Kind,
@@ -220,7 +257,12 @@ function PurchaseService:Start()
 				Description = product.Description,
 				RobuxPrice = info.Price,
 				Icon = info.Icon,
-				Tokens = tokens,
+				-- Sent Natural-quoted rather than scaled here. The client holds the
+				-- physique class already, so it can rescale the moment a transformation
+				-- lands instead of waiting for the next catalogue round trip — and both
+				-- sides scale through MuscleClassConfig.ScaleTokens, which is the same
+				-- function the grant goes through.
+				TokenGrant = product.TokenGrant,
 				Available = open and product.AssetId ~= 0,
 				Owned = product.Kind == "Gamepass" and self:OwnsGamepass(player, product.AssetId),
 			})
@@ -284,6 +326,8 @@ function PurchaseService:Start()
 				end
 				return
 			end
+			-- Bought just now, so whatever the cache last read is wrong.
+			forgetOwnership(player, gamePassId)
 			for _, product in gamepasses do
 				if product.AssetId == gamePassId then
 					product.Grant(player)
@@ -292,6 +336,12 @@ function PurchaseService:Start()
 			end
 		end
 	)
+
+	-- The cache is keyed by Player, so it would otherwise hold a reference to everyone
+	-- who has ever joined this server.
+	Players.PlayerRemoving:Connect(function(player: Player)
+		forgetOwnership(player, nil)
+	end)
 
 	DataService.ProfileLoaded:Connect(function(player: Player)
 		task.spawn(function()

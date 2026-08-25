@@ -1543,6 +1543,12 @@ function MenuController:_renderShop(parent: Frame)
 		return Net.Function("GetProductCatalogue"):InvokeServer()
 	end)
 
+	-- This render runs again on every profile push while the shop is open, so reading
+	-- the class from here is what keeps a pack's quoted payout current the moment a
+	-- transformation lands.
+	local data = ProfileController:Get()
+	local classLevel = if data ~= nil then data.MuscleClassLevel else 0
+
 	local sections: { [string]: { any } } = { Gamepass = {}, Potion = {}, Supplement = {}, Token = {} }
 	if ok and type(catalogue) == "table" then
 		for _, product in catalogue do
@@ -1776,13 +1782,16 @@ function MenuController:_renderShop(parent: Frame)
 					or (if ShopIcons.Get(product.Id) ~= nil then product.Id else visual.Icon)
 				-- A token pack's real payout depends on the buyer's physique class, so
 				-- the card quotes what this player would receive rather than the
-				-- Natural figure the product is written in. Same formatter as the HUD
-				-- counter, so "384K" means the same thing in both places.
+				-- Natural figure the product is written in. Scaled here rather than on
+				-- the server: this render already runs on every profile push, so the
+				-- figure follows a transformation the frame it happens instead of
+				-- trailing a round trip behind it. Same formatter as the HUD counter,
+				-- so "384K" means the same thing in both places.
 				local description = product.Description
-				if type(product.Tokens) == "number" then
-					description = `<font color="#{UI.Palette.Token:ToHex()}">≈ {NumberFormat.Format(
-						product.Tokens
-					)} TOKENS</font>\n{description}`
+				if type(product.TokenGrant) == "number" then
+					local granted = MuscleClassConfig.ScaleTokens(classLevel, product.TokenGrant)
+					description =
+						`<font color="#{UI.Palette.Token:ToHex()}">≈ {NumberFormat.Format(granted)} TOKENS</font>\n{description}`
 				end
 				productCard(
 					grid,
