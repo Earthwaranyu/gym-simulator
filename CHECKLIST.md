@@ -2043,3 +2043,18 @@ traffic exists:
       prompt — the shop is one press away and an inert LOCKED button would waste that.
       The nameplate glow is a one-pixel stroke, not two: at 14px a two-pixel halo in the
       text's own colour closed the counters of the letters and "VIP" read as a gold blob.
+
+- [x] 165. **Protection reads next to health, and the daily says when it returns.** The
+      immortality badge from #162 sat beside the power strip captioned `IMMORTAL 57:33` —
+      a word next to a potion bottle is the picture written out twice, and it was in the
+      corner that must not reflow when a badge appears. It moves above the health bar,
+      left edge and width shared with it, and shows the glyph and the bare time. Both
+      answer the same question, so a player checking one is already looking at the other.
+      The VIP daily claim button now counts down instead of inviting a press the server
+      would refuse. The wait is the rest of the current UTC day — the exact rule
+      `VipService.today()` implements — and not a rolling twenty-four hours, which would be
+      a longer promise than the pass makes. `VipLastClaimDay` already rides the profile
+      push, so the countdown costs no traffic. Its one-second loop exits on
+      `IsDescendantOf(game)` rather than a Parent check: the settings page is rebuilt on
+      every open, a destroyed row still reports its old parent, and without that guard each
+      visit would leave another loop writing to a button nobody can see.

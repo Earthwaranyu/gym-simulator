@@ -318,7 +318,7 @@ function HudController:_build()
 	UI.Role(fightTokenLabel, { Ink = "FightToken" })
 
 	--[[
-		Immortality, to the right of the summary and only while it is running.
+		Immortality, directly above the health bar and only while it is running.
 
 		A potion is bought in minutes or a day at a time, and until now the only time
 		the player was ever told how much was left was the toast at the moment of
@@ -326,29 +326,35 @@ function HudController:_build()
 		remaining length — which is the one thing you need to know before deciding to
 		stand in the open.
 
-		Its own panel rather than a fourth item in the headline row: that row is full,
-		and a badge that appears and disappears must not reflow the three numbers that
-		are always there.
+		It sits with the health bar because both answer the same question — how much
+		punishment can I take right now — and a player checking one is already looking
+		at the other. It is also the corner that can grow: the top-left strip is three
+		numbers that must not reflow when a badge appears and disappears.
+
+		The glyph says what it is, so the label is the time and nothing else. A caption
+		reading IMMORTAL next to a potion bottle is the picture written out twice.
 	]]
 	immortalPanel = UI.Panel("Immortality", screen)
-	immortalPanel.Position = UDim2.fromOffset(384, 16)
-	immortalPanel.Size = UDim2.fromOffset(150, 42)
+	immortalPanel.AnchorPoint = Vector2.new(0, 1)
+	-- Left edge and width shared with the health bar below it; 8px of air between.
+	immortalPanel.Position = UDim2.new(0, 20, 1, -70)
+	immortalPanel.Size = UDim2.fromOffset(132, 36)
 	immortalPanel.Visible = false
 
 	local immortalGlyph = Instance.new("Frame")
 	immortalGlyph.Name = "Glyph"
 	immortalGlyph.BackgroundTransparency = 1
 	immortalGlyph.AnchorPoint = Vector2.new(0, 0.5)
-	immortalGlyph.Position = UDim2.new(0, 10, 0.5, 0)
-	immortalGlyph.Size = UDim2.fromOffset(22, 22)
+	immortalGlyph.Position = UDim2.new(0, 9, 0.5, 0)
+	immortalGlyph.Size = UDim2.fromOffset(24, 24)
 	immortalGlyph.Parent = immortalPanel
 	Icons.Draw("Potion", immortalGlyph, UI.Dark.Text, UI.Dark.Glass)
 
 	immortalLabel = UI.Label("Remaining", immortalPanel)
-	immortalLabel.Position = UDim2.fromOffset(38, 0)
-	immortalLabel.Size = UDim2.new(1, -46, 1, 0)
-	immortalLabel.Font = UI.Font.Heading
-	immortalLabel.TextSize = 13
+	immortalLabel.Position = UDim2.fromOffset(40, 0)
+	immortalLabel.Size = UDim2.new(1, -48, 1, 0)
+	immortalLabel.Font = UI.Font.Numeric
+	immortalLabel.TextSize = 15
 	immortalLabel.TextXAlignment = Enum.TextXAlignment.Left
 	immortalLabel.TextColor3 = UI.Palette.CartoonPink
 
@@ -1371,7 +1377,7 @@ function HudController:_refreshImmortality()
 	end
 
 	immortalPanel.Visible = true
-	immortalLabel.Text = `IMMORTAL  {NumberFormat.Duration(remaining)}`
+	immortalLabel.Text = NumberFormat.Duration(remaining)
 end
 
 function HudController:_refreshProfile()

@@ -2007,13 +2007,67 @@ function MenuController:_renderSettings(parent: Frame)
 	local claim = row(parent, 58, order)
 	local label = UI.Label("Text", claim)
 	label.Size = UDim2.new(1, -132, 1, 0)
-	label.Text =
-		`<b>VIP daily protection</b>\n<font color="#8A93A8">Claim one hour of immortality every day</font>`
 
-	button(claim, "CLAIM", UI.Palette.Token, function()
-		local _, message = Net.Function("ClaimVipDaily"):InvokeServer()
-		toast(message)
-	end)
+	--[[
+		The daily resets on the UTC calendar day, which is what VipService.today()
+		means by "once a day". So the wait is the rest of today in UTC — not a rolling
+		twenty-four hours from the claim, which would be a different promise and a
+		longer one.
+
+		Derived here rather than asked for: VipLastClaimDay is on the profile and
+		already reaches this client with every push, so a countdown costs no traffic.
+	]]
+	local claimData = ProfileController:Get()
+	local claimedToday = claimData ~= nil and claimData.VipLastClaimDay == os.date("!%Y-%m-%d")
+
+	local function secondsUntilReset(): number
+		return 86400 - (os.time() % 86400)
+	end
+
+	label.Text = if claimedToday
+		then `<b>VIP daily protection</b>\n<font color="#8A93A8">Claimed today. The next hour is waiting tomorrow.</font>`
+		else `<b>VIP daily protection</b>\n<font color="#8A93A8">Claim one hour of immortality every day</font>`
+
+	local claimButton = button(
+		claim,
+		if claimedToday then `READY IN {NumberFormat.Duration(secondsUntilReset())}` else "CLAIM",
+		if claimedToday then UI.Palette.Glass else UI.Palette.Token,
+		function()
+			local ok, message = Net.Function("ClaimVipDaily"):InvokeServer()
+			toast(message)
+			-- Re-rendered on success so the button becomes its own countdown rather
+			-- than inviting a second press the server would refuse.
+			if ok then
+				self:_refresh()
+			end
+		end
+	)
+
+	if claimedToday then
+		claimButton.Active = false
+		claimButton.AutoButtonColor = false
+		claimButton.TextColor3 = UI.Palette.TextMuted
+		claimButton.TextSize = 12
+		-- Dies with the page. Settings is rebuilt on every open and on every refresh,
+		-- so without this guard each visit would leave another loop writing to a
+		-- button nobody can see.
+		task.spawn(function()
+			-- IsDescendantOf rather than a Parent check: a rebuilt page destroys the
+			-- old row, and a destroyed instance still reports whatever parent it had.
+			while claimButton:IsDescendantOf(game) do
+				task.wait(1)
+				if not claimButton:IsDescendantOf(game) then
+					break
+				end
+				local left = secondsUntilReset()
+				if left <= 0 then
+					self:_refresh()
+					break
+				end
+				claimButton.Text = `READY IN {NumberFormat.Duration(left)}`
+			end
+		end)
+	end
 
 	order += 1
 	local heading = UI.Label("ControlsHeading", parent)
