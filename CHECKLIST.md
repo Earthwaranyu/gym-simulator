@@ -2091,3 +2091,18 @@ traffic exists:
       number a Mythic buyer would see multiplied by 512. All four keep `AssetId = 0`: they
       still do not exist on the dashboard, and the startup warning count (four, not eight)
       is what proves no orphaned module survived the rename.
+
+- [x] 168. **A pack card names the number it will actually pay.** #167 sized the packs in
+      hours and left the tokens invisible: the module carries a Natural-quoted figure,
+      `AwardClassScaled` multiplies it by the buyer's class, and nothing on the card ever
+      said what would land in the balance. A Mythic buying the Medium pack receives
+      384,000 tokens, and the only way to learn that was to read the source.
+      `Types.Product` gains an optional `TokenGrant`, the four packs declare it, and the
+      catalogue row quotes `TokenService:ClassScaled(player, grant)` — the scaling split
+      out of `AwardClassScaled` so the two now share it. That sharing is the point: a card
+      that promises one number while the grant computes another is exactly the failure this
+      arrangement rules out, the same reason a price and the charge for it are never
+      worked out twice.
+      Quoted server-side because the server owns the class; the client only formats it,
+      with the same `NumberFormat.Format` the HUD counter uses, so `384K` means the same
+      thing in both places.

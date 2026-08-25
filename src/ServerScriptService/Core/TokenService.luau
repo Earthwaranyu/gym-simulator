@@ -152,10 +152,22 @@ end
 	only place the class multiplier is used to hold a number's meaning steady.
 ]]
 function TokenService:AwardClassScaled(player: Player, baseAmount: number): boolean
+	return self:AwardTokens(player, self:ClassScaled(player, baseAmount))
+end
+
+--[[
+	What a Natural-quoted amount is worth to this player, without paying it.
+
+	Split out of AwardClassScaled so the shop can quote the figure the grant will
+	actually credit. A card that promises one number while the grant computes another
+	is the failure this exists to prevent — the same reason a price and the charge for
+	it are never worked out twice.
+]]
+function TokenService:ClassScaled(player: Player, baseAmount: number): number
 	local data = DataService:GetData(player)
 	local level = if data ~= nil then data.MuscleClassLevel else 0
 	local class = MuscleClassConfig.Get(level)
-	return self:AwardTokens(player, baseAmount * class.TokenMultiplier)
+	return baseAmount * class.TokenMultiplier
 end
 
 --[[

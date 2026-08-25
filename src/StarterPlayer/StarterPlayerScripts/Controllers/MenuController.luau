@@ -1774,11 +1774,21 @@ function MenuController:_renderShop(parent: Frame)
 				-- with the game, then the shelf's shared glyph.
 				local iconName = product.Icon
 					or (if ShopIcons.Get(product.Id) ~= nil then product.Id else visual.Icon)
+				-- A token pack's real payout depends on the buyer's physique class, so
+				-- the card quotes what this player would receive rather than the
+				-- Natural figure the product is written in. Same formatter as the HUD
+				-- counter, so "384K" means the same thing in both places.
+				local description = product.Description
+				if type(product.Tokens) == "number" then
+					description = `<font color="#{UI.Palette.Token:ToHex()}">≈ {NumberFormat.Format(
+						product.Tokens
+					)} TOKENS</font>\n{description}`
+				end
 				productCard(
 					grid,
 					index,
 					product.DisplayName,
-					product.Description,
+					description,
 					iconName,
 					visual.Accent,
 					actionText,

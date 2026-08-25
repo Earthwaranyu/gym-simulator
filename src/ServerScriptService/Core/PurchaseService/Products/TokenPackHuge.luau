@@ -22,7 +22,8 @@ local Product: Types.Product = {
 	Kind = "DevProduct",
 	AssetId = 0,
 	DisplayName = "Huge Token Pack",
-	Description = "About twenty hours of training, scaled to your physique class.",
+	Description = "About twenty hours of training.",
+	TokenGrant = TOKENS,
 	RobuxPrice = 399,
 
 	Grant = function(player: Player): boolean

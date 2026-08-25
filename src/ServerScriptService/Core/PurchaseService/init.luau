@@ -207,6 +207,12 @@ function PurchaseService:Start()
 			-- yields and falls back to product.RobuxPrice, so a rate-limited or offline
 			-- lookup still returns a shop.
 			local info = ProductInfo.Get(product)
+			-- Quoted from the same function that will do the granting, so a card can
+			-- never promise a figure the grant would not credit.
+			local tokens: number? = nil
+			if product.TokenGrant ~= nil then
+				tokens = Loader.Get("TokenService"):ClassScaled(player, product.TokenGrant)
+			end
 			table.insert(rows, {
 				Id = product.Id,
 				Kind = product.Kind,
@@ -214,6 +220,7 @@ function PurchaseService:Start()
 				Description = product.Description,
 				RobuxPrice = info.Price,
 				Icon = info.Icon,
+				Tokens = tokens,
 				Available = open and product.AssetId ~= 0,
 				Owned = product.Kind == "Gamepass" and self:OwnsGamepass(player, product.AssetId),
 			})

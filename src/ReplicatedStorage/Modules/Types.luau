@@ -237,6 +237,10 @@ export type Product = {
 	-- Fallback only. The shop shows the Creator Dashboard price, read at runtime by
 	-- PurchaseService/ProductInfo; this is what it falls back to when that call fails.
 	RobuxPrice: number,
+	-- Tokens this product pays, quoted at Natural. Set it and the shop card quotes the
+	-- buyer's own scaled figure; leave it nil and the card says nothing about tokens,
+	-- which is what a potion or a pass wants.
+	TokenGrant: number?,
 	-- DevProducts: called once per purchase, after the receipt is confirmed new.
 	-- Gamepasses: called on join and immediately on purchase. Must be idempotent.
 	Grant: (Player) -> boolean,
