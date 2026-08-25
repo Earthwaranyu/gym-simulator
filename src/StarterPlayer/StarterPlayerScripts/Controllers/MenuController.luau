@@ -1808,11 +1808,19 @@ function MenuController:_renderTitles(parent: Frame)
 	intro.TextWrapped = true
 	intro.TextColor3 = UI.Palette.TextMuted
 	intro.Text =
-		"Power unlocks titles permanently. Select any unlocked title to display it above your player."
+		"Power unlocks titles permanently, and the VIP pass unlocks its own. Select any unlocked title to display it above your player."
+
+	-- The pass the title needs, answered from the attribute its grant sets. The server
+	-- checks ownership itself before equipping anything; this only decides what the row
+	-- draws, so a stale attribute costs a redraw rather than a free title.
+	local function ownsGamepass(productId: string): boolean
+		return Players.LocalPlayer:GetAttribute(`{productId}Owned`) == true
+	end
 
 	for index, rank in RankConfig.List do
-		local unlocked = power >= rank.MinPower
+		local unlocked = RankConfig.IsUnlocked(rank.Id, power, ownsGamepass)
 		local selected = selectedId == rank.Id
+		local pass = rank.RequiresGamepass
 		local line = row(parent, 64, index + 1)
 		line.BackgroundColor3 = if selected
 			then rank.Color:Lerp(UI.Palette.Backdrop, 0.68)
@@ -1831,8 +1839,11 @@ function MenuController:_renderTitles(parent: Frame)
 		requirement.Size = UDim2.new(0.62, 0, 0, 19)
 		requirement.TextSize = 12
 		requirement.TextColor3 = UI.Palette.TextMuted
-		requirement.Text = if unlocked
-			then `{NumberFormat.Format(rank.MinPower)} POWER · UNLOCKED`
+		requirement.Text = if pass ~= nil
+			then (if unlocked
+				then "GAMEPASS · UNLOCKED"
+				else `REQUIRES THE {string.upper(rank.DisplayName)} GAMEPASS`)
+			elseif unlocked then `{NumberFormat.Format(rank.MinPower)} POWER · UNLOCKED`
 			else `NEED {NumberFormat.Format(rank.MinPower - power)} MORE POWER`
 
 		local choose = Instance.new("TextButton")
@@ -1848,8 +1859,14 @@ function MenuController:_renderTitles(parent: Frame)
 		choose.Font = UI.Font.Heading
 		choose.TextSize = 12
 		choose.TextColor3 = if unlocked then UI.Palette.OnAccent else UI.Palette.TextMuted
-		choose.Text = if selected then "EQUIPPED" elseif unlocked then "SELECT TITLE" else "LOCKED"
-		choose.Active = unlocked and not selected
+		-- A locked power rank is a matter of training; a locked pass is a matter of
+		-- buying, and the shop is one prompt away, so that row stays pressable.
+		choose.Text = if selected
+			then "EQUIPPED"
+			elseif unlocked then "SELECT TITLE"
+			elseif pass ~= nil then `GET {string.upper(rank.DisplayName)}`
+			else "LOCKED"
+		choose.Active = not selected and (unlocked or pass ~= nil)
 		choose.Parent = line
 		local corner = Instance.new("UICorner")
 		corner.CornerRadius = UDim.new(0, 8)
@@ -1857,6 +1874,13 @@ function MenuController:_renderTitles(parent: Frame)
 		if choose.Active then
 			UI.Pressable(choose)
 			choose.Activated:Connect(function()
+				if not unlocked and pass ~= nil then
+					local bought, message = Net.Function("PromptProduct"):InvokeServer(pass)
+					if not bought then
+						toast(message)
+					end
+					return
+				end
 				local ok, message = Net.Function("SelectTitle"):InvokeServer(rank.Id)
 				toast(message)
 				if ok then

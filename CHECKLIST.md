@@ -2022,3 +2022,24 @@ traffic exists:
       passes for the account whose id is this place's `game.CreatorId`, and false for an
       unrelated user — a creator owns their own passes and cannot buy them. Every real
       player sees the buy button.
+
+- [x] 164. **VIP is something other players can see.** The pass sold "2x every stat & vip
+      title" and the title half did not exist — every title in the game was one of the nine
+      power ranks, and VIP bought a multiplier and a daily potion that nobody else could
+      notice. VIP is now a **selectable** title: it sits in the same list, unlocked by
+      owning the pass instead of by Power, so an owner chooses between it and the rank they
+      trained for rather than having one taken away.
+      It lives in a second `specials` list rather than among the ranks, because `Get()`
+      walks the ranks to decide what a player *is* — a VIP entry at `MinPower = 0` would
+      have broken the ascending-order assertion and then handed the title to every player
+      at zero power, pass or no pass. `RankConfig.IsUnlocked` takes an ownership predicate
+      so the same rule serves both sides: the server asks MarketplaceService, the client
+      reads the `VipOwned` attribute the grant sets.
+      `TitleService` asks each title its own question and, importantly, still demotes: the
+      old check compared Power, which a VIP title's `MinPower = 0` would always pass, so a
+      refunded pass would have left the title on forever. The ownership call yields, so the
+      saved title is published first and corrected a moment later rather than leaving a
+      blank plate. In the selector, a locked VIP row says `GET VIP` and opens the Roblox
+      prompt — the shop is one press away and an inert LOCKED button would waste that.
+      The nameplate glow is a one-pixel stroke, not two: at 14px a two-pixel halo in the
+      text's own colour closed the counters of the letters and "VIP" read as a gold blob.

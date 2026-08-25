@@ -1,9 +1,10 @@
 --!strict
 --[[
-	VIP — 199 Robux gamepass.
+	VIP — the flagship gamepass. Price comes from the Creator Dashboard.
 
-	Grants a permanent 2x stat boost while owned, and entitles the owner to claim one
-	1-hour immortal potion per day (VipService handles the claim).
+	Grants a permanent 2x stat boost while owned, entitles the owner to claim one 1-hour
+	immortal potion per day (VipService handles the claim), and unlocks the VIP title in
+	RankConfig — the one thing about the pass that other players can see.
 
 	Grant runs on every join as well as on purchase, so it must be idempotent. It is:
 	the boost is registered by id in the modifier stack, and re-registering replaces
@@ -28,6 +29,10 @@ local Product: Types.Product = {
 	Grant = function(player: Player): boolean
 		-- Permanent for the session: re-applied on every join by ApplyGamepasses.
 		Loader.Get("BoostService"):GrantGlobal(player, "VipGamepass", VIP_MULTIPLIER, nil)
+		-- So the title selector can paint the VIP row without a round trip. The server
+		-- still checks ownership itself before equipping it — this attribute decides
+		-- what the menu draws, never what a player may wear.
+		player:SetAttribute("VipOwned", true)
 		return true
 	end,
 }

@@ -100,6 +100,20 @@ function NameplateController:_attach(player: Player, character: Model)
 	title.TextXAlignment = Enum.TextXAlignment.Center
 	title.TextStrokeTransparency = 0.35
 
+	-- Off unless the title asks for it. A stroke rather than a second glowing label:
+	-- it survives being 14px tall at 150 studs, which is the whole point of a title
+	-- somebody paid for.
+	--
+	-- One pixel, not two. The text is 14px and a two-pixel halo in its own colour
+	-- closed the counters of the letters — a gold "VIP" read as a gold blob at any
+	-- distance worth reading it from. Thin and mostly transparent is a rim light;
+	-- thick is a smudge.
+	local titleGlow = Instance.new("UIStroke")
+	titleGlow.Thickness = 1
+	titleGlow.Transparency = 0.35
+	titleGlow.Enabled = false
+	titleGlow.Parent = title
+
 	local label = UI.Label("Name", gui)
 	label.Position = UDim2.fromOffset(0, 21)
 	label.Size = UDim2.new(1, 0, 0, 20)
@@ -123,6 +137,12 @@ function NameplateController:_attach(player: Player, character: Model)
 		local titleColor = player:GetAttribute("TitleColor")
 		title.Text = if type(titleName) == "string" then string.upper(titleName) else "NEWBIE"
 		title.TextColor3 = if typeof(titleColor) == "Color3" then titleColor else UI.Palette.TextMuted
+		local glowing = player:GetAttribute("TitleGlow") == true
+		titleGlow.Color = title.TextColor3
+		titleGlow.Enabled = glowing
+		-- The dark drop shadow every plate carries is what a coloured halo has to
+		-- fight; a glowing title drops it and lets its own colour do the separating.
+		title.TextStrokeTransparency = if glowing then 0.75 else 0.35
 		if humanoid.MaxHealth <= 0 then
 			bar.Set(0, "—")
 			return
@@ -148,6 +168,7 @@ function NameplateController:_attach(player: Player, character: Model)
 			humanoid:GetPropertyChangedSignal("MaxHealth"):Connect(refresh),
 			player:GetAttributeChangedSignal("TitleName"):Connect(refresh),
 			player:GetAttributeChangedSignal("TitleColor"):Connect(refresh),
+			player:GetAttributeChangedSignal("TitleGlow"):Connect(refresh),
 		},
 	}
 end
