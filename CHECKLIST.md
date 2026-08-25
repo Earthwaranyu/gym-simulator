@@ -1976,3 +1976,16 @@ traffic exists:
       Verified live: catalogue returns 19/19/29/199/299/699/699 with an icon each, the
       four uncreated token packs return their fallback price and no icon, and a bogus
       asset id degrades to the fallback instead of erroring the shop.
+
+- [x] 160. **Boosts are bought with Robux, not tokens.** The shop sold the same three
+      supplements twice: once for Robux and once for Tokens priced in *minutes of income*,
+      a rule that existed only so the two prices could not drift apart as physique classes
+      doubled token income. Selling a boost for the currency the game hands out for free
+      undercut the Robux half of the shop, so the token shelf is gone: `ShopConfig` and
+      `ShopService` are deleted, `PurchaseShopItem` and `GetShopPrices` are off the wire,
+      and Meal Prep — which never had a Robux twin — goes with them.
+      Pre-Workout and Protein Shake now describe their own effect (3x/180s, 2x/600s) in
+      their product files, since the config that held those numbers existed to keep two
+      sellers of one item in agreement and there is only one seller now. The supplements
+      shelf is recognised by an explicit id set rather than by "has a ShopConfig entry".
+      Tokens keep exactly one sink: the five per-stat doubling paths.

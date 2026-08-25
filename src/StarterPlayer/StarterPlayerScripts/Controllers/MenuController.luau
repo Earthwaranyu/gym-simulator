@@ -29,7 +29,6 @@ local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
 local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
-local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
 local ShopIcons = require(ReplicatedStorage.Modules.ShopIcons)
 local TokenMultiplierConfig = require(ReplicatedStorage.Modules.TokenMultiplierConfig)
 local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
@@ -1522,6 +1521,14 @@ function MenuController:_renderQuests(parent: Frame)
 	end
 end
 
+-- Which catalogue rows belong on the supplements shelf. An explicit set because these
+-- used to be recognised by having a ShopConfig entry, and that config went with the
+-- token-priced shelf; a new supplement is one id here plus its product file.
+local SUPPLEMENT_IDS: { [string]: boolean } = {
+	PreWorkout = true,
+	ProteinShake = true,
+}
+
 --[[
 	Shop — the Robux catalogue, in headed sections you scroll through.
 
@@ -1536,37 +1543,22 @@ function MenuController:_renderShop(parent: Frame)
 		return Net.Function("GetProductCatalogue"):InvokeServer()
 	end)
 
-	local prices: { [string]: number } = {}
-	local pricesOk, fetched = pcall(function()
-		return Net.Function("GetShopPrices"):InvokeServer()
-	end)
-	if pricesOk and type(fetched) == "table" then
-		prices = fetched
-	end
-
 	local sections: { [string]: { any } } = { Gamepass = {}, Potion = {}, Supplement = {}, Token = {} }
-	-- Product id -> Creator Dashboard icon, so the token-priced half of the shop can
-	-- show the same picture as its Robux twin. A supplement bought with tokens and one
-	-- bought with Robux are the same tub.
-	local artwork: { [string]: string } = {}
 	if ok and type(catalogue) == "table" then
 		for _, product in catalogue do
 			-- Grouped by what the thing is to the player, not by Roblox's product
 			-- kind: a potion and a token pack are both DevProducts and belong in
 			-- different parts of a shop.
-			-- Supplements are their own row now that they can also be bought with
-			-- tokens. They were filed under the immortality potions, which was never
-			-- true and reads worse with the same three items listed above in a section
-			-- of their own.
+			-- Supplements keep their own row rather than sitting under the immortality
+			-- potions, which was never true of them. Named explicitly: they used to be
+			-- recognised by having a ShopConfig entry, and that file is gone with the
+			-- token-priced shelf.
 			local group = if product.Kind == "Gamepass"
 				then "Gamepass"
 				elseif string.find(tostring(product.Id), "TokenPack") ~= nil then "Token"
-				elseif ShopConfig.Get(tostring(product.Id)) ~= nil then "Supplement"
+				elseif SUPPLEMENT_IDS[tostring(product.Id)] then "Supplement"
 				else "Potion"
 			table.insert(sections[group], product)
-			if product.Icon ~= nil then
-				artwork[tostring(product.Id)] = product.Icon
-			end
 		end
 	end
 
@@ -1717,45 +1709,6 @@ function MenuController:_renderShop(parent: Frame)
 		render(grid)
 	end
 
-	-- Tokens first: the half that rewards playing rather than paying, so it reads
-	-- before the Robux shelves rather than after them.
-	local data = ProfileController:Get()
-	local balance = if data ~= nil then data.Tokens else 0
-	section("SUPPLEMENTS", "Bought with tokens you earned", UI.Palette.Vital, #ShopConfig.List, function(grid)
-		for index, item in ShopConfig.List do
-			local price = prices[item.Id]
-			local known = type(price) == "number"
-			local affordable = known and balance >= price
-			local actionText = if not known
-				then "UNAVAILABLE"
-				elseif affordable then `BUY  ·  {NumberFormat.Format(price)}`
-				else `NEED {NumberFormat.Format(price - balance)} MORE`
-			productCard(
-				grid,
-				index,
-				item.DisplayName,
-				item.Description,
-				-- Not the Token glyph: that is the currency, and stamping it on the
-				-- card made every supplement look like the same skull.
-				artwork[item.Id] or "Potion",
-				UI.Palette.Vital,
-				actionText,
-				affordable,
-				function()
-					local bought, message = Net.Function("PurchaseShopItem"):InvokeServer(item.Id)
-					-- Toasted either way, unlike the Robux path: a Robux purchase
-					-- announces itself with Roblox's own dialog, and a token one has
-					-- nothing to say it happened but this.
-					toast(message)
-					if bought then
-						Loader.Get("EffectsController"):Play("Purchase")
-						self:_refresh()
-					end
-				end
-			)
-		end
-	end)
-
 	local groupVisuals = {
 		Gamepass = {
 			Title = "VIP & PASSES",
@@ -1770,8 +1723,8 @@ function MenuController:_renderShop(parent: Frame)
 			Icon = "Potion",
 		},
 		Supplement = {
-			Title = "SUPPLEMENTS · ROBUX",
-			Detail = "The same boosts, without the wait",
+			Title = "SUPPLEMENTS",
+			Detail = "Temporary boosts, bought outright",
 			Accent = UI.Palette.CartoonPink,
 			Icon = "Potion",
 		},

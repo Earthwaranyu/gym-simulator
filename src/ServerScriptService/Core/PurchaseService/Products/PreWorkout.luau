@@ -6,8 +6,10 @@
 	one you buy when you are already sitting on a machine, not the one you buy and
 	forget. Three minutes is short enough that it cannot be spent idling.
 
-	The multiplier and duration are read from ShopConfig rather than repeated here, so
-	the shop UI describing the item and the code granting it can never drift apart.
+	The multiplier and duration used to live in ShopConfig, because the same item could
+	also be bought with tokens and the two prices had to agree about what a Pre-Workout
+	was. Boosts are Robux-only now, so this file is the only description of the item and
+	the numbers live here.
 
 	Live dev product on the Creator Dashboard; PurchaseService registers it at startup.
 ]]
@@ -15,10 +17,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
-local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
 local Types = require(ReplicatedStorage.Modules.Types)
 
 local ITEM_ID = "PreWorkout"
+local MULTIPLIER = 3
+local DURATION = 180
 
 local Product: Types.Product = {
 	Id = ITEM_ID,
@@ -29,14 +32,7 @@ local Product: Types.Product = {
 	RobuxPrice = 29,
 
 	Grant = function(player: Player): boolean
-		local item = ShopConfig.Get(ITEM_ID)
-		if item == nil then
-			warn(`[{ITEM_ID}] No ShopConfig entry — the boost cannot be granted.`)
-			return false
-		end
-
-		local effect = item.Effect
-		Loader.Get("BoostService"):GrantGlobal(player, `Shop_{ITEM_ID}`, effect.Multiplier, effect.Duration)
+		Loader.Get("BoostService"):GrantGlobal(player, `Shop_{ITEM_ID}`, MULTIPLIER, DURATION)
 		return true
 	end,
 }

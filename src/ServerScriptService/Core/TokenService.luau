@@ -145,8 +145,11 @@ end
 	to buy one.
 
 	The number on a pack is therefore its Natural value, and this converts it, so what a
-	pack is really selling is a fixed stretch of progress at any point in the game. The
-	shop prices its items the same way and for the same reason; see ShopConfig's header.
+	pack is really selling is a fixed stretch of progress at any point in the game.
+
+	The token shop priced its items by the same rule and for the same reason. It is gone
+	— boosts are Robux-only and tokens buy the per-stat multipliers — so this is now the
+	only place the class multiplier is used to hold a number's meaning steady.
 ]]
 function TokenService:AwardClassScaled(player: Player, baseAmount: number): boolean
 	local data = DataService:GetData(player)

@@ -43,7 +43,6 @@ local SUITES = {
 		Module = require("../src/ReplicatedStorage/Modules/TokenMultiplierConfig"),
 	},
 	{ Name = "QuestCycleConfig", Module = require("../src/ReplicatedStorage/Modules/QuestCycleConfig") },
-	{ Name = "ShopConfig", Module = require("../src/ReplicatedStorage/Modules/ShopConfig") },
 	{ Name = "EffectsConfig", Module = require("../src/ReplicatedStorage/Modules/EffectsConfig") },
 	{ Name = "MusicConfig", Module = require("../src/ReplicatedStorage/Modules/MusicConfig") },
 	{ Name = "SoundCandidates", Module = require("../src/ReplicatedStorage/Modules/SoundCandidates") },
