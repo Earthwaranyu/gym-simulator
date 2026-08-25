@@ -2071,3 +2071,23 @@ traffic exists:
       directly below already gives the corner an edge to align to. Both labels carry a text
       stroke instead, the trick the nameplate labels use for the same reason: pink on a
       bright sky is unreadable without an outline.
+
+- [x] 167. **Token packs are sized in hours, not in tokens.** The worry was that multipliers
+      would make a pack's number meaningless. They do not, and writing down why is most of
+      this item: `AwardClassScaled` multiplies a pack by the buyer's physique class, so the
+      figure in the module is a **Natural-quoted** one and the pack is worth the same
+      stretch of progress at every stage. Two identities fall out of that, and they are
+      what a pack should actually be tuned against — a pack is `TOKENS / 4` minutes of
+      play, and because multiplier costs double at the same rate class income doubles, a
+      pack of X buys `log2(X / 100 + 1)` successive multiplier levels whether a Natural or
+      a Mythic buys it.
+      Measured against that, the old ladder topped out at 6.7 hours for 299 R$, which is
+      thin for a top tier. It is now Small/Medium/Large/Huge at 250 / 750 / 2,000 / 5,000
+      tokens — about 1, 3, 8 and 21 hours of play, roughly 1.8, 3.1, 4.4 and 5.7 doublings
+      — at 49 / 99 / 199 / 399 R$. Still not a route to the cap: one muscle costs 26.2M
+      tokens to max and all five cost 131M, and those numbers scale with nothing.
+      The modules are renamed to their sizes, because a file called `TokenPack400` that no
+      longer grants 400 is how names rot, and the cards say the hours rather than a raw
+      number a Mythic buyer would see multiplied by 512. All four keep `AssetId = 0`: they
+      still do not exist on the dashboard, and the startup warning count (four, not eight)
+      is what proves no orphaned module survived the rename.
