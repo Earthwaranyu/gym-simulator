@@ -38,6 +38,10 @@ No Toolbox models, no imported meshes, no uploaded animations. Machines are buil
 Roblox primitives and training animations are generated from joint angles in
 `PoseConfig.luau`, so nothing in the game is someone else's copyrighted work.
 
+Shop artwork in `ShopIcons.luau` is uploaded, on the same terms as the body mesh: those
+images were made for this project. An image from the Toolbox or an outside artist still
+is not. Interface glyphs without uploaded art stay drawn in `Icons.luau`.
+
 
 ## Git
 You commit one checklist per one commit but don't make you as a contributor or co-contributor just omit the co-author things.

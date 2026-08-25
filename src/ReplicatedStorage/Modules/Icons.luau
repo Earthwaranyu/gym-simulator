@@ -35,6 +35,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ShopIcons = require(ReplicatedStorage.Modules.ShopIcons)
 local UI = require(ReplicatedStorage.Modules.UI)
 
 local Icons = {}
@@ -437,6 +438,20 @@ function Icons.Draw(name: string, parent: GuiObject, color: Color3, hole: Color3
 	-- Square whatever the tile does, so nothing skews on an odd aspect.
 	UI.AspectRatio(holder, 1)
 	holder.Parent = parent
+
+	-- Uploaded artwork wins where it exists (see ShopIcons); everything else is
+	-- still drawn, and a key with no upload yet falls through to its glyph.
+	local image = ShopIcons.Get(name)
+	if image ~= nil then
+		local label = Instance.new("ImageLabel")
+		label.Name = "Art"
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.ScaleType = Enum.ScaleType.Fit
+		label.Image = image
+		label.Parent = holder
+		return holder
+	end
 
 	local builder = ICONS[name]
 	if builder == nil then

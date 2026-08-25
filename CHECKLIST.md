@@ -11,8 +11,8 @@ with no client remote to exploit.
 **Current roadmap: 11 / 18 items complete (#96–#113).** The checked foundation proves a
 large playable prototype; it does **not** mean the product is ready for a public launch.
 
-**Current public-launch blockers:** `DataService` still uses the Studio mock store, four
-product `AssetId`s are `0`, sound IDs are blank, and real persistence, Robux receipts,
+**Current public-launch blockers:** `DataService` still uses the Studio mock store, the
+four token-pack `AssetId`s are `0`, sound IDs are blank, and real persistence, Robux receipts,
 multiplayer balance, mobile controls, and load testing are incomplete. The current
 [`docs/PLAYTEST.md`](docs/PLAYTEST.md) also describes an older world and is reconciled in
 #96 before it is used as release evidence.
@@ -1943,3 +1943,18 @@ traffic exists:
       errors, 35 tagged zones, `check.sh` green and `validate_gym` at 35/35 against build
       `319220b972df`. The evidence block says plainly what that run does *not* prove: a
       machine can confirm the game boots correctly, and cannot confirm it is any good.
+
+- [x] 158. **The shop sells something real.** Seven of the eleven products carried
+      `AssetId = 0`, which is not a cosmetic gap: `PurchaseService` deliberately refuses to
+      register a zero-id product, so every Robux card in the shop rendered "COMING SOON"
+      and the whole Robux half of the economy was decorative. The three gamepasses (VIP,
+      Fast Travel, Auto Load), both immortal potions, Pre-Workout and Protein Shake now
+      carry their live ids from the Creator Dashboard. The four token packs stay at `0` on
+      purpose — they have not been created yet, and the unavailable path is what should
+      show until they are.
+      `ShopIcons.luau` carries the uploaded artwork for those products plus the two
+      currencies, and `Icons.Draw` consults it before falling back to the drawn glyph. That
+      fallback is the point: a key whose upload has not happened renders exactly what it
+      rendered before, so the artwork can land one id at a time without a broken frame in
+      between. The asset rule in `CLAUDE.md` gains the same carve-out the body mesh has —
+      our own images may be uploaded, the Toolbox still may not.

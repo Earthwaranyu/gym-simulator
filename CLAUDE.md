@@ -45,6 +45,11 @@ are off-limits for the same reason Toolbox models are: much of that pool is ripp
 commercial games, and an asset that gets moderated takes the sound with it. See the
 header of `EffectsConfig.luau`.
 
+Shop artwork is uploaded, and allowed on the same terms: the pass, potion, supplement
+and currency images in `ShopIcons.luau` were made for this project. An image from the
+Toolbox or an outside artist still is not. Everything without uploaded art stays drawn
+in `Icons.luau`, which remains the default for interface glyphs.
+
 The one mesh asset is the player's body, generated for this project by Studio's mesh
 generator and cut into R15 parts by `BodyMeshConfig`/`BodyMeshBuilder`. It is allowed
 because it is ours, not because meshes in general are: a mesh from the Toolbox or an

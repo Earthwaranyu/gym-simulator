@@ -1,0 +1,55 @@
+--!strict
+--[[
+	ShopIcons — uploaded artwork for the shop, keyed by product id.
+
+	Icons.luau exists because interface art must be original, and drawing it from
+	Frames guaranteed that. These images clear the same bar a different way: they
+	were made for this project, like the body mesh in BodyMeshConfig, so they are
+	ours to upload. Toolbox and third-party images remain off-limits.
+
+	This is a config table, not a system. Icons.Draw consults it first and falls
+	back to the drawn glyph when a key is missing or its id is still 0, so an icon
+	that has not been uploaded yet degrades to the shape it always had rather than
+	rendering an empty square. Adding artwork is one line here and nothing else.
+
+	Keys are product ids from PurchaseService/Products, plus the two currency
+	glyphs. Ids come from mcp upload_image against the source PNGs:
+
+	  Vip                  VIP crown
+	  FastTravel           fast travel marker
+	  AutoLoad             auto load weight barbell
+	  ImmortalPotion1Hour  potion bottle (shared with the 1 day product)
+	  ImmortalPotion1Day   potion bottle
+	  PreWorkout           pre-workout tub
+	  ProteinShake         protein shaker
+	  Token                skull
+	  FightToken           dumbbell
+]]
+
+-- 0 means "not uploaded yet" and draws the procedural glyph instead.
+local ASSETS: { [string]: number } = {
+	Vip = 0,
+	FastTravel = 0,
+	AutoLoad = 0,
+	ImmortalPotion1Hour = 0,
+	ImmortalPotion1Day = 0,
+	PreWorkout = 0,
+	ProteinShake = 0,
+	Token = 0,
+	FightToken = 0,
+}
+
+local ShopIcons = {}
+
+ShopIcons.Assets = ASSETS
+
+-- Returns a usable rbxassetid, or nil when the caller should draw the glyph.
+function ShopIcons.Get(name: string): string?
+	local id = ASSETS[name]
+	if id == nil or id <= 0 then
+		return nil
+	end
+	return `rbxassetid://{id}`
+end
+
+return ShopIcons

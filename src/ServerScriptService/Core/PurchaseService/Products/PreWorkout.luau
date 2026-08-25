@@ -9,8 +9,7 @@
 	The multiplier and duration are read from ShopConfig rather than repeated here, so
 	the shop UI describing the item and the code granting it can never drift apart.
 
-	AssetId must be set from the Roblox Creator Dashboard. Until it is, PurchaseService
-	logs a warning at startup and refuses to prompt this product.
+	Live dev product on the Creator Dashboard; PurchaseService registers it at startup.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,7 +23,7 @@ local ITEM_ID = "PreWorkout"
 local Product: Types.Product = {
 	Id = ITEM_ID,
 	Kind = "DevProduct",
-	AssetId = 0,
+	AssetId = 3709768865,
 	DisplayName = "Pre-Workout",
 	Description = "3x all stats for 3 minutes. Burns fast.",
 	RobuxPrice = 35,

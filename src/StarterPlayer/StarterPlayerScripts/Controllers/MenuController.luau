@@ -30,6 +30,7 @@ local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
 local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
 local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
+local ShopIcons = require(ReplicatedStorage.Modules.ShopIcons)
 local TokenMultiplierConfig = require(ReplicatedStorage.Modules.TokenMultiplierConfig)
 local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
 
@@ -1709,9 +1710,8 @@ function MenuController:_renderShop(parent: Frame)
 		render(grid)
 	end
 
-	-- Tokens first. It is the only part of this screen anybody can actually buy from
-	-- today — every Robux product below is still AssetId 0 — and it is the half that
-	-- rewards playing rather than paying.
+	-- Tokens first: the half that rewards playing rather than paying, so it reads
+	-- before the Robux shelves rather than after them.
 	local data = ProfileController:Get()
 	local balance = if data ~= nil then data.Tokens else 0
 	section("SUPPLEMENTS", "Bought with tokens you earned", UI.Palette.Vital, #ShopConfig.List, function(grid)
@@ -1784,12 +1784,15 @@ function MenuController:_renderShop(parent: Frame)
 					then "OWNED"
 					elseif not product.Available then "COMING SOON"
 					else `BUY  ·  R$ {NumberFormat.Format(product.RobuxPrice)}`
+				-- A product with its own uploaded artwork asks for it by id; the rest
+				-- fall back to the shelf's shared glyph.
+				local iconName = if ShopIcons.Get(product.Id) ~= nil then product.Id else visual.Icon
 				productCard(
 					grid,
 					index,
 					product.DisplayName,
 					product.Description,
-					visual.Icon,
+					iconName,
 					visual.Accent,
 					actionText,
 					enabled,
