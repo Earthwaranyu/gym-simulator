@@ -2009,3 +2009,16 @@ traffic exists:
       `ProfileChanged` push, so the client ticks it locally on a one-second clock. It
       formats with `NumberFormat.Duration`, the same function the purchase toast uses, so
       the badge and the toast cannot disagree.
+
+- [x] 163. **The price rides the buy button.** #161 put it in the card's corner because
+      `OWNED` was occupying the button, which is the one place a price is actually read.
+      It goes back: the button says `BUY · R$ 699` whenever the product can be bought, and
+      the corner label survives only for the cards whose button is already spent on `OWNED`
+      or `COMING SOON`. A price is therefore always on the card and never on it twice — and
+      the buyable cards get their full name row back, so "Immortal Potion (1 Hour)" stops
+      truncating.
+      Recorded because it will be asked again: a gamepass reading **OWNED in Studio is
+      Roblox's answer, not a bug**. `UserOwnsGamePassAsync` returns true for all three
+      passes for the account whose id is this place's `game.CreatorId`, and false for an
+      unrelated user — a creator owns their own passes and cannot buy them. Every real
+      player sees the buy button.

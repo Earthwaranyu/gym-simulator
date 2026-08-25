@@ -1761,10 +1761,15 @@ function MenuController:_renderShop(parent: Frame)
 		section(visual.Title, visual.Detail, visual.Accent, #products, function(grid)
 			for index, product in products do
 				local enabled = product.Available and not product.Owned
+				-- The price rides the button wherever the button has room for it. It
+				-- moves to the corner label only when the button is already spent on
+				-- OWNED or COMING SOON — so a price is always on the card, never twice.
+				local sellable = not product.Owned and product.Available
+				local priceText = `R$ {NumberFormat.Format(product.RobuxPrice)}`
 				local actionText = if product.Owned
 					then "OWNED"
 					elseif not product.Available then "COMING SOON"
-					else "BUY"
+					else `BUY  ·  {priceText}`
 				-- The dashboard icon if the product has one, then any artwork bundled
 				-- with the game, then the shelf's shared glyph.
 				local iconName = product.Icon
@@ -1784,7 +1789,7 @@ function MenuController:_renderShop(parent: Frame)
 							toast(message)
 						end
 					end,
-					`R$ {NumberFormat.Format(product.RobuxPrice)}`
+					if sellable then nil else priceText
 				)
 			end
 		end)
