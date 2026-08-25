@@ -1989,3 +1989,13 @@ traffic exists:
       sellers of one item in agreement and there is only one seller now. The supplements
       shelf is recognised by an explicit id set rather than by "has a ShopConfig entry".
       Tokens keep exactly one sink: the five per-stat doubling paths.
+
+- [x] 161. **A pass shows its price even to someone who owns it.** The card had one line of
+      text for both price and state, and `OWNED` won — so every gamepass looked free to
+      anybody who had bought it, the developer testing in Studio included, which is how
+      the missing price was found. The price moves to its own label in the card's top-right
+      and is drawn from the catalogue row regardless of what the button says; the button
+      is now just `BUY` / `OWNED` / `COMING SOON`.
+      Clicking START TRAINING also stopped firing `RankUp` — a metal hit with a 2.4 second
+      reverb tail — at the exact moment the music and ambience fade in behind the curtain.
+      Three loud things at once is what a player hears as one loud thing.

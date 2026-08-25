@@ -57,7 +57,6 @@ local player = Players.LocalPlayer
 
 local AppearanceController: any = nil
 local CustomizerStageController: any = nil
-local EffectsController: any = nil
 local ProfileController: any = nil
 local ToastController: any = nil
 
@@ -530,7 +529,10 @@ function CustomizerController:_apply()
 		return
 	end
 
-	EffectsController:Play("RankUp")
+	-- No sound here. This used to play RankUp — a metal hit with a 2.4 second reverb
+	-- tail — at the exact moment the music and ambience fade in behind the curtain,
+	-- and three loud things at once is what a player hears as one loud thing. The
+	-- curtain wipe and the toast are the confirmation.
 	-- The stage comes down behind black. Dropping the lights and the letterbox in
 	-- plain sight is the one moment that would give away that this was a menu.
 	CustomizerStageController:Curtain(function()
@@ -651,7 +653,6 @@ end
 function CustomizerController:Init()
 	AppearanceController = Loader.Get("AppearanceController")
 	CustomizerStageController = Loader.Get("CustomizerStageController")
-	EffectsController = Loader.Get("EffectsController")
 	ProfileController = Loader.Get("ProfileController")
 	ToastController = Loader.Get("ToastController")
 end

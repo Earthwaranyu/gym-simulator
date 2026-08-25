@@ -1585,7 +1585,12 @@ function MenuController:_renderShop(parent: Frame)
 		accent: Color3,
 		actionText: string,
 		enabled: boolean,
-		onClick: () -> ()
+		onClick: () -> (),
+		-- Drawn in the corner regardless of what the button says. The button reads
+		-- OWNED once a pass is bought, and that used to be the only place a price
+		-- appeared — so an owner, the developer included, could never see what their
+		-- own pass costs.
+		priceText: string?
 	)
 		local card = UI.CartoonCard(title, accent, grid)
 		card.LayoutOrder = layoutOrder
@@ -1623,6 +1628,20 @@ function MenuController:_renderShop(parent: Frame)
 		name.TextColor3 = UI.Palette.Text
 		name.TextTruncate = Enum.TextTruncate.AtEnd
 		name.Text = string.upper(title)
+
+		if priceText ~= nil then
+			local price = UI.Label("Price", card)
+			price.AnchorPoint = Vector2.new(1, 0)
+			price.Position = UDim2.new(1, -10, 0, 10)
+			price.Size = UDim2.fromOffset(64, 22)
+			price.Font = UI.Font.Heading
+			price.TextSize = 12
+			price.TextXAlignment = Enum.TextXAlignment.Right
+			price.TextColor3 = accent
+			price.Text = priceText
+			-- The name shares this row, so it yields the width the price takes.
+			name.Size = UDim2.new(1, -160, 0, 22)
+		end
 
 		local detail = UI.Label("Description", card)
 		detail.Position = UDim2.fromOffset(82, 32)
@@ -1745,7 +1764,7 @@ function MenuController:_renderShop(parent: Frame)
 				local actionText = if product.Owned
 					then "OWNED"
 					elseif not product.Available then "COMING SOON"
-					else `BUY  ·  R$ {NumberFormat.Format(product.RobuxPrice)}`
+					else "BUY"
 				-- The dashboard icon if the product has one, then any artwork bundled
 				-- with the game, then the shelf's shared glyph.
 				local iconName = product.Icon
@@ -1764,7 +1783,8 @@ function MenuController:_renderShop(parent: Frame)
 						if not bought then
 							toast(message)
 						end
-					end
+					end,
+					`R$ {NumberFormat.Format(product.RobuxPrice)}`
 				)
 			end
 		end)
