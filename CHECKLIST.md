@@ -1999,3 +1999,13 @@ traffic exists:
       Clicking START TRAINING also stopped firing `RankUp` — a metal hit with a 2.4 second
       reverb tail — at the exact moment the music and ambience fade in behind the curtain.
       Three loud things at once is what a player hears as one loud thing.
+
+- [x] 162. **The immortal potion says how long is left.** A player bought an hour or a day
+      of immunity and was told once, in a toast, at the moment of purchase; after a rejoin
+      the shield's remaining length was unknowable, which is precisely what you need before
+      deciding to stand in the open. A badge to the right of the summary panel shows
+      `IMMORTAL {duration}` while the potion runs and hides itself at zero.
+      No new remote: `ImmortalUntil` is an absolute epoch already riding every
+      `ProfileChanged` push, so the client ticks it locally on a one-second clock. It
+      formats with `NumberFormat.Duration`, the same function the purchase toast uses, so
+      the badge and the toast cannot disagree.

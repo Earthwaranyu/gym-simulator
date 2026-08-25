@@ -163,6 +163,9 @@ local manualStat: Types.StatId? = nil
 local powerLabel: TextLabel
 local tokenLabel: TextLabel
 local fightTokenLabel: TextLabel
+-- The immortality badge, hidden whenever the potion is not running.
+local immortalPanel: Frame
+local immortalLabel: TextLabel
 local healthBar: UI.Bar
 -- The tracker shows the one active step of the quest rotation. Kept as a row count
 -- rather than a single hard-coded row because every loop below already reads it, so a
@@ -313,6 +316,41 @@ function HudController:_build()
 	fightTokenLabel.TextSize = 13
 	fightTokenLabel.TextColor3 = UI.Palette.FightToken
 	UI.Role(fightTokenLabel, { Ink = "FightToken" })
+
+	--[[
+		Immortality, to the right of the summary and only while it is running.
+
+		A potion is bought in minutes or a day at a time, and until now the only time
+		the player was ever told how much was left was the toast at the moment of
+		purchase. Anyone who rejoined, or simply looked away, had a shield of unknown
+		remaining length — which is the one thing you need to know before deciding to
+		stand in the open.
+
+		Its own panel rather than a fourth item in the headline row: that row is full,
+		and a badge that appears and disappears must not reflow the three numbers that
+		are always there.
+	]]
+	immortalPanel = UI.Panel("Immortality", screen)
+	immortalPanel.Position = UDim2.fromOffset(384, 16)
+	immortalPanel.Size = UDim2.fromOffset(150, 42)
+	immortalPanel.Visible = false
+
+	local immortalGlyph = Instance.new("Frame")
+	immortalGlyph.Name = "Glyph"
+	immortalGlyph.BackgroundTransparency = 1
+	immortalGlyph.AnchorPoint = Vector2.new(0, 0.5)
+	immortalGlyph.Position = UDim2.new(0, 10, 0.5, 0)
+	immortalGlyph.Size = UDim2.fromOffset(22, 22)
+	immortalGlyph.Parent = immortalPanel
+	Icons.Draw("Potion", immortalGlyph, UI.Dark.Text, UI.Dark.Glass)
+
+	immortalLabel = UI.Label("Remaining", immortalPanel)
+	immortalLabel.Position = UDim2.fromOffset(38, 0)
+	immortalLabel.Size = UDim2.new(1, -46, 1, 0)
+	immortalLabel.Font = UI.Font.Heading
+	immortalLabel.TextSize = 13
+	immortalLabel.TextXAlignment = Enum.TextXAlignment.Left
+	immortalLabel.TextColor3 = UI.Palette.CartoonPink
 
 	-- Bottom-centre: which muscle the left mouse button is currently training.
 	--
@@ -1313,6 +1351,29 @@ function HudController:_refreshGoal(view: { any })
 	goalHeading.Text = if loop ~= nil then `OBJECTIVE · ROTATION {loop}` else "OBJECTIVE"
 end
 
+--[[
+	The countdown, driven from the profile rather than from a remote of its own.
+
+	`ImmortalUntil` is an absolute epoch on the profile and already rides every
+	ProfileChanged push, so the client can tick it locally between pushes and needs no
+	new traffic. It is refreshed on a one-second clock rather than per frame: the text
+	only ever changes once a second, and NumberFormat.Duration is the same function the
+	purchase toast uses, so the badge and the toast cannot disagree.
+]]
+function HudController:_refreshImmortality()
+	local data = ProfileController:Get()
+	local until_ = if data ~= nil then tonumber(data.ImmortalUntil) else nil
+	local remaining = if until_ ~= nil then until_ - os.time() else 0
+
+	if remaining <= 0 then
+		immortalPanel.Visible = false
+		return
+	end
+
+	immortalPanel.Visible = true
+	immortalLabel.Text = `IMMORTAL  {NumberFormat.Duration(remaining)}`
+end
+
 function HudController:_refreshProfile()
 	local data = ProfileController:Get()
 	if data == nil then
@@ -1322,6 +1383,7 @@ function HudController:_refreshProfile()
 	powerLabel.Text = `POWER  {NumberFormat.FormatGain(Formulas.TotalPower(data.Stats))}`
 	tokenLabel.Text = `TOKENS  {NumberFormat.Format(data.Tokens)}`
 	fightTokenLabel.Text = `FIGHT  {NumberFormat.Format(data.FightTokens)}`
+	self:_refreshImmortality()
 	self:_refreshTrainingReadout()
 end
 
@@ -1566,6 +1628,15 @@ function HudController:Start()
 		while true do
 			task.wait(0.5)
 			self:_refreshTrainingReadout()
+		end
+	end)
+
+	-- The potion expires on the server's clock with no message when it does, so the
+	-- badge counts itself down and hides itself at zero.
+	task.spawn(function()
+		while true do
+			self:_refreshImmortality()
+			task.wait(1)
 		end
 	end)
 
