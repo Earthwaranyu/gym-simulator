@@ -331,31 +331,40 @@ function HudController:_build()
 		at the other. It is also the corner that can grow: the top-left strip is three
 		numbers that must not reflow when a badge appears and disappears.
 
-		The glyph says what it is, so the label is the time and nothing else. A caption
-		reading IMMORTAL next to a potion bottle is the picture written out twice.
+		The shield says what it is, so the label is the time and nothing else, and it
+		carries no panel: a box drawn around two glyphs is furniture, and the corner it
+		sits in already has the health bar giving it an edge to align to.
 	]]
-	immortalPanel = UI.Panel("Immortality", screen)
+	immortalPanel = Instance.new("Frame")
+	immortalPanel.Name = "Immortality"
+	immortalPanel.BackgroundTransparency = 1
 	immortalPanel.AnchorPoint = Vector2.new(0, 1)
-	-- Left edge and width shared with the health bar below it; 8px of air between.
+	-- Left edge shared with the health bar below it; 8px of air between.
 	immortalPanel.Position = UDim2.new(0, 20, 1, -70)
-	immortalPanel.Size = UDim2.fromOffset(132, 36)
+	immortalPanel.Size = UDim2.fromOffset(110, 30)
 	immortalPanel.Visible = false
+	immortalPanel.Parent = screen
 
-	local immortalGlyph = Instance.new("Frame")
-	immortalGlyph.Name = "Glyph"
-	immortalGlyph.BackgroundTransparency = 1
-	immortalGlyph.AnchorPoint = Vector2.new(0, 0.5)
-	immortalGlyph.Position = UDim2.new(0, 9, 0.5, 0)
-	immortalGlyph.Size = UDim2.fromOffset(24, 24)
-	immortalGlyph.Parent = immortalPanel
-	Icons.Draw("Potion", immortalGlyph, UI.Dark.Text, UI.Dark.Glass)
+	-- The same shield the player list puts beside an immune name. One symbol for one
+	-- rule, wherever it appears — which is the only reason to mark it in two places.
+	-- It replaced the drawn Potion glyph, which was rendered in near-white and read as
+	-- a white block rather than a bottle.
+	local immortalGlyph = UI.Label("Shield", immortalPanel)
+	immortalGlyph.Size = UDim2.fromOffset(24, 30)
+	immortalGlyph.TextSize = 22
+	immortalGlyph.TextXAlignment = Enum.TextXAlignment.Left
+	immortalGlyph.TextStrokeTransparency = 0.25
+	immortalGlyph.Text = "🛡"
 
 	immortalLabel = UI.Label("Remaining", immortalPanel)
-	immortalLabel.Position = UDim2.fromOffset(40, 0)
-	immortalLabel.Size = UDim2.new(1, -48, 1, 0)
+	immortalLabel.Position = UDim2.fromOffset(30, 0)
+	immortalLabel.Size = UDim2.new(1, -30, 1, 0)
 	immortalLabel.Font = UI.Font.Numeric
-	immortalLabel.TextSize = 15
+	immortalLabel.TextSize = 16
 	immortalLabel.TextXAlignment = Enum.TextXAlignment.Left
+	-- No panel behind it any more, so it carries its own outline the way the
+	-- nameplate labels do. Pink on a bright sky is otherwise unreadable.
+	immortalLabel.TextStrokeTransparency = 0.25
 	immortalLabel.TextColor3 = UI.Palette.CartoonPink
 
 	-- Bottom-centre: which muscle the left mouse button is currently training.

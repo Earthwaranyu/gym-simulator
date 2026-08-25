@@ -2058,3 +2058,16 @@ traffic exists:
       `IsDescendantOf(game)` rather than a Parent check: the settings page is rebuilt on
       every open, a destroyed row still reports its old parent, and without that guard each
       visit would leave another loop writing to a button nobody can see.
+
+- [x] 166. **The immortality badge is a shield and a number.** What #165 actually put above
+      the health bar was a white block next to a timer: the Potion glyph was drawn in
+      `UI.Dark.Text`, near-white, at 24px, so the bottle's silhouette vanished into its own
+      colour. It is now the same 🛡 the player list already puts beside an immune name —
+      one symbol for one rule, wherever it appears, which is the only reason to mark it in
+      two places.
+      The `UI.Panel` went with it. A panel is a glass fill, a border and 10/12px of padding,
+      which is also why the badge's offsets looked wrong — everything inside was inset by
+      that padding. Two glyphs do not need a box drawn around them, and the health bar
+      directly below already gives the corner an edge to align to. Both labels carry a text
+      stroke instead, the trick the nameplate labels use for the same reason: pink on a
+      bright sky is unreadable without an outline.
