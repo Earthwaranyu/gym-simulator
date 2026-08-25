@@ -2125,3 +2125,20 @@ traffic exists:
       request timed out is worse than asking again.
       Measured: a catalogue call after the TTL lapses costs 84ms, the one immediately after
       it 50ms.
+
+- [x] 170. **The ground slam stops clattering.** The table was never actually removed. The
+      lead had been swapped to a steel door hit and the comment above the entry said so,
+      but `rbxassetid://9126090979` — which `SoundCandidates` describes in its own words as
+      "table falling on concrete (the old one)" — was still mixed in as a layer at half
+      volume. A table on concrete is a handful of small wooden knocks spread over two
+      seconds; under a steel hit that is not weight, it is noise with the wrong grain, and
+      it is what the slam still sounded like.
+      The layer is cut and the sub raised from 0.9 to 1 to carry what it was pretending to
+      add. The pitch, distortion and reverb are deliberately untouched: those are what
+      would make a slam sound *warbly*, not clattery, and changing four things at once when
+      only one of them can be heard makes the next report impossible to act on.
+      The lesson is the comment now carried in the file: **check the layer list.** A lead
+      swapped without pruning what is mixed under it leaves the old sound audible while the
+      entry looks correct, and a comment claiming otherwise is how it survived two passes.
+      No licensing change — all three remaining ids are the same ProSoundEffects recordings
+      already in use, and this only removes one.

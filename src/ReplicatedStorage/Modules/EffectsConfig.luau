@@ -253,9 +253,16 @@ EffectsConfig.Sounds = {
 	-- Q landing. The loudest thing in the game on purpose, and the most built: a steel
 	-- slam for the crack, a sub for the weight, and grit thrown up after it.
 	--
-	-- This used to be a recording of a table falling over, which is exactly the problem
-	-- with picking audio by reading descriptions. A ground slam is not a *thing falling*;
-	-- it is something enormous arriving, and it needs saturation and a tail to say so.
+	-- The lead used to be a recording of a table falling over, which is the problem with
+	-- picking audio by reading descriptions. A ground slam is not a *thing falling*; it
+	-- is something enormous arriving, and it needs saturation and a tail to say so.
+	--
+	-- That table then survived here as a LAYER for two more passes while this comment
+	-- claimed it was gone, and it still read as a clatter — a table on concrete is a
+	-- handful of small wooden knocks spread over two seconds, which under a steel hit
+	-- adds noise with the wrong grain rather than weight. **The layer list is the thing
+	-- to check**: a lead swapped without pruning what was mixed under it leaves the old
+	-- sound audible and the entry looking correct.
 	SlamImpact = {
 		SoundId = STEEL_BIG,
 		Volume = 1,
@@ -265,9 +272,12 @@ EffectsConfig.Sounds = {
 		RollOffMinDistance = 14,
 		RollOffMaxDistance = 220,
 		Layers = {
-			{ SoundId = SUB_MID, Volume = 0.9, Pitch = 0.7 } :: SoundSpec,
+			-- The sub carries it now that the clatter is gone. This is what a slam is
+			-- actually made of; the steel above is only its transient.
+			{ SoundId = SUB_MID, Volume = 1, Pitch = 0.7 } :: SoundSpec,
+			-- Grit thrown up after the hit: scatter of the right kind, and a different
+			-- recording from the table that was cut.
 			{ SoundId = DEBRIS, Volume = 0.5, Pitch = 0.9, PitchJitter = 0.12 } :: SoundSpec,
-			{ SoundId = "rbxassetid://9126090979", Volume = 0.5, Pitch = 0.8 } :: SoundSpec,
 		},
 		Effects = {
 			{ Class = "Distortion", Props = { Level = 0.3 } } :: EffectSpec,

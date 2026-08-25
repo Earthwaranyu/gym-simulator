@@ -59,7 +59,10 @@ SoundCandidates.For = {
 		{ SoundId = "rbxassetid://9119630452", Note = "steel door, big hit, 2.1s" },
 		{ SoundId = "rbxassetid://9119632199", Note = "steel door, thinner metallic slam, 2.4s" },
 		{ SoundId = "rbxassetid://9120270688", Note = "truck hit body, metal crash, 1.9s" },
-		{ SoundId = "rbxassetid://9126090979", Note = "table falling on concrete, 2.1s (the old one)" },
+		{
+			SoundId = "rbxassetid://9126090979",
+			Note = "table falling on concrete, 2.1s — the old lead, and later a layer. Cut for clattering; kept here only to A/B against.",
+		},
 		{ SoundId = "rbxassetid://9125870973", Note = "rock hitting wood, crash and boards, 1.8s" },
 	},
 
