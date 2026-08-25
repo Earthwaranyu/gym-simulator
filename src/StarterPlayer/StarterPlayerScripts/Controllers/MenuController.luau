@@ -1545,6 +1545,10 @@ function MenuController:_renderShop(parent: Frame)
 	end
 
 	local sections: { [string]: { any } } = { Gamepass = {}, Potion = {}, Supplement = {}, Token = {} }
+	-- Product id -> Creator Dashboard icon, so the token-priced half of the shop can
+	-- show the same picture as its Robux twin. A supplement bought with tokens and one
+	-- bought with Robux are the same tub.
+	local artwork: { [string]: string } = {}
 	if ok and type(catalogue) == "table" then
 		for _, product in catalogue do
 			-- Grouped by what the thing is to the player, not by Roblox's product
@@ -1560,6 +1564,9 @@ function MenuController:_renderShop(parent: Frame)
 				elseif ShopConfig.Get(tostring(product.Id)) ~= nil then "Supplement"
 				else "Potion"
 			table.insert(sections[group], product)
+			if product.Icon ~= nil then
+				artwork[tostring(product.Id)] = product.Icon
+			end
 		end
 	end
 
@@ -1728,7 +1735,9 @@ function MenuController:_renderShop(parent: Frame)
 				index,
 				item.DisplayName,
 				item.Description,
-				"Token",
+				-- Not the Token glyph: that is the currency, and stamping it on the
+				-- card made every supplement look like the same skull.
+				artwork[item.Id] or "Potion",
 				UI.Palette.Vital,
 				actionText,
 				affordable,
@@ -1784,9 +1793,10 @@ function MenuController:_renderShop(parent: Frame)
 					then "OWNED"
 					elseif not product.Available then "COMING SOON"
 					else `BUY  ·  R$ {NumberFormat.Format(product.RobuxPrice)}`
-				-- A product with its own uploaded artwork asks for it by id; the rest
-				-- fall back to the shelf's shared glyph.
-				local iconName = if ShopIcons.Get(product.Id) ~= nil then product.Id else visual.Icon
+				-- The dashboard icon if the product has one, then any artwork bundled
+				-- with the game, then the shelf's shared glyph.
+				local iconName = product.Icon
+					or (if ShopIcons.Get(product.Id) ~= nil then product.Id else visual.Icon)
 				productCard(
 					grid,
 					index,

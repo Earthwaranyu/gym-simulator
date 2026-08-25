@@ -430,7 +430,7 @@ end
 ]]
 function Icons.Draw(name: string, parent: GuiObject, color: Color3, hole: Color3): Frame
 	local holder = Instance.new("Frame")
-	holder.Name = `Icon_{name}`
+	holder.Name = if string.sub(name, 1, 7) == "rbxasse" then "Icon_Art" else `Icon_{name}`
 	holder.AnchorPoint = Vector2.new(0.5, 0.5)
 	holder.Position = UDim2.fromScale(0.5, 0.5)
 	holder.Size = UDim2.fromScale(1, 1)
@@ -439,9 +439,11 @@ function Icons.Draw(name: string, parent: GuiObject, color: Color3, hole: Color3
 	UI.AspectRatio(holder, 1)
 	holder.Parent = parent
 
-	-- Uploaded artwork wins where it exists (see ShopIcons); everything else is
-	-- still drawn, and a key with no upload yet falls through to its glyph.
-	local image = ShopIcons.Get(name)
+	-- Uploaded artwork wins where it exists; everything else is still drawn. A caller
+	-- may pass an id straight through — the shop hands over the icon the Creator
+	-- Dashboard already has for each product — or a ShopIcons key whose upload has not
+	-- happened yet, which falls through to its glyph.
+	local image = if string.match(name, "^rbxassetid://%d+$") ~= nil then name else ShopIcons.Get(name)
 	if image ~= nil then
 		local label = Instance.new("ImageLabel")
 		label.Name = "Art"

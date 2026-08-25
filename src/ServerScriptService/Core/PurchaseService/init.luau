@@ -28,6 +28,8 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local Types = require(ReplicatedStorage.Modules.Types)
 
+local ProductInfo = require(script.ProductInfo)
+
 local PurchaseService = {
 	Name = "PurchaseService",
 	Priority = 21,
@@ -180,6 +182,14 @@ function PurchaseService:Start()
 		return self:_processReceipt(receiptInfo)
 	end
 
+	-- Primed here rather than on the first shop opening, so the first player to look
+	-- sees dashboard prices instead of the fallbacks.
+	local warmList = {}
+	for _, product in products do
+		table.insert(warmList, product)
+	end
+	ProductInfo.Warm(warmList)
+
 	--[[
 		What the shop screen draws. Built from the same registry the prompt path uses,
 		so a new file in Products/ appears in the UI with no client edit — and an
@@ -192,12 +202,18 @@ function PurchaseService:Start()
 
 		local rows = {}
 		for _, product in products do
+			-- Price and icon come from the Creator Dashboard, not from the module: the
+			-- two drifted apart on six of seven products before this. ProductInfo never
+			-- yields and falls back to product.RobuxPrice, so a rate-limited or offline
+			-- lookup still returns a shop.
+			local info = ProductInfo.Get(product)
 			table.insert(rows, {
 				Id = product.Id,
 				Kind = product.Kind,
 				DisplayName = product.DisplayName,
 				Description = product.Description,
-				RobuxPrice = product.RobuxPrice,
+				RobuxPrice = info.Price,
+				Icon = info.Icon,
 				Available = open and product.AssetId ~= 0,
 				Owned = product.Kind == "Gamepass" and self:OwnsGamepass(player, product.AssetId),
 			})

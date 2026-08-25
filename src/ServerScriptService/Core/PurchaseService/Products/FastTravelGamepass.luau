@@ -27,7 +27,7 @@ local Product: Types.Product = {
 	AssetId = 1954945633,
 	DisplayName = "Fast Travel",
 	Description = "Teleport to any map destination your relevant muscle has unlocked.",
-	RobuxPrice = 149,
+	RobuxPrice = 299,
 
 	Grant = function(_player: Player): boolean
 		return true

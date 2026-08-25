@@ -23,7 +23,7 @@ local Product: Types.Product = {
 	AssetId = 1952620111,
 	DisplayName = "VIP",
 	Description = "2x all stats, plus a free 1-hour immortal potion every day.",
-	RobuxPrice = 199,
+	RobuxPrice = 699,
 
 	Grant = function(player: Player): boolean
 		-- Permanent for the session: re-applied on every join by ApplyGamepasses.

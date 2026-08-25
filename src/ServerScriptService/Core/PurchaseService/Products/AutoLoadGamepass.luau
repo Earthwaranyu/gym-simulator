@@ -19,7 +19,7 @@ local Product: Types.Product = {
 	AssetId = 1955305572,
 	DisplayName = "Auto Load",
 	Description = "Automatically fits the heaviest load your trained muscle can handle. Toggle it any time.",
-	RobuxPrice = 99,
+	RobuxPrice = 699,
 
 	Grant = function(player: Player): boolean
 		player:SetAttribute("AutoLoadOwned", true)

@@ -27,7 +27,7 @@ local Product: Types.Product = {
 	AssetId = 3709768828,
 	DisplayName = "Protein Shake",
 	Description = "2x all stats for 10 minutes.",
-	RobuxPrice = 25,
+	RobuxPrice = 19,
 
 	Grant = function(player: Player): boolean
 		local item = ShopConfig.Get(ITEM_ID)

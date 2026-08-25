@@ -26,7 +26,7 @@ local Product: Types.Product = {
 	AssetId = 3709768865,
 	DisplayName = "Pre-Workout",
 	Description = "3x all stats for 3 minutes. Burns fast.",
-	RobuxPrice = 35,
+	RobuxPrice = 29,
 
 	Grant = function(player: Player): boolean
 		local item = ShopConfig.Get(ITEM_ID)

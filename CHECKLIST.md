@@ -30,7 +30,7 @@ multiplayer balance, mobile controls, and load testing are incomplete. The curre
 | Token accrual | Passive per-tick, **only while alive, inside a gym zone, and somewhere you can be attacked**, plus quest rewards |
 | Training | **Hold E to mount.** You teleport onto the machine, lock into it, and reps tick on their own — no stamina, no clicking. Hold E again to get off |
 | Assets | **Everything original.** Part-built machines, animations generated from joint angles. No Toolbox models, no uploaded animation ids |
-| PvP opt-out | **Paid only** — immortal potions (19 R$ / 1h, 79 R$ / 1 day) and VIP (199 R$, 1h daily) |
+| PvP opt-out | **Paid only** — immortal potions (19 R$ / 1h, 199 R$ / 1 day) and VIP (699 R$, 1h daily) |
 | Reputation | Criminal → Neutral → Guardian → Hero, driven by who you kill |
 | Git | One commit per checklist item. No co-author trailer. |
 
@@ -119,8 +119,8 @@ system that consumes it:
 - [x] 40. ~~`CurrencyService` — cash from reps, kills, and bounties.~~ **Removed.** Cash was deleted; the economy is Tokens (time, quests, bosses) and Fight Tokens (KOs, bounties, goblins).
 - [x] 41. Data-driven shop catalogue: gym-tier unlocks, supplements (timed multipliers), abilities.
 - [x] 42. `MarketplaceService` handler — gamepasses + dev products, **idempotent** receipt processing.
-- [x] 43. **Immortal potions** as dev products: 1 hour for 19 R$, 1 day for 79 R$. Expiry stored on the profile so it survives rejoin.
-- [x] 44. **VIP gamepass** at 199 R$ — grants one 1-hour immortal potion per day, with a daily-claim reset.
+- [x] 43. **Immortal potions** as dev products: 1 hour for 19 R$, 1 day for 199 R$ (live dashboard prices, read at runtime — see #159). Expiry stored on the profile so it survives rejoin.
+- [x] 44. **VIP gamepass** at 699 R$ — grants one 1-hour immortal potion per day, with a daily-claim reset.
 - [x] 45. Boost/multiplier sources all register into the Phase-2 modifier stack (#13) — 2x Stats, VIP, token boosts, and event buffs must not special-case.
 
 ## Phase 7 — UI
@@ -273,7 +273,7 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       than from `Workspace`: with streaming on, a district 1,500 studs away is not
       replicated, so a client measuring for itself would draw only what happened to be
       loaded.
-- [x] 74. **Fast Travel gamepass.** 149 R$ to travel from wherever you are standing
+- [x] 74. **Fast Travel gamepass.** 299 R$ to travel from wherever you are standing
       instead of only from the plaza. One new file implementing `Types.Product`, no service
       edits — and its `Grant` deliberately does nothing: `TravelService` asks whether the
       player owns the pass at the moment they travel, so ownership is read live rather than
@@ -1958,3 +1958,21 @@ traffic exists:
       rendered before, so the artwork can land one id at a time without a broken frame in
       between. The asset rule in `CLAUDE.md` gains the same carve-out the body mesh has —
       our own images may be uploaded, the Toolbox still may not.
+
+- [x] 159. **The dashboard sets the price, not the code.** #158 wired the live `AssetId`s
+      and stopped there, which left every card quoting a number Roblox would not charge:
+      VIP was advertised at 199 R$ against a real 699, Fast Travel 149 against 299, the
+      1 day potion 79 against 199. Six of seven were wrong, and copying today's numbers
+      into the modules would only have moved the drift to the next dashboard edit.
+      `ProductInfo` caches `MarketplaceService:GetProductInfo` behind a 300s TTL, warmed
+      off the request path at startup because that call yields and is rate limited. It
+      never yields itself and never throws: a failed lookup falls back to the module's
+      `RobuxPrice`, which is now documented as a fallback rather than a price.
+      The same call carries `IconImageAssetId`, so the artwork attached to each product on
+      the dashboard *is* the shop's artwork — no second copy to keep in sync, and the
+      uploaded images shrink to the two currencies in `ShopIcons`. The token-priced
+      supplements borrow their Robux twin's picture, because a Pre-Workout bought with
+      tokens is the same tub; only Meal Prep, which has no product, keeps a drawn glyph.
+      Verified live: catalogue returns 19/19/29/199/299/699/699 with an icon each, the
+      four uncreated token packs return their fallback price and no icon, and a bogus
+      asset id degrades to the fallback instead of erroring the shop.

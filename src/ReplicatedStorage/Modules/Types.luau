@@ -234,6 +234,8 @@ export type Product = {
 	AssetId: number,
 	DisplayName: string,
 	Description: string,
+	-- Fallback only. The shop shows the Creator Dashboard price, read at runtime by
+	-- PurchaseService/ProductInfo; this is what it falls back to when that call fails.
 	RobuxPrice: number,
 	-- DevProducts: called once per purchase, after the receipt is confirmed new.
 	-- Gamepasses: called on join and immediately on purchase. Must be idempotent.
