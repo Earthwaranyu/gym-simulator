@@ -11,6 +11,12 @@
         "$path": "Packages"
       }
     },
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "Boot": {
+        "$path": "src/ReplicatedFirst/Boot.client.luau"
+      }
+    },
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "Core": {

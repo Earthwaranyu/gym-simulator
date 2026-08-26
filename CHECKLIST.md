@@ -2300,3 +2300,41 @@ traffic exists:
       gets one of them wrong.
       Verified in Studio at both ends — dark ink at 70% over the empty track, cream at 100%
       over the fill, flipping mid-drag — and the HUD counters confirmed still GothamBold.
+
+- [x] 176. **The fighter creator arrives before the world does.** On a fresh join the gym
+      was on screen for a second or two before "CREATE YOUR FIGHTER" appeared. Two causes,
+      only one of them removable.
+      The removable one was a literal `task.wait(1)` in `CustomizerController:Start`,
+      commented "let the body finish dressing itself", sitting on top of a
+      `ProfileController:WaitFor` that spun on `task.wait(0.1)` and so charged every caller
+      up to a tenth of a second *after* the data had already landed. The intent of the wait
+      was right and the implementation was a guess: a second is dead time on a fast machine
+      and not enough on a slow one, and neither has anything to do with a clock. It now
+      waits for what "dressed" actually means — the character exists, its root part exists,
+      and `AppearanceService.gate` has written the `Customizing` attribute — each with its
+      own timeout, falling through rather than hanging. `WaitFor` wakes on the `Changed`
+      signal it already had.
+      The unremovable one is the profile round trip: whether a player is new is only
+      knowable from `Appearance.Chosen`, which comes from a DataStore. That cannot be made
+      faster from the client. It can only be covered — and nothing covered it, because the
+      project had **no ReplicatedFirst at all**. Everything the game draws lives in
+      StarterPlayerScripts, which cannot run until the character is already loading.
+      So there is now one script in ReplicatedFirst whose whole job is to be on screen
+      before anything else is. It requires nothing: ReplicatedFirst runs before
+      ReplicatedStorage has necessarily replicated, so requiring the UI module would mean a
+      WaitForChild at the very front of the boot, reintroducing the delay it exists to
+      cover. Its two colours are copied from the palette by hand, and the header says so.
+      The lift is a player attribute for the same reason — nothing has to have loaded for an
+      attribute to work.
+      **It lifts itself after ten seconds no matter what.** This is the only rule in the file
+      that may not depend on anything else working. A wrong-looking join is recoverable; a
+      player stuck behind an opaque frame has no game.
+      **That fallback caught a real bug during testing.** The handoff originally waited on
+      `RenderStepped`, which does not fire while the client is not rendering — Studio lost
+      focus mid-test and the curtain lifted on the timeout with `BootReady` still unset,
+      because the thread was parked forever. A player who alt-tabs across the join would
+      have hit exactly that. It waits a Heartbeat step instead, which keeps running.
+      Verified both branches in Studio: new player opens the creator already framed, with
+      the curtain lifting onto a finished shot rather than a moving camera; returning player
+      (tested by temporarily defaulting `Chosen`) lifts straight into the world with the HUD
+      up and the creator closed. The ten-second fallback is proven by the run that hit it.

@@ -657,6 +657,65 @@ function CustomizerController:Init()
 	ToastController = Loader.Get("ToastController")
 end
 
+--[[
+	Lifts the boot curtain in ReplicatedFirst.
+
+	Every path out of the first-join branch has to call this, including the ones that
+	decide not to open anything. The curtain has its own timeout so a missed call is
+	not fatal, but a player who sits behind an opaque screen for ten seconds because a
+	branch forgot to speak has effectively lost the join.
+]]
+local function markBootReady()
+	player:SetAttribute("BootReady", true)
+end
+
+--[[
+	Waits until the character is actually ready to be framed.
+
+	This replaces a flat `task.wait(1)` whose comment said "let the body finish dressing
+	itself". The intent was right and the implementation was a guess: a second is dead
+	time on a fast machine and not enough on a slow one, and neither case has anything
+	to do with a clock. The three conditions below are what "dressed" actually means —
+	the character exists, its root part exists, and the server's appearance pass has
+	run, which is observable because AppearanceService.gate writes the Customizing
+	attribute at the end of it.
+
+	Every step has its own timeout and falls through rather than hanging. A creator
+	framed on a half-built rig is a bad first second; a creator that never opens is a
+	player stuck behind a curtain.
+]]
+local function waitForBody(): Model?
+	local character = player.Character
+	if character == nil then
+		character = player.CharacterAdded:Wait()
+	end
+	if character == nil then
+		return nil
+	end
+
+	if character:FindFirstChild("HumanoidRootPart") == nil then
+		character:WaitForChild("HumanoidRootPart", 5)
+	end
+
+	if character:GetAttribute("Customizing") == nil then
+		local ready = false
+		local connection = character:GetAttributeChangedSignal("Customizing"):Connect(function()
+			ready = true
+		end)
+
+		local deadline = os.clock() + 5
+		while not ready and os.clock() < deadline do
+			if character:GetAttribute("Customizing") ~= nil then
+				break
+			end
+			task.wait()
+		end
+		connection:Disconnect()
+	end
+
+	return character
+end
+
 function CustomizerController:Start()
 	self:_build()
 
@@ -668,14 +727,31 @@ function CustomizerController:Start()
 	task.spawn(function()
 		local data = ProfileController:WaitFor(20)
 		if data == nil or data.Appearance == nil or data.Appearance.Chosen then
+			-- Returning player, or a profile that never came. Either way there is
+			-- nothing to open and no reason to hold the screen.
+			markBootReady()
 			return
 		end
-		-- Let the body finish dressing itself; opening onto a half-built rig frames
-		-- the camera on a character that is about to change size.
-		task.wait(1)
+
+		waitForBody()
+
 		if not isOpen then
 			self:Open(true)
 		end
+
+		--[[
+			One step, so the stage camera and the letterbox are actually in place. The
+			curtain is above both, and lifting it a frame early shows the camera moving
+			into position — the exact shot it exists to hide.
+
+			Heartbeat, not RenderStepped. RenderStepped does not fire while the client
+			is not rendering, so a player who alt-tabs across the join would park this
+			thread forever and sit behind the curtain until its ten-second fallback.
+			Caught exactly that way in Studio: the window lost focus mid-test and the
+			curtain lifted on the timeout with BootReady still unset.
+		]]
+		task.wait()
+		markBootReady()
 	end)
 end
 
