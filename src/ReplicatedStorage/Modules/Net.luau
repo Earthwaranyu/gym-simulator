@@ -76,6 +76,11 @@ local EVENT_NAMES: { string } = {
 	"ManualTrain",
 	-- Server -> ALL clients: someone was knocked out. Drives the kill feed.
 	"KillFeed",
+	-- Server -> ALL clients: world news — a boss rising, a streak worth hunting.
+	-- Posted to chat rather than the toast stack, because it is something that happened
+	-- in the world rather than something that happened to you, and chat keeps a
+	-- scrollback a four-second toast never could.
+	"Announce",
 	-- Server -> client: the public roster (power, rank, reputation, bounty) for the
 	-- custom tab bar. Sent as a whole list rather than per-player deltas.
 	"RosterChanged",

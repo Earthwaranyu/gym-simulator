@@ -22,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
+local Announce = require(ReplicatedStorage.Modules.Announce)
 
 -- Fight Tokens added to a player's head per kill in their current streak. A five-kill
 -- outlaw is worth 7, against a physique class costing tens — a real prize for one
@@ -75,10 +76,9 @@ function BountyService:_announce(player: Player)
 	local bounty = self:GetBounty(player)
 	local streak = self:GetStreak(player)
 
-	for _, other in Players:GetPlayers() do
-		Net.Event("Notify")
-			:FireClient(other, `{player.Name} is on a {streak} streak — {bounty} Fight Token bounty!`)
-	end
+	-- Chat, for the same reason the boss line is: this is a target every player might
+	-- want to go and find, not a note about their own afternoon.
+	Announce.Broadcast(`{player.Name} is on a {streak} streak — {bounty} Fight Token bounty!`)
 end
 
 function BountyService:_reset(player: Player)

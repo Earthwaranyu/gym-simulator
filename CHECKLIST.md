@@ -2338,3 +2338,43 @@ traffic exists:
       the curtain lifting onto a finished shot rather than a moving camera; returning player
       (tested by temporarily defaulting `Chosen`) lifts straight into the world with the HUD
       up and the creator closed. The ten-second fallback is proven by the run that hit it.
+
+- [x] 177. **The toast loses its box, and world news moves to chat.**
+      A toast was a `UI.Panel` — glass fill, corner, stroke, padding — plus a 3px accent
+      rail, all wrapped around one sentence that lives four seconds. The furniture was the
+      loudest thing on screen. It is now a bare `TextLabel` and nothing else.
+      Losing the panel meant losing the background the text was legible against: the old
+      colour was near-black ink, readable only because it sat on a light fill, and over the
+      world it would have vanished against dark terrain. So the line carries its own
+      contrast the way the immortality badge and the nameplates do — light text with an
+      outline — and that outline is the whole reason the panel could go.
+      The accent moved into the text. It only ever tinted the rail, and the rail is gone, so
+      the kill feed's three states (muted repeat, red outlaw, orange ordinary) now read as
+      coloured text. Every other caller passes no accent and is unchanged.
+      One trap in the rewrite: the fade ended on `fade.Completed:Wait()`, where `fade`
+      tweened the *panel's* background. With no panel that tween animates nothing, so the
+      removal now waits on the text tween — and the stroke fades with it, or the outline
+      hangs in the air after the glyphs have gone.
+      **Boss spawns were server-wide news wearing a personal notification's clothes.**
+      `MobService` looped every player firing `Notify`, so "Titan of the Square has risen"
+      sat next to "Knocked off the machine!" and expired in four seconds with no way to look
+      back at it. It now goes to chat in red, and the toast is gone. `BountyService`'s
+      streak announce used the identical loop-over-all-players idiom and moves with it, so
+      the split is now clean: **chat is what happened in the world, toasts are what happened
+      to you.**
+      Both go through `Announce.Broadcast`, a plain module rather than a Loader system
+      because it holds no state and needs no lifecycle — a service should not have to think
+      about ignite order to say something. It is one `FireAllClients`, not a broadcast
+      hand-written as N unicasts, which is what both sites were doing.
+      Posted to `RBXGeneral` from the client, not the server: `TextChannels` is populated at
+      runtime, and a player whose chat is unavailable should quietly miss the line rather
+      than make a boss spawn throw. The message is escaped before it goes inside the `<font>`
+      tag — mob names come from config, but the bounty line carries a *player's* display
+      name, and that is not a string this code gets to assume anything about.
+      Verified in Studio: toasts are `TextLabel`s with zero descendants, centred, stroked,
+      still fading and still capping at five; the announce arrives on RBXGeneral with the
+      red markup intact. **Not verified: that Roblox's chat window actually displays it** —
+      the window never appeared in the Studio session despite messages landing every 1.5s,
+      and CoreGui cannot be introspected from a script. Worth confirming in a real client.
+      Note for whoever does: the HUD's power strip and minimap occupy the top-left, which is
+      exactly where the chat window is aligned.

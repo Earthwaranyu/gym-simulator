@@ -31,6 +31,7 @@ local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
+local Announce = require(ReplicatedStorage.Modules.Announce)
 local MobRigConfig = require(ReplicatedStorage.Modules.MobRigConfig)
 local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
@@ -671,9 +672,9 @@ function MobService:_maintainBosses(now: number)
 		local model = self:_spawn(site.Mob, home, site.Radius, home + Vector3.new(0, 6, 0))
 		liveBoss[zoneId] = model
 
-		for _, player in Players:GetPlayers() do
-			Net.Event("Notify"):FireClient(player, `{site.Mob.DisplayName} has risen. Find the arena.`)
-		end
+		-- Chat, not a toast. A boss rising is news for the whole server, and a player
+		-- who was mid-set when it happened can still scroll back and read it.
+		Announce.Broadcast(`{site.Mob.DisplayName} has risen. Find the arena.`)
 		self:_broadcastBossState()
 	end
 end
