@@ -41,6 +41,8 @@ local ProfileTemplate: Types.ProfileData = {
 	Reputation = 0,
 
 	ImmortalUntil = 0,
+	-- Reconcile fills missing top-level keys, so this needs no migration.
+	BoostUntil = {},
 	VipLastClaimDay = "",
 
 	Kills = 0,

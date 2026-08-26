@@ -25,6 +25,7 @@ local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local Types = require(ReplicatedStorage.Modules.Types)
 local Icons = require(ReplicatedStorage.Modules.Icons)
 local AbilityConfig = require(ReplicatedStorage.Modules.AbilityConfig)
+local BoostConfig = require(ReplicatedStorage.Modules.BoostConfig)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
 
 -- A slot is big enough to hit with a thumb and small enough to sit under the middle
@@ -163,9 +164,21 @@ local manualStat: Types.StatId? = nil
 local powerLabel: TextLabel
 local tokenLabel: TextLabel
 local fightTokenLabel: TextLabel
--- The immortality badge, hidden whenever the potion is not running.
-local immortalPanel: Frame
+--[[
+	The buff stack above the health bar: immortality and every timed boost, each row
+	hidden whenever that buff is not running.
+
+	A list rather than three pinned badges. Each one used to hard-code its own Y
+	offset, which works for exactly one badge — with three, hiding the middle one
+	leaves a hole. The UIListLayout re-flows instead, so any combination stacks tidily.
+]]
+local buffStack: Frame
+local immortalRow: Frame
 local immortalLabel: TextLabel
+-- One row per BoostConfig id, built once at startup and toggled thereafter.
+local boostRows: { [string]: { Row: Frame, Time: TextLabel } } = {}
+local totalRow: Frame
+local totalLabel: TextLabel
 local healthBar: UI.Bar
 -- The tracker shows the one active step of the quest rotation. Kept as a row count
 -- rather than a single hard-coded row because every loop below already reads it, so a
@@ -331,32 +344,55 @@ function HudController:_build()
 		at the other. It is also the corner that can grow: the top-left strip is three
 		numbers that must not reflow when a badge appears and disappears.
 
+		The supplements now share that corner, for the reason the immortality badge
+		exists at all: a Pre-Workout burns in three minutes and the only thing that ever
+		told you it was running was the purchase toast. Same rows, same clock, same
+		formatter — one place to look for "what is running on me right now".
+
 		The shield says what it is, so the label is the time and nothing else, and it
 		carries no panel: a box drawn around two glyphs is furniture, and the corner it
 		sits in already has the health bar giving it an edge to align to.
 	]]
-	immortalPanel = Instance.new("Frame")
-	immortalPanel.Name = "Immortality"
-	immortalPanel.BackgroundTransparency = 1
-	immortalPanel.AnchorPoint = Vector2.new(0, 1)
+	buffStack = Instance.new("Frame")
+	buffStack.Name = "Buffs"
+	buffStack.BackgroundTransparency = 1
+	buffStack.AnchorPoint = Vector2.new(0, 1)
 	-- Left edge shared with the health bar below it; 8px of air between.
-	immortalPanel.Position = UDim2.new(0, 20, 1, -70)
-	immortalPanel.Size = UDim2.fromOffset(110, 30)
-	immortalPanel.Visible = false
-	immortalPanel.Parent = screen
+	buffStack.Position = UDim2.new(0, 20, 1, -70)
+	buffStack.Size = UDim2.fromOffset(170, 130)
+	buffStack.Parent = screen
+
+	local buffLayout = Instance.new("UIListLayout")
+	buffLayout.FillDirection = Enum.FillDirection.Vertical
+	-- Grows upward from the health bar, so the row nearest the bar keeps its place as
+	-- rows above it come and go.
+	buffLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	buffLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	buffLayout.Padding = UDim.new(0, 2)
+	buffLayout.Parent = buffStack
+
+	immortalRow = Instance.new("Frame")
+	immortalRow.Name = "Immortality"
+	immortalRow.BackgroundTransparency = 1
+	immortalRow.Size = UDim2.new(1, 0, 0, 30)
+	-- Last in the stack: it is the one that is not about training, and it sits closest
+	-- to the health bar because it is the other half of "how much can I take".
+	immortalRow.LayoutOrder = 100
+	immortalRow.Visible = false
+	immortalRow.Parent = buffStack
 
 	-- The same shield the player list puts beside an immune name. One symbol for one
 	-- rule, wherever it appears — which is the only reason to mark it in two places.
 	-- It replaced the drawn Potion glyph, which was rendered in near-white and read as
 	-- a white block rather than a bottle.
-	local immortalGlyph = UI.Label("Shield", immortalPanel)
+	local immortalGlyph = UI.Label("Shield", immortalRow)
 	immortalGlyph.Size = UDim2.fromOffset(24, 30)
 	immortalGlyph.TextSize = 22
 	immortalGlyph.TextXAlignment = Enum.TextXAlignment.Left
 	immortalGlyph.TextStrokeTransparency = 0.25
 	immortalGlyph.Text = "🛡"
 
-	immortalLabel = UI.Label("Remaining", immortalPanel)
+	immortalLabel = UI.Label("Remaining", immortalRow)
 	immortalLabel.Position = UDim2.fromOffset(30, 0)
 	immortalLabel.Size = UDim2.new(1, -30, 1, 0)
 	immortalLabel.Font = UI.Font.Numeric
@@ -366,6 +402,111 @@ function HudController:_build()
 	-- nameplate labels do. Pink on a bright sky is otherwise unreadable.
 	immortalLabel.TextStrokeTransparency = 0.25
 	immortalLabel.TextColor3 = UI.Palette.CartoonPink
+
+	--[[
+		One row per timed boost, above the shield.
+
+		Built from BoostConfig rather than named here, so a third supplement is a row in
+		that table and nothing in this file. All of them are built hidden at startup:
+		the alternative is creating instances inside the one-second tick, and a boost
+		expiring should not be able to hitch a frame.
+
+		The multiplier is the big number and the clock is the small one. What a player
+		checks mid-set is whether they are still boosted; how long is the follow-up
+		question, and sizing them the other way round makes the badge read as a timer
+		with a decoration rather than a buff with a timer.
+	]]
+	--[[
+		Sorted, because `for id in BoostConfig.Boosts` is hash order: the rows would sit
+		in a different sequence from one session to the next, which is exactly the kind
+		of instability a player reads as a bug. Strongest on top, id as the tie-break so
+		two equal multipliers still land somewhere fixed.
+	]]
+	local boostIds = {}
+	for id in BoostConfig.Boosts do
+		table.insert(boostIds, id)
+	end
+	table.sort(boostIds, function(a: string, b: string): boolean
+		local left, right = BoostConfig.Boosts[a], BoostConfig.Boosts[b]
+		if left.Multiplier ~= right.Multiplier then
+			return left.Multiplier > right.Multiplier
+		end
+		return a < b
+	end)
+
+	for boostOrder, id in boostIds do
+		local boost = BoostConfig.Boosts[id]
+
+		local row = Instance.new("Frame")
+		row.Name = id
+		row.BackgroundTransparency = 1
+		row.Size = UDim2.new(1, 0, 0, 28)
+		row.LayoutOrder = boostOrder
+		row.Visible = false
+		row.Parent = buffStack
+
+		local glyph = UI.Label("Glyph", row)
+		glyph.Size = UDim2.fromOffset(24, 28)
+		glyph.TextSize = 22
+		glyph.TextXAlignment = Enum.TextXAlignment.Left
+		glyph.TextStrokeTransparency = 0.25
+		glyph.Text = boost.Glyph
+
+		local colour = (UI.Palette :: any)[boost.Colour] or UI.Palette.Accent
+
+		local multiplier = UI.Label("Multiplier", row)
+		multiplier.Position = UDim2.fromOffset(30, 0)
+		multiplier.Size = UDim2.fromOffset(40, 28)
+		multiplier.Font = UI.Font.Numeric
+		multiplier.TextSize = 20
+		multiplier.TextXAlignment = Enum.TextXAlignment.Left
+		multiplier.TextStrokeTransparency = 0.25
+		multiplier.TextColor3 = colour
+		multiplier.Text = `x{boost.Multiplier}`
+
+		local time = UI.Label("Remaining", row)
+		time.Position = UDim2.fromOffset(72, 0)
+		time.Size = UDim2.new(1, -72, 1, 0)
+		time.Font = UI.Font.Numeric
+		time.TextSize = 16
+		time.TextXAlignment = Enum.TextXAlignment.Left
+		time.TextStrokeTransparency = 0.25
+		time.TextColor3 = colour
+
+		boostRows[id] = { Row = row, Time = time }
+	end
+
+	--[[
+		The combined multiplier, shown only when more than one boost is running.
+
+		Boosts multiply — a shake and a pre-workout is x6, not x3 — and that product is
+		the thing the player actually paid for. Leaving them to multiply two chips in
+		their head is how a stacking bonus goes unnoticed and unbought. With one boost
+		running the row would just restate that boost, so it hides.
+	]]
+	totalRow = Instance.new("Frame")
+	totalRow.Name = "BoostTotal"
+	totalRow.BackgroundTransparency = 1
+	totalRow.Size = UDim2.new(1, 0, 0, 28)
+	-- Under the boosts it sums, above the shield, which is not part of the sum.
+	totalRow.LayoutOrder = 99
+	totalRow.Visible = false
+	totalRow.Parent = buffStack
+
+	local totalGlyph = UI.Label("Glyph", totalRow)
+	totalGlyph.Size = UDim2.fromOffset(24, 28)
+	totalGlyph.TextSize = 20
+	totalGlyph.TextXAlignment = Enum.TextXAlignment.Left
+	totalGlyph.TextStrokeTransparency = 0.25
+	totalGlyph.Text = "⚙"
+
+	totalLabel = UI.Label("Total", totalRow)
+	totalLabel.Position = UDim2.fromOffset(30, 0)
+	totalLabel.Size = UDim2.new(1, -30, 1, 0)
+	totalLabel.Font = UI.Font.Numeric
+	totalLabel.TextSize = 20
+	totalLabel.TextXAlignment = Enum.TextXAlignment.Left
+	totalLabel.TextStrokeTransparency = 0.25
 
 	-- Bottom-centre: which muscle the left mouse button is currently training.
 	--
@@ -1367,26 +1508,58 @@ function HudController:_refreshGoal(view: { any })
 end
 
 --[[
-	The countdown, driven from the profile rather than from a remote of its own.
+	The countdowns, driven from the profile rather than from a remote of their own.
 
-	`ImmortalUntil` is an absolute epoch on the profile and already rides every
-	ProfileChanged push, so the client can tick it locally between pushes and needs no
-	new traffic. It is refreshed on a one-second clock rather than per frame: the text
-	only ever changes once a second, and NumberFormat.Duration is the same function the
-	purchase toast uses, so the badge and the toast cannot disagree.
+	`ImmortalUntil` and `BoostUntil` are absolute epochs on the profile and already ride
+	every ProfileChanged push, so the client can tick them locally between pushes and
+	needs no new traffic. That is the whole reason boosts were moved onto the profile:
+	an in-memory boost would have needed a remote of its own, and would still have
+	vanished on rejoin while its badge was mid-count.
+
+	Refreshed on a one-second clock rather than per frame: the text only ever changes
+	once a second, and NumberFormat.Duration is the same function the purchase toasts
+	use, so a badge and the toast that announced it cannot disagree.
 ]]
-function HudController:_refreshImmortality()
+function HudController:_refreshBuffs()
 	local data = ProfileController:Get()
+
 	local until_ = if data ~= nil then tonumber(data.ImmortalUntil) else nil
 	local remaining = if until_ ~= nil then until_ - os.time() else 0
 
-	if remaining <= 0 then
-		immortalPanel.Visible = false
-		return
+	immortalRow.Visible = remaining > 0
+	if remaining > 0 then
+		immortalLabel.Text = NumberFormat.Duration(remaining)
 	end
 
-	immortalPanel.Visible = true
-	immortalLabel.Text = NumberFormat.Duration(remaining)
+	local boostUntil = if data ~= nil then data.BoostUntil else nil
+	local now = os.time()
+	local product = 1
+	local live = 0
+
+	for id, entry in boostRows do
+		local expiresAt = if boostUntil ~= nil then tonumber(boostUntil[id]) else nil
+		local left = if expiresAt ~= nil then expiresAt - now else 0
+
+		entry.Row.Visible = left > 0
+		if left <= 0 then
+			continue
+		end
+
+		entry.Time.Text = NumberFormat.Duration(left)
+
+		local boost = BoostConfig.Get(id)
+		if boost ~= nil then
+			product *= boost.Multiplier
+			live += 1
+		end
+	end
+
+	-- One boost makes this row a restatement of the row above it, so it only earns its
+	-- space once there is a product the player could not read off a single badge.
+	totalRow.Visible = live > 1
+	if live > 1 then
+		totalLabel.Text = `x{product} TOTAL`
+	end
 end
 
 function HudController:_refreshProfile()
@@ -1398,7 +1571,7 @@ function HudController:_refreshProfile()
 	powerLabel.Text = `POWER  {NumberFormat.FormatGain(Formulas.TotalPower(data.Stats))}`
 	tokenLabel.Text = `TOKENS  {NumberFormat.Format(data.Tokens)}`
 	fightTokenLabel.Text = `FIGHT  {NumberFormat.Format(data.FightTokens)}`
-	self:_refreshImmortality()
+	self:_refreshBuffs()
 	self:_refreshTrainingReadout()
 end
 
@@ -1646,11 +1819,11 @@ function HudController:Start()
 		end
 	end)
 
-	-- The potion expires on the server's clock with no message when it does, so the
-	-- badge counts itself down and hides itself at zero.
+	-- Potions and boosts expire on the server's clock with no message when they do, so
+	-- the badges count themselves down and hide themselves at zero.
 	task.spawn(function()
 		while true do
-			self:_refreshImmortality()
+			self:_refreshBuffs()
 			task.wait(1)
 		end
 	end)

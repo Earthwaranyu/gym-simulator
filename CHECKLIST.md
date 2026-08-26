@@ -2162,3 +2162,44 @@ traffic exists:
       The header comments that said the id "must be set from the Creator Dashboard" are
       rewritten rather than left, because a stale instruction to do something already done
       is how the next reader concludes the file is broken.
+
+- [x] 172. **The supplements say what they are doing.** #169 gave the immortal potion a
+      badge because a shield of unknown length is the one thing you need to know before
+      standing in the open. The Protein Shake and Pre-Workout had the same hole and a
+      shorter fuse: a Pre-Workout burns in three minutes, and the only thing that ever
+      told you it was running was the toast at the moment of purchase.
+      They now sit in the same corner — 🥤 `x2` and ⚡ `x3`, the multiplier at TextSize 20
+      and the clock at 16, because what a player checks mid-set is *whether* they are
+      boosted; how long is the follow-up question, and sizing them the other way round
+      makes the badge read as a timer with a decoration rather than a buff with a timer.
+      Three pinned badges do not work — each hard-coding its own Y offset is fine for one,
+      but hiding the middle one leaves a hole — so the shield moved into a bottom-aligned
+      `UIListLayout` and the rows re-flow instead.
+      **They stack, and the badge now says so.** `GetMultiplier` has always been a product
+      over live modifiers, so both at once was already x6; nobody could see it. A `⚙ x6
+      TOTAL` row appears once more than one boost is live, and hides at one, where it would
+      only restate the row above it. Leaving players to multiply two chips in their head is
+      how a stacking bonus goes unbought.
+      **The bug found on the way is the bigger half.** Boosts lived only in the in-memory
+      `StatService` table, which is dropped on `PlayerRemoving` — buy a ten-minute shake,
+      disconnect at two, and you paid Robux for nothing. A visible countdown would have
+      made that worse, vanishing mid-count. `BoostUntil` is now an absolute epoch map on
+      the profile, exactly as `ImmortalUntil` already was, restored into the modifier stack
+      on `ProfileLoaded`; the profile is the durable record and the modifier table is a
+      cache. That is also what lets the badge tick with no remote of its own — it rides
+      the existing ProfileChanged push, which is the whole reason the immortality badge
+      was free to build.
+      Re-buying now **extends** rather than resets, matching `ImmortalityService:Grant`.
+      It used to overwrite, silently binning the nine minutes you had already paid for.
+      `GrantGlobal` returns false when the write fails so ProcessReceipt leaves the receipt
+      unconsumed and Roblox retries, rather than charging for a boost that never landed.
+      Permanent boosts stay off the profile on purpose: those are gamepasses, re-granted
+      each join from the ownership check, and persisting them would give a revoked pass a
+      second life.
+      The numbers moved to `BoostConfig` in ReplicatedStorage, because the HUD has to read
+      a multiplier and a glyph and a client cannot require a product module. A third
+      supplement is now a row in that table plus a product module — neither the HUD nor
+      BoostService names a boost, they both iterate it.
+      Row order is sorted by multiplier, not hash order. `for id in BoostConfig.Boosts`
+      put the rows in a different sequence from one session to the next, which is exactly
+      the kind of instability a player reads as a bug.

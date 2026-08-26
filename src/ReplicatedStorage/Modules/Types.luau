@@ -66,6 +66,9 @@ export type ProfileData = {
 
 	-- os.time() at which purchased PvP immunity lapses. 0 means never bought one.
 	ImmortalUntil: number,
+	-- Timed stat boosts, keyed by BoostConfig id, valued with an absolute os.time()
+	-- expiry. On the profile rather than in memory so a rejoin cannot void a purchase.
+	BoostUntil: { [string]: number },
 	-- os.date "%Y-%m-%d" of the last VIP daily potion claim. Empty means never claimed.
 	VipLastClaimDay: string,
 
