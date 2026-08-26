@@ -1521,6 +1521,17 @@ function MenuController:_renderQuests(parent: Frame)
 	end
 end
 
+--[[
+	Bumped every time the body is cleared for a re-render.
+
+	A page that asks the server for anything yields, and the body can be cleared and
+	re-rendered while it is waiting. The stale render then resumes and appends its
+	sections to a body that already belongs to the newer one — the shop came back with
+	every shelf twice. Each yielding page captures this on entry and drops what it
+	built if the number moved underneath it.
+]]
+local renderGeneration = 0
+
 -- Which catalogue rows belong on the supplements shelf. An explicit set because these
 -- used to be recognised by having a ShopConfig entry, and that config went with the
 -- token-priced shelf; a new supplement is one id here plus its product file.
@@ -1528,6 +1539,40 @@ local SUPPLEMENT_IDS: { [string]: boolean } = {
 	PreWorkout = true,
 	ProteinShake = true,
 }
+
+--[[
+	Products that carry a daily claim, and the remote that claims it.
+
+	A table rather than an `if product.Id == "Vip"` branch in the card loop, so a
+	second recurring entitlement is a row here and nothing else.
+]]
+local DAILY_CLAIMS: { [string]: { Remote: string, Label: string } } = {
+	Vip = { Remote = "ClaimVipDaily", Label = "CLAIM" },
+}
+
+--[[
+	How long until the daily claim comes back.
+
+	The daily resets on the UTC calendar day, which is what VipService.today() means by
+	"once a day". So the wait is the rest of today in UTC — not a rolling twenty-four
+	hours from the claim, which would be a different promise and a longer one. A player
+	who claims at 23:59 can claim again at 00:01, and that is deliberate.
+
+	This is why the button says RESETS rather than READY IN: an eighteen-hour countdown
+	under "READY IN" reads as a broken twenty-four hour timer, because it never says
+	what it is counting toward.
+
+	Derived on the client rather than asked for: VipLastClaimDay is on the profile and
+	already reaches this client with every push, so the countdown costs no traffic.
+]]
+local function secondsUntilReset(): number
+	return 86400 - (os.time() % 86400)
+end
+
+local function claimedToday(): boolean
+	local data = ProfileController:Get()
+	return data ~= nil and data.VipLastClaimDay == os.date("!%Y-%m-%d")
+end
 
 --[[
 	Shop — the Robux catalogue, in headed sections you scroll through.
@@ -1539,9 +1584,17 @@ local SUPPLEMENT_IDS: { [string]: boolean } = {
 	player has already committed to buying it.
 ]]
 function MenuController:_renderShop(parent: Frame)
+	local generation = renderGeneration
 	local ok, catalogue = pcall(function()
 		return Net.Function("GetProductCatalogue"):InvokeServer()
 	end)
+
+	-- Another refresh landed while the catalogue was in flight; that one owns the body
+	-- now. Claiming the VIP daily is the reliable way to hit this: it marks the profile
+	-- dirty and refreshes, so a push arrives mid-round-trip.
+	if generation ~= renderGeneration then
+		return
+	end
 
 	-- This render runs again on every profile push while the shop is open, so reading
 	-- the class from here is what keeps a pack's quoted payout current the moment a
@@ -1596,8 +1649,17 @@ function MenuController:_renderShop(parent: Frame)
 		-- OWNED once a pass is bought, and that used to be the only place a price
 		-- appeared — so an owner, the developer included, could never see what their
 		-- own pass costs.
-		priceText: string?
-	)
+		priceText: string?,
+		--[[
+			An optional second button sharing the action row.
+
+			Only the VIP card uses one today, for its daily claim. It is a parameter
+			rather than a special case inside this function because a card should not
+			know which product it is drawing — the caller knows that already, and the
+			nil case has to stay byte-identical to what every other product renders.
+		]]
+		secondary: { Text: string, Enabled: boolean, OnClick: () -> () }?
+	): TextButton?
 		local card = UI.CartoonCard(title, accent, grid)
 		card.LayoutOrder = layoutOrder
 
@@ -1659,34 +1721,70 @@ function MenuController:_renderShop(parent: Frame)
 		detail.TextTruncate = Enum.TextTruncate.AtEnd
 		detail.Text = description
 
-		local action = Instance.new("TextButton")
-		action.Name = "Buy"
+		--[[
+			The action row. One full-width button, or two half-width ones when the
+			caller passed a secondary.
+
+			Split horizontally rather than stacked: the card is 108px and the
+			description already runs to y=70, so there is no second band to put a
+			button in without resizing every cell in the grid.
+		]]
+		local function actionButton(name: string, text: string, active: boolean): TextButton
+			local button = Instance.new("TextButton")
+			button.Name = name
+			button.BackgroundColor3 = if active then UI.Palette.CartoonCream else UI.Palette.TextMuted
+			button.BackgroundTransparency = if active then 0 else 0.28
+			button.BorderSizePixel = 0
+			button.AutoButtonColor = false
+			button.Font = UI.Font.Heading
+			button.TextSize = 12
+			button.TextColor3 = UI.Palette.CartoonInk
+			button.Text = text
+			button.Parent = card
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 8)
+			corner.Parent = button
+
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = UI.Palette.CartoonInk
+			stroke.Thickness = 2
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.Parent = button
+
+			return button
+		end
+
+		local action = actionButton("Buy", actionText, enabled)
 		action.Position = UDim2.fromOffset(10, 78)
-		action.Size = UDim2.new(1, -20, 0, 26)
-		action.BackgroundColor3 = if enabled then UI.Palette.CartoonCream else UI.Palette.TextMuted
-		action.BackgroundTransparency = if enabled then 0 else 0.28
-		action.BorderSizePixel = 0
-		action.AutoButtonColor = false
-		action.Font = UI.Font.Heading
-		action.TextSize = 12
-		action.TextColor3 = UI.Palette.CartoonInk
-		action.Text = actionText
-		action.Parent = card
-
-		local actionCorner = Instance.new("UICorner")
-		actionCorner.CornerRadius = UDim.new(0, 8)
-		actionCorner.Parent = action
-
-		local actionStroke = Instance.new("UIStroke")
-		actionStroke.Color = UI.Palette.CartoonInk
-		actionStroke.Thickness = 2
-		actionStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		actionStroke.Parent = action
+		action.Size = if secondary ~= nil then UDim2.new(0.5, -13, 0, 26) else UDim2.new(1, -20, 0, 26)
 
 		if enabled then
 			UI.Pressable(action, { PressScale = 0.95, HoverScale = 1.02 })
 			action.Activated:Connect(onClick)
 		end
+
+		if secondary == nil then
+			return nil
+		end
+
+		local extra = actionButton("Secondary", secondary.Text, secondary.Enabled)
+		extra.AnchorPoint = Vector2.new(1, 0)
+		extra.Position = UDim2.new(1, -10, 0, 78)
+		extra.Size = UDim2.new(0.5, -13, 0, 26)
+		-- Half a cell is narrower than the settings row this moved from, and the
+		-- countdown is the longest string either button ever carries.
+		extra.TextSize = 11
+
+		if secondary.Enabled then
+			UI.Pressable(extra, { PressScale = 0.95, HoverScale = 1.02 })
+			extra.Activated:Connect(secondary.OnClick)
+		else
+			extra.Active = false
+			extra.TextColor3 = UI.Palette.TextMuted
+		end
+
+		return extra
 	end
 
 	local function section(
@@ -1793,7 +1891,37 @@ function MenuController:_renderShop(parent: Frame)
 					description =
 						`<font color="#{UI.Palette.Token:ToHex()}">≈ {NumberFormat.Format(granted)} TOKENS</font>\n{description}`
 				end
-				productCard(
+				--[[
+					A daily claim sits beside the card's own button, and only for an
+					owner: offering CLAIM to someone who does not own the pass is an
+					invitation to be refused.
+
+					It used to be a row in the Settings tab, which is not where anyone
+					goes after buying VIP. The card that sold them the pass is.
+				]]
+				local daily = DAILY_CLAIMS[product.Id]
+				local secondary = nil
+				if daily ~= nil and product.Owned then
+					local waiting = claimedToday()
+					secondary = {
+						Text = if waiting
+							then `RESETS {NumberFormat.Duration(secondsUntilReset())}`
+							else daily.Label,
+						Enabled = not waiting,
+						OnClick = function()
+							local claimed, message = Net.Function(daily.Remote):InvokeServer()
+							toast(message)
+							-- Re-rendered on success so the button becomes its own
+							-- countdown rather than inviting a second press the
+							-- server would refuse.
+							if claimed then
+								self:_refresh()
+							end
+						end,
+					}
+				end
+
+				local claimButton = productCard(
 					grid,
 					index,
 					product.DisplayName,
@@ -1808,8 +1936,34 @@ function MenuController:_renderShop(parent: Frame)
 							toast(message)
 						end
 					end,
-					if sellable then nil else priceText
+					if sellable then nil else priceText,
+					secondary
 				)
+
+				--[[
+					The countdown rewrites itself once a second.
+
+					Guarded on IsDescendantOf rather than a Parent check: the shop page
+					is rebuilt on every profile push, and a destroyed button still
+					reports whatever parent it had. Without the guard every push would
+					leave another loop writing to a button nobody can see.
+				]]
+				if claimButton ~= nil and secondary ~= nil and not secondary.Enabled then
+					task.spawn(function()
+						while claimButton:IsDescendantOf(game) do
+							task.wait(1)
+							if not claimButton:IsDescendantOf(game) then
+								break
+							end
+							local left = secondsUntilReset()
+							if left <= 0 then
+								self:_refresh()
+								break
+							end
+							claimButton.Text = `RESETS {NumberFormat.Duration(left)}`
+						end
+					end)
+				end
 			end
 		end)
 	end
@@ -1911,9 +2065,14 @@ function MenuController:_renderTitles(parent: Frame)
 end
 
 function MenuController:_renderLeaderboard(parent: Frame)
+	local generation = renderGeneration
 	local ok, boards = pcall(function()
 		return Net.Function("GetLeaderboard"):InvokeServer()
 	end)
+
+	if generation ~= renderGeneration then
+		return
+	end
 
 	if not ok or type(boards) ~= "table" or #boards == 0 then
 		local empty = UI.Label("Empty", parent)
@@ -2023,72 +2182,6 @@ function MenuController:_renderSettings(parent: Frame)
 	volumeRow("SfxVolume", "Sound effects", "Training, combat, and menu feedback", UI.Palette.Power)
 
 	order += 1
-	local claim = row(parent, 58, order)
-	local label = UI.Label("Text", claim)
-	label.Size = UDim2.new(1, -132, 1, 0)
-
-	--[[
-		The daily resets on the UTC calendar day, which is what VipService.today()
-		means by "once a day". So the wait is the rest of today in UTC — not a rolling
-		twenty-four hours from the claim, which would be a different promise and a
-		longer one.
-
-		Derived here rather than asked for: VipLastClaimDay is on the profile and
-		already reaches this client with every push, so a countdown costs no traffic.
-	]]
-	local claimData = ProfileController:Get()
-	local claimedToday = claimData ~= nil and claimData.VipLastClaimDay == os.date("!%Y-%m-%d")
-
-	local function secondsUntilReset(): number
-		return 86400 - (os.time() % 86400)
-	end
-
-	label.Text = if claimedToday
-		then `<b>VIP daily protection</b>\n<font color="#8A93A8">Claimed today. The next hour is waiting tomorrow.</font>`
-		else `<b>VIP daily protection</b>\n<font color="#8A93A8">Claim one hour of immortality every day</font>`
-
-	local claimButton = button(
-		claim,
-		if claimedToday then `READY IN {NumberFormat.Duration(secondsUntilReset())}` else "CLAIM",
-		if claimedToday then UI.Palette.Glass else UI.Palette.Token,
-		function()
-			local ok, message = Net.Function("ClaimVipDaily"):InvokeServer()
-			toast(message)
-			-- Re-rendered on success so the button becomes its own countdown rather
-			-- than inviting a second press the server would refuse.
-			if ok then
-				self:_refresh()
-			end
-		end
-	)
-
-	if claimedToday then
-		claimButton.Active = false
-		claimButton.AutoButtonColor = false
-		claimButton.TextColor3 = UI.Palette.TextMuted
-		claimButton.TextSize = 12
-		-- Dies with the page. Settings is rebuilt on every open and on every refresh,
-		-- so without this guard each visit would leave another loop writing to a
-		-- button nobody can see.
-		task.spawn(function()
-			-- IsDescendantOf rather than a Parent check: a rebuilt page destroys the
-			-- old row, and a destroyed instance still reports whatever parent it had.
-			while claimButton:IsDescendantOf(game) do
-				task.wait(1)
-				if not claimButton:IsDescendantOf(game) then
-					break
-				end
-				local left = secondsUntilReset()
-				if left <= 0 then
-					self:_refresh()
-					break
-				end
-				claimButton.Text = `READY IN {NumberFormat.Duration(left)}`
-			end
-		end)
-	end
-
-	order += 1
 	local heading = UI.Label("ControlsHeading", parent)
 	heading.Size = UDim2.new(1, 0, 0, 28)
 	heading.LayoutOrder = order
@@ -2148,6 +2241,7 @@ function MenuController:_refresh()
 	bodyScroll.AutomaticCanvasSize = if fixedPage then Enum.AutomaticSize.None else Enum.AutomaticSize.Y
 	bodyScroll.CanvasPosition = Vector2.zero
 
+	renderGeneration += 1
 	body:ClearAllChildren()
 	local layout = UI.VerticalList(body, 6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder

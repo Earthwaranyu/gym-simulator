@@ -2203,3 +2203,34 @@ traffic exists:
       Row order is sorted by multiplier, not hash order. `for id in BoostConfig.Boosts`
       put the rows in a different sequence from one session to the next, which is exactly
       the kind of instability a player reads as a bug.
+
+- [x] 173. **The VIP daily claim moves to the card that sold the pass.** It was a row in
+      the Settings tab, which is not where anyone goes after buying VIP. It now sits beside
+      the VIP card's own button in the shop: `OWNED` and `CLAIM` share the action row,
+      split horizontally because the card is 108px and the description already runs to
+      y=70 — there is no second band to put a button in without resizing every cell in the
+      grid. `productCard` takes an optional `secondary`; nil renders exactly what the other
+      eleven products rendered before, which is the only acceptable blast radius for a
+      change to the one function every card goes through.
+      Only an **owner** sees it. Offering CLAIM to someone who does not own the pass is an
+      invitation to be refused. Which products carry a daily lives in a `DAILY_CLAIMS`
+      table rather than an `if product.Id == "Vip"` branch, so a second entitlement is a
+      row there and nothing else.
+      **The "18 hours" was not a bug.** The daily resets on the UTC calendar day —
+      `VipService.today()` is `os.date("!%Y-%m-%d")`, and the header has always called the
+      trade deliberate: claim at 23:59 and you can claim again at 00:01. Eighteen hours was
+      the honest time to the next UTC midnight. What was wrong was the wording: `READY IN
+      18:00:00` reads as a broken twenty-four hour timer because it never says what it is
+      counting toward. It now says `RESETS 18:00:00`. The rule is unchanged and the comment
+      explaining it moved with the code, which is what stops the question being re-asked.
+      **The bug found on the way is the one worth keeping.** `_renderShop` yields on
+      `GetProductCatalogue`, and `_refresh` clears the body and re-renders. A profile push
+      landing during that round trip cleared the body under a render that was still in
+      flight; the stale render resumed and appended its shelves to the new page, and the
+      shop came back with every shelf twice. Claiming is the reliable way to hit it — it
+      marks the profile dirty *and* refreshes — but any push at the wrong moment would
+      have done it, and this was latent long before the claim button existed.
+      Fixed with a `renderGeneration` counter bumped on every clear: a yielding page
+      captures it on entry and drops what it built if the number moved underneath it.
+      `_renderLeaderboard` yields the same way and gets the same guard. Verified in Studio
+      by claiming and counting sections — four, not eight.
