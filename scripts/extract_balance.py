@@ -52,19 +52,19 @@ RANK_FIELDS = {
     "MinPower": float,
 }
 
-# Goblins are built by a `goblin(zone, name, health, damage, fightTokens)` helper
+# Thieves are built by a `thief(zone, name, health, damage, fightTokens)` helper
 # rather than written as table literals, so `_collect` cannot see them. Their shared
 # numbers — how many stand in a field, how long a killed one stays gone — live in the
 # helper body as constants.
-GOBLIN_CALL = re.compile(
-    r"""goblin\(\s*"(?P<zone>\w+)"\s*,\s*"[^"]*"\s*,\s*"""
+THIEF_CALL = re.compile(
+    r"""thief\(\s*"(?P<zone>\w+)"\s*,\s*"[^"]*"\s*,\s*"""
     r"""(?P<health>[\d_.e]+)\s*,\s*(?P<damage>[\d_.e]+)\s*,\s*(?P<tokens>[\d_.e]+)\s*\)""",
     re.VERBOSE,
 )
 
 
-def _goblin_rows(path: Path) -> list[dict]:
-    """Every goblin tier, plus the field constants they all share.
+def _thief_rows(path: Path) -> list[dict]:
+    """Every thief tier, plus the field constants they all share.
 
     Fight Token income is what the simulator was missing, and it is a product of four
     numbers: what a kill pays, how many stand in a field, how long a slot stays empty
@@ -73,7 +73,7 @@ def _goblin_rows(path: Path) -> list[dict]:
     """
     source = path.read_text()
     rows = []
-    for match in GOBLIN_CALL.finditer(source):
+    for match in THIEF_CALL.finditer(source):
         rows.append(
             {
                 "ZoneId": match.group("zone"),
@@ -83,7 +83,7 @@ def _goblin_rows(path: Path) -> list[dict]:
             }
         )
     if not rows:
-        raise SystemExit("extract_balance: found no goblin rows in MobConfig")
+        raise SystemExit("extract_balance: found no thief rows in MobConfig")
     return rows
 
 
@@ -174,18 +174,18 @@ def _constant(path: Path, name: str) -> float:
     return float(match.group(1))
 
 
-def _goblin_constant(source: str, name: str) -> float:
-    """A shared field from inside the `goblin(...)` helper body.
+def _thief_constant(source: str, name: str) -> float:
+    """A shared field from inside the `thief(...)` helper body.
 
     Scoped to that function rather than searched across the file, because the boss
     helper directly below declares several of the same field names with different
     values and a whole-file search would silently pick whichever came first.
     """
-    start = source.index("local function goblin(")
+    start = source.index("local function thief(")
     end = source.index("local function boss(", start)
     match = re.search(rf"^\t\t{name} = ([\d_.eE+-]+),$", source[start:end], re.MULTILINE)
     if match is None:
-        raise SystemExit(f"[extract_balance] Could not find `{name}` in MobConfig's goblin helper")
+        raise SystemExit(f"[extract_balance] Could not find `{name}` in MobConfig's thief helper")
     return float(match.group(1).replace("_", ""))
 
 
@@ -198,10 +198,10 @@ def render() -> str:
     zones = _collect(MODULES / "ZoneConfig.luau", "zones", ZONE_FIELDS)
     ranks = _collect(MODULES / "RankConfig.luau", "ranks", RANK_FIELDS)
 
-    mobs = _goblin_rows(MODULES / "MobConfig.luau")
+    mobs = _thief_rows(MODULES / "MobConfig.luau")
     mob_source = (MODULES / "MobConfig.luau").read_text()
-    population = _goblin_constant(mob_source, "Population")
-    respawn = _goblin_constant(mob_source, "RespawnSeconds")
+    population = _thief_constant(mob_source, "Population")
+    respawn = _thief_constant(mob_source, "RespawnSeconds")
 
     training = ROOT / "src" / "ServerScriptService" / "Core" / "TrainingService.luau"
     combo_goal = _constant(training, "COMBO_GOAL")
@@ -228,8 +228,8 @@ def render() -> str:
         "",
         f"BalanceInputs.COMBO_GOAL = {_number(combo_goal)}",
         f"BalanceInputs.MAX_COMBO_MULTIPLIER = {_number(max_combo)}",
-        f"BalanceInputs.GOBLIN_POPULATION = {_number(population)}",
-        f"BalanceInputs.GOBLIN_RESPAWN_SECONDS = {_number(respawn)}",
+        f"BalanceInputs.THIEF_POPULATION = {_number(population)}",
+        f"BalanceInputs.THIEF_RESPAWN_SECONDS = {_number(respawn)}",
         "",
         "BalanceInputs.Equipment = {",
     ]
@@ -264,7 +264,7 @@ def render() -> str:
             )
         )
 
-    lines += ["}", "", "BalanceInputs.Goblins = {"]
+    lines += ["}", "", "BalanceInputs.Thieves = {"]
     for row in mobs:
         lines.append(
             '\t{{ ZoneId = "{zone}", Health = {health}, Damage = {damage}, '

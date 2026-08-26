@@ -348,37 +348,44 @@ local function drawQuest(parent: GuiObject, color: Color3, hole: Color3)
 end
 
 --[[
-	Goblin — a head with pointed ears and two knocked-out eyes.
+	Thief — a hooded head with the face covered and one lit eye-slit.
 
-	Everything here is chosen to survive being 28 pixels wide on a map. The ears are
-	rotated squares rather than real triangles, because at that size a triangle and a
-	tilted square are the same picture and one of them is a single frame. The eyes are
-	knockouts rather than dark shapes so the glyph reads on a light paper map and on a
-	dark HUD tile without being redrawn.
+	Everything here is chosen to survive being 28 pixels wide on a map. The hood is a
+	rounded square drawn behind and slightly above the head, because at that size a real
+	cowl silhouette and a rounded square are the same picture and one of them is a single
+	frame. The slit is a knockout rather than a dark shape so the glyph reads on a light
+	paper map and on a dark HUD tile without being redrawn.
 ]]
-local function drawGoblin(parent: GuiObject, color: Color3, hole: Color3)
-	-- Ears first, so the head overlaps their inner corners and they read as attached.
-	shape(parent, "EarLeft", 0.16, 0.38, 0.26, 0.26, color, 45, 0.12)
-	shape(parent, "EarRight", 0.84, 0.38, 0.26, 0.26, color, 45, 0.12)
+local function drawThief(parent: GuiObject, color: Color3, hole: Color3)
+	-- Hood first, so the face overlaps its lower edge and reads as sitting inside it.
+	shape(parent, "Hood", 0.5, 0.44, 0.78, 0.72, color, 0, 0.42)
+	-- The peak is what stops the hood reading as a helmet.
+	shape(parent, "Peak", 0.5, 0.16, 0.5, 0.22, color, 0, 0.3)
 
-	local head = shape(parent, "Head", 0.5, 0.5, 0.62, 0.58, color, 0, 0.32)
-	knockout(head, "EyeLeft", 0.32, 0.4, 0.18, 0.22, hole, 0, 1)
-	knockout(head, "EyeRight", 0.68, 0.4, 0.18, 0.22, hole, 0, 1)
-	-- One wide gap for the mouth. A row of separate teeth vanishes at map size.
-	knockout(head, "Mouth", 0.5, 0.74, 0.44, 0.1, hole, 0, 0.4)
+	local face = shape(parent, "Face", 0.5, 0.56, 0.5, 0.46, hole, 0, 0.3)
+	-- One slit, the way the rig wears one. Two eyes here would read as the old goblin.
+	knockout(face, "Slit", 0.5, 0.36, 0.72, 0.16, color, 0, 0.4)
 end
 
 --[[
-	Boss goblin — the same head, horned.
+	Brute — head and shoulders, and the shoulders are the whole glyph.
 
-	Deliberately built from the goblin rather than beside it: the two icons have to be
-	recognisably the same creature, or the map stops saying "this is the big one" and
-	starts saying "this is something else".
+	Deliberately *not* built from the thief. The two used to be the same head with horns
+	added, because they were the same creature at two sizes; they are not any more, and
+	the map has to say "this is a different thing" rather than "this is the big one".
+
+	At map size a muscular figure is legible only as a silhouette ratio, so this is a
+	small circle on a very wide trapezoid and nothing else.
 ]]
-local function drawGoblinBoss(parent: GuiObject, color: Color3, hole: Color3)
-	shape(parent, "HornLeft", 0.22, 0.14, 0.16, 0.3, color, 20, 0.3)
-	shape(parent, "HornRight", 0.78, 0.14, 0.16, 0.3, color, -20, 0.3)
-	drawGoblin(parent, color, hole)
+local function drawBrute(parent: GuiObject, color: Color3, hole: Color3)
+	-- Shoulders first and wide: the ratio between these and the head is the read.
+	shape(parent, "Shoulders", 0.5, 0.72, 0.96, 0.44, color, 0, 0.3)
+	shape(parent, "TrapLeft", 0.26, 0.52, 0.3, 0.22, color, 18, 0.2)
+	shape(parent, "TrapRight", 0.74, 0.52, 0.3, 0.22, color, -18, 0.2)
+
+	local head = shape(parent, "Head", 0.5, 0.34, 0.38, 0.38, color, 0, 0.5)
+	knockout(head, "EyeLeft", 0.32, 0.46, 0.16, 0.16, hole, 0, 1)
+	knockout(head, "EyeRight", 0.68, 0.46, 0.16, 0.16, hole, 0, 1)
 end
 
 local ICONS: { [string]: Builder } = {
@@ -402,8 +409,8 @@ local ICONS: { [string]: Builder } = {
 	Potion = drawPotion,
 	Vip = drawVip,
 	Quest = drawQuest,
-	Goblin = drawGoblin,
-	GoblinBoss = drawGoblinBoss,
+	Thief = drawThief,
+	Brute = drawBrute,
 	-- The dumbbell is the token mark throughout the HUD, and Train already is one.
 	-- Aliased rather than copied so the two cannot drift apart in a restyle.
 	Token = drawTrain,

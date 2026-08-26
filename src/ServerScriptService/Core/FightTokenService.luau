@@ -75,7 +75,7 @@ function FightTokenService:Start()
 	end)
 
 	-- Field monsters are the reliable, non-adversarial way to earn Fight Tokens. PvP
-	-- pays better per kill but needs a victim who is worth killing; goblins are always
+	-- pays better per kill but needs a victim who is worth killing; thieves are always
 	-- there, which is what stops the physique ladder depending on other players.
 	--
 	-- Bosses deliberately pay nothing here: their reward is a Token lump, handled by
@@ -85,7 +85,7 @@ function FightTokenService:Start()
 			return
 		end
 		-- Scaled by the killer's physique class, capped at what this tier is worth so a
-		-- high class cannot farm starter goblins for the rest of its own ladder.
+		-- high class cannot farm starter thieves for the rest of its own ladder.
 		local data = DataService:GetData(killer)
 		local classLevel = if data ~= nil then data.MuscleClassLevel else 0
 		local reward = (mob.FightTokenReward or 0) * MobConfig.RewardMultiplier(mob, classLevel)

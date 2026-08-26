@@ -529,7 +529,7 @@ end
 	2,555-token ladder was worth about four minutes of farming.
 
 	The chain is: a punch deals the attacker's Arms one-for-one, a balanced player's Arms
-	is a fifth of their total Power, and a goblin's health is set per tier. That gives
+	is a fifth of their total Power, and a thief's health is set per tier. That gives
 	time-to-kill; population and respawn give how many are available; the tier's reward
 	gives the rate.
 ]]
@@ -538,8 +538,8 @@ local PUNCHES_PER_CHAIN = 3
 local RETARGET_SECONDS = 0.5
 local TARGET_MINUTES = 12
 
-local function goblinFor(zoneId: string)
-	for _, row in Inputs.Goblins do
+local function thiefFor(zoneId: string)
+	for _, row in Inputs.Thieves do
 		if row.ZoneId == zoneId then
 			return row
 		end
@@ -552,7 +552,7 @@ local function bestFieldAt(power: number)
 	local best, bestZone = nil, nil
 	for _, zone in Inputs.Zones do
 		if power >= zone.RequiredPower then
-			local row = goblinFor(zone.Id)
+			local row = thiefFor(zone.Id)
 			if row ~= nil and (best == nil or row.FightTokenReward > best.FightTokenReward) then
 				best, bestZone = row, zone
 			end
@@ -572,7 +572,7 @@ local function tokensPerMinute(power: number): (number, string, number)
 	-- With six in a field a kill is normally limited by how fast you can swing. The
 	-- respawn only binds once you clear the field faster than it refills, which is
 	-- exactly the case a player who has out-levelled a tier is in.
-	local fieldCycle = Inputs.GOBLIN_RESPAWN_SECONDS / Inputs.GOBLIN_POPULATION
+	local fieldCycle = Inputs.THIEF_RESPAWN_SECONDS / Inputs.THIEF_POPULATION
 	local perKill = math.max(killSeconds, fieldCycle)
 	return 60 / perKill * row.FightTokenReward, zone.Id, perKill
 end

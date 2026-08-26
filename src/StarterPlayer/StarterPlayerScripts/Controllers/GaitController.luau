@@ -73,7 +73,7 @@ type Entry = {
 
 local active: { [Model]: Entry } = {}
 -- Mob models to consider each frame, kept as a set rather than re-read from the tag
--- every frame. A field of six goblins and a boss are all walking at once.
+-- every frame. A field of six thieves and a boss are all walking at once.
 local mobs: { [Model]: boolean } = {}
 
 local function bindJoints(character: Model): { Bound }
@@ -391,8 +391,8 @@ function GaitController:Start()
 	-- Player, and a rig without the joints a gait names binds nothing and is skipped.
 	-- FlinchController takes mobs the same way and for the same reason.
 	--
-	-- Their speeds land where you would want: a goblin at 20 sits just past a walk and
-	-- a boss at 32 is a third of the way to the dash silhouette, so goblins jog in and
+	-- Their speeds land where you would want: a thief at 20 sits just past a walk and
+	-- a boss at 32 is a third of the way to the dash silhouette, so thieves jog in and
 	-- a boss charges, off the same two poses the player uses.
 	local function watchMob(instance: Instance)
 		if instance:IsA("Model") then

@@ -141,7 +141,7 @@ local Punch: Types.Ability = {
 		context.AttackerCharacter:SetAttribute(StrikeConfig.STRIKE_ATTRIBUTE, workspace:GetServerTimeNow())
 
 		-- Everything past here is the hit, which needs something to hit. CombatTarget
-		-- rather than Target: a punch lands on a goblin exactly as it lands on a
+		-- rather than Target: a punch lands on a mob exactly as it lands on a
 		-- player, and ApplyDamageToTarget is what knows the difference.
 		local target = context.CombatTarget
 		if target == nil then

@@ -246,7 +246,7 @@ function FlinchController:Start()
 		self:_track(player)
 	end)
 
-	-- Mobs flinch too. CombatService stamps any model it damages, and a goblin that
+	-- Mobs flinch too. CombatService stamps any model it damages, and a thief that
 	-- stood perfectly still while being beaten would be the one thing in the fight not
 	-- reacting. A rig without the joints a flinch names simply binds nothing and is
 	-- skipped, so this costs nothing for a mob built out of parts.

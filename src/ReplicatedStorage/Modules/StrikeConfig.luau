@@ -407,7 +407,7 @@ local HEAVY_FOLLOW = combatPose(Vector3.new(0, 0, -0.7), {
 	The monster swings. Two of them, both authored heavier and slower than anything a
 	player throws.
 
-	A goblin has no combat training and no reach discipline: it winds one arm back past
+	A thief has no combat training and no reach discipline: it winds one arm back past
 	its own shoulder line, drops its guard completely and throws its whole body at you.
 	That readability is the point — the wind-up is the only warning a player gets, and it
 	has to be legible from behind as well as from in front.
@@ -749,7 +749,7 @@ local strikes: { Strike } = {
 		},
 	},
 	{
-		-- The ordinary monster swing. Slower than a player's jab on purpose: a goblin
+		-- The ordinary mob swing. Slower than a player's jab on purpose: a thief
 		-- landing a hit should feel like something you let happen.
 		Id = "MobSwing",
 		Duration = 1.1,

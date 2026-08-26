@@ -14,7 +14,7 @@
 	very late one takes a session, which is the pacing a repeating quest wants.
 
 	The kill step grows more slowly than the training steps, because a kill costs travel
-	and a fight rather than time on a machine. Twelve goblins is a chore; the curve is
+	and a fight rather than time on a machine. Twelve thieves is a chore; the curve is
 	tuned so it reaches that only after many rotations.
 ]]
 

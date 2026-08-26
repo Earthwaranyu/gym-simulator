@@ -18,8 +18,8 @@ local BalanceInputs = {}
 
 BalanceInputs.COMBO_GOAL = 50
 BalanceInputs.MAX_COMBO_MULTIPLIER = 2
-BalanceInputs.GOBLIN_POPULATION = 6
-BalanceInputs.GOBLIN_RESPAWN_SECONDS = 12
+BalanceInputs.THIEF_POPULATION = 6
+BalanceInputs.THIEF_RESPAWN_SECONDS = 12
 
 BalanceInputs.Equipment = {
 	{ Id = "BenchPress", StatId = "Chest", BaseGain = 1.8, RepInterval = 1.8, UnlockPower = 0 },
@@ -85,7 +85,7 @@ BalanceInputs.Ranks = {
 	{ Id = "Godlike", MinPower = 1000000000000000 },
 }
 
-BalanceInputs.Goblins = {
+BalanceInputs.Thieves = {
 	{ ZoneId = "Garage", Health = 15, Damage = 8, FightTokenReward = 1 },
 	{ ZoneId = "Iron", Health = 80000, Damage = 8000, FightTokenReward = 2 },
 	{ ZoneId = "Powerhouse", Health = 400000, Damage = 40000, FightTokenReward = 4 },

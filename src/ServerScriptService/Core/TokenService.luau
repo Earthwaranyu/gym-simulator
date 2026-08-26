@@ -193,7 +193,7 @@ function TokenService:Start()
 		if mob.Kind ~= "Boss" then
 			return
 		end
-		-- Same class scaling and same tier cap the goblins use, through the same
+		-- Same class scaling and same tier cap the thieves use, through the same
 		-- function, so the two currencies cannot drift apart.
 		local data = DataService:GetData(killer)
 		local classLevel = if data ~= nil then data.MuscleClassLevel else 0

@@ -474,7 +474,7 @@ end
 	world can do to you.
 
 	Two differences from the player-versus-player path, both deliberate. Core is not
-	consulted at all — reflecting onto a goblin would need a damage path in the opposite
+	consulted at all — reflecting onto a mob would need a damage path in the opposite
 	direction for no gameplay gain. And Back can never block the hit outright: at worst
 	it stops MAX_ENVIRONMENT_BLOCK of it, so a monster whose tier you have left behind
 	becomes trivial rather than harmless.

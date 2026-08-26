@@ -1528,7 +1528,7 @@ def validate_station_zone_volumes(
 
 # What a monster's swing is worth, as a share of the health a player at that tier
 # actually has. These are the shares the rows are written from.
-GOBLIN_DAMAGE_SHARE = 0.08
+THIEF_DAMAGE_SHARE = 0.08
 BOSS_DAMAGE_SHARE = 0.25
 
 # How many punches a monster is worth, against a player entering its tier.
@@ -1536,9 +1536,9 @@ BOSS_DAMAGE_SHARE = 0.25
 # This is the only unit that means anything for monster health: a punch does damage
 # equal to the attacker's Arms, and a tier's entry stat IS their Arms at that point.
 # Health used to be the tier gate over twenty, which sounds like a difficulty curve and
-# is not -- it made every goblin above the starter field die in a single punch and every
+# is not -- it made every thief above the starter field die in a single punch and every
 # boss in three.
-GOBLIN_PUNCHES = 8
+THIEF_PUNCHES = 8
 BOSS_PUNCHES = 60
 PUNCH_TOLERANCE = 0.15
 # Rounded rows will not hit the share exactly; this is wide enough for that and far
@@ -1570,7 +1570,7 @@ def read_mob_rows() -> tuple[list[dict[str, Any]], dict[str, float], dict[str, f
     """
     source = MOB_CONFIG_PATH.read_text(encoding="utf-8")
     patterns = {
-        "Normal": r'goblin\("(\w+)",\s*"([^"]+)",\s*([\d_.e+]+),\s*([\d_.e+]+),\s*([\d_.e+]+)\)',
+        "Normal": r'thief\("(\w+)",\s*"([^"]+)",\s*([\d_.e+]+),\s*([\d_.e+]+),\s*([\d_.e+]+)\)',
         "Boss": r'boss\("(\w+)",\s*"([^"]+)",\s*([\d_.e+]+),\s*([\d_.e+]+),\s*([\d_.e+]+)\)',
     }
     rows: list[dict[str, Any]] = []
@@ -1641,7 +1641,7 @@ def validate_mob_rig(validator: Validator) -> None:
             f"ornament {name} hangs off {parent}, which is not a part of the rig",
         )
 
-    # The point of using the stock R15 names is that the player's gait drives a goblin
+    # The point of using the stock R15 names is that the player's gait drives a thief
     # untranslated. If a rename ever breaks that, the mob simply stops walking.
     gait_source = ROOT / "src" / "ReplicatedStorage" / "Modules" / "GaitConfig.luau"
     listed = re.search(r"GaitConfig\.Joints = \{(.*?)\n\}", gait_source.read_text(encoding="utf-8"), re.S)
@@ -1750,7 +1750,7 @@ def validate_mob_roster(validator: Validator) -> None:
     tiers = [zone for zone in gates if zone in tier_cap]
     validator.check(
         len(rows) == 2 * len(tiers),
-        f"expected one goblin and one boss per active tier ({2 * len(tiers)}), found {len(rows)}",
+        f"expected one thief and one boss per active tier ({2 * len(tiers)}), found {len(rows)}",
     )
 
     seen: Counter[str] = Counter(f"{row['zone']}{row['kind']}" for row in rows)
@@ -1777,7 +1777,7 @@ def validate_mob_roster(validator: Validator) -> None:
 
         player_health = 100 + entry_stat * 10
         share = row["damage"] / player_health
-        want = BOSS_DAMAGE_SHARE if kind == "Boss" else GOBLIN_DAMAGE_SHARE
+        want = BOSS_DAMAGE_SHARE if kind == "Boss" else THIEF_DAMAGE_SHARE
         validator.check(
             abs(share - want) <= DAMAGE_SHARE_TOLERANCE,
             f"{label} deals {share:.2%} of tier health, wanted about {want:.0%}",
@@ -1806,22 +1806,22 @@ def validate_mob_roster(validator: Validator) -> None:
     # single number is right across all of it -- it is hand-picked to be beatable at one
     # damage a punch.
     for zone in tiers:
-        goblin = next((r for r in rows if r["zone"] == zone and r["kind"] == "Normal"), None)
+        thief = next((r for r in rows if r["zone"] == zone and r["kind"] == "Normal"), None)
         boss = next((r for r in rows if r["zone"] == zone and r["kind"] == "Boss"), None)
-        if goblin is None or boss is None:
-            validator.fail(f"{zone} is missing a goblin or a boss")
+        if thief is None or boss is None:
+            validator.fail(f"{zone} is missing a thief or a boss")
             continue
 
         entry_stat = gates[zone][0]
         if entry_stat <= 0:
             validator.check(
-                goblin["health"] <= 30,
-                f"the starter goblin has {goblin['health']:g} health, too much to beat at "
+                thief["health"] <= 30,
+                f"the starter thief has {thief['health']:g} health, too much to beat at "
                 f"one damage a punch",
             )
             continue
 
-        for row, wanted in ((goblin, GOBLIN_PUNCHES), (boss, BOSS_PUNCHES)):
+        for row, wanted in ((thief, THIEF_PUNCHES), (boss, BOSS_PUNCHES)):
             punches = row["health"] / entry_stat
             validator.check(
                 abs(punches - wanted) <= wanted * PUNCH_TOLERANCE,
@@ -1847,7 +1847,7 @@ def validate_mob_roster(validator: Validator) -> None:
 
     # Shared behaviour, read off the two factories rather than the rows.
     #
-    # Speed is checked against the player's, not against zero. A goblin ran at 14 and a
+    # Speed is checked against the player's, not against zero. A thief ran at 14 and a
     # boss at 12 while a player walks at 16, so neither could close on anyone who was
     # moving and a whole arena read as empty. "Faster than nothing" is not the contract;
     # "able to catch someone walking away" is.
@@ -1856,7 +1856,7 @@ def validate_mob_roster(validator: Validator) -> None:
 
     source = MOB_CONFIG_PATH.read_text(encoding="utf-8")
     speeds: dict[str, float] = {}
-    for factory in ("goblin", "boss"):
+    for factory in ("thief", "boss"):
         body = re.search(
             r"local function " + factory + r"\(.*?\n\treturn \{(.*?)\n\t\}", source, re.S
         )
@@ -1881,9 +1881,9 @@ def validate_mob_roster(validator: Validator) -> None:
         )
 
     validator.check(
-        speeds.get("boss", 0) > speeds.get("goblin", 0),
-        f"a boss at {speeds.get('boss', 0):g} must outrun its field goblins at "
-        f"{speeds.get('goblin', 0):g}",
+        speeds.get("boss", 0) > speeds.get("thief", 0),
+        f"a boss at {speeds.get('boss', 0):g} must outrun its field thieves at "
+        f"{speeds.get('thief', 0):g}",
     )
 
 

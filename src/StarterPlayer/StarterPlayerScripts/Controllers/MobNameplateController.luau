@@ -16,7 +16,7 @@
 	monster's health reads exactly like a player's.
 
 	Everything is event-driven. There can be forty-nine of these alive at once — six
-	goblins in each of seven fields, plus the bosses — and polling that many humanoids
+	thieves in each of seven fields, plus the bosses — and polling that many humanoids
 	every frame to redraw a bar that mostly has not changed is a cost with nothing to show
 	for it.
 ]]
@@ -39,13 +39,13 @@ local HEADROOM = 1.4
 -- nameplate allows for a character.
 local BIND_TIMEOUT = 10
 
--- A goblin only matters once you are close enough to be in trouble. A boss has to be
+-- A thief only matters once you are close enough to be in trouble. A boss has to be
 -- legible from the rim of its own arena, which is seventy studs from the middle, and
 -- from far enough out to decide whether to walk in at all.
-local GOBLIN_DISTANCE = 150
+local THIEF_DISTANCE = 150
 local BOSS_DISTANCE = 250
 
-local GOBLIN_PLATE = Vector2.new(200, 52)
+local THIEF_PLATE = Vector2.new(200, 52)
 local BOSS_PLATE = Vector2.new(280, 68)
 
 type Plate = {
@@ -81,7 +81,7 @@ function MobNameplateController:_bind(model: Instance)
 	-- a boss is created wherever its timer says, usually nowhere near you, so with
 	-- streaming it does not reach this client until you travel to the arena — and a
 	-- model that streams in delivers its descendants over several frames. Looking once
-	-- and returning meant every boss went bar-less for its entire life, while goblins
+	-- and returning meant every boss went bar-less for its entire life, while thieves
 	-- were fine because a field only ever spawns one within four hundred studs of a
 	-- player, well inside the streaming radius, arriving complete.
 	local head = model:WaitForChild("Head", BIND_TIMEOUT)
@@ -104,19 +104,19 @@ function MobNameplateController:_bind(model: Instance)
 	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 
 	local boss = definition.Kind == "Boss"
-	local size = if boss then BOSS_PLATE else GOBLIN_PLATE
+	local size = if boss then BOSS_PLATE else THIEF_PLATE
 
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "GymMobPlate"
 	gui.Adornee = head
 	gui.Size = UDim2.fromOffset(size.X, size.Y)
-	-- Measured off the whole model, because a boss is 2.1 times a goblin and a flat
+	-- Measured off the whole model, because a boss is 2.1 times a thief and a flat
 	-- offset would sit inside its horns.
 	gui.StudsOffsetWorldSpace = UI.HeadroomOffset(model, head, HEADROOM * definition.Scale)
 	-- Occluded by walls, matching the player plates. Reading a boss's health through the
 	-- side of its arena would be a free wallhack.
 	gui.AlwaysOnTop = false
-	gui.MaxDistance = if boss then BOSS_DISTANCE else GOBLIN_DISTANCE
+	gui.MaxDistance = if boss then BOSS_DISTANCE else THIEF_DISTANCE
 	gui.Parent = head
 
 	local name = UI.Label("Name", gui)

@@ -5,7 +5,7 @@
 	The project's asset rule allows nothing anyone else drew, which rules out every
 	hair accessory on the platform. So a style is a handful of blocks, balls and wedges
 	welded to the head, described here and built by AppearanceController — the same
-	technique MobRigConfig uses to make a goblin out of parts.
+	technique MobRigConfig uses to make a thief out of parts.
 
 	**Offsets and sizes are fractions of the head part, not studs.** The body grows: a
 	trained player's head is bigger than a newbie's, and BodyMeshController rescales the

@@ -1356,7 +1356,7 @@ function VfxController:Start()
 	end)
 
 	-- Mobs get impacts for the same reason they get flinches: CombatService stamps every
-	-- model it damages, and hitting a goblin should look like hitting something.
+	-- model it damages, and hitting a mob should look like hitting something.
 	for _, model in CollectionService:GetTagged(MobConfig.MOB_TAG) do
 		if model:IsA("Model") then
 			self:_watch(model)

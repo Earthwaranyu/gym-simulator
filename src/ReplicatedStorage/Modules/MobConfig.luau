@@ -1,6 +1,6 @@
 --!strict
 --[[
-	MobConfig — the fourteen monsters, one field goblin and one boss per tier.
+	MobConfig — the fourteen hostiles, one field thief and one boss per tier.
 
 	Health and damage are written out rather than computed from the zone's
 	RequiredPower. A formula would look tidier and be far worse to tune: these numbers
@@ -14,14 +14,14 @@
 	  * Health is counted in PUNCHES, because that is the only unit that means anything
 	    here: a player's punch does damage equal to their Arms, so a monster's health is
 	    chosen as a multiple of the Arms a player has when they first enter the tier. A
-	    goblin takes eight and a boss sixty.
+	    thief takes eight and a boss sixty.
 
 	    It used to be the tier's gate divided by twenty, which sounds similar and is not:
-	    the gate IS a player's Arms at that point, so every goblin above the starter
+	    the gate IS a player's Arms at that point, so every thief above the starter
 	    field died in a single punch and every boss in three. A whole fight lasted less
 	    than a second and none of it was felt. Damage from a punch is the attacker's Arms stat one-for-one.
 	  * Damage is a fixed SHARE of the health a player at that tier will have
-	    (Formulas.MaxHealth is 100 + Chest * 10): a goblin takes about 8% a swing and
+	    (Formulas.MaxHealth is 100 + Chest * 10): a thief takes about 8% a swing and
 	    kills an unprotected tier-appropriate player in twelve, and a boss takes 25% and
 	    kills in four. Against the eighteen seconds of punching a boss costs, that means
 	    it out-trades you unless you dodge the heavy — which is the whole reason the
@@ -33,15 +33,15 @@
 	    Back is what blunts it, against the tier's AttackStat below; Chest is what gives
 	    you the health to spend. That asymmetry is the point: Chest and Back are what
 	    make you survive here.
-	  * A boss is roughly twelve field goblins of health and three of damage, which is
+	  * A boss is roughly twelve field thieves of health and three of damage, which is
 	    what makes it a thing you come back for on the timer rather than something you
 	    clear on the way past.
 
-	Rewards double with every tier, on both currencies. A goblin one tier up pays twice
+	Rewards double with every tier, on both currencies. A thief one tier up pays twice
 	the Fight Tokens; a boss one tier up pays twice the Tokens. That matches the
 	multiplier ladder and the physique ladder, which also double, so a fight is worth
 	about the same fraction of your next purchase wherever you are on the map. Note the
-	two are genuinely different currencies: goblins pay FightTokenReward, spent on
+	two are genuinely different currencies: thieves pay FightTokenReward, spent on
 	physique transformations, and bosses pay TokenReward, spent on stat multipliers.
 	Bosses are the only combat source of the multiplier currency.
 
@@ -91,7 +91,7 @@ export type Mob = {
 	UltimateRadius: number?,
 	UltimateMultiplier: number?,
 	Color: Color3,
-	-- Multiplies the base goblin build. Bosses are visibly bigger from across the arena.
+	-- Multiplies the base build. Bosses are visibly bigger from across the arena.
 	Scale: number,
 	-- The highest physique-class bonus this monster's reward will accept. See TIER_CAP.
 	RewardCap: number,
@@ -152,10 +152,13 @@ local TIER_ATTACK: { [string]: number } = {
 	Storm = 500e6,
 }
 
-local GOBLIN_GREEN = Color3.fromRGB(96, 138, 61)
-local BOSS_RED = Color3.fromRGB(150, 46, 42)
+-- Dark cloth. Every part of a thief is this colour pushed toward black by its Shade,
+-- which is what lets a hood, a mask and a satchel come from one field.
+local THIEF_CLOTH = Color3.fromRGB(52, 58, 74)
+-- Skin. The brute's shorts and wraps fall out of the same ramp at the dark end.
+local BRUTE_SKIN = Color3.fromRGB(198, 152, 114)
 
-local function goblin(
+local function thief(
 	zoneId: string,
 	displayName: string,
 	health: number,
@@ -163,7 +166,7 @@ local function goblin(
 	fightTokens: number
 ): Mob
 	return {
-		Id = `{zoneId}Goblin`,
+		Id = `{zoneId}Thief`,
 		ZoneId = zoneId,
 		Kind = "Normal",
 		DisplayName = displayName,
@@ -172,7 +175,7 @@ local function goblin(
 		AttackCooldown = 1.6,
 		AttackRange = 9,
 		-- Faster than a walking player (Formulas.BASE_WALK_SPEED, 16) and slower than a
-		-- base sprint (24). Ignore a goblin and it catches you; decide to leave and it
+		-- base sprint (24). Ignore a thief and it catches you; decide to leave and it
 		-- cannot stop you. It used to be 14, which meant it lost ground to anyone
 		-- strolling away and was scenery rather than a threat.
 		WalkSpeed = 20,
@@ -181,7 +184,7 @@ local function goblin(
 		Population = 6,
 		RespawnSeconds = 12,
 		FightTokenReward = fightTokens,
-		Color = GOBLIN_GREEN,
+		Color = THIEF_CLOTH,
 		Scale = 1,
 		RewardCap = TIER_CAP[zoneId] or 1,
 		AttackStat = TIER_ATTACK[zoneId] or 1,
@@ -208,7 +211,7 @@ local function boss(zoneId: string, displayName: string, health: number, damage:
 		TokenReward = tokens,
 		-- The rhythm of a boss fight. The wind-up is long enough to see, recognise and
 		-- walk out of — that is the whole move. A boss that simply hit harder would be
-		-- a bigger goblin; one you have to read turns the fight into a conversation.
+		-- a bigger thief; one you have to read turns the fight into a conversation.
 		UltimateCooldown = 12,
 		UltimateWindup = 1.3,
 		UltimateRadius = 34,
@@ -220,7 +223,7 @@ local function boss(zoneId: string, displayName: string, health: number, damage:
 		-- Ten minutes of the thirty-minute cycle. Long enough to travel to, short
 		-- enough that an unfought boss is gone well before the next one is due.
 		DespawnSeconds = 600,
-		Color = BOSS_RED,
+		Color = BRUTE_SKIN,
 		Scale = 2.1,
 		RewardCap = TIER_CAP[zoneId] or 1,
 		AttackStat = TIER_ATTACK[zoneId] or 1,
@@ -229,32 +232,32 @@ end
 
 local mobs: { Mob } = {
 	-- Garage (gate 0). Deliberately beatable by someone who has trained nothing:
-	-- this is where a player learns that monsters hit back.
-	goblin("Garage", "Runt Goblin", 15, 8, 1),
+	-- this is where a player learns that the street hits back.
+	thief("Garage", "Alley Thief", 15, 8, 1),
 	boss("Garage", "Scrap Warden", 400, 25, 10),
 
 	-- Iron (gate 50K)
-	goblin("Iron", "Park Goblin", 80_000, 8_000, 2),
+	thief("Iron", "Park Thief", 80_000, 8_000, 2),
 	boss("Iron", "Iron Warden", 600_000, 25_000, 20),
 
 	-- Powerhouse (gate 250K)
-	goblin("Powerhouse", "Dock Goblin", 400_000, 40_000, 4),
+	thief("Powerhouse", "Dock Thief", 400_000, 40_000, 4),
 	boss("Powerhouse", "Tidebreaker", 3e6, 125_000, 40),
 
 	-- Strongman (gate 1M)
-	goblin("Strongman", "Freight Goblin", 1.6e6, 160_000, 8),
+	thief("Strongman", "Freight Thief", 1.6e6, 160_000, 8),
 	boss("Strongman", "Yard Colossus", 12e6, 500_000, 80),
 
 	-- Titan (gate 5M)
-	goblin("Titan", "Plaza Goblin", 8e6, 800_000, 16),
+	thief("Titan", "Plaza Thief", 8e6, 800_000, 16),
 	boss("Titan", "Titan of the Square", 60e6, 2.5e6, 160),
 
 	-- Skydeck (gate 25M)
-	goblin("Skydeck", "Rooftop Goblin", 40e6, 4e6, 32),
+	thief("Skydeck", "Rooftop Thief", 40e6, 4e6, 32),
 	boss("Skydeck", "Skydeck Sentinel", 300e6, 12.5e6, 320),
 
 	-- Storm (gate 250M). The flight-only tier, and the hardest thing in the game.
-	goblin("Storm", "Storm Goblin", 400e6, 40e6, 64),
+	thief("Storm", "Storm Thief", 400e6, 40e6, 64),
 	boss("Storm", "Stormcaller", 3e9, 125e6, 640),
 }
 
@@ -293,10 +296,10 @@ end
 --[[
 	What one kill is worth right now, as a multiplier on the reward written in the row.
 
-	**Bosses only.** A goblin always pays its flat tier reward, however grand the killer
-	is, because goblins pay Fight Tokens and Fight Tokens buy physique classes — so a
+	**Bosses only.** A thief always pays its flat tier reward, however grand the killer
+	is, because thieves pay Fight Tokens and Fight Tokens buy physique classes — so a
 	class that multiplied them would be funding its own ladder. It is not a small effect:
-	a class-2 player one-shots Powerhouse goblins, and at a scaled 16 a kill, six to a
+	a class-2 player one-shots Powerhouse thieves, and at a scaled 16 a kill, six to a
 	field on a twelve-second respawn, the entire 2,555 chain pays for itself in about
 	five minutes. The tier cap cannot catch it either, since a player farms the very tier
 	their class is capped at. Tying Fight Token income to *where* you fight rather than

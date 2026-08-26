@@ -2413,3 +2413,45 @@ traffic exists:
       is sent. Verified by clicking `+` ten times in a row — the value clamped to 100, no
       rejection toast appeared, and the level survived leaving the tab and returning, so the
       one collapsed write did land.
+
+- [x] 179. **The goblins became thieves and the bosses became brutes.** A reskin, and almost
+      entirely a data edit, because MobRigConfig already describes a body as Bones, Joints
+      and Decor and MobService only interprets it. That was the payoff of writing the rig as
+      data: two new creatures needed no new code.
+      **The brute stopped being a zoomed goblin.** `BOSS` was literally `Bones = GOBLIN.Bones,
+      Joints = GOBLIN.Joints` with horns and pauldrons bolted on at 2.1x — which is a bigger
+      goblin however much you decorate it, because proportion is what a silhouette is read
+      by. It owns its own skeleton now: a very wide chest, a waist that does not follow it,
+      arms thicker than the thief's legs, and a head deliberately left at ordinary size.
+      That last one is the whole trick — everything is bigger at 2.1x, so muscle can only be
+      read in the ratio of shoulders to skull. The idea is borrowed from PhysiqueConfig
+      (girth on X and Z, leave Y alone); only the idea, because that system deforms an
+      EditableMesh and is capped at a handful of instances per client, so it could never
+      dress a field.
+      The thief is ordinary human proportions with the read carried by the hood and the
+      covered face: the goblin's 2.1-wide chest was most of why it looked like a creature.
+      One lit eye-slit rather than two glowing eyeballs — a pair of neon spheres is a
+      monster, a band of light under a hood is a person hiding their face.
+      **What could not change is the naming contract**, and it is why a reskin was safe at
+      all. Every joint keeps its stock R15 name, because GaitController, StrikeController
+      and FlinchController drive mobs through the same PosePlayback the player uses purely
+      because those names match. `Head` stays because MobNameplateController does
+      `WaitForChild("Head")` and renaming it would silently delete every health bar.
+      `RightLowerArm` stays because `VfxController.handOf` falls through to it, so the boss
+      wind-up VFX hangs there. Verified rather than assumed: all eleven joints animate on a
+      live thief, and the nameplate reads ALLEY THIEF above it.
+      Renaming was safe because mob ids are runtime-only — a model attribute and a travel
+      id — and never reach a profile. `goblin(...)` is `thief(...)`, ids are `{Zone}Thief`,
+      and the fourteen display names moved with them.
+      **The rename reached further than the mobs.** `extract_balance.py` and
+      `validate_gym.py` both regex for `goblin\\(` — they would have silently found zero mob
+      rows and validated nothing. Both moved, `_balance_inputs.luau` was regenerated, and
+      `simulate.luau` follows the renamed constants. The validator passes.
+      Map pins were redrawn: the boss glyph used to be the goblin's head plus horns because
+      they were the same creature at two sizes, and they are not any more — it is now a
+      small head on very wide shoulders, which is the only thing that reads as muscle at
+      twenty-eight pixels.
+      One correction after looking at it in game: the two pecs were 1.08 wide at 0.54 out,
+      which put their inner edges together and made a single flat plate across the chest —
+      a breastplate, not a chest. Narrower and further apart, they leave a 0.67-stud gap and
+      the sternum survives.

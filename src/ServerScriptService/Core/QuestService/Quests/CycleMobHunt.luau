@@ -7,7 +7,7 @@
 	kills against hundreds of stat points — because it costs a trip and a real fight
 	rather than time spent standing on a machine.
 
-	Bosses count. They are far harder than the goblins the quest is asking for, so
+	Bosses count. They are far harder than the thieves the quest is asking for, so
 	refusing them would be a trap: a player who happens to fell a boss during this step
 	would watch it award nothing.
 
@@ -25,7 +25,7 @@ local Types = require(ReplicatedStorage.Modules.Types)
 local Quest: Types.Quest = {
 	Id = "CycleMobHunt",
 	DisplayName = "Culling",
-	Description = "Defeat goblins in a monster field.",
+	Description = "Defeat thieves in a hostile field.",
 	Category = "Combat",
 	CycleOrder = 3,
 

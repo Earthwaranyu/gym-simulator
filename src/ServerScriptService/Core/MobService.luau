@@ -5,7 +5,7 @@
 	Two kinds of site, both authored as invisible tagged markers in the generated world
 	(see mob_sites in scripts/build_gym.py):
 
-	  * A mob field per tier, kept populated with a fixed number of goblins that respawn
+	  * A mob field per tier, kept populated with a fixed number of thieves that respawn
 	    shortly after dying. This is where the quest cycle's kill step is served.
 	  * A boss arena per tier, empty most of the time. Each tier's boss is on its own
 	    thirty-minute clock, and the clocks are seeded staggered so that a boss becomes
@@ -18,7 +18,7 @@
 
 	Combat is not implemented here. MobService registers a target provider with
 	CombatService and receives damage through that; CombatService never learns what a
-	goblin is. Rewards are not paid here either: this fires MobKilled and the services
+	thief is. Rewards are not paid here either: this fires MobKilled and the services
 	that already own each currency listen for it.
 ]]
 
@@ -125,11 +125,11 @@ end
 
 	Every part, joint and ornament is described in MobRigConfig; this walks that
 	description and builds it. The shape of the thing is data, and this is the
-	interpreter — which is what lets a goblin and a boss be two tables rather than two
+	interpreter — which is what lets a thief and a brute be two tables rather than two
 	code paths, and what makes redesigning one an edit to a config.
 
 	The rig is jointed with Motor6Ds carrying the stock R15 joint names, so every pose,
-	gait and strike the player already has addresses a goblin correctly. It used to be
+	gait and strike the player already has addresses a mob correctly. It used to be
 	WeldConstraints, which is why monsters could not animate at all: a weld has nothing
 	to rotate.
 
@@ -362,7 +362,7 @@ function MobService:_spawn(definition: MobConfig.Mob, home: Vector3, radius: num
 		DespawnAt = if definition.Kind == "Boss" and definition.DespawnSeconds ~= nil
 			then os.clock() + definition.DespawnSeconds
 			else nil,
-		-- Goblins keep last-hit credit and carry no table: they die in a punch or two,
+		-- Thieves keep last-hit credit and carry no table: they die in a punch or two,
 		-- so every contributor would clear any threshold and the bookkeeping would buy
 		-- nothing.
 		Damage = if definition.Kind == "Boss" then {} else nil,
@@ -388,7 +388,7 @@ end
 
 --[[
 	Nearest player worth chasing. Anyone in a safe zone or holding an immortal potion is
-	invisible to a mob: letting them aggro would pile every goblin against a barrier
+	invisible to a mob: letting them aggro would pile every thief against a barrier
 	they cannot hit through, which looks broken and costs a permanent chase.
 ]]
 local function nearestVictim(from: Vector3, range: number): (Player?, BasePart?, number)
@@ -447,7 +447,7 @@ end
 	Damage is applied AFTER the wind-up and only to whoever is still inside the radius,
 	which is the entire point — the animation raises both arms overhead for well over a
 	second, and walking out during that window costs nothing. A boss that simply hit
-	harder would be a bigger goblin; one you have to read turns the fight into something
+	harder would be a bigger thief; one you have to read turns the fight into something
 	with a rhythm.
 
 	Falloff is Formulas.SlamFalloff, the same curve the player's own Ground Slam uses, so
@@ -721,7 +721,7 @@ end
 --[[
 	Damage from a player, routed here by CombatService's target provider registry. This
 	owns the mob's health rules, which is the whole reason the registry exists: nothing
-	in CombatService has to know a goblin has a Humanoid.
+	in CombatService has to know a mob has a Humanoid.
 ]]
 function MobService:_damage(attacker: Player, model: Model, damage: number): (number, boolean)
 	local record = live[model]

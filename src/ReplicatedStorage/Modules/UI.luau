@@ -407,8 +407,8 @@ export type Bar = {
 
 	The plate hangs off one part — a head, a torso — but has to clear the entire model,
 	and the two are only the same height on a figure that happens to be built that way.
-	A boss is 2.1 times a goblin, so a fixed offset either buries the plate in its horns
-	or leaves it hanging in the sky above a goblin.
+	A boss is 2.1 times a thief, so a fixed offset either buries the plate in the brute's
+	shoulders or leaves it hanging in the sky above a thief.
 
 	`headroom` is the gap left above the model's own top.
 ]]

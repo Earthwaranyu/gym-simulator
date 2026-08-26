@@ -86,7 +86,7 @@ CombatService.EntityKilled = Signal.new()
 	Non-player things a player can hit.
 
 	CombatService knows how a punch travels, what a safe zone means and how Back and
-	Core resolve a hit. It deliberately does not know what a goblin is. A system that
+	Core resolve a hit. It deliberately does not know what a thief is. A system that
 	owns some other kind of combatant registers a provider here and gets targeting and
 	damage routing for free, exactly as a new file in Abilities/ gets an ability.
 
@@ -559,7 +559,7 @@ function CombatService:ApplyDamageToTarget(
 			local damage, killed = provider.ApplyDamage(attacker, target.Model, rawDamage)
 			if damage > 0 then
 				-- Mobs flinch too. It costs one attribute write and the alternative is a
-				-- goblin that stands perfectly still while being beaten.
+				-- mob that stands perfectly still while being beaten.
 				self:_markHit(target.Model, weight)
 				Net.Event("CombatFeedback"):FireClient(attacker, {
 					Kind = "Hit",
@@ -587,7 +587,7 @@ end
 	It reuses every defensive rule that matters (safe zones, immortality, Back's block
 	and the flight grounding) but must never touch kill bookkeeping: there is no killer
 	Player to credit, and PlayerKilled's seven listeners all assume there is. Deaths are
-	counted here directly so being killed by a goblin is not invisible to the profile.
+	counted here directly so being killed by a mob is not invisible to the profile.
 
 	`attackStat` is the Arms-equivalent of whatever swung — MobConfig's per-tier
 	AttackStat. Back's bands are a ratio of defence to attack, so without a real number
@@ -624,7 +624,7 @@ function CombatService:ApplyEnvironmentDamage(
 		Formulas.ResolveEnvironmentDamage(rawDamage, StatService:GetStat(victim, "Back"), attackStat)
 	local damage = breakdown.Damage
 	-- The same last word the player-versus-player path gives a modifier. A guard that
-	-- stopped a punch but not a goblin would be a rule the player has no way to learn.
+	-- stopped a punch but not a mob would be a rule the player has no way to learn.
 	local blockedDamage = breakdown.Blocked
 	for _, modifier in damageModifiers do
 		local reduced = modifier.Apply(victim, nil, damage)

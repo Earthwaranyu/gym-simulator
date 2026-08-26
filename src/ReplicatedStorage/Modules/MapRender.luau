@@ -122,8 +122,8 @@ local FEATURE_LAYERS: { [string]: number } = {
 
 -- The glyph drawn in the middle of each hostile site, and the colour it is drawn in.
 local SITE_ICONS: { [string]: { Icon: string, Color: Color3 } } = {
-	MobField = { Icon = "Goblin", Color = Color3.fromRGB(64, 96, 40) },
-	BossArena = { Icon = "GoblinBoss", Color = Color3.fromRGB(122, 28, 26) },
+	MobField = { Icon = "Thief", Color = Color3.fromRGB(52, 58, 74) },
+	BossArena = { Icon = "Brute", Color = Color3.fromRGB(150, 96, 62) },
 }
 
 local destinations: { Destination } = {}
@@ -538,10 +538,10 @@ function MapRender.DrawFeatures(
 			stroke.Thickness = 2
 			stroke.Parent = shape
 
-			-- Sized against the drawn circle rather than the screen, so the goblin fills
+			-- Sized against the drawn circle rather than the screen, so the glyph fills
 			-- a big arena on the full map and stays a legible mark on a small one. It
 			-- lives inside the `wantsDetail` branch on purpose: the minimap draws these
-			-- as plain tinted circles, because a goblin at eight pixels is a smudge.
+			-- as plain tinted circles, because a figure at eight pixels is a smudge.
 			local glyph = Instance.new("Frame")
 			glyph.Name = "SiteIcon"
 			glyph.AnchorPoint = Vector2.new(0.5, 0.5)

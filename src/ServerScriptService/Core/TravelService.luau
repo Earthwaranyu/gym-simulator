@@ -100,7 +100,7 @@ local function landingCFrame(station: Instance): CFrame?
 	return base.CFrame + Vector3.new(0, base.Size.Y / 2 + 4, 0)
 end
 
--- The hostile twin of findStation. Mob ids are "<Zone>Goblin" / "<Zone>Boss" and
+-- The hostile twin of findStation. Mob ids are "<Zone>Thief" / "<Zone>Boss" and
 -- machine travel ids are "<Zone>-<Family>", so the two id spaces cannot collide and
 -- one Travel remote can serve both.
 local function findHostile(travelId: string): MobConfig.Site?

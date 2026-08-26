@@ -205,7 +205,7 @@ end
 --[[
 	The line under a hostile site's name: what is standing there, or when it will be.
 
-	A field never has a timer. Its goblins respawn one at a time on their own clocks and
+	A field never has a timer. Its thieves respawn one at a time on their own clocks and
 	the field is always worth walking to, so promising a countdown for it would be
 	inventing a fact the server never sends.
 ]]
@@ -646,7 +646,7 @@ function FullMapController:_renderHostile(parent: Frame, data: any?, hostile: Ho
 	else
 		powerLabel.TextColor3 = UI.Palette.Vital
 		-- Two different currencies, and the row cannot tell you which without being
-		-- told: goblins pay Fight Tokens, which buy physique transformations, and
+		-- told: thieves pay Fight Tokens, which buy physique transformations, and
 		-- bosses pay Tokens, which buy stat multipliers. Naming the wrong one sends a
 		-- player to farm for something they cannot spend on what they are saving for.
 		local currency = if hostile.Kind == "Boss" then "TOKENS" else "FIGHT TOKENS"
