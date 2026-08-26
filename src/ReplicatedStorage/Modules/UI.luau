@@ -173,6 +173,11 @@ UI.Font = {
 	-- mixed Medium/Black treatment, especially after viewport scaling.
 	Body = Enum.Font.GothamBold,
 	Numeric = Enum.Font.GothamBold,
+	-- The one exception, and it is a narrow one: a small readout printed on top of a
+	-- filled bar. The rule above is about headings and body text, where a heavier face
+	-- survives scaling; at 13px on a coloured fill bold closes up the counters and the
+	-- number reads as a smudge rather than a figure.
+	Readout = Enum.Font.Gotham,
 }
 
 local CORNER_RADIUS = UDim.new(0, 10)
@@ -480,6 +485,9 @@ local PRESS_IN = TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection
 local PRESS_OUT = TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 local KNOB_SIZE = 18
+-- Space kept clear to the right of the readout, and the margin used to decide when the
+-- fill has reached it.
+local CAPTION_INSET = 26
 
 export type Slider = {
 	Root: TextButton,
@@ -606,15 +614,17 @@ function UI.Slider(name: string, parent: Instance?, options: SliderOptions?): Sl
 	knobScale.Parent = knob
 
 	local caption = UI.Label("Caption", root)
-	caption.Size = UDim2.new(1, -34, 1, 0)
+	caption.Size = UDim2.new(1, -(CAPTION_INSET + 8), 1, 0)
 	caption.Position = UDim2.fromOffset(8, 0)
-	caption.Font = UI.Font.Numeric
+	caption.Font = UI.Font.Readout
 	caption.TextSize = 13
 	caption.TextXAlignment = Enum.TextXAlignment.Right
 	-- Above the fill and the knob both, or the number vanishes under the handle at the
 	-- top of the range.
 	caption.ZIndex = 4
-	caption.TextStrokeTransparency = 0.4
+	-- No text stroke. The badges that carry one sit over open sky and need it; this
+	-- number sits on an opaque fill that already separates it from the page, so an
+	-- outline only thickens glyphs that are small enough to close up.
 
 	root.Parent = parent
 
@@ -636,6 +646,22 @@ function UI.Slider(name: string, parent: Instance?, options: SliderOptions?): Sl
 		knob.Position = UDim2.new(ratio, (0.5 - ratio) * KNOB_SIZE, 0.5, 0)
 		-- The unit is the whole point of the readout. "72" could be anything.
 		caption.Text = `{current}%`
+
+		--[[
+			The readout is right-aligned, so a nearly-full bar slides its own fill
+			underneath it — and dark ink on a dark fill is unreadable. It flips to the
+			on-accent colour exactly when the fill reaches it.
+
+			Measured against the text's own width rather than a guessed ratio: "7%" and
+			"100%" are covered at different points, and a fixed threshold gets one of
+			them wrong. An outline used to paper over this; it also thickened the glyphs
+			enough to be the reason this readout was hard to read in the first place.
+		]]
+		local trackWidth = math.max(1, root.AbsoluteSize.X)
+		local reach = caption.TextBounds.X + CAPTION_INSET
+		caption.TextColor3 = if ratio * trackWidth > trackWidth - reach
+			then UI.Palette.OnAccent
+			else UI.Palette.Text
 	end
 
 	local function scaleKnob(target: number, info: TweenInfo)

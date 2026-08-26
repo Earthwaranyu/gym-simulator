@@ -2277,3 +2277,26 @@ traffic exists:
       so stays in the file, or it gets added again.
       Verified in Studio by dragging: 70% to 30%, one server write on release (`UpdateSetting`
       is rate limited to four), the value still 30% after leaving the tab and returning.
+
+- [x] 175. **The volume readout stops being a smudge.** Three things were fighting the
+      number on the slider, all introduced by the polish pass that was supposed to help it.
+      `UI.Font.Numeric` is GothamBold, so a 13px readout was set in the same weight as a
+      heading. On top of that it carried `TextStrokeTransparency = 0.4`, and at that size an
+      outline closes up the counters — the glyphs stop being a figure and become a shape.
+      The stroke was copied from the immortality badge, which needs one because it floats
+      over open sky; this number sits on an opaque fill that already separates it from the
+      page, so the outline was buying nothing and costing legibility.
+      Fixed with `UI.Font.Readout = Enum.Font.Gotham` and no stroke. `Numeric` is left alone:
+      29 call sites use it, and none of them asked for this. The new entry carries its own
+      comment saying why it is exempt from the one-face rule directly above it, because a
+      second face added silently under a comment claiming there is only one is how the next
+      reader concludes the rule is dead.
+      **Dropping the stroke exposed what it had been hiding.** The readout is right-aligned,
+      so a nearly-full bar slides its own fill underneath it, and dark ink on the dark teal
+      of the music fill is invisible — the outline had been papering over a contrast bug
+      while causing a legibility one. The colour now flips to on-accent exactly when the
+      fill reaches the text, measured against the text's own `TextBounds` rather than a
+      guessed ratio: "7%" and "100%" are covered at different points and one fixed threshold
+      gets one of them wrong.
+      Verified in Studio at both ends — dark ink at 70% over the empty track, cream at 100%
+      over the fill, flipping mid-drag — and the HUD counters confirmed still GothamBold.
