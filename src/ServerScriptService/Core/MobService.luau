@@ -107,6 +107,14 @@ local live: { [Model]: Live } = {}
 ]]
 -- The top of BodyLoftBuilder's 1..2.2 girth range.
 local BRUTE_SCALE = 2.2
+--[[
+	Where a loft-dressed character's root sits above the floor, per unit of scale.
+
+	Measured from a player wearing the generated body: half-height 1.93, lowest point
+	0.731 below the floor, so the root rides 1.199 above it. See the note in buildMob.
+]]
+local LOFT_ROOT_HEIGHT = 1.199
+
 -- How much bigger the boss rig is than the loft's bind pose. Must match the Scale on
 -- the boss rows in MobConfig, or the dressed body will not line up with its own joints.
 local BRUTE_RIG_SCALE = 2.1
@@ -317,10 +325,37 @@ local function buildMob(definition: MobConfig.Mob): (Model, Humanoid, BasePart)
 
 	local humanoid = Instance.new("Humanoid")
 	humanoid.RigType = Enum.HumanoidRigType.R15
-	-- Measured, not assumed: the drop from the root's underside to the lowest thing on
-	-- the body. A hard-coded value was only ever right for one set of leg offsets, and
-	-- was three studs wrong on a boss.
-	humanoid.HipHeight = math.max(0, -(rig.RootSize.Y / 2 * scale) - lowest)
+	--[[
+		A loft-dressed mob stands by its mesh, not by its skeleton.
+
+		`lowest` measures the primitive rig, and for a brute that is the bottom of a
+		shin capsule's ball cap — 6.7 studs under the root at scale 2.1. The generated
+		body is not that tall: its geometry stops 4.05 under the root, because the loft's
+		legs do not reach all the way down to the foot bone its skeleton names. Standing
+		the rig on its own lowest part therefore hangs the visible body two and a half
+		studs in the air, and since the rig is hidden once the body is on, all a player
+		sees is a boss floating.
+
+		So a dressed mob's hip height comes from the body instead. The ratio is measured
+		off a live player wearing the same mesh: root 1.199 studs over the floor with a
+		half-height of 1.93, which leaves the body's lowest point 0.731 under the floor —
+		feet planted rather than resting on the surface. Everything in the loft scales
+		linearly, so one number covers every size:
+
+			rootAboveGround = (1.93 - 0.731) * scale
+			hipHeight       = rootAboveGround - RootSize.Y / 2 * scale
+
+		Undressed, the mob falls back to the measured rig, which is what the fallback
+		wants: no mesh, so the skeleton is the thing standing on the floor.
+	]]
+	if definition.Kind == "Boss" then
+		humanoid.HipHeight = math.max(0, (LOFT_ROOT_HEIGHT - rig.RootSize.Y / 2) * scale)
+	else
+		-- Measured, not assumed: the drop from the root's underside to the lowest thing on
+		-- the body. A hard-coded value was only ever right for one set of leg offsets, and
+		-- was three studs wrong on a boss.
+		humanoid.HipHeight = math.max(0, -(rig.RootSize.Y / 2 * scale) - lowest)
+	end
 	humanoid.MaxHealth = definition.Health
 	humanoid.Health = definition.Health
 	humanoid.WalkSpeed = definition.WalkSpeed

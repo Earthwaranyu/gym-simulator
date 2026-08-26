@@ -2501,3 +2501,36 @@ traffic exists:
       CLAUDE.md's asset paragraph was describing the dead AI-mesh pipeline as if it shipped.
       Corrected: there is no mesh asset in the game, the body is generated at runtime, and
       the fourteen-piece cutter is disabled and unrevivable as written.
+
+- [x] 181. **The boss stands on the ground again.** I floated it in #180 by re-proportioning
+      the brute rig, and the cause was a mismatch between what holds a boss up and what a
+      player can see.
+      `buildMob` derives HipHeight by measuring the lowest point the rig reaches, which is
+      the right instinct — a hard-coded value is only ever correct for one set of legs. But
+      `reach` counts the ball caps on capsule limbs, and on a brute at scale 2.1 the shin
+      cap hangs 6.7 studs under the root. The generated body is not that tall: its geometry
+      stops 4.05 under the root, because the loft's legs do not reach down to the foot bone
+      its own skeleton names. Standing the rig on its lowest part therefore hung the visible
+      body two and a half studs in the air, and the rig is hidden once the body is on, so
+      all that was left on screen was a boss floating over nothing.
+      Measured rather than reasoned about, and the measuring is what found it. The first
+      guess — that the foot and the shin cap disagreed by about a third of a stud — was
+      right about the mechanism and an order of magnitude out on the size. The real numbers:
+      lowest rig part `RightLowerLegCap` 0.151 *below* the floor, foot 0.196 above it, and
+      the mesh 2.505 above it. Comparing against a player wearing the same mesh gave the
+      target: root 1.199 over the floor for a half-height of 1.93, which leaves the body's
+      lowest point 0.731 *under* the floor — feet planted, not perched.
+      So a dressed mob now takes its hip height from the body rather than the skeleton, from
+      one ratio that scales linearly with the rig. Undressed mobs keep the measured rig,
+      which is what the fallback wants: no mesh, so the skeleton is the thing standing on
+      the floor. Thieves are untouched.
+      After: hip height 4.609 -> 0.417, and the mesh bottom moved from 2.505 above the floor
+      to 1.414 below it against a target of 1.54 — the remaining tenth is the legs being
+      mid-stride when sampled. Animation did not regress: all 14 loft bones still follow the
+      rig.
+      **On Blender**: asked for, and declined for now on the evidence. It is not installed
+      here, the body already is a real rigged animated mesh generated at runtime, and the
+      import step is the one thing that cannot be scripted — `AssetService:CreateAssetAsync`
+      is unavailable, so a Blender body would need a human to import it before any of it
+      could be wired up. The route stays open; it is a replacement for a working system
+      rather than a repair to a broken one.
