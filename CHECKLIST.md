@@ -2234,3 +2234,46 @@ traffic exists:
       captures it on entry and drops what it built if the number moved underneath it.
       `_renderLeaderboard` yields the same way and gets the same guard. Verified in Studio
       by claiming and counting sections — four, not eight.
+
+- [x] 174. **The settings page stops lying about the controls, and the sliders earn their
+      place.** Two jobs on one screen.
+      **The controls text was wrong in almost every clause.** It claimed `F punches` — F is
+      Block, and Punch is the left mouse button with no key at all (`AbilityConfig.luau:71`
+      says so on purpose). It claimed `Q flies` — Q is the ground slam, and flight is a
+      double-tapped Space gated on Power. It claimed holding the mouse trains the selected
+      hotbar muscle, a feature whose buttons are destroyed the frame they are built
+      (`HudController.luau:700-704`). It called Shift a sprint hold when it is a toggle, and
+      it never mentioned C, R, Escape or Tab.
+      None of that was a typo. It is what a screen does when it restates a config in its own
+      words: the config moves and the sentence does not. So the sentences are gone. Combat
+      rows are generated from `AbilityConfig.Ordered()` — `DisplayName` for the action,
+      `KeyCode` for the cap, `LMB` where the key is nil, `(hold)` where `Kind == "Hold"` —
+      and movement keys come from `MovementConfig`. A rebound ability is on this page with
+      no edit, and a wrong key here now requires the game itself to be wrong.
+      Presented as keycaps in a two-column grid, with `KEY_CAPTIONS` translating enum names
+      into what players call them: nobody is looking for a key called LeftShift. The row
+      grows with `AutomaticSize` rather than the old hard-coded 112px, because a list that
+      comes from a config can gain an entry.
+      **`1`-`5` are deliberately not listed.** They still call `_select`, but it only paints
+      `slotButtons`, which is cleared when the dock is destroyed — so the keys do nothing
+      visible. Documenting a dead key is worse than omitting it. The dead `_select` /
+      `_beginManualTraining` / `_trainPing` path is left standing for a separate change.
+      **The sliders got the polish.** They were already drag sliders; what they lacked was
+      any sign of being draggable. A bare filled bar reads as a progress meter — something
+      the game is telling you — rather than a control. So: a stroked knob riding the fill,
+      a three-stop gradient and a top-edge shine borrowed from the HUD stat chips, a track
+      stroke so the empty half still reads as part of the control, hover and press scaling
+      on the existing `PRESS_IN`/`PRESS_OUT` curves rather than a new easing, and a `%` on
+      the readout, which said `72` and could have meant anything. Knob travel is inset by
+      its own radius so it sits inside the trough at 0 and 100 instead of hanging off.
+      **Fixed a leak while in there.** `UserInputService.InputEnded` was connected once per
+      slider at construction and never disconnected, so every rebuild of the settings page
+      leaked a listener for the session. It is bound on the way down and dropped on the way
+      up, so no global listener exists at all while nobody is dragging.
+      **Wheel-to-nudge was built and then removed.** Every slider here lives on a scrolling
+      page, so the wheel both moved the value and scrolled the list under it — measured, one
+      notch of three went to the page. A control that quietly changes a player's audio while
+      they scroll past it is worse than one that only answers to a drag. The comment saying
+      so stays in the file, or it gets added again.
+      Verified in Studio by dragging: 70% to 30%, one server write on release (`UpdateSetting`
+      is rate limited to four), the value still 30% after leaving the tab and returning.

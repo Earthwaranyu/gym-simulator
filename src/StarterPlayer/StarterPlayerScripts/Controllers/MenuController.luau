@@ -32,6 +32,8 @@ local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
 local ShopIcons = require(ReplicatedStorage.Modules.ShopIcons)
 local TokenMultiplierConfig = require(ReplicatedStorage.Modules.TokenMultiplierConfig)
 local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
+local AbilityConfig = require(ReplicatedStorage.Modules.AbilityConfig)
+local MovementConfig = require(ReplicatedStorage.Modules.MovementConfig)
 
 local MenuController = {
 	Name = "MenuController",
@@ -1551,6 +1553,29 @@ local DAILY_CLAIMS: { [string]: { Remote: string, Label: string } } = {
 }
 
 --[[
+	What a key is called on a keycap, where that differs from what Roblox calls it.
+
+	Enum names are precise and nobody says them. A player looking for the sprint key is
+	looking at a cap marked SHIFT, not LeftShift.
+]]
+local KEY_CAPTIONS: { [string]: string } = {
+	LeftShift = "SHIFT",
+	RightShift = "SHIFT",
+	LeftControl = "CTRL",
+	RightControl = "CTRL",
+	LeftAlt = "ALT",
+	RightAlt = "ALT",
+	Space = "SPACE",
+	Return = "ENTER",
+	Escape = "ESC",
+}
+
+local function keyCaption(key: Enum.KeyCode | string): string
+	local name = if typeof(key) == "EnumItem" then key.Name else key :: string
+	return KEY_CAPTIONS[name] or string.upper(name)
+end
+
+--[[
 	How long until the daily claim comes back.
 
 	The daily resets on the UTC calendar day, which is what VipService.today() means by
@@ -2190,17 +2215,143 @@ function MenuController:_renderSettings(parent: Frame)
 	heading.TextColor3 = UI.Palette.Accent
 	heading.Text = "CONTROLS"
 
+	--[[
+		The bindings, read from the configs that define them.
+
+		This was four hand-written lines of prose, and every one of them had drifted:
+		it claimed F punches (F blocks), that Q flies (Q is the ground slam), and that
+		holding the mouse trains the selected muscle — a feature whose buttons are
+		destroyed the frame they are built. None of that was ever a typo. It is what
+		happens when a screen restates a config in its own words: the config moves and
+		the sentence does not.
+
+		So the sentences are gone. Combat rows come from AbilityConfig and movement
+		keys from MovementConfig, which means a rebound ability is right here with no
+		edit, and a wrong key on this page now requires the game itself to be wrong.
+	]]
 	order += 1
-	local note = row(parent, 112, order)
-	local noteText = UI.Label("Note", note)
-	noteText.Size = UDim2.fromScale(1, 1)
-	noteText.TextSize = 13
-	noteText.TextWrapped = true
-	noteText.TextColor3 = UI.Palette.TextMuted
-	noteText.Text = "Hold E at a machine to mount or dismount  ·  Space dismounts\n"
-		.. "Hold mouse to train the selected hotbar muscle  ·  F punches\n"
-		.. "Shift sprints  ·  Q flies  ·  Space climbs  ·  Ctrl descends\n"
-		.. "M opens the menu  ·  Tab toggles the player list"
+	local controls = row(parent, 0, order)
+
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.new(0.5, -6, 0, 26)
+	grid.CellPadding = UDim2.fromOffset(12, 6)
+	grid.FillDirectionMaxCells = 2
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = controls
+
+	local padding = controls:FindFirstChildOfClass("UIPadding")
+	if padding ~= nil then
+		padding.PaddingTop = UDim.new(0, 10)
+		padding.PaddingBottom = UDim.new(0, 10)
+	end
+
+	local capOrder = 0
+
+	--[[
+		One binding: the key drawn as a physical cap, then what it does.
+
+		The cap is sized to its text rather than fixed, because SHIFT and C both have to
+		look like the same kind of object while being four characters apart.
+	]]
+	local function keycap(key: string, action: string)
+		capOrder += 1
+
+		local line = Instance.new("Frame")
+		line.Name = action
+		line.BackgroundTransparency = 1
+		line.Size = UDim2.new(1, 0, 0, 26)
+		line.LayoutOrder = capOrder
+		line.Parent = controls
+
+		local cap = UI.Label("Key", line)
+		cap.AutomaticSize = Enum.AutomaticSize.X
+		cap.Size = UDim2.fromOffset(0, 22)
+		cap.Position = UDim2.fromOffset(0, 2)
+		cap.BackgroundColor3 = UI.Palette.Backdrop
+		cap.BackgroundTransparency = 0.15
+		cap.Font = UI.Font.Numeric
+		cap.TextSize = 12
+		cap.TextColor3 = UI.Palette.Text
+		cap.TextXAlignment = Enum.TextXAlignment.Center
+		cap.Text = key
+		UI.Role(cap, { Ink = "Text", Fill = "Backdrop" })
+
+		local capPadding = Instance.new("UIPadding")
+		capPadding.PaddingLeft = UDim.new(0, 8)
+		capPadding.PaddingRight = UDim.new(0, 8)
+		capPadding.Parent = cap
+
+		local capCorner = Instance.new("UICorner")
+		capCorner.CornerRadius = UDim.new(0, 5)
+		capCorner.Parent = cap
+
+		local capStroke = Instance.new("UIStroke")
+		capStroke.Color = UI.Palette.GlassStroke
+		capStroke.Thickness = 1
+		capStroke.Transparency = 0.25
+		capStroke.Parent = cap
+		UI.Role(capStroke, { Stroke = "GlassStroke" })
+
+		-- The label starts past the widest cap rather than past this one, so the
+		-- actions line up in a column instead of stepping in and out with key length.
+		local text = UI.Label("Action", line)
+		text.Position = UDim2.fromOffset(78, 0)
+		text.Size = UDim2.new(1, -78, 1, 0)
+		text.TextSize = 13
+		text.TextColor3 = UI.Palette.TextMuted
+		text.TextTruncate = Enum.TextTruncate.AtEnd
+		text.Text = action
+	end
+
+	local function group(title: string)
+		capOrder += 1
+		local heading = UI.Label(title, controls)
+		heading.Size = UDim2.new(1, 0, 0, 26)
+		heading.LayoutOrder = capOrder
+		heading.Font = UI.Font.Heading
+		heading.TextSize = 11
+		heading.TextColor3 = UI.Palette.Accent
+		heading.Text = string.upper(title)
+
+		-- A heading owns its whole row; the grid would otherwise put the first binding
+		-- of the group beside it.
+		capOrder += 1
+		local spacer = Instance.new("Frame")
+		spacer.Name = "Spacer"
+		spacer.BackgroundTransparency = 1
+		spacer.Size = UDim2.new(1, 0, 0, 26)
+		spacer.LayoutOrder = capOrder
+		spacer.Parent = controls
+	end
+
+	group("Combat")
+	for _, ability in AbilityConfig.Ordered() do
+		-- Punch carries no KeyCode on purpose: it is the left mouse button, and has
+		-- been since before the ability table existed.
+		local key = if ability.KeyCode ~= nil then keyCaption(ability.KeyCode) else "LMB"
+		local action = if ability.Kind == "Hold" then `{ability.DisplayName} (hold)` else ability.DisplayName
+		keycap(key, action)
+	end
+
+	group("Movement")
+	keycap(keyCaption(MovementConfig.SPRINT_KEY), "Sprint (toggle)")
+	keycap(keyCaption(MovementConfig.DASH_KEY), "Dash")
+	keycap("SPACE ×2", "Fly — needs Power")
+	keycap(keyCaption(MovementConfig.ASCEND_KEY), "Rise while flying")
+	keycap(keyCaption(MovementConfig.DESCEND_KEY), "Drop while flying")
+
+	group("General")
+	keycap("E", "Hold at a machine to train")
+	keycap("SPACE", "Leave the machine")
+	keycap("M", "Menu")
+	keycap("ESC", "Close")
+	keycap("TAB", "Player list")
+
+	-- Grown from the rows actually rendered. A hard-coded height was survivable while
+	-- this was a fixed block of prose; it is not once the list comes from a config that
+	-- can gain an entry.
+	controls.AutomaticSize = Enum.AutomaticSize.Y
+	controls.Size = UDim2.new(1, 0, 0, 0)
 end
 
 function MenuController:_refresh()

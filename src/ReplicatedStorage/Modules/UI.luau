@@ -473,6 +473,14 @@ function UI.Bar(name: string, color: Color3, parent: Instance?, emptyColor: Colo
 	return bar
 end
 
+-- Shared by every press-feedback tween in this module: buttons, and the slider knob.
+-- Hoisted above Slider because it uses them too, and two copies of an easing curve is
+-- how two controls start feeling subtly different.
+local PRESS_IN = TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local PRESS_OUT = TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+local KNOB_SIZE = 18
+
 export type Slider = {
 	Root: TextButton,
 	-- Moves the handle without firing OnChanged. For pushing saved state in.
@@ -505,6 +513,10 @@ export type SliderOptions = {
 	It is a TextButton rather than a Frame so the whole track is one input target — a
 	press anywhere on it jumps the handle there, which is what a player expects and what
 	a handle-only hit area does not give you on a phone.
+
+	The knob is not decoration. Without one there is nothing on screen that looks
+	grabbable, and a bare filled bar reads as a progress meter — something the game is
+	telling you — rather than a control you are meant to drag.
 ]]
 function UI.Slider(name: string, parent: Instance?, options: SliderOptions?): Slider
 	local settings: SliderOptions = options or {}
@@ -520,40 +532,132 @@ function UI.Slider(name: string, parent: Instance?, options: SliderOptions?): Sl
 	root.BackgroundTransparency = UI.Surfaces.BarTrackTransparency
 	root.BorderSizePixel = 0
 	root.Size = UDim2.new(1, 0, 0, 22)
+	root.ClipsDescendants = false
 	UI.Role(root, { Ink = "Backdrop", Opacity = "BarTrackTransparency" })
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 6)
 	corner.Parent = root
 
+	-- The track needs an edge of its own. Against a panel of a similar value an
+	-- unstroked trough disappears, and the empty right-hand side stops reading as part
+	-- of the control at all.
+	local trackStroke = Instance.new("UIStroke")
+	trackStroke.Color = UI.Palette.GlassStroke
+	trackStroke.Thickness = 1
+	trackStroke.Transparency = 0.4
+	trackStroke.Parent = root
+	UI.Role(trackStroke, { Stroke = "GlassStroke" })
+
 	local fill = Instance.new("Frame")
 	fill.Name = "Fill"
 	fill.BackgroundColor3 = colour
 	fill.BorderSizePixel = 0
 	fill.Size = UDim2.fromScale(0, 1)
+	fill.ClipsDescendants = true
 	fill.Parent = root
 
 	local fillCorner = Instance.new("UICorner")
 	fillCorner.CornerRadius = UDim.new(0, 6)
 	fillCorner.Parent = fill
 
+	-- Lightened at the left, full strength at the right, so the fill has somewhere to
+	-- travel to. The same three-stop shape CartoonCard uses, for the same reason.
+	local fillGradient = Instance.new("UIGradient")
+	fillGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, colour:Lerp(UI.Palette.OnAccent, 0.3)),
+		ColorSequenceKeypoint.new(0.55, colour),
+		ColorSequenceKeypoint.new(1, colour:Lerp(UI.Palette.CartoonInk, 0.16)),
+	})
+	fillGradient.Parent = fill
+
+	-- The top-edge highlight the HUD stat chips use. Two pixels of lighter colour is
+	-- the difference between a painted rectangle and something with a surface.
+	local shine = Instance.new("Frame")
+	shine.Name = "Shine"
+	shine.BackgroundColor3 = UI.Palette.OnAccent
+	shine.BackgroundTransparency = 0.55
+	shine.BorderSizePixel = 0
+	shine.Position = UDim2.fromOffset(0, 2)
+	shine.Size = UDim2.new(1, 0, 0, 2)
+	shine.ZIndex = 2
+	shine.Parent = fill
+
+	local knob = Instance.new("Frame")
+	knob.Name = "Knob"
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.Size = UDim2.fromOffset(KNOB_SIZE, KNOB_SIZE)
+	knob.BackgroundColor3 = UI.Palette.OnAccent
+	knob.BorderSizePixel = 0
+	knob.ZIndex = 3
+	knob.Parent = root
+	UI.Role(knob, { Ink = "OnAccent" })
+
+	local knobCorner = Instance.new("UICorner")
+	knobCorner.CornerRadius = UDim.new(1, 0)
+	knobCorner.Parent = knob
+
+	local knobStroke = Instance.new("UIStroke")
+	knobStroke.Color = colour
+	knobStroke.Thickness = 3
+	knobStroke.Parent = knob
+
+	local knobScale = Instance.new("UIScale")
+	knobScale.Parent = knob
+
 	local caption = UI.Label("Caption", root)
-	caption.Size = UDim2.new(1, -16, 1, 0)
+	caption.Size = UDim2.new(1, -34, 1, 0)
 	caption.Position = UDim2.fromOffset(8, 0)
 	caption.Font = UI.Font.Numeric
 	caption.TextSize = 13
 	caption.TextXAlignment = Enum.TextXAlignment.Right
-	caption.ZIndex = 2
+	-- Above the fill and the knob both, or the number vanishes under the handle at the
+	-- top of the range.
+	caption.ZIndex = 4
+	caption.TextStrokeTransparency = 0.4
 
 	root.Parent = parent
 
 	local current = math.clamp(settings.Value or minimum, minimum, maximum)
 	local dragging = false
+	local releaseConnection: RBXScriptConnection? = nil
+
+	local function ratioOf(): number
+		local span = math.max(1, maximum - minimum)
+		return (current - minimum) / span
+	end
 
 	local function render()
-		local span = math.max(1, maximum - minimum)
-		fill.Size = UDim2.fromScale((current - minimum) / span, 1)
-		caption.Text = tostring(current)
+		local ratio = ratioOf()
+		fill.Size = UDim2.fromScale(ratio, 1)
+		-- Travel is inset by the knob's own radius, so at 0 and 100 the handle sits
+		-- inside the trough instead of hanging half of itself off the end. The fill
+		-- still runs edge to edge; only the handle is pulled in.
+		knob.Position = UDim2.new(ratio, (0.5 - ratio) * KNOB_SIZE, 0.5, 0)
+		-- The unit is the whole point of the readout. "72" could be anything.
+		caption.Text = `{current}%`
+	end
+
+	local function scaleKnob(target: number, info: TweenInfo)
+		TweenService:Create(knobScale, info, { Scale = target }):Play()
+	end
+
+	local function commit()
+		if settings.OnCommitted ~= nil then
+			settings.OnCommitted(current)
+		end
+	end
+
+	local function setValue(value: number)
+		local clamped = math.clamp(math.round(value), minimum, maximum)
+		if clamped == current then
+			return
+		end
+		current = clamped
+		render()
+		if settings.OnChanged ~= nil then
+			settings.OnChanged(current)
+		end
 	end
 
 	local function valueAt(x: number): number
@@ -563,30 +667,72 @@ function UI.Slider(name: string, parent: Instance?, options: SliderOptions?): Sl
 		return math.round(minimum + ratio * (maximum - minimum))
 	end
 
-	local function moveTo(x: number)
-		local value = valueAt(x)
-		if value == current then
+	local function stopDragging()
+		if not dragging then
 			return
 		end
-		current = value
-		render()
-		if settings.OnChanged ~= nil then
-			settings.OnChanged(current)
+		dragging = false
+		scaleKnob(1, PRESS_OUT)
+		if releaseConnection ~= nil then
+			releaseConnection:Disconnect()
+			releaseConnection = nil
 		end
+		commit()
 	end
 
 	root.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			if not dragging then
+				scaleKnob(1.15, PRESS_IN)
+			end
+			return
+		end
 		if
 			input.UserInputType ~= Enum.UserInputType.MouseButton1
 			and input.UserInputType ~= Enum.UserInputType.Touch
 		then
 			return
 		end
+
 		dragging = true
-		moveTo(input.Position.X)
+		scaleKnob(1.25, PRESS_IN)
+		setValue(valueAt(input.Position.X))
+
+		--[[
+			Connected per drag rather than once per slider.
+
+			This used to be a permanent UserInputService.InputEnded connection made at
+			construction and never disconnected, so every rebuild of the settings page
+			leaked one listener for the lifetime of the session. Bound on the way down
+			and dropped on the way up, there is no global listener at all while nobody
+			is dragging.
+
+			It still has to be UserInputService rather than the track's own InputEnded:
+			a drag that ends off the side of the control must commit, or the value
+			silently reverts on the next redraw.
+		]]
+		if releaseConnection == nil then
+			releaseConnection = UserInputService.InputEnded:Connect(function(ended: InputObject)
+				if
+					ended.UserInputType == Enum.UserInputType.MouseButton1
+					or ended.UserInputType == Enum.UserInputType.Touch
+				then
+					stopDragging()
+				end
+			end)
+		end
 	end)
 
 	root.InputChanged:Connect(function(input: InputObject)
+		--[[
+			No wheel-to-nudge here, though it is the obvious thing to add.
+
+			Every slider in this game lives on a scrolling page, and the wheel over a
+			track would both nudge the value and scroll the list under it. Measured: of
+			three notches, one moved the page and two moved the volume. A control that
+			quietly changes a player's audio while they scroll past it is worse than one
+			that only responds to being dragged.
+		]]
 		if not dragging then
 			return
 		end
@@ -596,24 +742,12 @@ function UI.Slider(name: string, parent: Instance?, options: SliderOptions?): Sl
 		then
 			return
 		end
-		moveTo(input.Position.X)
+		setValue(valueAt(input.Position.X))
 	end)
 
-	-- Released anywhere, not just over the track. A drag that ends off the side of the
-	-- control still has to commit, or the value silently reverts on the next redraw.
-	UserInputService.InputEnded:Connect(function(input: InputObject)
-		if not dragging then
-			return
-		end
-		if
-			input.UserInputType ~= Enum.UserInputType.MouseButton1
-			and input.UserInputType ~= Enum.UserInputType.Touch
-		then
-			return
-		end
-		dragging = false
-		if settings.OnCommitted ~= nil then
-			settings.OnCommitted(current)
+	root.InputEnded:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseMovement and not dragging then
+			scaleKnob(1, PRESS_OUT)
 		end
 	end)
 
@@ -651,9 +785,6 @@ export type PressableOptions = {
 	-- feedback lands at the moment the finger does.
 	OnPress: (() -> ())?,
 }
-
-local PRESS_IN = TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local PRESS_OUT = TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 -- Called once per press, for whoever wants to make a noise about it.
 local pressListener: (() -> ())? = nil
