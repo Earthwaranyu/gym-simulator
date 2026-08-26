@@ -2378,3 +2378,38 @@ traffic exists:
       and CoreGui cannot be introspected from a script. Worth confirming in a real client.
       Note for whoever does: the HUD's power strip and minimap occupy the top-left, which is
       exactly where the chat window is aligned.
+
+- [x] 178. **The spawn pad was a duplicate nobody authored, and the volume rows became
+      clickable.**
+      The visible pad at spawn was not in this repository. `Workspace` held *two*
+      `SpawnLocation`s: the one `default.project.json` declares — 10x10, y=2.3,
+      `Transparency = 1`, `CanCollide = false` — and a second 12x12 at y=0.5, fully opaque
+      and collidable, living only in the `.rbxl`. That is why "make the spawn pad invisible"
+      had no obvious source to edit: Rojo does not manage the instance, so no change under
+      `src/` could ever have touched it. Two enabled spawn points also means Roblox chooses
+      between them, so the stray was not merely visible, it was likely where players landed.
+      It was deleted in Studio, which is where it lived. **Git cannot record that**, so this
+      entry is the only account of it: if a future reader finds one SpawnLocation and
+      wonders, the missing one was the 12x12 orphan and the survivor is the one the project
+      declares. Checked before deleting rather than after: a downward ray from spawn
+      ignoring both pads lands on `Environment_Mainland.DistrictGround_1_5` at y=1, solid
+      and collidable and level with the removed pad's top face, so nothing was holding the
+      player up except the ground that is still there. Confirmed in play — one SpawnLocation,
+      invisible, and the character's Y does not move over 2.5 seconds.
+      **The sliders got buttons**, because dragging a 200px track on a trackpad is a fiddly
+      gesture and mute in particular should be one click. Each row is now
+      `[-] [slider] [+] [speaker]`. Steps move 10 at a time and clamp to 0-100, which is the
+      range `SettingsService` clamps to anyway.
+      Mute returns to **the level before muting**, not to the default — remembered in a
+      module-scope table, and the scope is the whole trick: `_renderSettings` re-runs on
+      every profile push, so a table declared inside it would forget the level within a
+      second or two and unmute would silently jump to the default. A rejoin still loses it,
+      because a muted setting is just 0 on the profile with nowhere to record what it used
+      to be; unmute then falls back to the channel default, which is honest rather than a
+      guess.
+      The writes are debounced, for the same reason `UI.Slider` splits `OnChanged` from
+      `OnCommitted`: `UpdateSetting` is rate limited to four calls, and ten taps of `+`
+      would spend the budget and start failing. The mix follows every click; only the last
+      is sent. Verified by clicking `+` ten times in a row — the value clamped to 100, no
+      rejection toast appeared, and the level survived leaving the tab and returning, so the
+      one collapsed write did land.

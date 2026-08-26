@@ -1553,6 +1553,29 @@ local DAILY_CLAIMS: { [string]: { Remote: string, Label: string } } = {
 }
 
 --[[
+	The level each volume was at before it was muted.
+
+	Module scope, not inside `_renderSettings`, because that function re-runs on every
+	profile push — a table declared in there would forget the pre-mute level within a
+	second or two of the player muting, and unmute would silently jump to the default
+	instead of going back where they were.
+
+	A rejoin still loses it: a muted setting is just 0 on the profile, with nowhere to
+	record what it used to be. Unmute then falls back to the channel's default, which is
+	the honest answer rather than a guess.
+]]
+local mutedFrom: { [string]: number } = {}
+
+local VOLUME_DEFAULTS: { [string]: number } = {
+	MasterVolume = 100,
+	MusicVolume = 70,
+	SfxVolume = 100,
+}
+
+-- One click of a step button.
+local VOLUME_STEP = 10
+
+--[[
 	What a key is called on a keycap, where that differs from what Roblox calls it.
 
 	Enum names are precise and nobody says them. A player looking for the sprint key is
@@ -2141,9 +2164,7 @@ end
 
 function MenuController:_renderSettings(parent: Frame)
 	local data = ProfileController:Get()
-	local settings = if data ~= nil
-		then data.Settings
-		else { MasterVolume = 100, MusicVolume = 70, SfxVolume = 100 }
+	local settings = if data ~= nil then data.Settings else VOLUME_DEFAULTS
 	local order = 0
 
 	--[[
@@ -2166,25 +2187,142 @@ function MenuController:_renderSettings(parent: Frame)
 		label.Text = `<b>{displayName}</b>\n<font color="#8A93A8">{detail}</font>`
 
 		local current = (settings :: any)[settingName]
-		local slider = UI.Slider(settingName, line, {
-			Value = if type(current) == "number" then current else 100,
-			Colour = colour,
-			OnChanged = function(value: number)
-				local live = ProfileController:Get()
-				if live ~= nil then
-					(live.Settings :: any)[settingName] = value
-					Loader.Get("EffectsController"):_applyVolumes()
-				end
-			end,
-			OnCommitted = function(value: number)
+		local level = if type(current) == "number" then current else VOLUME_DEFAULTS[settingName] or 100
+
+		local slider: UI.Slider
+		local muteButton: TextButton
+		local commitPending: thread? = nil
+
+		--[[
+			Applies a level locally at once and writes it to the server on a delay.
+
+			The delay is not politeness. `Net` rate limits UpdateSetting to four calls,
+			which is the same reason UI.Slider splits OnChanged from OnCommitted — a
+			player tapping `+` ten times would spend the whole budget and start getting
+			failures. The mix follows every click; only the last one is sent.
+		]]
+		local function apply(value: number, commit: boolean)
+			local live = ProfileController:Get()
+			if live ~= nil then
+				(live.Settings :: any)[settingName] = value
+				Loader.Get("EffectsController"):_applyVolumes()
+			end
+
+			-- The speaker reads the state, so it has to follow every path that changes
+			-- the level — including a drag, which never touches the buttons.
+			muteButton.Text = if value <= 0 then "🔇" else "🔊"
+
+			if not commit then
+				return
+			end
+
+			if commitPending ~= nil then
+				task.cancel(commitPending)
+			end
+			commitPending = task.delay(0.3, function()
+				commitPending = nil
 				local ok, message = Net.Function("UpdateSetting"):InvokeServer(settingName, value)
 				if not ok then
 					toast(message)
 				end
+			end)
+		end
+
+		slider = UI.Slider(settingName, line, {
+			Value = level,
+			Colour = colour,
+			OnChanged = function(value: number)
+				-- Live during a drag, but not sent: the release commits.
+				apply(value, false)
+			end,
+			OnCommitted = function(value: number)
+				apply(value, true)
 			end,
 		})
-		slider.Root.Size = UDim2.new(0.5, -12, 0, 22)
-		slider.Root.Position = UDim2.new(0.5, 12, 0.5, -11)
+		-- Room at both ends for the step buttons and the speaker.
+		slider.Root.Size = UDim2.new(0.5, -104, 0, 22)
+		slider.Root.Position = UDim2.new(0.5, 40, 0.5, -11)
+
+		--[[
+			A square control on the row's right half.
+
+			The settings `button` helper is the wrong shape here — it is a fixed 104x28
+			pinned to the row's right edge, which is one button's worth of room, and this
+			row needs three alongside a slider.
+		]]
+		local function miniButton(name: string, text: string, width: number, onClick: () -> ()): TextButton
+			local button = Instance.new("TextButton")
+			button.Name = name
+			button.AnchorPoint = Vector2.new(0, 0.5)
+			button.Size = UDim2.fromOffset(width, 22)
+			button.BackgroundColor3 = UI.Palette.Backdrop
+			button.BackgroundTransparency = 0.15
+			button.BorderSizePixel = 0
+			button.AutoButtonColor = false
+			button.Font = UI.Font.Heading
+			button.TextSize = 14
+			button.TextColor3 = UI.Palette.Text
+			button.Text = text
+			button.Parent = line
+			UI.Role(button, { Ink = "Text", Fill = "Backdrop" })
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 6)
+			corner.Parent = button
+
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = UI.Palette.GlassStroke
+			stroke.Thickness = 1
+			stroke.Transparency = 0.25
+			stroke.Parent = button
+			UI.Role(stroke, { Stroke = "GlassStroke" })
+
+			UI.Pressable(button, { PressScale = 0.92, HoverScale = 1.06 })
+			button.Activated:Connect(onClick)
+			return button
+		end
+
+		local function nudge(delta: number)
+			local live = ProfileController:Get()
+			local now = if live ~= nil then tonumber((live.Settings :: any)[settingName]) else nil
+			local value = math.clamp((now or level) + delta, 0, 100)
+			slider.Set(value)
+			apply(value, true)
+		end
+
+		local minus = miniButton("Down", "−", 24, function()
+			nudge(-VOLUME_STEP)
+		end)
+		minus.Position = UDim2.new(0.5, 12, 0.5, 0)
+
+		local plus = miniButton("Up", "+", 24, function()
+			nudge(VOLUME_STEP)
+		end)
+		plus.AnchorPoint = Vector2.new(1, 0.5)
+		plus.Position = UDim2.new(1, -38, 0.5, 0)
+
+		muteButton = miniButton("Mute", "🔊", 30, function()
+			local live = ProfileController:Get()
+			local now = if live ~= nil then tonumber((live.Settings :: any)[settingName]) else nil
+			local value = now or level
+
+			if value > 0 then
+				mutedFrom[settingName] = value
+				value = 0
+			else
+				-- Back to where they were, not to the default. Remembering it is the
+				-- whole point; the default is only the fallback for a rejoin, which has
+				-- nowhere to have remembered anything.
+				value = mutedFrom[settingName] or VOLUME_DEFAULTS[settingName] or 100
+			end
+
+			slider.Set(value)
+			apply(value, true)
+		end)
+		muteButton.AnchorPoint = Vector2.new(1, 0.5)
+		muteButton.Position = UDim2.new(1, 0, 0.5, 0)
+		muteButton.TextSize = 13
+		muteButton.Text = if level <= 0 then "🔇" else "🔊"
 	end
 
 	order += 1
