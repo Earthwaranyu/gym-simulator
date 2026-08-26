@@ -89,6 +89,11 @@ export type Rig = {
 }
 
 local SMOOTH = Enum.Material.SmoothPlastic
+-- Stock materials, so this costs no asset question at all. Cloth and leather under the
+-- same light are most of what reads as "not plastic" at a glance, and a thief is almost
+-- entirely made of both.
+local FABRIC = Enum.Material.Fabric
+local LEATHER = Enum.Material.Leather
 
 --[[
 	The thief.
@@ -107,21 +112,118 @@ local THIEF: Rig = {
 	RootSize = Vector3.new(2, 2, 1),
 
 	Bones = {
-		{ Name = "LowerTorso", Shape = "Block", Size = Vector3.new(1.15, 0.85, 0.75), Shade = -0.15 },
-		{ Name = "UpperTorso", Shape = "Block", Size = Vector3.new(1.55, 1.5, 0.9), Shade = 0 },
+		{
+			Name = "LowerTorso",
+			Shape = "Block",
+			Size = Vector3.new(1.15, 0.85, 0.75),
+			Shade = -0.15,
+			Material = FABRIC,
+		},
+		{
+			Name = "UpperTorso",
+			Shape = "Block",
+			Size = Vector3.new(1.55, 1.5, 0.9),
+			Shade = 0,
+			Material = FABRIC,
+		},
 		-- Hooded and masked, so the head is cloth rather than skin and takes the body's
 		-- colour without looking wrong.
-		{ Name = "Head", Shape = "Ball", Size = Vector3.new(1, 1, 1), Shade = 0.05 },
+		{ Name = "Head", Shape = "Ball", Size = Vector3.new(1, 1, 1), Shade = 0.05, Material = FABRIC },
 
-		{ Name = "RightUpperArm", Shape = "Capsule", Size = Vector3.new(0.45, 1.2, 0.45), Shade = -0.05 },
-		{ Name = "RightLowerArm", Shape = "Capsule", Size = Vector3.new(0.4, 1.1, 0.4), Shade = -0.1 },
-		{ Name = "LeftUpperArm", Shape = "Capsule", Size = Vector3.new(0.45, 1.2, 0.45), Shade = -0.05 },
-		{ Name = "LeftLowerArm", Shape = "Capsule", Size = Vector3.new(0.4, 1.1, 0.4), Shade = -0.1 },
+		{
+			Name = "RightUpperArm",
+			Shape = "Capsule",
+			Size = Vector3.new(0.45, 1.2, 0.45),
+			Shade = -0.05,
+			Material = FABRIC,
+		},
+		{
+			Name = "RightLowerArm",
+			Shape = "Capsule",
+			Size = Vector3.new(0.4, 1.1, 0.4),
+			Shade = -0.1,
+			Material = FABRIC,
+		},
+		{
+			Name = "LeftUpperArm",
+			Shape = "Capsule",
+			Size = Vector3.new(0.45, 1.2, 0.45),
+			Shade = -0.05,
+			Material = FABRIC,
+		},
+		{
+			Name = "LeftLowerArm",
+			Shape = "Capsule",
+			Size = Vector3.new(0.4, 1.1, 0.4),
+			Shade = -0.1,
+			Material = FABRIC,
+		},
 
-		{ Name = "RightUpperLeg", Shape = "Capsule", Size = Vector3.new(0.55, 1.15, 0.55), Shade = -0.25 },
-		{ Name = "RightLowerLeg", Shape = "Capsule", Size = Vector3.new(0.48, 1.05, 0.48), Shade = -0.32 },
-		{ Name = "LeftUpperLeg", Shape = "Capsule", Size = Vector3.new(0.55, 1.15, 0.55), Shade = -0.25 },
-		{ Name = "LeftLowerLeg", Shape = "Capsule", Size = Vector3.new(0.48, 1.05, 0.48), Shade = -0.32 },
+		{
+			Name = "RightUpperLeg",
+			Shape = "Capsule",
+			Size = Vector3.new(0.55, 1.15, 0.55),
+			Shade = -0.25,
+			Material = FABRIC,
+		},
+		{
+			Name = "RightLowerLeg",
+			Shape = "Capsule",
+			Size = Vector3.new(0.48, 1.05, 0.48),
+			Shade = -0.32,
+			Material = FABRIC,
+		},
+		{
+			Name = "LeftUpperLeg",
+			Shape = "Capsule",
+			Size = Vector3.new(0.55, 1.15, 0.55),
+			Shade = -0.25,
+			Material = FABRIC,
+		},
+		{
+			Name = "LeftLowerLeg",
+			Shape = "Capsule",
+			Size = Vector3.new(0.48, 1.05, 0.48),
+			Shade = -0.32,
+			Material = FABRIC,
+		},
+
+		--[[
+			Hands and feet are bones now, not decor welded to a forearm.
+
+			They were rigid, which meant they could not follow a wrist or an ankle
+			because the rig had neither. Promoting them is free animation: GaitConfig
+			already drives ankles, and PosePlayback was skipping that channel only
+			because there was nothing there to find.
+		]]
+		{
+			Name = "RightHand",
+			Shape = "Ball",
+			Size = Vector3.new(0.44, 0.44, 0.44),
+			Shade = -0.45,
+			Material = LEATHER,
+		},
+		{
+			Name = "LeftHand",
+			Shape = "Ball",
+			Size = Vector3.new(0.44, 0.44, 0.44),
+			Shade = -0.45,
+			Material = LEATHER,
+		},
+		{
+			Name = "RightFoot",
+			Shape = "Block",
+			Size = Vector3.new(0.5, 0.3, 0.82),
+			Shade = -0.5,
+			Material = LEATHER,
+		},
+		{
+			Name = "LeftFoot",
+			Shape = "Block",
+			Size = Vector3.new(0.5, 0.3, 0.82),
+			Shade = -0.5,
+			Material = LEATHER,
+		},
 	},
 
 	-- Stock R15 names, deliberately. This is what lets GaitConfig and StrikeConfig drive
@@ -207,6 +309,36 @@ local THIEF: Rig = {
 			C0 = Vector3.new(0, -0.55, 0),
 			C1 = Vector3.new(0, 0.5, 0),
 		},
+
+		-- Stock R15 names again, so the gait's ankle channel finds something.
+		{
+			Name = "RightWrist",
+			Part0 = "RightLowerArm",
+			Part1 = "RightHand",
+			C0 = Vector3.new(0, -0.55, 0),
+			C1 = Vector3.new(0, 0.02, 0),
+		},
+		{
+			Name = "LeftWrist",
+			Part0 = "LeftLowerArm",
+			Part1 = "LeftHand",
+			C0 = Vector3.new(0, -0.55, 0),
+			C1 = Vector3.new(0, 0.02, 0),
+		},
+		{
+			Name = "RightAnkle",
+			Part0 = "RightLowerLeg",
+			Part1 = "RightFoot",
+			C0 = Vector3.new(0, -0.52, 0),
+			C1 = Vector3.new(0, 0.05, -0.16),
+		},
+		{
+			Name = "LeftAnkle",
+			Part0 = "LeftLowerLeg",
+			Part1 = "LeftFoot",
+			C0 = Vector3.new(0, -0.52, 0),
+			C1 = Vector3.new(0, 0.05, -0.16),
+		},
 	},
 
 	Decor = {
@@ -219,6 +351,7 @@ local THIEF: Rig = {
 			Size = Vector3.new(1.24, 1.2, 1.2),
 			Offset = Vector3.new(0, 0.1, -0.06),
 			Shade = -0.35,
+			Material = FABRIC,
 		},
 		-- The peak is what makes it a hood and not a helmet: it overhangs the face and
 		-- throws the eyes into shadow.
@@ -230,6 +363,7 @@ local THIEF: Rig = {
 			Offset = Vector3.new(0, 0.4, 0.34),
 			Rotation = Vector3.new(-20, 0, 0),
 			Shade = -0.42,
+			Material = FABRIC,
 		},
 		-- Cloth across the nose and mouth. Darker than the hood so the face reads as
 		-- two layers rather than one solid lump.
@@ -240,6 +374,7 @@ local THIEF: Rig = {
 			Size = Vector3.new(1.02, 0.36, 1),
 			Offset = Vector3.new(0, -0.14, 0.02),
 			Shade = -0.55,
+			Material = FABRIC,
 		},
 		-- One slit rather than the goblin's two lit eyeballs. A pair of glowing spheres
 		-- is a monster; a band of light under a hood is a person hiding their face.
@@ -262,6 +397,7 @@ local THIEF: Rig = {
 			Offset = Vector3.new(0.55, -0.02, -0.44),
 			Rotation = Vector3.new(0, 0, -12),
 			Shade = -0.45,
+			Material = LEATHER,
 		},
 		{
 			Name = "Strap",
@@ -271,6 +407,7 @@ local THIEF: Rig = {
 			Offset = Vector3.new(0.26, 0, 0.47),
 			Rotation = Vector3.new(0, 0, 16),
 			Shade = -0.5,
+			Material = LEATHER,
 		},
 		{
 			Name = "Belt",
@@ -279,41 +416,19 @@ local THIEF: Rig = {
 			Size = Vector3.new(1.2, 0.22, 0.82),
 			Offset = Vector3.new(0, -0.22, 0),
 			Shade = -0.5,
+			Material = LEATHER,
 		},
 
+		-- The coat hem. Legs emerging from cloth rather than straight out of a box is
+		-- most of the difference between a figure and a set of shapes.
 		{
-			Name = "HandRight",
-			Parent = "RightLowerArm",
-			Shape = "Ball",
-			Size = Vector3.new(0.44, 0.44, 0.44),
-			Offset = Vector3.new(0, -0.58, 0),
-			Shade = -0.45,
-		},
-		{
-			Name = "HandLeft",
-			Parent = "LeftLowerArm",
-			Shape = "Ball",
-			Size = Vector3.new(0.44, 0.44, 0.44),
-			Offset = Vector3.new(0, -0.58, 0),
-			Shade = -0.45,
-		},
-		{
-			Name = "FootRight",
-			Parent = "RightLowerLeg",
-			Shape = "Wedge",
-			Size = Vector3.new(0.52, 0.26, 0.8),
-			Offset = Vector3.new(0, -0.56, 0.18),
-			Rotation = Vector3.new(0, 180, 0),
-			Shade = -0.5,
-		},
-		{
-			Name = "FootLeft",
-			Parent = "LeftLowerLeg",
-			Shape = "Wedge",
-			Size = Vector3.new(0.52, 0.26, 0.8),
-			Offset = Vector3.new(0, -0.56, 0.18),
-			Rotation = Vector3.new(0, 180, 0),
-			Shade = -0.5,
+			Name = "CoatHem",
+			Parent = "LowerTorso",
+			Shape = "Block",
+			Size = Vector3.new(1.16, 0.5, 0.86),
+			Offset = Vector3.new(0, -0.52, 0),
+			Shade = -0.4,
+			Material = FABRIC,
 		},
 	},
 }
@@ -321,260 +436,192 @@ local THIEF: Rig = {
 --[[
 	The brute.
 
-	This used to be the goblin rig wearing horns at 2.1x scale, which is a zoomed goblin
-	however much you decorate it. It has its own proportions now, and they are the only
-	thing doing the work: a very wide chest, a waist that does not follow it, arms
-	thicker than the thief's legs, and a head left at ordinary size.
+	This rig is deliberately ordinary. Its bones sit at the **stock R15 bind pose**
+	BodyLoftConfig.BONES describes — shoulders at x +/- 1.5, hips at +/- 0.5, the torso
+	from y 0.1 down to -0.9 — because a lofted body is dressed onto it, and the loft's
+	geometry is authored against exactly those positions. A bone that sits anywhere else
+	hands the mesh a constant offset and the body arrives bent.
 
-	The head is the trick. Muscle is not read in absolute size — everything is bigger at
-	2.1x — it is read in the ratio of shoulders to skull, so the head deliberately does
-	not grow with the chest.
+	So the muscle does not come from the boxes any more. The boxes are the skeleton and
+	the fallback; the bulk comes from the loft, which is given every muscle progress at
+	1.0. That is the whole point of the change: a very muscular man rather than a large
+	arrangement of shapes.
 
-	The idea is borrowed from PhysiqueConfig, which grows the player on X and Z and
-	leaves Y alone. Only the idea: that system deforms an EditableMesh and is capped at
-	a handful of instances per client, so it could never dress a mob.
+	It still has to look right unclothed, because the loft is allowed to fail — a client
+	holds only seven or eight EditableMesh instances and a busy arena can spend them all
+	— so these proportions are a heavy build, not a placeholder.
 ]]
 local BRUTE: Rig = {
 	Id = "Brute",
 	RootSize = Vector3.new(2, 2, 1),
 
 	Bones = {
-		{ Name = "LowerTorso", Shape = "Block", Size = Vector3.new(1.35, 0.8, 0.85), Shade = -0.05 },
-		{ Name = "UpperTorso", Shape = "Block", Size = Vector3.new(2.6, 1.7, 1.35), Shade = 0 },
-		-- Not scaled up with the chest. A big head on big shoulders is just a big man;
-		-- a normal head on those shoulders is a bodybuilder.
-		{ Name = "Head", Shape = "Ball", Size = Vector3.new(1, 1, 1), Shade = 0.04 },
+		{ Name = "LowerTorso", Shape = "Block", Size = Vector3.new(1.9, 0.9, 1), Shade = 0 },
+		{ Name = "UpperTorso", Shape = "Block", Size = Vector3.new(2.1, 1.6, 1.15), Shade = 0 },
+		{ Name = "Head", Shape = "Ball", Size = Vector3.new(1.15, 1.15, 1.15), Shade = 0.04 },
 
-		{ Name = "RightUpperArm", Shape = "Capsule", Size = Vector3.new(0.95, 1.3, 0.95), Shade = -0.02 },
-		{ Name = "RightLowerArm", Shape = "Capsule", Size = Vector3.new(0.82, 1.15, 0.82), Shade = -0.05 },
-		{ Name = "LeftUpperArm", Shape = "Capsule", Size = Vector3.new(0.95, 1.3, 0.95), Shade = -0.02 },
-		{ Name = "LeftLowerArm", Shape = "Capsule", Size = Vector3.new(0.82, 1.15, 0.82), Shade = -0.05 },
+		{ Name = "RightUpperArm", Shape = "Capsule", Size = Vector3.new(0.82, 1.1, 0.82), Shade = 0 },
+		{ Name = "RightLowerArm", Shape = "Capsule", Size = Vector3.new(0.72, 1.05, 0.72), Shade = -0.03 },
+		{ Name = "RightHand", Shape = "Ball", Size = Vector3.new(0.68, 0.68, 0.68), Shade = -0.02 },
+		{ Name = "LeftUpperArm", Shape = "Capsule", Size = Vector3.new(0.82, 1.1, 0.82), Shade = 0 },
+		{ Name = "LeftLowerArm", Shape = "Capsule", Size = Vector3.new(0.72, 1.05, 0.72), Shade = -0.03 },
+		{ Name = "LeftHand", Shape = "Ball", Size = Vector3.new(0.68, 0.68, 0.68), Shade = -0.02 },
 
-		{ Name = "RightUpperLeg", Shape = "Capsule", Size = Vector3.new(1, 1.1, 1), Shade = -0.12 },
-		{ Name = "RightLowerLeg", Shape = "Capsule", Size = Vector3.new(0.82, 1, 0.82), Shade = -0.16 },
-		{ Name = "LeftUpperLeg", Shape = "Capsule", Size = Vector3.new(1, 1.1, 1), Shade = -0.12 },
-		{ Name = "LeftLowerLeg", Shape = "Capsule", Size = Vector3.new(0.82, 1, 0.82), Shade = -0.16 },
+		{ Name = "RightUpperLeg", Shape = "Capsule", Size = Vector3.new(0.92, 1.25, 0.92), Shade = -0.06 },
+		{ Name = "RightLowerLeg", Shape = "Capsule", Size = Vector3.new(0.8, 1.15, 0.8), Shade = -0.1 },
+		{ Name = "RightFoot", Shape = "Block", Size = Vector3.new(0.86, 0.36, 1.1), Shade = -0.55 },
+		{ Name = "LeftUpperLeg", Shape = "Capsule", Size = Vector3.new(0.92, 1.25, 0.92), Shade = -0.06 },
+		{ Name = "LeftLowerLeg", Shape = "Capsule", Size = Vector3.new(0.8, 1.15, 0.8), Shade = -0.1 },
+		{ Name = "LeftFoot", Shape = "Block", Size = Vector3.new(0.86, 0.36, 1.1), Shade = -0.55 },
 	},
 
+	--[[
+		Every C1 is zero and every C0 is the plain difference between two bind
+		positions, so each part lands exactly on the coordinate BodyLoftConfig.BONES
+		names for it. Written this way on purpose: the moment a C1 starts nudging a
+		limb for looks, the rig and the mesh disagree and nobody can see why.
+	]]
 	Joints = {
 		{
 			Name = "Root",
 			Part0 = "HumanoidRootPart",
 			Part1 = "LowerTorso",
-			C0 = Vector3.new(0, -0.55, 0),
+			C0 = Vector3.new(0, -0.9, 0),
 			C1 = Vector3.zero,
 		},
 		{
 			Name = "Waist",
 			Part0 = "LowerTorso",
 			Part1 = "UpperTorso",
-			C0 = Vector3.new(0, 0.4, 0),
-			C1 = Vector3.new(0, -0.85, 0),
+			C0 = Vector3.new(0, 1, 0),
+			C1 = Vector3.zero,
 		},
+		-- The head is not a loft bone; it keeps its own placement above the chest.
 		{
 			Name = "Neck",
 			Part0 = "UpperTorso",
 			Part1 = "Head",
-			C0 = Vector3.new(0, 0.85, 0),
-			C1 = Vector3.new(0, -0.5, 0),
+			C0 = Vector3.new(0, 1.35, 0),
+			C1 = Vector3.zero,
 		},
 
 		{
 			Name = "RightShoulder",
 			Part0 = "UpperTorso",
 			Part1 = "RightUpperArm",
-			C0 = Vector3.new(1.45, 0.5, 0),
-			C1 = Vector3.new(0, 0.6, 0),
+			C0 = Vector3.new(1.5, 0.2, 0),
+			C1 = Vector3.zero,
 		},
 		{
 			Name = "RightElbow",
 			Part0 = "RightUpperArm",
 			Part1 = "RightLowerArm",
-			C0 = Vector3.new(0, -0.62, 0),
-			C1 = Vector3.new(0, 0.55, 0),
+			C0 = Vector3.new(0, -0.59, 0),
+			C1 = Vector3.zero,
+		},
+		{
+			Name = "RightWrist",
+			Part0 = "RightLowerArm",
+			Part1 = "RightHand",
+			C0 = Vector3.new(0, -0.6, 0),
+			C1 = Vector3.zero,
 		},
 		{
 			Name = "LeftShoulder",
 			Part0 = "UpperTorso",
 			Part1 = "LeftUpperArm",
-			C0 = Vector3.new(-1.45, 0.5, 0),
-			C1 = Vector3.new(0, 0.6, 0),
+			C0 = Vector3.new(-1.5, 0.2, 0),
+			C1 = Vector3.zero,
 		},
 		{
 			Name = "LeftElbow",
 			Part0 = "LeftUpperArm",
 			Part1 = "LeftLowerArm",
-			C0 = Vector3.new(0, -0.62, 0),
-			C1 = Vector3.new(0, 0.55, 0),
+			C0 = Vector3.new(0, -0.59, 0),
+			C1 = Vector3.zero,
+		},
+		{
+			Name = "LeftWrist",
+			Part0 = "LeftLowerArm",
+			Part1 = "LeftHand",
+			C0 = Vector3.new(0, -0.6, 0),
+			C1 = Vector3.zero,
 		},
 
 		{
 			Name = "RightHip",
 			Part0 = "LowerTorso",
 			Part1 = "RightUpperLeg",
-			C0 = Vector3.new(0.45, -0.4, 0),
-			C1 = Vector3.new(0, 0.52, 0),
+			C0 = Vector3.new(0.5, -0.59, 0),
+			C1 = Vector3.zero,
 		},
 		{
 			Name = "RightKnee",
 			Part0 = "RightUpperLeg",
 			Part1 = "RightLowerLeg",
-			C0 = Vector3.new(0, -0.52, 0),
-			C1 = Vector3.new(0, 0.48, 0),
+			C0 = Vector3.new(0, -0.73, 0),
+			C1 = Vector3.zero,
+		},
+		{
+			Name = "RightAnkle",
+			Part0 = "RightLowerLeg",
+			Part1 = "RightFoot",
+			C0 = Vector3.new(0, -0.63, 0),
+			C1 = Vector3.zero,
 		},
 		{
 			Name = "LeftHip",
 			Part0 = "LowerTorso",
 			Part1 = "LeftUpperLeg",
-			C0 = Vector3.new(-0.45, -0.4, 0),
-			C1 = Vector3.new(0, 0.52, 0),
+			C0 = Vector3.new(-0.5, -0.59, 0),
+			C1 = Vector3.zero,
 		},
 		{
 			Name = "LeftKnee",
 			Part0 = "LeftUpperLeg",
 			Part1 = "LeftLowerLeg",
-			C0 = Vector3.new(0, -0.52, 0),
-			C1 = Vector3.new(0, 0.48, 0),
+			C0 = Vector3.new(0, -0.73, 0),
+			C1 = Vector3.zero,
+		},
+		{
+			Name = "LeftAnkle",
+			Part0 = "LeftLowerLeg",
+			Part1 = "LeftFoot",
+			C0 = Vector3.new(0, -0.63, 0),
+			C1 = Vector3.zero,
 		},
 	},
 
+	--[[
+		Almost nothing. Decor rides the bones rigidly, and anything sitting proud of
+		the chest would poke through the lofted body that is dressed over it. What is
+		left is the face, which the loft does not generate, and the shorts.
+	]]
 	Decor = {
-		-- Traps filling the gap between neck and shoulder are what stop a wide chest
-		-- reading as a wardrobe.
-		{
-			Name = "TrapRight",
-			Parent = "UpperTorso",
-			Shape = "Wedge",
-			Size = Vector3.new(0.72, 0.5, 0.72),
-			Offset = Vector3.new(0.6, 0.82, -0.08),
-			Rotation = Vector3.new(0, 0, -18),
-			Shade = -0.06,
-		},
-		{
-			Name = "TrapLeft",
-			Parent = "UpperTorso",
-			Shape = "Wedge",
-			Size = Vector3.new(0.72, 0.5, 0.72),
-			Offset = Vector3.new(-0.6, 0.82, -0.08),
-			Rotation = Vector3.new(0, 0, 18),
-			Shade = -0.06,
-		},
-		--[[
-			Two pecs, and the gap between them is the point.
-
-			These were 1.08 wide at 0.54 out, which put their inner edges together and
-			made one flat slab across the whole chest — a breastplate, not a chest. They
-			are narrower and further apart now so the sternum line survives, and rolled
-			outward slightly so each one turns away from the centre.
-		]]
-		{
-			Name = "PecRight",
-			Parent = "UpperTorso",
-			Shape = "Block",
-			Size = Vector3.new(0.92, 0.56, 0.26),
-			Offset = Vector3.new(0.62, 0.32, 0.64),
-			Rotation = Vector3.new(10, 0, -6),
-			Shade = 0.09,
-		},
-		{
-			Name = "PecLeft",
-			Parent = "UpperTorso",
-			Shape = "Block",
-			Size = Vector3.new(0.92, 0.56, 0.26),
-			Offset = Vector3.new(-0.62, 0.32, 0.64),
-			Rotation = Vector3.new(10, 0, 6),
-			Shade = 0.09,
-		},
-
-		-- Sat high enough to read as a separate band floating over the face. Lowered
-		-- onto the eyes and pulled back into the skull so it shades them instead.
 		{
 			Name = "Brow",
 			Parent = "Head",
 			Shape = "Block",
-			Size = Vector3.new(0.86, 0.16, 0.34),
-			Offset = Vector3.new(0, 0.17, 0.4),
+			Size = Vector3.new(0.9, 0.16, 0.36),
+			Offset = Vector3.new(0, 0.2, 0.46),
 			Rotation = Vector3.new(-14, 0, 0),
 			Shade = -0.2,
 		},
-		-- Dark, not Neon. Lit eyes were right on a goblin and are wrong on a man: this
-		-- is meant to be the biggest thing in the gym, not something supernatural.
 		{
 			Name = "EyeRight",
 			Parent = "Head",
 			Shape = "Ball",
-			Size = Vector3.new(0.16, 0.16, 0.16),
-			Offset = Vector3.new(0.24, 0.06, 0.48),
+			Size = Vector3.new(0.17, 0.17, 0.17),
+			Offset = Vector3.new(0.26, 0.06, 0.53),
 			Shade = -0.85,
 		},
 		{
 			Name = "EyeLeft",
 			Parent = "Head",
 			Shape = "Ball",
-			Size = Vector3.new(0.16, 0.16, 0.16),
-			Offset = Vector3.new(-0.24, 0.06, 0.48),
+			Size = Vector3.new(0.17, 0.17, 0.17),
+			Offset = Vector3.new(-0.26, 0.06, 0.53),
 			Shade = -0.85,
-		},
-
-		-- The body is skin, so the shorts have to come from the shade ramp.
-		{
-			Name = "Shorts",
-			Parent = "LowerTorso",
-			Shape = "Block",
-			Size = Vector3.new(1.48, 0.72, 0.98),
-			Offset = Vector3.new(0, -0.28, 0),
-			Shade = -0.78,
-		},
-		{
-			Name = "WrapRight",
-			Parent = "RightLowerArm",
-			Shape = "Block",
-			Size = Vector3.new(0.88, 0.3, 0.88),
-			Offset = Vector3.new(0, -0.4, 0),
-			Shade = -0.7,
-		},
-		{
-			Name = "WrapLeft",
-			Parent = "LeftLowerArm",
-			Shape = "Block",
-			Size = Vector3.new(0.88, 0.3, 0.88),
-			Offset = Vector3.new(0, -0.4, 0),
-			Shade = -0.7,
-		},
-
-		{
-			Name = "HandRight",
-			Parent = "RightLowerArm",
-			Shape = "Ball",
-			Size = Vector3.new(0.8, 0.8, 0.8),
-			Offset = Vector3.new(0, -0.62, 0),
-			Shade = -0.02,
-		},
-		{
-			Name = "HandLeft",
-			Parent = "LeftLowerArm",
-			Shape = "Ball",
-			Size = Vector3.new(0.8, 0.8, 0.8),
-			Offset = Vector3.new(0, -0.62, 0),
-			Shade = -0.02,
-		},
-		{
-			Name = "FootRight",
-			Parent = "RightLowerLeg",
-			Shape = "Wedge",
-			Size = Vector3.new(0.86, 0.34, 1.1),
-			Offset = Vector3.new(0, -0.54, 0.22),
-			Rotation = Vector3.new(0, 180, 0),
-			Shade = -0.6,
-		},
-		{
-			Name = "FootLeft",
-			Parent = "LeftLowerLeg",
-			Shape = "Wedge",
-			Size = Vector3.new(0.86, 0.34, 1.1),
-			Offset = Vector3.new(0, -0.54, 0.22),
-			Rotation = Vector3.new(0, 180, 0),
-			Shade = -0.6,
 		},
 	},
 }

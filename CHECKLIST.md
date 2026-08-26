@@ -2455,3 +2455,49 @@ traffic exists:
       which put their inner edges together and made a single flat plate across the chest —
       a breastplate, not a chest. Narrower and further apart, they leave a 0.67-stud gap and
       the sternum survives.
+
+- [x] 180. **The boss wears a real body.** The mobs were primitives and looked it. The game
+      already renders a genuinely muscular body — `BodyLoftBuilder`, one procedurally
+      lofted skinned mesh driven by bones that follow the stock R15 rig — and
+      `Build(progressByStat, detail, palette, scales)` turns out to be entirely
+      player-agnostic: four plain tables in, a MeshPart out. "Very muscular" is literally
+      every progress at 1.0.
+      So a boss now wears it. `BodyLoftController` drives players **plus** models carrying
+      a tag, and `MobService` tags bosses with the same `MuscleProgress` and `MuscleScales`
+      folders a character carries. That is the whole integration — no branch anywhere in
+      that controller learned what a mob is, because `dress`, `progressOf`, `paletteOf` and
+      `follow` all read a Model and a rig rather than a Player.
+      **Only bosses, and that is a budget decision rather than an oversight.** A Play client
+      allows seven or eight `EditableMesh` instances at once — a cap on instances, not
+      memory — and each dressed body costs one. Six thieves in a field would spend what the
+      players' own bodies need, and `CreateEditableMesh` returns nil rather than erroring,
+      so the loss would be silent. Players are refreshed before bosses for the same reason:
+      whatever is dressed last is what goes without, and a boss falling back to its own rig
+      is a worse-looking boss while a player falling back is the player's own body missing.
+      **Two things had to be fixed before the mesh would fit.** The rig had no
+      `LeftHand`/`RightHand`/`LeftFoot`/`RightFoot` — hands and feet were rigid decor — so
+      four of the loft's fifteen bones had nothing to follow. Promoting them to real bones
+      with wrist and ankle joints also bought animation that was never there: GaitConfig
+      drives ankles, and PosePlayback had been skipping that channel only because the rig
+      had none. Both rigs got it.
+      The second was scale, and it took two attempts. `BodyLoftConfig.BONES` is an absolute
+      bind pose in studs, and a boss rig is built at 2.1, so every bone was handed a large
+      constant translation and the body arrived in pieces — arms floating off the shoulders.
+      Scaling the rendered part was necessary but not sufficient: the fix is that the *Bone*
+      stays at the unscaled bind, because that is the pose the skin weights were baked
+      against, while `bindInverse` is measured against the **rig**, which rests at 2.1 times
+      those coordinates. Getting that one wrong is what folded the second attempt into a
+      lump. Measured after: every bone's rest offset is exactly 0.
+      The brute rig is therefore ordinary human proportions now rather than a 2.6-wide
+      chest. The muscle comes from the loft; the boxes are the skeleton and the fallback.
+      **The thief stays primitive by design** and got what primitives can have: Fabric and
+      Leather instead of SmoothPlastic — stock materials, so no asset question at all —
+      real hand and foot bones, and a coat hem so the legs emerge from cloth rather than
+      from a box. Verified in a field: 31 fabric parts, 7 leather, 15 joints, and no
+      EditableMesh instance at all.
+      Verified on the boss: dressed and active, 15 bones, every rest offset 0, body
+      11.99 x 8.11 x 5.64 against a player's 4.11 x 3.86 x 1.37, and while it walks 13 rig
+      joints animate — including the new ankles — with 14 loft bones following them.
+      CLAUDE.md's asset paragraph was describing the dead AI-mesh pipeline as if it shipped.
+      Corrected: there is no mesh asset in the game, the body is generated at runtime, and
+      the fourteen-piece cutter is disabled and unrevivable as written.

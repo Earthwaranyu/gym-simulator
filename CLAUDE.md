@@ -50,10 +50,17 @@ and currency images in `ShopIcons.luau` were made for this project. An image fro
 Toolbox or an outside artist still is not. Everything without uploaded art stays drawn
 in `Icons.luau`, which remains the default for interface glyphs.
 
-The one mesh asset is the player's body, generated for this project by Studio's mesh
-generator and cut into R15 parts by `BodyMeshConfig`/`BodyMeshBuilder`. It is allowed
-because it is ours, not because meshes in general are: a mesh from the Toolbox or an
-outside artist still is not.
+There is no mesh asset in the shipped game at all. The player's body — and, since it is
+the same system, a boss's — is generated at runtime by `BodyLoftBuilder`: one skinned
+`EditableMesh` lofted from numbers in `BodyLoftConfig`, with no uploaded geometry
+anywhere. Nothing here is anyone else's work because nothing here is authored art.
+
+`BodyMeshConfig`/`BodyMeshBuilder` describe an earlier attempt that cut an AI-generated
+sculpt into fourteen R15 parts. It is **disabled** (`_BodyMeshController`, underscore) and
+cannot be revived as written: a Play client allows only seven or eight `EditableMesh`
+instances at once, so fourteen pieces can never render. Read its header before reaching
+for it. Should a mesh ever be uploaded, the rule is unchanged — ours is allowed because
+it is ours, not because meshes in general are.
 
 
 ## Git

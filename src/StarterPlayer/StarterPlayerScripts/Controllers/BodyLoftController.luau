@@ -18,6 +18,7 @@
 	reached, and on a busy server some clients will hit it.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -46,6 +47,28 @@ local SCALES_FOLDER_NAME = "MuscleScales"
 	only once the body has survived a frame, and cleared the moment it has not.
 ]]
 local ACTIVE_ATTRIBUTE = "BodyLoftActive"
+--[[
+	How much larger than the loft's bind pose a rig is, read off the model.
+
+	BodyLoftConfig.BONES is an absolute bind pose in studs — shoulders at x +/- 1.5 —
+	and `follow` hands each bone the difference between where its limb is now and where
+	that bind says it should be. A rig built at another scale therefore hands every bone
+	a large constant translation, and the body arrives in pieces: arms floating off the
+	shoulders, the head adrift. Bosses are built at 2.1.
+
+	The fix is to render the mesh at the rig's scale and then express the bone deltas in
+	that scaled space, which is what `rigScale` is for. A player has no attribute and
+	scale 1, so nothing about the player path changes.
+]]
+local SCALE_ATTRIBUTE = "LoftScale"
+
+local function rigScaleOf(character: Model): number
+	local scale = tonumber(character:GetAttribute(SCALE_ATTRIBUTE))
+	if scale == nil or scale <= 0 then
+		return 1
+	end
+	return scale
+end
 -- Growth is continuous but rebuilding is not free, so progress is rounded to steps.
 -- Twenty-four is fine enough that a step is invisible and coarse enough that a long
 -- training session rebuilds a couple of dozen times, not every frame.
@@ -64,6 +87,8 @@ type Dressed = {
 	-- vertex colours, so there is nothing to tint afterwards, only a rebuild.
 	palette: BodyLoftBuilder.Palette,
 	detail: string,
+	-- How much bigger this rig is than the loft's bind pose. 1 for a player.
+	rigScale: number,
 	hidden: { BasePart },
 	-- Set once the body has survived a frame. Until then the rig stays visible.
 	proven: boolean,
@@ -176,15 +201,28 @@ local function dress(
 		return false
 	end
 
+	local rigScale = rigScaleOf(character)
+
 	local bones: { [string]: Bone } = {}
 	local bindInverse: { [string]: CFrame } = {}
 	local rootBone: Bone? = nil
 	for _, definition in BodyLoftConfig.BONES do
 		local bone = Instance.new("Bone")
 		bone.Name = definition.Name
+		--[[
+			The Bone itself stays at the unscaled bind, because that is the pose the
+			mesh's skin weights were baked against — move it and every vertex is
+			displaced before a single frame runs.
+
+			`bindInverse` is a different question. It is measured against the *rig*,
+			whose limbs rest at `rigScale` times these coordinates, so it has to be
+			scaled or the delta is not zero when the boss is standing still. That
+			non-zero rest pose is what folded the first attempt into a lump.
+		]]
 		bone.CFrame = CFrame.new(definition.X, definition.Y, definition.Z)
 		bones[definition.Name] = bone
-		bindInverse[definition.Name] = bone.CFrame:Inverse()
+		bindInverse[definition.Name] =
+			CFrame.new(definition.X * rigScale, definition.Y * rigScale, definition.Z * rigScale):Inverse()
 		if definition.Name == "Root" then
 			rootBone = bone
 		end
@@ -209,6 +247,12 @@ local function dress(
 		if descendant:IsA("BasePart") and descendant.Name ~= "Head" and descendant ~= root then
 			table.insert(hidden, descendant)
 		end
+	end
+
+	if rigScale ~= 1 then
+		-- Scales the geometry and the bone space with it, so the skeleton keeps
+		-- lining up with the mesh it drives.
+		built.Part.Size *= rigScale
 	end
 
 	built.Part.CFrame = root.CFrame
@@ -250,6 +294,7 @@ local function dress(
 		scaleSteps = scaleSteps,
 		palette = palette,
 		detail = detailName,
+		rigScale = rigScale,
 		hidden = hidden,
 		proven = false,
 	}
@@ -285,7 +330,17 @@ local function follow(character: Model, entry: Dressed)
 		end
 		local limb = character:FindFirstChild(definition.Part)
 		if limb ~= nil and limb:IsA("BasePart") then
-			bone.Transform = entry.bindInverse[definition.Name] * (inverseRoot * limb.CFrame)
+			local delta = entry.bindInverse[definition.Name] * (inverseRoot * limb.CFrame)
+			if entry.rigScale ~= 1 then
+				-- The limb offsets are world studs on a rig that is `rigScale` times
+				-- the bind, but bone space is scaled by the part, so a stud here is
+				-- already `rigScale` studs on screen. Divide, or every joint travels
+				-- that much too far and the body comes apart.
+				local x, y, z = delta.Position.X, delta.Position.Y, delta.Position.Z
+				delta = CFrame.new(x / entry.rigScale, y / entry.rigScale, z / entry.rigScale)
+					* (delta - delta.Position)
+			end
+			bone.Transform = delta
 		end
 	end
 	-- One frame's grace before the rig is hidden. The body has now been parented and
@@ -382,12 +437,44 @@ function BodyLoftController:Start()
 		end
 	end)
 
+	--[[
+		Everything this controller drives: every player's character, plus any model
+		tagged for a loft body. MobService tags bosses.
+
+		A mob needs no special case anywhere below. `dress`, `progressOf`, `paletteOf`
+		and `follow` all read a Model and a rig, never a Player, so a boss carrying the
+		same MuscleProgress and MuscleScales folders a character carries is dressed by
+		the same code — which is why bosses cost this file a list and not a branch.
+	]]
+	local function driven(): { Model }
+		local models: { Model } = {}
+		for _, player in Players:GetPlayers() do
+			local character = player.Character
+			if character ~= nil and character.Parent ~= nil then
+				table.insert(models, character)
+			end
+		end
+		--[[
+			Players first, deliberately.
+
+			`CreateEditableMesh` returns nil once the cap is reached, so whatever is
+			refreshed last is what goes without a body. A boss losing its mesh and
+			falling back to its own rig is a worse-looking boss; a player losing theirs
+			is the player's own body missing, and that is not a trade worth making.
+		]]
+		for _, model in CollectionService:GetTagged(BodyLoftConfig.MOB_TAG) do
+			if model:IsA("Model") and model.Parent ~= nil then
+				table.insert(models, model)
+			end
+		end
+		return models
+	end
+
 	task.spawn(function()
 		while true do
 			task.wait(0.15)
-			for _, player in Players:GetPlayers() do
-				local character = player.Character
-				if character ~= nil and character.Parent ~= nil then
+			for _, character in driven() do
+				if character.Parent ~= nil then
 					refresh(character)
 					--[[
 						Also drive the body from here, not only from RenderStepped.

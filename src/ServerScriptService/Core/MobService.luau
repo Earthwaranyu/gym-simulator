@@ -31,6 +31,8 @@ local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
+local BodyLoftConfig = require(ReplicatedStorage.Modules.BodyLoftConfig)
+local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local Announce = require(ReplicatedStorage.Modules.Announce)
 local MobRigConfig = require(ReplicatedStorage.Modules.MobRigConfig)
 local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
@@ -103,6 +105,12 @@ local live: { [Model]: Live } = {}
 	matures. Timers keep maturing while a field is asleep, so walking back into range
 	still finds it full, which is the behaviour the wake radius always intended.
 ]]
+-- The top of BodyLoftBuilder's 1..2.2 girth range.
+local BRUTE_SCALE = 2.2
+-- How much bigger the boss rig is than the loft's bind pose. Must match the Scale on
+-- the boss rows in MobConfig, or the dressed body will not line up with its own joints.
+local BRUTE_RIG_SCALE = 2.1
+
 local respawnAt: { [string]: { number } } = {}
 local mobFolder: Folder
 -- Zone id -> os.clock() at which that tier's boss may next appear.
@@ -324,11 +332,61 @@ local function buildMob(definition: MobConfig.Mob): (Model, Humanoid, BasePart)
 	return model, humanoid, bones.UpperTorso or root
 end
 
+--[[
+	Marks a boss to be dressed in the generated body, and says how muscular.
+
+	The numbers are the same shape MuscleService writes into a player's character —
+	a MuscleProgress folder of 0..1 per stat and a MuscleScales folder of per-part
+	growth — because BodyLoftController reads a Model, not a Player. Giving a mob the
+	same two folders is the whole integration; nothing in that controller had to learn
+	what a mob is.
+
+	Everything is at the ceiling. A boss is what the player is training to become, so
+	it should look like the top of the ladder rather than a stage along it.
+
+	Only bosses. A client holds seven or eight EditableMesh instances at once and each
+	dressed body costs one, so a field of six thieves would spend the budget the
+	players' own bodies need. Thieves stay primitives by design, not by omission.
+]]
+local function dressAsBrute(model: Model)
+	local progress = Instance.new("Folder")
+	progress.Name = "MuscleProgress"
+	for _, stat in StatConfig.List do
+		local value = Instance.new("NumberValue")
+		value.Name = stat.Id
+		value.Value = 1
+		value.Parent = progress
+	end
+	progress.Parent = model
+
+	local scales = Instance.new("Folder")
+	scales.Name = "MuscleScales"
+	for _, bone in BodyLoftConfig.BONES do
+		if scales:FindFirstChild(bone.Part) == nil then
+			local value = Instance.new("NumberValue")
+			value.Name = bone.Part
+			-- The top of the loft's 1..2.2 range.
+			value.Value = BRUTE_SCALE
+			value.Parent = scales
+		end
+	end
+	scales.Parent = model
+
+	-- The rig is built at the row's Scale; the loft bind pose is not. Telling the
+	-- client which is which is the difference between a boss and a pile of limbs.
+	model:SetAttribute("LoftScale", BRUTE_RIG_SCALE)
+	CollectionService:AddTag(model, BodyLoftConfig.MOB_TAG)
+end
+
 function MobService:_spawn(definition: MobConfig.Mob, home: Vector3, radius: number, at: Vector3): Model
 	local model, humanoid, _ = buildMob(definition)
 	model:SetAttribute(MobConfig.ID_ATTRIBUTE, definition.Id)
 	model:SetAttribute(MobConfig.ZONE_ATTRIBUTE, definition.ZoneId)
 	CollectionService:AddTag(model, MobConfig.MOB_TAG)
+
+	if definition.Kind == "Boss" then
+		dressAsBrute(model)
+	end
 
 	local root = model.PrimaryPart :: BasePart
 	-- Pivot rather than place the root alone: the body hangs off the root through

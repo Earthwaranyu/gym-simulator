@@ -42,6 +42,14 @@
 local BodyLoftConfig = {}
 
 BodyLoftConfig.FOLDER_NAME = "GeneratedLoft"
+--[[
+	Non-player models that should also be dressed in the generated body.
+
+	Tagged rather than discovered, because the cap on EditableMesh instances means this
+	can never be "every model that happens to have an R15 rig" — it has to be an
+	explicit, small, deliberate list. MobService tags bosses and nothing else.
+]]
+BodyLoftConfig.MOB_TAG = "LoftBody"
 BodyLoftConfig.PART_NAME = "Body"
 
 --[[
