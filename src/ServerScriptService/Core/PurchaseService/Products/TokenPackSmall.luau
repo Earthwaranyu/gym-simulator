@@ -29,8 +29,9 @@
 	None of them is a route to the cap: one muscle costs 26.2M tokens to max and all
 	five cost 131M, and those numbers do not scale with anything.
 
-	AssetId must be set from the Roblox Creator Dashboard. Until it is, PurchaseService
-	logs a warning at startup and refuses to prompt this product.
+	The AssetId is the live developer product on the Roblox Creator Dashboard, with
+	managed pricing off so the Robux price below is the one the buyer sees. RobuxPrice
+	is only the fallback ProductInfo quotes before its first fetch lands.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -43,7 +44,7 @@ local TOKENS = 250
 local Product: Types.Product = {
 	Id = "TokenPackSmall",
 	Kind = "DevProduct",
-	AssetId = 0,
+	AssetId = 3709886043,
 	DisplayName = "Small Token Pack",
 	Description = "About one hour of training.",
 	TokenGrant = TOKENS,

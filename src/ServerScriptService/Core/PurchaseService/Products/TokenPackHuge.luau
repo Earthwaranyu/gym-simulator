@@ -6,8 +6,9 @@
 	converts it to the buyer's class, so what this really sells is a fixed stretch of
 	progress at any point in the game.
 
-	AssetId must be set from the Roblox Creator Dashboard. Until it is, PurchaseService
-	logs a warning at startup and refuses to prompt this product.
+	The AssetId is the live developer product on the Roblox Creator Dashboard, with
+	managed pricing off so the Robux price below is the one the buyer sees. RobuxPrice
+	is only the fallback ProductInfo quotes before its first fetch lands.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,7 +21,7 @@ local TOKENS = 5000
 local Product: Types.Product = {
 	Id = "TokenPackHuge",
 	Kind = "DevProduct",
-	AssetId = 0,
+	AssetId = 3709886164,
 	DisplayName = "Huge Token Pack",
 	Description = "About twenty hours of training.",
 	TokenGrant = TOKENS,

@@ -2142,3 +2142,23 @@ traffic exists:
       entry looks correct, and a comment claiming otherwise is how it survived two passes.
       No licensing change — all three remaining ids are the same ProSoundEffects recordings
       already in use, and this only removes one.
+
+- [x] 171. **The token packs go on sale.** #167 sized them in hours and #168 taught the card
+      to quote what it will actually pay, but all four still carried `AssetId = 0`, which
+      `_loadProducts` reads as "does not exist yet": four startup warnings, `Available =
+      false`, a `COMING SOON` card that cannot be clicked, and a `PromptProduct` that
+      refuses. The dashboard products now exist, so the ids are pasted in — Small
+      3709886043, Medium 3709886078, Large 3709886119, Huge 3709886164 — and every one of
+      those gates opens on that one field.
+      No shop or receipt code changed, and that is the point: the buy button, the live
+      price label, the class-scaled `≈ N TOKENS` line and the `PurchaseId`-keyed idempotent
+      grant were all built to work the moment an id was real. A feature that needs edits in
+      five files to turn on was not finished when it was written.
+      Managed pricing is deliberately **off** on all four. With it on, Roblox may move the
+      price per region or per experiment, and a pack whose whole pitch is "this many hours
+      for this many Robux" cannot have the second half drift underneath the first. The
+      module's `RobuxPrice` stays at 49/99/199/399 as the pre-warm fallback only — the
+      figure on the card comes from `ProductInfo`, which reads the dashboard at runtime.
+      The header comments that said the id "must be set from the Creator Dashboard" are
+      rewritten rather than left, because a stale instruction to do something already done
+      is how the next reader concludes the file is broken.
