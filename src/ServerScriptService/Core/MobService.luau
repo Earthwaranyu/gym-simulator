@@ -115,6 +115,9 @@ local BRUTE_SCALE = 2.2
 ]]
 local LOFT_ROOT_HEIGHT = 1.199
 
+-- How cut the boss is. 1 is a player; BodyLoftConfig clamps the ceiling.
+local BRUTE_LEANNESS = 1.7
+
 -- How much bigger the boss rig is than the loft's bind pose. Must match the Scale on
 -- the boss rows in MobConfig, or the dressed body will not line up with its own joints.
 local BRUTE_RIG_SCALE = 2.1
@@ -400,8 +403,11 @@ local function dressAsBrute(model: Model)
 		if scales:FindFirstChild(bone.Part) == nil then
 			local value = Instance.new("NumberValue")
 			value.Name = bone.Part
-			-- The top of the loft's 1..2.2 range.
-			value.Value = BRUTE_SCALE
+			-- Hands and feet are absent from every stat's BodyScales, so a player never
+			-- grows them past 1. Inflating them here rounded off the two parts that
+			-- most need to stay crisp.
+			local extremity = string.find(bone.Part, "Hand") ~= nil or string.find(bone.Part, "Foot") ~= nil
+			value.Value = if extremity then 1 else BRUTE_SCALE
 			value.Parent = scales
 		end
 	end
@@ -410,6 +416,9 @@ local function dressAsBrute(model: Model)
 	-- The rig is built at the row's Scale; the loft bind pose is not. Telling the
 	-- client which is which is the difference between a boss and a pile of limbs.
 	model:SetAttribute("LoftScale", BRUTE_RIG_SCALE)
+	-- Cut well past anything training produces. Size alone reads as bulk; this is what
+	-- makes the boss look like the ceiling rather than a heavier player.
+	model:SetAttribute(BodyLoftConfig.LEANNESS_ATTRIBUTE, BRUTE_LEANNESS)
 	CollectionService:AddTag(model, BodyLoftConfig.MOB_TAG)
 end
 

@@ -212,8 +212,11 @@ function BodyLoftBuilder.Build(
 	progressByStat: { [string]: number },
 	detail: Detail,
 	palette: Palette,
-	scales: Scales
+	scales: Scales,
+	-- How cut the body is, independently of how big. 1 is a player; see BodyLoftConfig.
+	rawLeanness: number?
 ): Built?
+	local leanness = BodyLoftConfig.Leanness(rawLeanness)
 	local mesh = AssetService:CreateEditableMesh()
 	if mesh == nil then
 		return nil
@@ -274,7 +277,7 @@ function BodyLoftBuilder.Build(
 		local WHITE = Color3.new(1, 1, 1)
 		local neutral = mesh:AddColor(WHITE, 1)
 		local function shadeFor(relief: number, reach: number): number
-			local tint = BodyLoftConfig.ReliefTint(relief, reach)
+			local tint = BodyLoftConfig.ReliefTint(relief, reach, leanness)
 			if tint >= 1 then
 				return neutral
 			end
@@ -343,7 +346,18 @@ function BodyLoftBuilder.Build(
 					y = axisY,
 					z = axisZ - cosA * localRadius * l.Out,
 					r = lobeRadius * girth,
-					blend = l.Blend * girth,
+					--[[
+						The fillet grows, but slower than the body does.
+
+						Blend is the soft joint where a lobe melts into the tube, and at
+						`* girth` it widened in step with the muscle — so the bigger a
+						body got the more its muscles fused into one smooth mass. That is
+						the same flattening the radius comment above warns about, arriving
+						by a different door. A square root keeps enough growth that a
+						crease never hardens into a seam at size, without letting the
+						separation dissolve.
+					]]
+					blend = l.Blend * math.sqrt(girth),
 					-- Stretch is a shape, not a size, so it rides along unscaled: the
 					-- girth factor is already in the radius and applying it twice would
 					-- make a lat flatten further the bigger the player got.
@@ -372,6 +386,9 @@ function BodyLoftBuilder.Build(
 					local scaleX, scaleZ = ringScale(sample.Bones, scales, partOfBone)
 					local rx = sample.RX * scaleX
 					local rz = sample.RZ * scaleZ
+					-- Leanness rides along with girth: a lean body cuts deeper at the
+					-- same size, which is the whole difference between big and ripped.
+					local grooveScale = (scaleX + scaleZ) * 0.5 * leanness
 					--[[
 						Spread only as far as the ring belongs to the limb.
 
@@ -417,9 +434,18 @@ function BodyLoftBuilder.Build(
 							radius = BodyLoftConfig.SmoothMax(exit, radius, l.blend)
 						end
 					end
-					-- Grooves cut afterwards, so a channel bites into the muscle it
-					-- separates instead of being swallowed by the union.
-					radius += push
+					--[[
+						Grooves cut afterwards, so a channel bites into the muscle it
+						separates instead of being swallowed by the union.
+
+						Scaled by girth for the same reason the lobes are. Displacement
+						is authored in absolute studs, so an unscaled cut stayed a
+						0.18-stud nick while the chest it divides grew from 1.14 to 1.88
+						— the definition washed out exactly as the muscle arrived, and a
+						maxed body read as bulky rather than cut. A cut has to keep its
+						proportion to the thing it separates.
+					]]
+					radius += push * grooveScale
 
 					local position = Vector3.new(centreX + dirX * radius, sample.Y, sample.Z + dirZ * radius)
 					local vertexId = mesh:AddVertex(position)
@@ -583,7 +609,7 @@ function BodyLoftBuilder.Build(
 		for _, value in progressByStat do
 			overall = math.max(overall, value)
 		end
-		local skin = BodySkinPainter.Get(palette, overall)
+		local skin = BodySkinPainter.Get(palette, overall, leanness)
 		if skin ~= nil then
 			part.TextureContent = Content.fromObject(skin)
 		end

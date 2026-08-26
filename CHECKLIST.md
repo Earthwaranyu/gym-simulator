@@ -2534,3 +2534,44 @@ traffic exists:
       is unavailable, so a Blender body would need a human to import it before any of it
       could be wired up. The route stays open; it is a replacement for a working system
       rather than a repair to a broken one.
+
+- [x] 182. **Definition stops washing out as a body grows.** The boss read as fat-muscular
+      rather than ripped, and my first diagnosis — the flat 2.2 girth I hand it — was wrong.
+      Worth writing down as wrong: a maxed player gets the same 2.2 on both UpperTorso and
+      LowerTorso, and PhysiqueConfig already tapers hard (LowerTorso.X 0.17 against
+      UpperTorso.X 0.54, so at 2.2 the chest grows 65% and the waist 20%). The waist was
+      never the problem.
+      The real fault was an asymmetry in BodyLoftBuilder. The base radius scales with
+      girth. Lobes scale with girth, deliberately — the comment there says why: *"the sphere
+      grows with the body too, or muscles shrink relative to a widening torso and the
+      physique flattens out at high rank."* **Grooves did not.** `radius += push` added
+      Displacement in absolute studs, so at 2.2 the chest went from 1.14 to 1.88 while
+      PecCleft stayed a 0.18-stud nick. The exact flattening that comment warns about was
+      happening anyway, one layer down, and the cuts vanished precisely as the muscle
+      arrived. `blend = l.Blend * girth` compounded it: the fillets joining lobes widened
+      with size, so muscles fused more the bigger a body got.
+      Grooves now scale with girth for the same reason lobes do, and the fillet grows on a
+      square root — enough that a crease never hardens into a seam at size, not so much
+      that the separation dissolves. This is a fix for every large body, not just the boss:
+      a maxed player was losing definition the same way.
+      **Then a leanness axis**, because there was none. Definition was purely a function of
+      the same progress that drove size, so nothing could be big and cut independently —
+      a maxed body was a larger beginner. Leanness deepens the cuts and darkens the shadow
+      in them without touching a radius. 1 is a player and the default everywhere; the boss
+      runs 1.7, which is what lets it look like something no amount of training produces.
+      It is clamped rather than trusted, because it multiplies values that self-tests guard:
+      groove depth against the minimum surviving radius, stroke depth against pure black.
+      Both self-tests still pass.
+      The one place a mistake here would never surface is the skin cache, which is shared
+      across every body on the client — a boss painted with deeper shadows would otherwise
+      be handed to the next player sharing its skin tone. Leanness is part of the cache key,
+      quantised like progress already is.
+      Also dropped hands and feet from the boss's scale loop: it was setting every part to
+      2.2 including LeftHand and RightFoot, which a player never grows past 1, rounding off
+      the two parts that most need to stay crisp.
+      Verified: all nineteen self-tests pass, the boss still stands on the ground (mesh
+      bottom -1.418) and still animates (14 loft bones following), and a player has no
+      leanness attribute so their path is untouched. **Not verified: how it actually looks.**
+      Studio's screen capture hung repeatedly and the camera kept being reclaimed, so the
+      "is it ripped" question — the only one that matters here — is still open and wants
+      human eyes.

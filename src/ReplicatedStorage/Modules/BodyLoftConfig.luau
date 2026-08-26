@@ -89,6 +89,32 @@ BodyLoftConfig.MAX_INFLUENCES = 4
 -- tinted at all; see ReliefTint.
 BodyLoftConfig.GROOVE_SHADE = 0.18
 
+--[[
+	How cut a body is, independently of how big it is.
+
+	Until now definition was purely a function of the same progress that drove size, so
+	nothing could be big and lean at once — a maxed body was simply a larger version of a
+	beginner's. Leanness is the missing axis: it deepens the cuts between muscles and
+	darkens the shadow in them without touching a single radius.
+
+	1 is a player and the default everywhere. A boss runs higher, which is what lets it
+	look like something no amount of training produces.
+
+	Clamped rather than trusted. It multiplies values that self-tests guard — groove
+	depth against the minimum surviving radius, stroke depth against pure black — and a
+	number arriving from an attribute has no business being able to walk through those.
+]]
+BodyLoftConfig.DEFAULT_LEANNESS = 1
+BodyLoftConfig.MAX_LEANNESS = 2
+BodyLoftConfig.LEANNESS_ATTRIBUTE = "LoftLeanness"
+
+function BodyLoftConfig.Leanness(value: number?): number
+	if value == nil or value ~= value then
+		return BodyLoftConfig.DEFAULT_LEANNESS
+	end
+	return math.clamp(value, 1, BodyLoftConfig.MAX_LEANNESS)
+end
+
 -- The widest authored torso half-width. Arm spread is measured against this, so a
 -- chest that grows by 65% pushes the arms out by 65% of this, not of their own girth.
 BodyLoftConfig.TORSO_HALF_WIDTH = 1.0
@@ -688,12 +714,15 @@ end
 	Lives here rather than in the builder so it loads under the bare `luau` CLI and
 	can be asserted, like SmoothMax and RayExit before it.
 ]]
-function BodyLoftConfig.ReliefTint(relief: number, reach: number): number
+function BodyLoftConfig.ReliefTint(relief: number, reach: number, leanness: number?): number
 	if reach <= 1e-4 or relief >= 0 then
 		return 1
 	end
 	local depth = math.clamp(-relief / reach, 0, 1)
-	return 1 - depth * BodyLoftConfig.GROOVE_SHADE
+	-- Capped short of 1: a groove is a shadow, and a shadow that reaches black is a
+	-- hole. The existing self-test asserts exactly that and must keep passing.
+	local shade = math.min(BodyLoftConfig.GROOVE_SHADE * BodyLoftConfig.Leanness(leanness), 0.6)
+	return 1 - depth * shade
 end
 
 function BodyLoftConfig.RunSelfTest(): { string }

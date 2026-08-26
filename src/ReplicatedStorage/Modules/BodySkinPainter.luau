@@ -106,7 +106,7 @@ end
 	drawn line is hard-edged and a muscle shadow is not: the falloff across a stroke's
 	width is most of what makes it read as a shadow instead of a scratch.
 ]]
-local function paint(palette: Palette, stage: number): EditableImage?
+local function paint(palette: Palette, stage: number, leanness: number): EditableImage?
 	local image = AssetService:CreateEditableImage({ Size = Vector2.new(RESOLUTION, RESOLUTION) })
 	if image == nil then
 		return nil
@@ -168,7 +168,11 @@ local function paint(palette: Palette, stage: number): EditableImage?
 			continue
 		end
 		local width = column.x1 - column.x0 + 1
-		local depth = s.Depth * strength
+		-- Leaner bodies cut harder. Capped short of 1 because Depth is a fraction
+		-- toward black and a stroke that reaches it stops being a shadow and becomes a
+		-- painted line; BodySkinConfig's self-test holds the authored values under 0.5
+		-- for the same reason.
+		local depth = math.min(s.Depth * leanness, 0.62) * strength
 		-- The stroke's box, padded by its width and clamped to its own column so a
 		-- torso shadow can never bleed onto the arm painted beside it.
 		local pad = s.Width * 2
@@ -219,14 +223,25 @@ end
 	untextured rather than failing, because a plain-coloured body is a far better
 	outcome than no body.
 ]]
-function BodySkinPainter.Get(palette: Palette, progress: number): EditableImage?
+--[[
+	`leanness` is part of the cache key, not just an argument.
+
+	The cache is shared across every body on the client, so a boss painted with deeper
+	shadows would otherwise be handed to the next player who happens to share its skin
+	tone — and that is the kind of wrong that never errors and never looks like a
+	caching bug. Quantised for the same reason `progress` is: a continuous key would
+	repaint a 512px texture for a difference nobody can see.
+]]
+function BodySkinPainter.Get(palette: Palette, progress: number, leanness: number?): EditableImage?
 	local stage = math.floor(math.clamp(progress, 0, 1) * BodySkinConfig.STAGES + 0.5)
-	local id = key(palette, stage)
+	local lean = BodyLoftConfig.Leanness(leanness)
+	local leanStep = math.floor(lean * 10 + 0.5)
+	local id = `{key(palette, stage)}|{leanStep}`
 	local existing = cache[id]
 	if existing then
 		return existing
 	end
-	local image = paint(palette, stage)
+	local image = paint(palette, stage, lean)
 	if image ~= nil then
 		cache[id] = image
 	end

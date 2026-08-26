@@ -62,6 +62,14 @@ local ACTIVE_ATTRIBUTE = "BodyLoftActive"
 ]]
 local SCALE_ATTRIBUTE = "LoftScale"
 
+--[[
+	How cut this body is. A player has no attribute and gets the default, so nothing
+	about the player path changes; MobService sets it on bosses.
+]]
+local function leannessOf(character: Model): number
+	return BodyLoftConfig.Leanness(tonumber(character:GetAttribute(BodyLoftConfig.LEANNESS_ATTRIBUTE)))
+end
+
 local function rigScaleOf(character: Model): number
 	local scale = tonumber(character:GetAttribute(SCALE_ATTRIBUTE))
 	if scale == nil or scale <= 0 then
@@ -89,6 +97,8 @@ type Dressed = {
 	detail: string,
 	-- How much bigger this rig is than the loft's bind pose. 1 for a player.
 	rigScale: number,
+	-- Baked into the mesh and the texture, so a change has to rebuild both.
+	leanness: number,
 	hidden: { BasePart },
 	-- Set once the body has survived a frame. Until then the rig stays visible.
 	proven: boolean,
@@ -196,7 +206,8 @@ local function dress(
 	end
 	local detail = (BodyLoftConfig.DETAIL :: any)[detailName]
 	local palette = paletteOf(character)
-	local built = BodyLoftBuilder.Build(progress, detail, palette, scales)
+	local leanness = leannessOf(character)
+	local built = BodyLoftBuilder.Build(progress, detail, palette, scales, leanness)
 	if built == nil then
 		return false
 	end
@@ -295,6 +306,7 @@ local function dress(
 		palette = palette,
 		detail = detailName,
 		rigScale = rigScale,
+		leanness = leanness,
 		hidden = hidden,
 		proven = false,
 	}
@@ -384,6 +396,7 @@ local function refresh(character: Model)
 		local stale = entry.detail ~= wanted
 			or palette.Skin ~= entry.palette.Skin
 			or palette.Pants ~= entry.palette.Pants
+			or leannessOf(character) ~= entry.leanness
 		if not stale then
 			for statId, value in progress do
 				if quantise(value) ~= entry.steps[statId] then
