@@ -603,39 +603,66 @@ for _, sign in { -1, 1 } do
 	lobe(`{side}PecUpper`, "Chest", "Torso", 0.775, sign * 0.40, 0.62, 0.64, 0.12, 0.34, 0.92, { 1, 0.85, 1 })
 
 	--[[
-		The lat, and the reason Stretch exists at all.
+		The lat, as a stack of heads that narrows on the way down.
 
-		A latissimus is a broad flat sheet down the side of the ribs. Rendered as a
-		sphere — which is what every lobe here was until now — it is a lump on an
-		otherwise smooth back, and the wide V that makes the whole silhouette read
-		simply is not there. Stretched tall in Y and flattened in Z it becomes the
-		sheet, and the flare is what pushes the arms out.
+		A latissimus is wide at the armpit and comes to a point at the waist. An
+		ellipsoid cannot do that: it is exactly as wide at the bottom as it is in the
+		middle, so a lat tall enough to be a sheet is also a slab lying across the
+		waist. This was one lobe centred at y = +0.28 with a vertical semi-axis of 1.28
+		studs — spanning y = -1.00 to +1.56, the whole torso — and on its own it pushed
+		the waist from 0.673 to 1.588 studs at full growth. Inflating it, which is what
+		the pass before this one did, inflated the waist hardest of all. The chest to
+		waist ratio came out at 1.43: a barrel with shoulders.
+
+		Three heads with falling radius carry the taper instead, the same way the
+		deltoid, tricep, quad and calf are already built here. StretchY drops from 1.7
+		to near 1 because the stack is doing the stretching now; StretchZ stays low so
+		these stay sheets down the ribs rather than balls on the back.
+
+		The failure mode to watch is the opposite one: taper so hard the lat stops
+		flaring at the armpit and the back goes narrow. RunSelfTest measures the
+		finished silhouette at both ends for exactly that reason.
 	]]
 	lobe(
-		`{side}Lat`,
+		`{side}LatUpper`,
 		"Back",
 		"Torso",
+		0.635,
+		sign * (PI / 2 - 0.16),
 		0.60,
-		sign * (PI / 2 - 0.15),
-		0.60,
-		0.74,
+		0.72,
 		0.14,
 		0.16,
 		0.88,
-		{ 1.15, 1.7, 0.6 }
+		{ 1.15, 0.95, 0.6 }
 	)
 	lobe(
-		`{side}LatSweep`,
+		`{side}LatMid`,
 		"Back",
 		"Torso",
-		0.44,
-		sign * (PI / 2 + 0.22),
+		0.520,
+		sign * (PI / 2 + 0.04),
 		0.60,
-		0.60,
+		0.50,
 		0.15,
+		0.28,
+		0.92,
+		{ 1.1, 0.85, 0.62 }
+	)
+	-- The point of the sheet. The only head that reaches anywhere near the waist, and
+	-- deliberately the smallest thing on the torso.
+	lobe(
+		`{side}LatLower`,
+		"Back",
+		"Torso",
+		0.430,
+		sign * (PI / 2 + 0.20),
+		0.72,
+		0.30,
+		0.16,
 		0.40,
 		0.95,
-		{ 1.1, 1.5, 0.65 }
+		{ 1.0, 0.75, 0.65 }
 	)
 	-- Between the lat and the rear delt. Small, but the armpit reads as a hollow
 	-- without it and the back loses its outline against the arm.
@@ -673,8 +700,8 @@ for row, t in { 0.56, 0.46, 0.36 } do
 			"Torso",
 			t,
 			sign * 0.20,
-			0.72,
-			0.40,
+			0.74,
+			0.46,
 			0.08,
 			0.30 + (row - 1) * 0.08,
 			0.92
@@ -708,9 +735,9 @@ local function groove(
 end
 
 -- The abdominal grid: one channel down the middle, three across it.
-groove("LineaAlba", "Core", "Torso", 0.46, 0, 0.16, 0.16, 0.19, 0.18, 0.75)
+groove("LineaAlba", "Core", "Torso", 0.46, 0, 0.16, 0.16, 0.22, 0.18, 0.75)
 for row, t in { 0.57, 0.47, 0.37 } do
-	groove(`AbGap{row}`, "Core", "Torso", t, 0, 0.030, 0.42, 0.16, 0.22 + row * 0.05, 0.85)
+	groove(`AbGap{row}`, "Core", "Torso", t, 0, 0.030, 0.42, 0.19, 0.22 + row * 0.05, 0.85)
 end
 
 for _, sign in { -1, 1 } do
@@ -767,7 +794,7 @@ for _, sign in { -1, 1 } do
 	-- The shoulder blade's inner border, between rhomboid and spine.
 	groove(`ScapulaGap{tag}`, "Back", "Torso", 0.70, sign * (PI - 0.16), 0.10, 0.11, 0.12, SPLIT_START, 0.95)
 	-- The serratus fingers along the ribs, under the armpit and above the oblique.
-	groove(`Serratus{tag}`, "Core", "Torso", 0.50, sign * 1.20, 0.055, 0.16, 0.11, 0.55, 1.00)
+	groove(`Serratus{tag}`, "Core", "Torso", 0.50, sign * 1.20, 0.055, 0.16, 0.13, 0.55, 1.00)
 	--[[
 		The line under the oblique, and the reason the waist read as soft.
 
@@ -1395,6 +1422,144 @@ function BodyLoftConfig.RunSelfTest(): { string }
 						)
 					end
 				end
+			end
+		end
+	end
+
+	--[[
+		The finished silhouette, not the ring table.
+
+		This is the check whose absence let a barrel ship while I was measuring the
+		waist. The rings said 0.640 shrinking to 0.618 and that was true — of the
+		*rings*. On top of them sat a latissimus modelled as one tall ellipsoid, just as
+		wide at its bottom as its middle, which pushed the actual surface at the waist
+		from 0.656 to 1.588 studs. The body came out 1.43 chest to waist: a barrel with
+		shoulders, and every number in the config looked right.
+
+		So this measures what the builder builds — base ring, every lobe's ray-union,
+		then the grooves — and asks the two questions a physique is judged on: is the
+		waist still the narrowest part of the torso once it is fully grown, and does the
+		chest clear it by a real margin. Everything needed is pure and already in this
+		module, so it runs under the bare `luau` CLI like the rest.
+	]]
+	do
+		local torso: Tube? = nil
+		for _, tube in tubes do
+			if tube.Id == "Torso" then
+				torso = tube
+			end
+		end
+		if torso == nil then
+			table.insert(failures, "there is no torso to measure")
+		else
+			local body = torso :: Tube
+			local MAX_SCALE = 2.2
+			local growth = MAX_SCALE - 1
+			-- The same weights PhysiqueConfig applies, restated as plain numbers so this
+			-- module stays loadable without it. Kept beside the burial check's copies.
+			local WEIGHT = { UpperTorso = { 0.54, 0.38 }, LowerTorso = { 0.17, 0.17 } }
+
+			local function sampleAt(t: number)
+				local ringList = body.Rings
+				local at = math.clamp(t, 0, 1) * (#ringList - 1) + 1
+				local lower = math.clamp(math.floor(at), 1, #ringList)
+				local upper = math.clamp(lower + 1, 1, #ringList)
+				local frac = at - lower
+				local a, b = ringList[lower], ringList[upper]
+				local sx, sz, total = 0, 0, 0
+				for _, inf in a.Bones do
+					local w = WEIGHT[inf.Bone] or WEIGHT.UpperTorso
+					sx += (1 + growth * w[1]) * inf.Weight
+					sz += (1 + growth * w[2]) * inf.Weight
+					total += inf.Weight
+				end
+				local cinch = 1 - ((a.Cinch or 0) + ((b.Cinch or 0) - (a.Cinch or 0)) * frac)
+				return {
+					Y = a.Y + (b.Y - a.Y) * frac,
+					RX = (a.RX + (b.RX - a.RX) * frac) * (sx / total) * cinch,
+					RZ = (a.RZ + (b.RZ - a.RZ) * frac) * (sz / total) * cinch,
+					Girth = (sx + sz) / (2 * total) * cinch,
+				}
+			end
+
+			-- Half-width of the finished surface at a height, looking head-on.
+			local function halfWidthAt(t: number): number
+				local here = sampleAt(t)
+				local widest = 0
+				for step = 0, 63 do
+					local angle = step / 64 * 2 * PI
+					local dirX, dirZ = math.sin(angle), -math.cos(angle)
+					local radius = math.sqrt((dirX * here.RX) ^ 2 + (dirZ * here.RZ) ^ 2)
+					for _, l in lobes do
+						if l.Tube ~= body.Id then
+							continue
+						end
+						local lobeRadius = BodyLoftConfig.LobeRadius(l, 1) * here.Girth
+						if lobeRadius <= 1e-4 then
+							continue
+						end
+						local there = sampleAt(l.T)
+						local localRadius =
+							math.sqrt((math.sin(l.Angle) * there.RX) ^ 2 + (math.cos(l.Angle) * there.RZ) ^ 2)
+						local hit = BodyLoftConfig.RayExit(
+							0,
+							0,
+							0,
+							dirX,
+							0,
+							dirZ,
+							math.sin(l.Angle) * localRadius * l.Out,
+							there.Y - here.Y,
+							-math.cos(l.Angle) * localRadius * l.Out,
+							lobeRadius,
+							l.StretchX,
+							l.StretchY,
+							l.StretchZ
+						)
+						if hit ~= nil then
+							radius = BodyLoftConfig.SmoothMax(radius, hit, l.Blend * math.sqrt(here.Girth))
+						end
+					end
+					local push = 0
+					for _, m in grooves do
+						if m.Tube == body.Id then
+							push += BodyLoftConfig.Displacement(m, t, angle, 1)
+						end
+					end
+					widest = math.max(widest, math.abs(dirX) * (radius + push * here.Girth))
+				end
+				return widest
+			end
+
+			local chest, waist, waistY = 0, math.huge, 0
+			for step = 0, 20 do
+				local t = step / 20
+				local y = sampleAt(t).Y
+				local width = halfWidthAt(t)
+				chest = math.max(chest, width)
+				-- The waist band: below the ribs, above the hips.
+				if y <= -0.25 and y >= -1.30 and width < waist then
+					waist, waistY = width, y
+				end
+			end
+			-- A physique is its taper. Below this it is a barrel with shoulders.
+			local MIN_TAPER = 2.4
+			if chest < waist * MIN_TAPER then
+				table.insert(
+					failures,
+					`the finished body tapers only {string.format("%.2f", chest / waist)}:1 `
+						.. `(chest {string.format("%.2f", chest)} against a waist of `
+						.. `{string.format("%.2f", waist)}), under the {MIN_TAPER}:1 a physique needs`
+				)
+			end
+			-- And the narrowest point has to be the waist, not the hips: when a lobe
+			-- floods the waist the minimum migrates downward and the pinch disappears.
+			if waistY > -0.35 or waistY < -1.10 then
+				table.insert(
+					failures,
+					`the narrowest point of the torso is at y={string.format("%.2f", waistY)}, `
+						.. "which is not where the waist is"
+				)
 			end
 		end
 	end

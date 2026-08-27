@@ -2837,3 +2837,48 @@ traffic exists:
       Still short of the reference, and honestly: the shoulder still reads as a wide flat shelf
       from a high angle, and the crease shading is streaky rather than crisp — 4.7% of
       face-corners carry it, which is sparse. Call it half way there, up from about a quarter.
+
+- [x] 189. **The lat was eating the waist, and I had been measuring the wrong thing.** The player
+      said the waist kept growing. They were right, it was my regression from #188, and the way I
+      missed it matters more than the fix.
+      Last pass I measured the waist and reported it shrinking: rings 0.640 → 0.618. That was
+      true — of the *rings*. Measuring the **finished surface** instead, base ring plus every
+      lobe's ray-union plus grooves, the waist went 0.656 → **1.568 at full growth, +139%**,
+      against a chest growing +102%. The waist was growing faster than the chest and the body
+      came out **1.43 chest-to-waist**: a barrel with shoulders, while every number in the config
+      looked right and my own measurement said it was fine.
+      The cause was `{side}Lat`. A latissimus is wide at the armpit and comes to a point at the
+      waist; an ellipsoid is exactly as wide at its bottom as its middle. That lobe sat at
+      y = +0.28 with a vertical semi-axis of 1.28 studs — spanning y = -1.00 to +1.56, the entire
+      torso — and on its own pushed the waist from 0.673 to 1.588. `LatSweep` added another +83%.
+      So inflating the lats in #188, radius 0.54 → 0.74, inflated the waist harder than anything
+      else on the body. Splitting the blame: **98% of the waist's growth was the lat, 2% was
+      LowerTorso scaling.**
+      Fixed by giving the lat the same treatment every other muscle here already has: three heads
+      with falling radius — `LatUpper` at the armpit carrying the flare, `LatMid` at the ribs,
+      `LatLower` small and the only one near the waist — with StretchY down from 1.7 to ~0.9,
+      because the stack carries the taper now instead of one stretched shape. Waist at y = -0.60
+      now goes 0.640 → **0.607, which is a 5% *shrink***, hips stay flat, chest is unchanged, and
+      the ratio is **3.72 : 1**.
+      That 2% is why `PhysiqueConfig` was left alone, which was worth checking before assuming:
+      `WEIGHTS.LowerTorso` sizes the real R15 part and that part's `Size` *is* the player hitbox;
+      `PhysiqueConfig.RunSelfTest` requires `max(X, Z) > 0.16667` and we sit at 0.17, exactly on
+      the floor; and `BodyLoftConfig.RunSelfTest` hardcodes that same 0.17 as a literal in the
+      limb-cap burial check, so changing one without the other would leave a test validating a
+      body that no longer exists. All of that to fix 2% of the problem.
+      Core's payoff went where the player asked — the abs. Ab lobes up to radius 0.46 and the
+      cuts between them deeper (`LineaAlba` 0.22, `AbGap` 0.19, `Serratus` 0.13). Safe to raise
+      because they sit at angle ±0.20, dead front: they lift the belly toward the viewer rather
+      than pushing past the silhouette, and the waist measurement does not move when they grow.
+      No stat mapping changed. Every player-facing string already frames Core as abs.
+      **The real fix is the new self-test**, which measures the finished silhouette rather than
+      the ring table — the same maths the builder runs, all of it already pure in this module —
+      and asserts that the waist is still the narrowest part of the torso at full growth and that
+      the chest clears it by 2.4:1. Confirmed non-vacuous by putting the old lat back: it reports
+      "the narrowest point of the torso is at y=-1.20, which is not where the waist is", which is
+      precisely the migration that happened. A ring table is not a body, and until now nothing in
+      this file had ever checked the body.
+      Verified: twenty self-test suites pass; `check.sh` clean but for the two `MenuController`
+      selene warnings that predate this branch. **Not verified by eye:** Studio's capture timed
+      out again this round. Still open and unrelated: the torso does not narrow toward the neck —
+      it holds ~2.0 half-width from the chest all the way up, which is the flat shoulder shelf.
