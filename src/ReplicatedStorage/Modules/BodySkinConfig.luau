@@ -325,10 +325,21 @@ end
 
 BodySkinConfig.STROKES = strokes
 
--- Texture resolution. 512 is the smallest that keeps an ab separation crisp once the
--- torso only owns half the width; 1024 costs four times the fill for no visible gain
--- at the distance players actually see each other.
-BodySkinConfig.RESOLUTION = 512
+--[[
+	Texture resolution. 1024, which is Roblox's ceiling for an EditableImage.
+
+	This said 512 and argued that 1024 "costs four times the fill for no visible gain",
+	which was measured on the torso and never on a limb. The atlas is split by *column*,
+	so at 512 an arm owned 76 pixels for its entire circumference and a leg owned 51 —
+	a crease three pixels wide with nowhere to go but blur. That is why arm and leg
+	definition read as a smear no matter what was authored into it.
+
+	The cost is real and worth stating: 4 MiB per cached texture instead of 1, and about
+	56 ms of fill instead of 14 on the first body of a new skin tone. The cache is keyed
+	by tone, stage and leanness and shared by every body on the client, so it is paid
+	rarely rather than per character.
+]]
+BodySkinConfig.RESOLUTION = 1024
 
 -- Crease intensity is quantised so the cache stays small: a body rebuilding across
 -- twenty-four growth steps would otherwise want twenty-four textures per skin tone.
@@ -377,11 +388,17 @@ function BodySkinConfig.RunSelfTest(): { string }
 			-- A stroke wider than this is a smudge, not a crease.
 			table.insert(failures, `{s.Id} has an implausible width`)
 		end
-		-- Under about a hundredth of a region the stroke lands on fewer than three
-		-- pixels of a 512 texture and reads as a scratch rather than a shadow. That
-		-- is what the first version of this file got wrong across the board.
+		--[[
+			A floor that only speaks for the widest region.
+
+			This module is required by the bare `luau` CLI and so may not require
+			BodyLoftConfig, which owns the atlas columns — and it is the *column* that
+			decides how many pixels a stroke really gets. The per-region version of this
+			check lives in scripts/selftest.luau, which has both modules in hand; this
+			one stays as the cheap local guard.
+		]]
 		if s.Width < 0.012 then
-			table.insert(failures, `{s.Id} is too thin to read at texture resolution`)
+			table.insert(failures, `{s.Id} is too thin to read on the widest region`)
 		end
 		if s.Depth <= 0 or s.Depth > 0.5 then
 			-- Past this the shadow reads as dirt rather than shape.

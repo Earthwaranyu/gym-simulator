@@ -31,6 +31,15 @@ local BodySkinConfig = require(script.Parent.BodySkinConfig)
 local BodySkinPainter = {}
 
 local RESOLUTION = BodySkinConfig.RESOLUTION
+--[[
+	How much of a stroke's half-width holds full depth before the feather begins.
+
+	Half is a line with an edge; much more and the stroke aliases, much less and it is
+	the pure gradient this replaced. Applies to every stroke, so it is the one number
+	that decides whether the body reads as drawn or as smudged.
+]]
+local CORE_FRACTION = 0.5
+
 local cache: { [string]: EditableImage } = {}
 
 export type Palette = { Skin: Color3, Pants: Color3 }
@@ -191,9 +200,25 @@ local function paint(palette: Palette, stage: number, leanness: number): Editabl
 				local u = (x - column.x0) / math.max(1, width - 1)
 				local distance = distanceToSegment(u, v, s.U0, s.V0, s.U1, s.V1)
 				if distance < s.Width then
-					-- Smoothstep falloff: hard in the middle, feathered at the edge.
-					local t = 1 - distance / s.Width
-					local fade = t * t * (3 - 2 * t)
+					--[[
+						A solid core, then a feathered edge.
+
+						The comment here used to claim "hard in the middle, feathered at
+						the edge", but a smoothstep over the whole half-width is feather
+						all the way to the centre line — the only pixel at full depth was
+						the one exactly on it. Every crease was therefore a gradient with
+						no line in it, which is why definition read as a smudge even
+						where there were pixels to spare. The inner CORE_FRACTION now
+						stays at full depth and only the outer band falls off.
+					]]
+					local reach = distance / s.Width
+					local fade
+					if reach <= CORE_FRACTION then
+						fade = 1
+					else
+						local t = 1 - (reach - CORE_FRACTION) / (1 - CORE_FRACTION)
+						fade = t * t * (3 - 2 * t)
+					end
 					local factor = 1 - depth * fade
 					local offset = y * RESOLUTION * 4 + x * 4
 					buffer.writeu8(pixels, offset, channel(buffer.readu8(pixels, offset) / 255 * factor))

@@ -401,17 +401,24 @@ function BodyLoftBuilder.Build(
 					-- same size, which is the whole difference between big and ripped.
 					local grooveScale = (scaleX + scaleZ) * 0.5 * leanness
 					--[[
-						Spread only as far as the ring belongs to the limb.
+						Every ring of a limb rides out by the same amount.
 
-						Applied flat to every ring it dragged the shoulder cap outward
-						too — and that cap is skinned to the torso, so the joint got
-						stretched into the flat plate visible at the shoulders. Weighting
-						it by how much of the ring the limb's own bones carry leaves the
-						cap on the shoulder while the arm proper rides out.
+						This was once weighted by how much of the ring the limb's own
+						bones carried, on the theory that holding the top rings back kept
+						the shoulder joint attached. It did the opposite. A weight that
+						climbs from 0.30 at the cap to 1.0 down the arm is a *gradient of
+						translation*, and a gradient of translation fans the rings apart:
+						at full growth the four shoulder rings were pushed out by 0.194,
+						0.292, 0.421 and 0.518 studs respectively, which turned a 2.75:1
+						silhouette into 4.55:1 — a horizontal shelf, which is precisely
+						the plate it was meant to remove.
+
+						Translating the whole tube uniformly preserves the authored slope
+						exactly, at every size. What actually keeps the joint attached is
+						that the tube's first ring now *starts inside the torso* — see the
+						cap comment below and the burial check in RunSelfTest.
 					]]
-					local limbShare = 1 - (sample.Bones.UpperTorso or 0) - (sample.Bones.LowerTorso or 0)
-					local centreX = sample.X
-						+ (if sample.X < 0 then -spread else spread) * math.clamp(limbShare, 0, 1)
+					local centreX = sample.X + (if sample.X < 0 then -spread else spread)
 					--[[
 						The surface is the smooth union of the tube and every lobe on it.
 
@@ -559,14 +566,26 @@ function BodyLoftBuilder.Build(
 				end
 			end
 
-			-- Cap both ends so the body is closed. The caps at a shoulder or hip are
-			-- buried inside the torso and never seen; the ones at a wrist or ankle
-			-- meet the stock R15 hand and foot.
+			--[[
+				Cap both ends so the body is closed.
+
+				A cap is a triangle fan with every normal locked to +/-Y, so it is a
+				perfectly flat disc facing straight up or straight down. At a wrist or
+				ankle that is fine — it meets the stock R15 hand or foot. At a shoulder
+				or hip it is only fine while it is **inside the torso**, and for a long
+				time it was not: the arm's cap sat at y = 0.86 reaching out to x = 1.9 at
+				full growth, while the torso had already necked in to 1.5 and collapsed
+				to 0.7 above it. A horizontal disc hanging in clear air off the side of
+				the shoulder is the dinner plate people kept seeing, and no amount of
+				tuning the deltoid could hide it because it was not the deltoid.
+
+				The limb tubes now begin well inside the torso, and RunSelfTest asserts
+				that burial at both ends of the growth curve rather than assuming it the
+				way this comment used to.
+			]]
 			for _, capIndex in { 1, #samples } do
 				local sample = samples[capIndex]
-				local capShare = 1 - (sample.Bones.UpperTorso or 0) - (sample.Bones.LowerTorso or 0)
-				local capX = sample.X
-					+ (if sample.X < 0 then -spread else spread) * math.clamp(capShare, 0, 1)
+				local capX = sample.X + (if sample.X < 0 then -spread else spread)
 				local centre = mesh:AddVertex(Vector3.new(capX, sample.Y, sample.Z))
 				local centreUV = mesh:AddUV(Vector2.new(0.5, sample.T))
 				-- The cap faces along the tube, away from the body.

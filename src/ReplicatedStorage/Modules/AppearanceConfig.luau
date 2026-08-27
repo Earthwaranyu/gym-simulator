@@ -54,8 +54,21 @@ AppearanceConfig.PantColors = {
 } :: { Swatch }
 
 --[[
-	Looks an id up in one of the palettes above. Unknown ids resolve to the first
-	entry rather than nil: every caller is painting a body that has to end up some
+	The ids a player who has never chosen anything ends up with.
+
+	These must stay equal to ProfileTemplate.Appearance. Stated here as well because
+	Find needs a fallback and "the first row of the palette" is the wrong one: the
+	palettes are ordered lightest-first, so a miss handed back Porcelain — near-white —
+	and a body that failed to resolve its tone came out pale rather than the tan every
+	new player is actually given. A fallback should look like the default, not like
+	whichever entry happens to be listed first.
+]]
+AppearanceConfig.DEFAULT_SKIN_ID = "Tan"
+AppearanceConfig.DEFAULT_PANT_ID = "Charcoal"
+
+--[[
+	Looks an id up in one of the palettes above. Unknown ids resolve to that palette's
+	default rather than nil: every caller is painting a body that has to end up some
 	colour, so there is nothing useful for them to do with a miss.
 ]]
 function AppearanceConfig.Find(list: { Swatch }, id: string?): Swatch
@@ -64,6 +77,14 @@ function AppearanceConfig.Find(list: { Swatch }, id: string?): Swatch
 			if swatch.Id == id then
 				return swatch
 			end
+		end
+	end
+	local fallback = if list == AppearanceConfig.SkinTones
+		then AppearanceConfig.DEFAULT_SKIN_ID
+		else AppearanceConfig.DEFAULT_PANT_ID
+	for _, swatch in list do
+		if swatch.Id == fallback then
+			return swatch
 		end
 	end
 	return list[1]

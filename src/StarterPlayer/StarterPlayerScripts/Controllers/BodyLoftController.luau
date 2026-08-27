@@ -144,19 +144,30 @@ end
 	AppearanceService already paints them there through BodyColors — UpperTorso is
 	skin, UpperLeg is the shorts. Reading the rig means a player changing their
 	appearance needs no notification path to reach this file.
+
+	**Returns nil until the rig has actually been painted**, and that is the point.
+	This used to fall back to a hardcoded cream when the parts were not there yet, which
+	sounds harmless and is not: the colour is *baked into the texture*, the texture is
+	cached globally by palette, and the loft is dressed on the client the moment a
+	character streams in — which can easily be before the server's BodyColors has
+	replicated. The result was a pale body under a correctly tanned head, with nothing
+	to recover it but a periodic re-check. Waiting a frame costs nothing; guessing costs
+	a wrong body that looks deliberate.
+
+	BodyColors is the signal rather than the part colours themselves, because a part
+	defaults to a perfectly plausible colour and there is no way to tell an unpainted
+	rig from a painted one by looking at it.
 ]]
-local function paletteOf(character: Model): BodyLoftBuilder.Palette
-	local skin = Color3.fromRGB(234, 219, 200)
-	local pants = Color3.fromRGB(40, 44, 56)
+local function paletteOf(character: Model): BodyLoftBuilder.Palette?
+	if character:FindFirstChildOfClass("BodyColors") == nil then
+		return nil
+	end
 	local torso = character:FindFirstChild("UpperTorso")
-	if torso ~= nil and torso:IsA("BasePart") then
-		skin = torso.Color
-	end
 	local leg = character:FindFirstChild("LeftUpperLeg")
-	if leg ~= nil and leg:IsA("BasePart") then
-		pants = leg.Color
+	if torso == nil or not torso:IsA("BasePart") or leg == nil or not leg:IsA("BasePart") then
+		return nil
 	end
-	return { Skin = skin, Pants = pants }
+	return { Skin = torso.Color, Pants = leg.Color }
 end
 
 local function detailFor(character: Model): string?
@@ -166,7 +177,12 @@ local function detailFor(character: Model): string?
 		return nil
 	end
 	local distance = (camera.CFrame.Position - root.Position).Magnitude
-	if distance <= BodyLoftConfig.DETAIL.Near.MaxDistance then
+	-- Hero is the expensive tier and deliberately has a short reach: it is for your own
+	-- body, and for whoever is close enough that the definition is the thing being
+	-- looked at. Paying ninety-six sides for every visible character was never the plan.
+	if distance <= BodyLoftConfig.DETAIL.Hero.MaxDistance then
+		return "Hero"
+	elseif distance <= BodyLoftConfig.DETAIL.Near.MaxDistance then
 		return "Near"
 	elseif distance <= BodyLoftConfig.DETAIL.Mid.MaxDistance then
 		return "Mid"
@@ -206,6 +222,10 @@ local function dress(
 	end
 	local detail = (BodyLoftConfig.DETAIL :: any)[detailName]
 	local palette = paletteOf(character)
+	if palette == nil then
+		-- Not painted yet. The caller retries, and the stock rig shows meanwhile.
+		return false
+	end
 	local leanness = leannessOf(character)
 	local built = BodyLoftBuilder.Build(progress, detail, palette, scales, leanness)
 	if built == nil then
@@ -393,9 +413,11 @@ local function refresh(character: Model)
 
 	if entry ~= nil then
 		local palette = paletteOf(character)
+		-- An unpainted rig is not a reason to tear down a body that is already correct;
+		-- it only means there is nothing new to compare against this frame.
 		local stale = entry.detail ~= wanted
-			or palette.Skin ~= entry.palette.Skin
-			or palette.Pants ~= entry.palette.Pants
+			or (palette ~= nil and palette.Skin ~= entry.palette.Skin)
+			or (palette ~= nil and palette.Pants ~= entry.palette.Pants)
 			or leannessOf(character) ~= entry.leanness
 		if not stale then
 			for statId, value in progress do

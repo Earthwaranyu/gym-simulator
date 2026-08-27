@@ -180,7 +180,7 @@ table.insert(tubes, {
 	Id = "Torso",
 	Spread = 0,
 	U0 = 0,
-	U1 = 0.5,
+	U1 = 0.4,
 	Rings = {
 		ring(-1.55, 0.60, 0.40, { { Bone = "LowerTorso", Weight = 1 } }, "Pants"),
 		ring(-1.20, 0.66, 0.42, { { Bone = "LowerTorso", Weight = 1 } }, "Pants"),
@@ -220,25 +220,41 @@ for _, side in { "Left", "Right" } do
 		Id = `{side}Arm`,
 		Side = side,
 		Spread = 1,
-		U0 = if side == "Left" then 0.5 else 0.65,
-		U1 = if side == "Left" then 0.65 else 0.8,
+		U0 = if side == "Left" then 0.4 else 0.55,
+		U1 = if side == "Left" then 0.55 else 0.7,
 		Rings = {
-			ring(0.86, 0.34, 0.34, {
+			--[[
+				The root ring, and it is deliberately tiny and far inboard.
+
+				A tube is closed with a flat disc facing along its own axis, so an arm's
+				first ring is a horizontal plate. The only thing that makes that
+				acceptable is being *inside the torso*, and at 0.34 wide sitting at
+				x = 1.18 it was not — at full growth it reached x = 1.9 against a torso
+				that had narrowed to 1.5, and hung there in open air as the flat shelf
+				above each shoulder. Starting the arm inside the chest and letting it
+				emerge is both what a shoulder actually does and what keeps the cap
+				hidden. RunSelfTest checks the burial at both ends of the growth curve.
+			]]
+			ring(0.86, 0.18, 0.18, {
+				{ Bone = "UpperTorso", Weight = 0.92 },
+				{ Bone = `{side}UpperArm`, Weight = 0.08 },
+			}, "Skin", sx * 0.45),
+			ring(0.80, 0.34, 0.34, {
 				{ Bone = "UpperTorso", Weight = 0.7 },
 				{ Bone = `{side}UpperArm`, Weight = 0.3 },
-			}, "Skin", sx * 1.18),
-			ring(0.78, 0.46, 0.46, {
-				{ Bone = "UpperTorso", Weight = 0.55 },
-				{ Bone = `{side}UpperArm`, Weight = 0.45 },
-			}, "Skin", sx * 1.28),
-			ring(0.68, 0.52, 0.52, {
-				{ Bone = "UpperTorso", Weight = 0.35 },
-				{ Bone = `{side}UpperArm`, Weight = 0.65 },
-			}, "Skin", sx * 1.37),
-			ring(0.58, 0.56, 0.56, {
-				{ Bone = "UpperTorso", Weight = 0.2 },
-				{ Bone = `{side}UpperArm`, Weight = 0.8 },
-			}, "Skin", sx * 1.44),
+			}, "Skin", sx * 0.95),
+			ring(0.72, 0.46, 0.46, {
+				{ Bone = "UpperTorso", Weight = 0.5 },
+				{ Bone = `{side}UpperArm`, Weight = 0.5 },
+			}, "Skin", sx * 1.22),
+			ring(0.64, 0.53, 0.53, {
+				{ Bone = "UpperTorso", Weight = 0.3 },
+				{ Bone = `{side}UpperArm`, Weight = 0.7 },
+			}, "Skin", sx * 1.38),
+			ring(0.56, 0.56, 0.56, {
+				{ Bone = "UpperTorso", Weight = 0.15 },
+				{ Bone = `{side}UpperArm`, Weight = 0.85 },
+			}, "Skin", sx * 1.46),
 			ring(0.30, 0.56, 0.56, { { Bone = `{side}UpperArm`, Weight = 1 } }, "Skin", sx * 1.5),
 			ring(0.02, 0.50, 0.50, { { Bone = `{side}UpperArm`, Weight = 1 } }, "Skin", sx * 1.5),
 			ring(-0.24, 0.40, 0.40, {
@@ -259,13 +275,20 @@ for _, side in { "Left", "Right" } do
 		Id = `{side}Leg`,
 		Side = side,
 		Spread = 0.3,
-		U0 = if side == "Left" then 0.8 else 0.9,
-		U1 = if side == "Left" then 0.9 else 1,
+		U0 = if side == "Left" then 0.7 else 0.85,
+		U1 = if side == "Left" then 0.85 else 1,
 		Rings = {
-			ring(-0.98, 0.62, 0.58, {
+			-- Buried for the same reason the arm's is: a hip cap is a flat disc facing
+			-- straight up, and at 0.62 wide it reached past the torso's own 0.66 and
+			-- left an upward-facing ledge at the hip.
+			ring(-0.92, 0.20, 0.20, {
+				{ Bone = "LowerTorso", Weight = 0.85 },
+				{ Bone = `{side}UpperLeg`, Weight = 0.15 },
+			}, "Pants", sx * 0.25),
+			ring(-1.06, 0.50, 0.48, {
 				{ Bone = "LowerTorso", Weight = 0.4 },
 				{ Bone = `{side}UpperLeg`, Weight = 0.6 },
-			}, "Pants", sx * 0.5),
+			}, "Pants", sx * 0.44),
 			ring(-1.30, 0.66, 0.62, { { Bone = `{side}UpperLeg`, Weight = 1 } }, "Pants", sx * 0.5),
 			ring(-1.65, 0.62, 0.58, { { Bone = `{side}UpperLeg`, Weight = 1 } }, "Pants", sx * 0.5),
 			ring(-1.95, 0.48, 0.47, { { Bone = `{side}UpperLeg`, Weight = 1 } }, "Skin", sx * 0.5),
@@ -470,9 +493,9 @@ for _, side in { "Left", "Right" } do
 	-- Three heads on a shoulder cap barely half a stud wide, so they are deliberately
 	-- tight and hard-edged: a delt that melts into the arm is the thing that made the
 	-- old shoulder read as a sphere. Blend is the lever, not radius.
-	lobe(`{side}DeltSide`, "Arms", arm, 0.12, outward, 0.50, 0.52, 0.10, 0.08, 0.72)
-	lobe(`{side}DeltFront`, "Arms", arm, 0.13, outward * 0.45, 0.50, 0.42, 0.10, SPLIT_START, 0.95)
-	lobe(`{side}DeltRear`, "Arms", arm, 0.13, outward * 1.55, 0.50, 0.40, 0.11, SPLIT_START, 0.95)
+	lobe(`{side}DeltSide`, "Arms", arm, 0.20, outward, 0.50, 0.58, 0.10, 0.08, 0.72)
+	lobe(`{side}DeltFront`, "Arms", arm, 0.15, outward * 0.45, 0.50, 0.48, 0.10, SPLIT_START, 0.95)
+	lobe(`{side}DeltRear`, "Arms", arm, 0.25, outward * 1.55, 0.50, 0.46, 0.11, SPLIT_START, 0.95)
 
 	-- StretchY below 1 shortens the lobe *along the arm*, which is what turns a ball
 	-- into a peak. A bicep is short and tall, not a sausage.
@@ -497,11 +520,11 @@ for _, side in { "Left", "Right" } do
 	lobe(`{side}Quad`, "Legs", leg, 0.32, 0, 0.46, 0.56, 0.17, 0.12, 0.84, { 1, 1.3, 1 })
 	lobe(`{side}VastusLateralis`, "Legs", leg, 0.38, outward * 0.42, 0.46, 0.38, 0.15, SPLIT_START, 1.00)
 	-- The teardrop just above the knee. Small and low, and the last thing to arrive.
-	lobe(`{side}VastusMedialis`, "Legs", leg, 0.52, -outward * 0.38, 0.46, 0.30, 0.12, 0.66, 1.00)
+	lobe(`{side}VastusMedialis`, "Legs", leg, 0.52, -outward * 0.38, 0.55, 0.34, 0.12, 0.66, 1.00)
 
 	lobe(`{side}Hamstring`, "Legs", leg, 0.36, PI, 0.46, 0.52, 0.19, 0.25, 0.95)
 	lobe(`{side}Calf`, "Legs", leg, 0.70, PI - outward * 0.20, 0.42, 0.42, 0.14, 0.28, 1.00)
-	lobe(`{side}CalfLateral`, "Legs", leg, 0.76, PI + outward * 0.20, 0.42, 0.34, 0.14, SPLIT_START, 1.00)
+	lobe(`{side}CalfLateral`, "Legs", leg, 0.76, PI + outward * 0.20, 0.50, 0.38, 0.14, SPLIT_START, 1.00)
 end
 
 -- Chest and Back share the torso tube but listen to different stats, so training
@@ -734,13 +757,93 @@ BodyLoftConfig.GROOVES = grooves
 	that is what makes a limb read as a smooth curve rather than a stack of cans.
 ]]
 BodyLoftConfig.DETAIL = {
-	-- Grooves are narrow, so they alias into a smudge without enough sides to land
-	-- on. Thirty is the point where an ab channel reads as a channel rather than a
-	-- dark patch; the cost is measured in check 4 of the plan rather than assumed.
-	Near = { Sides = 30, Subdivisions = 3, MaxDistance = 40 },
+	--[[
+		Hero — you, and whoever is close enough to count your abs.
+
+		Ninety-six sides is not vanity. A groove is only a groove if the mesh has
+		vertices inside it: the angular width of one facet is 2pi/Sides, and a cut
+		narrower than that is sampled entirely between its own walls and moves nothing.
+		At the old thirty sides a facet was 0.209 rad and **thirty-two of the fifty-one
+		grooves were narrower than one** — PecCleft and LineaAlba among them, which is
+		to say the chest and the abdomen. Every past round of deepening a cut and
+		looking again was tuning numbers the mesh could not express.
+
+		**An EditableMesh is capped at 20,000 triangles**, and that is the real ceiling
+		here — not memory, not frame time. This body is 378 triangles per side at three
+		subdivisions, so ninety-six sides is 36,288 and the engine simply refuses it:
+		`CreateEditableMesh` comes back with "Triangle count above limit" and the caller
+		falls through to the stock rig. Sixty-four at three subdivisions is 24,192 and is
+		refused too. The budget has to be *spent*, not merely raised.
+
+		It is spent on angle rather than on length. Nearly every line that defines this
+		physique runs vertically — the cleft between the pecs, the linea alba, the outer
+		edge of the lat, the seams down the arms — and a vertical line is resolved by
+		sides. The horizontal ones, the ab gaps and the elbow and knee, are fewer and
+		coarser. So sixty-four sides at two subdivisions (18,304 triangles) beats
+		forty-eight at three (18,144) for the same money.
+
+		SPREAD_FLOOR_FACTOR below turns whatever is chosen here into the narrowest cut
+		that can survive it, and RunSelfTest holds every groove to it — so this number
+		and the groove table can no longer drift apart.
+	]]
+	Hero = { Sides = 64, Subdivisions = 2, MaxDistance = 15 },
+	-- Near — everyone else in the room. Coarser on both axes, and indistinguishable a
+	-- few studs further out than Hero reaches.
+	Near = { Sides = 40, Subdivisions = 2, MaxDistance = 40 },
 	Mid = { Sides = 14, Subdivisions = 1, MaxDistance = 110 },
 	-- Beyond Mid the generated body is dropped entirely and the stock rig shows.
 }
+
+--[[
+	How narrow a cut may be before the mesh stops being able to hold it.
+
+	A groove is a Gaussian, `exp(-(d/sigma)^2)`, so it has no hard edge — the question
+	is not whether a vertex lands inside it but how much of the authored depth the
+	nearest vertex actually reaches. The floor of the cut can sit up to half a sample
+	spacing away, so the depth that survives is `exp(-(spacing/2/sigma)^2)`. Requiring
+	at least half of it gives
+
+	    sigma >= spacing / (2 * sqrt(ln 2))  ~=  0.6 * spacing
+
+	Below that a groove is authored, costs a build, and does close to nothing — and
+	nothing about the number says so. At the thirty sides this used to run at, the
+	angular floor was 0.126 and fourteen grooves sat under it; every other groove was
+	landing at reduced depth, which is the same bug in milder form and is most of why
+	deepening them by hand never helped.
+]]
+--[[
+	The engine's ceiling on one EditableMesh.
+
+	Twenty thousand triangles, and it is enforced by refusal rather than by degradation:
+	`CreateEditableMesh` returns "Triangle count above limit" and BodyLoftBuilder hands
+	back nil, so the player silently keeps the stock R15 rig. That is the worst possible
+	failure to debug — nothing errors, the body simply never appears — and it is a
+	config change away at all times, since one extra ring or a bumped Sides can cross it.
+	RunSelfTest prices every detail tier against it.
+]]
+BodyLoftConfig.MAX_TRIANGLES = 20000
+
+export type Detail = { Sides: number, Subdivisions: number, MaxDistance: number }
+
+-- What a tier will actually cost: two triangles per quad of the grid, plus a fan at
+-- each end of every tube.
+function BodyLoftConfig.TriangleCount(detail: Detail): number
+	local total = 0
+	for _, tube in tubes do
+		local samples = (#tube.Rings - 1) * (detail.Subdivisions + 1) + 1
+		total += (samples - 1) * detail.Sides * 2 + detail.Sides * 2
+	end
+	return total
+end
+
+BodyLoftConfig.SPREAD_FLOOR_FACTOR = 0.5 / math.sqrt(math.log(2))
+
+-- The sample spacing along a tube at a given detail, which is what a groove's SpreadT
+-- is measured against. Shared with the self-test rather than recomputed there.
+function BodyLoftConfig.SampleStep(tube: Tube, subdivisions: number): number
+	local samples = (#tube.Rings - 1) * (subdivisions + 1) + 1
+	return 1 / math.max(1, samples - 1)
+end
 
 --[[
 	Which way a tube was authored, and therefore whether the builder must reverse its
@@ -997,6 +1100,36 @@ function BodyLoftConfig.RunSelfTest(): { string }
 		if m.SpreadT <= 0 or m.SpreadAngle <= 0 then
 			table.insert(failures, `{m.Id} has a non-positive spread`)
 		end
+		--[[
+			A cut the mesh cannot hold is not a subtle cut, it is nothing.
+
+			See SPREAD_FLOOR_FACTOR. Tested against the *finest* LOD, because a groove
+			that cannot survive Hero cannot survive anything, while a coarser tier is
+			allowed to lose detail — that is what a tier is for.
+		]]
+		do
+			local hero = BodyLoftConfig.DETAIL.Hero
+			local factor = BodyLoftConfig.SPREAD_FLOOR_FACTOR
+			local angleFloor = factor * (2 * PI / hero.Sides)
+			if m.SpreadAngle < angleFloor then
+				table.insert(
+					failures,
+					`{m.Id} is too narrow for the mesh: SpreadAngle {string.format("%.4f", m.SpreadAngle)} `
+						.. `against a floor of {string.format("%.4f", angleFloor)}`
+				)
+			end
+			local tube = tubeIds[m.Tube]
+			if tube ~= nil then
+				local tFloor = factor * BodyLoftConfig.SampleStep(tube, hero.Subdivisions)
+				if m.SpreadT < tFloor then
+					table.insert(
+						failures,
+						`{m.Id} is too short for the mesh: SpreadT {string.format("%.4f", m.SpreadT)} `
+							.. `against a floor of {string.format("%.4f", tFloor)} on {m.Tube}`
+					)
+				end
+			end
+		end
 		if m.Amplitude == 0 then
 			table.insert(failures, `{m.Id} has zero amplitude and does nothing`)
 		end
@@ -1049,6 +1182,116 @@ function BodyLoftConfig.RunSelfTest(): { string }
 				local sum = normalise(normalise(m.Angle) + normalise(p.Angle))
 				if math.abs(sum) > 1e-9 then
 					table.insert(failures, `{m.Id} and {p.Id} sit at different angles`)
+				end
+			end
+		end
+	end
+
+	-- Every detail tier must fit the engine's triangle budget, or the body it describes
+	-- silently does not exist. See MAX_TRIANGLES.
+	for name, detail in BodyLoftConfig.DETAIL :: { [string]: Detail } do
+		local count = BodyLoftConfig.TriangleCount(detail)
+		if count > BodyLoftConfig.MAX_TRIANGLES then
+			table.insert(
+				failures,
+				`detail tier {name} needs {count} triangles against a limit of `
+					.. `{BodyLoftConfig.MAX_TRIANGLES}; the body would never build`
+			)
+		end
+	end
+
+	--[[
+		A limb's first ring must be buried inside the torso, at every size.
+
+		Every tube is closed with a triangle fan whose normals are locked along the
+		tube's own axis, so a limb's root ring is a flat horizontal disc. That is only
+		acceptable while it is inside the body: exposed, it is a shelf hanging in open
+		air off the side of a shoulder or hip, which is exactly what shipped and what no
+		amount of tuning the deltoid could hide.
+
+		Checked at both ends of the growth curve because the two disagree — the torso
+		widens on UpperTorso's X weight while the limb rides out on `spread`, so a cap
+		that is comfortably buried on a beginner can emerge on a maxed body. That is the
+		case that actually broke, and testing only the bind pose would have missed it.
+	]]
+	do
+		local torso: Tube? = nil
+		for _, tube in tubes do
+			if tube.Id == "Torso" then
+				torso = tube
+			end
+		end
+		if torso == nil then
+			table.insert(failures, "there is no torso to bury a limb in")
+		else
+			local body = torso :: Tube
+			-- The torso's own profile at a height, by walking its rings rather than by
+			-- T: a limb's T means nothing on another tube.
+			local function torsoRadiiAt(y: number): (number, number)
+				local rings = body.Rings
+				if y <= rings[1].Y then
+					return rings[1].RX, rings[1].RZ
+				end
+				for index = 2, #rings do
+					local lower, upper = rings[index - 1], rings[index]
+					if y <= upper.Y then
+						local span = upper.Y - lower.Y
+						local frac = if span > 0 then (y - lower.Y) / span else 0
+						return lower.RX + (upper.RX - lower.RX) * frac,
+							lower.RZ + (upper.RZ - lower.RZ) * frac
+					end
+				end
+				return rings[#rings].RX, rings[#rings].RZ
+			end
+
+			local maxScale = 2.2
+			for _, tube in tubes do
+				if tube.Id == "Torso" then
+					continue
+				end
+				local root = tube.Rings[1]
+				for _, case in { { Name = "bind", Scale = 1 }, { Name = "full", Scale = maxScale } } do
+					local growth = case.Scale - 1
+					-- The same weights PhysiqueConfig applies, restated as plain numbers
+					-- so this module stays loadable by the bare `luau` CLI.
+					local torsoX = 1 + growth * 0.54
+					local torsoZ = 1 + growth * 0.38
+					local limbW = if string.find(tube.Id, "Arm") then 0.29 else 0.33
+					local rootW = if string.find(tube.Id, "Arm") then 0.54 else 0.17
+					local limbShare = 0
+					local hostShare = 0
+					for _, inf in root.Bones do
+						if string.find(inf.Bone, "Torso") then
+							hostShare += inf.Weight
+						else
+							limbShare += inf.Weight
+						end
+					end
+					local total = math.max(hostShare + limbShare, 1e-6)
+					local ringScale = (hostShare * (1 + growth * rootW) + limbShare * (1 + growth * limbW))
+						/ total
+					local baseX, baseZ = torsoRadiiAt(root.Y)
+					local spread = (torsoX - 1) * BodyLoftConfig.TORSO_HALF_WIDTH * tube.Spread
+					local centre = math.abs(root.X) + spread
+					local outer = centre + root.RX * ringScale
+					local limit = baseX * torsoX
+					if outer >= limit then
+						table.insert(
+							failures,
+							`{tube.Id}'s cap is exposed at {case.Name}: reaches `
+								.. `{string.format("%.3f", outer)} against a torso half-width of `
+								.. `{string.format("%.3f", limit)}`
+						)
+					end
+					local deep = root.RZ * ringScale
+					local limitZ = baseZ * torsoZ
+					if deep >= limitZ then
+						table.insert(
+							failures,
+							`{tube.Id}'s cap is exposed front-to-back at {case.Name}: `
+								.. `{string.format("%.3f", deep)} against {string.format("%.3f", limitZ)}`
+						)
+					end
 				end
 			end
 		end

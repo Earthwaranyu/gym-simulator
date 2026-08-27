@@ -2686,3 +2686,53 @@ traffic exists:
       Verified: `check.sh` clean but for the two `MenuController` selene warnings that predate
       this branch; nineteen self-tests pass; Studio preview cleaned up afterwards and the
       real `ReplicatedStorage.Modules` tree left untouched (every build ran from a clone).
+
+- [x] 186. **The cuts were narrower than the mesh could hold, and the plate was an end cap.**
+      #185 said the body read as a muddy smear and blamed texture resolution. That was half
+      of it. Rated against the reference the shipped body scores about 25%, and three things
+      were wrong, none of them "the numbers want more tuning".
+      **A groove is a Gaussian, and the mesh has to have a vertex inside it.** At thirty
+      sides a facet was 0.209 rad. The depth a cut actually reaches is
+      `exp(-(spacing/2/sigma)^2)`, so surviving with half its authored depth needs
+      `sigma >= 0.6 * spacing` — a floor of 0.126, and fourteen grooves sat under it while
+      every other one landed shallow. That is why deepening them by hand never helped: the
+      amplitude was never the thing being sampled. `SPREAD_FLOOR_FACTOR` derives the floor
+      from whatever the finest tier is set to, and `RunSelfTest` holds every groove to it on
+      both axes, so the two can no longer drift apart.
+      **The shoulder plate was never the deltoid.** Every tube is closed with a triangle fan
+      whose normals are locked to its own axis, so a limb's root ring is a flat horizontal
+      disc — fine inside the torso, and it was not inside: at full growth the arm's cap
+      reached x = 1.9 while the torso had necked to 1.5, hanging in open air. The
+      `spread * limbShare` term made it worse rather than better; a weight climbing from 0.30
+      at the cap to 1.0 down the arm is a *gradient of translation*, which fans the rings from
+      a 2.75:1 silhouette to 4.55:1 — the same shelf it was added to remove. The limb tubes
+      now start well inside the body and the spread is uniform, which preserves the authored
+      slope at every size. The hip had the same bug and the same upward-facing ledge. The
+      burial is now asserted at both ends of the growth curve, and the check was confirmed
+      non-vacuous by putting the old ring back and watching it fail.
+      **The user asked for 96 sides. The engine refuses it.** An EditableMesh is capped at
+      20,000 triangles and enforces it by *refusal* — "Triangle count above limit", the build
+      returns nil, and the player silently keeps the stock rig with nothing logged as an
+      error. 96/3 is 36,288 and 64/3 is 24,192; both were rejected in Studio. The budget had
+      to be spent rather than raised, and it went on angle over length — nearly every line
+      that defines this physique runs vertically — so 64 sides at 2 subdivisions (18,304)
+      over 48 at 3 (18,144). `MAX_TRIANGLES` and `TriangleCount` now price every tier in the
+      self-test, because a config change is always one ring away from crossing it.
+      Also: texture to 1024 with the atlas rebalanced (torso 0.5 → 0.4, legs 0.10 → 0.15
+      each), because the columns are what decide pixels and at 512 an arm owned 76 of them
+      for its whole circumference and a leg 51. The stroke falloff had no solid core — a
+      smoothstep across the entire half-width is feather all the way to the centre line, so
+      every crease was a gradient with no line in it. And the cream body: `AppearanceConfig
+      .Find` fell back to the palette's first row, which is Porcelain, while every new player
+      is given Tan; `paletteOf` now refuses to bake a palette until BodyColors has actually
+      replicated, rather than guessing cream and caching it globally.
+      The stroke-width test hardcoded 512 and the torso's share, so it spoke for one region
+      out of five and would have gone on passing after the resolution moved. The per-region
+      version needs both modules and neither may require the other, so it lives in
+      `scripts/selftest.luau` as a cross-module suite alongside the appearance defaults.
+      Verified: twenty self-test suites pass, `check.sh` clean but for the two `MenuController`
+      selene warnings that predate this branch, build measured at 54–59 ms per body at the new
+      settings (unchanged from before, so no yielding was needed), and the silhouette now
+      rises monotonically from 0.73 at the neck to 2.90 at the shoulder and stays flat down
+      the arm instead of spiking and falling back. **Not verified: how it looks.** Studio's
+      screen capture hung on every attempt this round after working earlier in the session.
