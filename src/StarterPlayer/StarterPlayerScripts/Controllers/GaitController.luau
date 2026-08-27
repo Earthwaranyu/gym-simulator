@@ -33,13 +33,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Loader = require(ReplicatedStorage.Modules.Loader)
-local PoseConfig = require(ReplicatedStorage.Modules.PoseConfig)
 local PosePlayback = require(ReplicatedStorage.Modules.PosePlayback)
 local GaitConfig = require(ReplicatedStorage.Modules.GaitConfig)
-local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
-local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
+local StanceConfig = require(ReplicatedStorage.Modules.StanceConfig)
 
 local GaitController = {
 	Name = "GaitController",
@@ -69,6 +67,18 @@ type Entry = {
 	releasing: boolean,
 	-- Which footfall we last fired, so a stride cannot double-fire its dust.
 	lastFootfall: number,
+	--[[
+		The character's chest scale, resolved once. StanceConfig turns it into how far
+		the arms are held out from the ribs; see the assignment in _apply for why the
+		offset sits outside the weight lerp.
+
+		Held as the NumberValue rather than the number so a body that grows mid-stride
+		spreads without a re-sync, and resolved here rather than per frame because
+		FindFirstChild on every visible character every frame is not free. nil for
+		anything with no MuscleScales folder, which is every rig but a player and a
+		lofted boss.
+	]]
+	torsoScale: NumberValue?,
 }
 
 local active: { [Model]: Entry } = {}
@@ -90,6 +100,24 @@ local function bindJoints(character: Model): { Bound }
 		end
 	end
 	return bound
+end
+
+--[[
+	The chest scale MuscleService (players) and MobService:dressAsBrute (bosses) both
+	publish. Deliberately one lookup with no branch on what kind of thing this is: a
+	brute is written MuscleScales.UpperTorso = BRUTE_SCALE, which is the same cap a
+	maxed player reaches, so a boss stands at full spread through this path alone.
+]]
+local function torsoScaleOf(character: Model): NumberValue?
+	local scales = character:FindFirstChild("MuscleScales")
+	if scales == nil then
+		return nil
+	end
+	local value = scales:FindFirstChild("UpperTorso")
+	if value ~= nil and value:IsA("NumberValue") then
+		return value
+	end
+	return nil
 end
 
 function GaitController:_clear(character: Model)
@@ -121,19 +149,10 @@ local function groundSpeedFor(character: Model): number?
 	end
 
 	-- Bolted to a machine, mid-punch, or in the air: all three own the body already.
-	if character:GetAttribute(PoseConfig.POSE_ATTRIBUTE) ~= nil then
+	-- The list lives in GaitConfig because StanceController has to release the
+	-- shoulders on exactly the same three cases.
+	if GaitConfig.BodyIsClaimed(character) then
 		return nil
-	end
-	if character:GetAttribute(FlightConfig.STATE_ATTRIBUTE) ~= nil then
-		return nil
-	end
-	local strikeAt = character:GetAttribute(StrikeConfig.STRIKE_ATTRIBUTE)
-	if type(strikeAt) == "number" then
-		local strikeId = character:GetAttribute(StrikeConfig.STRIKE_ID_ATTRIBUTE)
-		local strike = if type(strikeId) == "string" then StrikeConfig.Get(strikeId) else nil
-		if strike ~= nil and workspace:GetServerTimeNow() - strikeAt < strike.Duration then
-			return nil
-		end
 	end
 
 	-- Only running counts. Jumping, falling, swimming and climbing keep the engine's
@@ -245,6 +264,8 @@ function GaitController:_apply(delta: number)
 		-- that always exists.
 		local shaped = GaitConfig.Walk
 		local elapsed = entry.phase * 1
+		local torsoScale = entry.torsoScale
+		local abduction = if torsoScale ~= nil then StanceConfig.Degrees(torsoScale.Value) else 0
 		for _, bound in entry.joints do
 			if bound.joint.Parent == nil then
 				continue
@@ -271,7 +292,18 @@ function GaitController:_apply(delta: number)
 				posed *= CFrame.Angles(-math.rad(Formulas.RunLean(blend)), 0, 0)
 			end
 
-			bound.joint.Transform = IDENTITY:Lerp(posed, weight)
+			--[[
+				The stance offset goes *outside* the lerp, and that is load-bearing.
+				Inside it, abduction would fade toward identity along with the gait's
+				own blend-out, so a maxed player's arms would visibly drop every time
+				they stopped walking — which is the one thing the stance exists to
+				prevent. Outside, the spread holds at full strength and only the swing
+				fades underneath it.
+
+				Apply is inert for every joint but the shoulders, so this needs no
+				branch beside the Root and Neck cases above.
+			]]
+			bound.joint.Transform = StanceConfig.Apply(bound.name, IDENTITY:Lerp(posed, weight), abduction)
 		end
 	end
 end
@@ -342,6 +374,7 @@ function GaitController:_sync(character: Model)
 		weight = 0,
 		releasing = false,
 		lastFootfall = 0,
+		torsoScale = torsoScaleOf(character),
 	}
 end
 

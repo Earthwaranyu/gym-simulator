@@ -37,6 +37,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PoseConfig = require(ReplicatedStorage.Modules.PoseConfig)
 local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
+local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 
 local GaitConfig = {}
@@ -78,6 +79,38 @@ GaitConfig.Joints = {
 -- Fade in and out against whatever the animator is doing. Faster in than out: starting
 -- to move should feel immediate, while stopping eases back into Roblox's idle rather
 -- than snapping to it.
+--[[
+	Whether something already owns this body more strongly than a locomotion pose does.
+
+	Lives here rather than inside GaitController because it is no longer only the gait
+	that asks. StanceController holds a maxed player's arms out from their ribs while
+	they stand still, and it must let go of the shoulders in exactly the same three
+	cases the gait does — bolted to a machine, mid-punch, or airborne. Two copies of
+	that list is two places for a fourth case to be forgotten, and the failure looks
+	like a player throwing a punch with one arm stuck in a lat spread.
+
+	Checked explicitly rather than left to Loader write order, for the reason
+	GaitController's header gives: "the training pose happens to run later" is a fact
+	nothing in either file states, and a reordering would silently break it.
+]]
+function GaitConfig.BodyIsClaimed(character: Instance): boolean
+	if character:GetAttribute(PoseConfig.POSE_ATTRIBUTE) ~= nil then
+		return true
+	end
+	if character:GetAttribute(FlightConfig.STATE_ATTRIBUTE) ~= nil then
+		return true
+	end
+	local strikeAt = character:GetAttribute(StrikeConfig.STRIKE_ATTRIBUTE)
+	if type(strikeAt) == "number" then
+		local strikeId = character:GetAttribute(StrikeConfig.STRIKE_ID_ATTRIBUTE)
+		local strike = if type(strikeId) == "string" then StrikeConfig.Get(strikeId) else nil
+		if strike ~= nil and workspace:GetServerTimeNow() - strikeAt < strike.Duration then
+			return true
+		end
+	end
+	return false
+end
+
 GaitConfig.BLEND_IN_SECONDS = 0.16
 GaitConfig.BLEND_OUT_SECONDS = 0.24
 

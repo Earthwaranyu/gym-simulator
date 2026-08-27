@@ -2575,3 +2575,42 @@ traffic exists:
       Studio's screen capture hung repeatedly and the camera kept being reclaimed, so the
       "is it ripped" question — the only one that matters here — is still open and wants
       human eyes.
+
+- [x] 183. **A grown body cannot put its arms down.** The reference physique everyone pictures
+      when they say "gym simulator body" reads as huge partly because of the *stance*: the lat
+      fills the space the upper arm used to hang in, so the arms are held out whether the
+      character wants them there or not. Ours stood with its arms at its sides at every size,
+      which made a maxed player read as a normal person wearing muscle rather than as somebody
+      whose own mass is in the way.
+      Abduction is now derived, not chosen. `BodyLoftBuilder` already pushes the arm tubes
+      outward by `spreadStuds = (AxisScale("UpperTorso", scale).X - 1) * TORSO_HALF_WIDTH`,
+      which is 0.648 studs at the 2.2 cap. `StanceConfig.MAX_DEGREES = 33` is exactly
+      `asin(0.648 / 1.19)` over the bind pose's 1.19-stud shoulder-to-hand reach — the angle
+      at which the rig arm travels out by as much as the lat mass grew. Larger is a T-pose;
+      smaller sinks the upper arm into the chest. `RunSelfTest` asserts the two against each
+      other, so retuning `WEIGHTS.UpperTorso.X` now fails loudly instead of silently starting
+      to clip arms through a body. `ARM_REACH` is likewise checked against `BONES` rather
+      than trusted, and the curve is `growth^0.7` so the first sessions show something.
+      Two consumers, because the gait deliberately does nothing at rest. `GaitController`
+      composes the offset onto its own shoulders while moving; a new `StanceController` at
+      Priority 8 — the weakest slot — covers standing. The wrap goes **outside** the weight
+      lerp, and that was the whole trick: inside it, abduction faded toward identity along
+      with the gait's blend-out and the arms dipped every time a player stopped, which is the
+      one thing this exists to prevent.
+      No idle pose, deliberately. `GaitConfig.RunSelfTest` asserts every entry in `List` has
+      all thirteen joints, hip opposition at exactly 0.5 and a knee lagging its hip; a
+      standing pose satisfies none, so admitting one would have meant weakening four real
+      invariants. `PoseConfig` already overrides the stock idle per joint, so claiming two
+      shoulders locks the arms out while the idle's breathing and sway keep playing.
+      The three ownership checks moved out of `GaitController` into
+      `GaitConfig.BodyIsClaimed`, because it is no longer only the gait that asks. Two copies
+      of that list is two places to forget a fourth case, and the failure looks like a player
+      throwing a punch with one arm stuck in a lat spread.
+      Bosses need no branch anywhere: `BRUTE_SCALE == MAX_MUSCLE_SCALE`, so `growth` clamps
+      to 1 and a brute stands permanently spread through the same path a player grows into.
+      Thieves have no `MuscleScales` folder, resolve to zero degrees, and are released on the
+      first frame.
+      Verified: `check.sh` clean (the two remaining selene warnings are pre-existing in
+      `MenuController` and predate this branch). **Not verified: how it looks.** The angle is
+      derived from the mesh rather than eyeballed, which is the best a number can do, but
+      whether 33° reads as a lat spread or as a penguin wants human eyes.

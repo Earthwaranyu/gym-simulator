@@ -18,6 +18,7 @@ local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
 local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
 local GaitConfig = require(ReplicatedStorage.Modules.GaitConfig)
 local FlinchConfig = require(ReplicatedStorage.Modules.FlinchConfig)
+local StanceConfig = require(ReplicatedStorage.Modules.StanceConfig)
 
 require(ReplicatedStorage.Modules.Net)
 
@@ -42,6 +43,7 @@ if RunService:IsStudio() then
 			{ Name = "FlightConfig", Failures = FlightConfig.RunSelfTest() },
 			{ Name = "GaitConfig", Failures = GaitConfig.RunSelfTest() },
 			{ Name = "FlinchConfig", Failures = FlinchConfig.RunSelfTest() },
+			{ Name = "StanceConfig", Failures = StanceConfig.RunSelfTest() },
 		}
 	do
 		if #suite.Failures > 0 then
