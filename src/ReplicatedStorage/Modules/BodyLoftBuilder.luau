@@ -69,6 +69,7 @@ type Sample = {
 	RX: number,
 	RZ: number,
 	Slot: string,
+	Cinch: number,
 	Bones: { [string]: number },
 	T: number,
 }
@@ -116,6 +117,7 @@ local function sampleTube(tube: any, detail: Detail): { Sample }
 				RZ = lerp(a.RZ, b.RZ, t),
 				-- A band is one slot or the other; there is no half-trousered ring.
 				Slot = if t < 0.5 then a.Slot else b.Slot,
+				Cinch = lerp(a.Cinch or 0, b.Cinch or 0, t),
 				Bones = blend(maps[index], maps[index + 1], t),
 				T = 0,
 			})
@@ -129,6 +131,7 @@ local function sampleTube(tube: any, detail: Detail): { Sample }
 		RX = last.RX,
 		RZ = last.RZ,
 		Slot = last.Slot,
+		Cinch = last.Cinch or 0,
 		Bones = maps[#rings],
 		T = 1,
 	})
@@ -217,6 +220,12 @@ function BodyLoftBuilder.Build(
 	rawLeanness: number?
 ): Built?
 	local leanness = BodyLoftConfig.Leanness(rawLeanness)
+	-- How far along the whole physique is, used for the things that are not any one
+	-- muscle: the waist's cinch and which crease stage the texture is painted at.
+	local taper = 0
+	for _, value in progressByStat do
+		taper = math.max(taper, value)
+	end
 	local mesh = AssetService:CreateEditableMesh()
 	if mesh == nil then
 		return nil
@@ -395,8 +404,19 @@ function BodyLoftBuilder.Build(
 					end
 					-- Angle 0 is the front, and the avatar faces -Z.
 					local scaleX, scaleZ = ringScale(sample.Bones, scales, partOfBone)
-					local rx = sample.RX * scaleX
-					local rz = sample.RZ * scaleZ
+					--[[
+						The waist is the one band that gets *smaller* as the body grows.
+
+						Everything else here multiplies girth upward, which is the whole
+						point everywhere but here: a chest reads big because of what sits
+						under it, and a waist that grows along with it flattens the taper
+						the physique depends on. Cinch is authored per ring and driven by
+						overall progress, so a beginner is never wasp-waisted and the V
+						arrives with the muscle rather than ahead of it.
+					]]
+					local cinch = 1 - sample.Cinch * taper
+					local rx = sample.RX * scaleX * cinch
+					local rz = sample.RZ * scaleZ * cinch
 					-- Leanness rides along with girth: a lean body cuts deeper at the
 					-- same size, which is the whole difference between big and ripped.
 					local grooveScale = (scaleX + scaleZ) * 0.5 * leanness
@@ -635,11 +655,7 @@ function BodyLoftBuilder.Build(
 			skin and shorts as vertex colours, so the player keeps a correct if plain
 			body rather than none at all.
 		]]
-		local overall = 0
-		for _, value in progressByStat do
-			overall = math.max(overall, value)
-		end
-		local skin = BodySkinPainter.Get(palette, overall, leanness)
+		local skin = BodySkinPainter.Get(palette, taper, leanness)
 		if skin ~= nil then
 			part.TextureContent = Content.fromObject(skin)
 		end

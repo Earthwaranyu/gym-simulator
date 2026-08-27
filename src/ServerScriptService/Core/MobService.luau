@@ -107,13 +107,6 @@ local live: { [Model]: Live } = {}
 ]]
 -- The top of BodyLoftBuilder's 1..2.2 girth range.
 local BRUTE_SCALE = 2.2
---[[
-	Where a loft-dressed character's root sits above the floor, per unit of scale.
-
-	Measured from a player wearing the generated body: half-height 1.93, lowest point
-	0.731 below the floor, so the root rides 1.199 above it. See the note in buildMob.
-]]
-local LOFT_ROOT_HEIGHT = 1.199
 
 -- How cut the boss is. 1 is a player; BodyLoftConfig clamps the ceiling.
 local BRUTE_LEANNESS = 1.7
@@ -352,7 +345,24 @@ local function buildMob(definition: MobConfig.Mob): (Model, Humanoid, BasePart)
 		wants: no mesh, so the skeleton is the thing standing on the floor.
 	]]
 	if definition.Kind == "Boss" then
-		humanoid.HipHeight = math.max(0, (LOFT_ROOT_HEIGHT - rig.RootSize.Y / 2) * scale)
+		--[[
+			Stand on whichever reaches lower: the generated body, or the rig underneath.
+
+			Both exist at once. The loft hides the rig's limbs but keeps its head, hands
+			and feet, and the two do not end at the same height — the loft stops at the
+			ankle 2.86 under the root, while the brute's rig foot reaches 6.36 under it
+			at this scale. Standing on either one alone buries the other, and a boss with
+			its shins in the pavement is what shipped: a hand-measured 1.199 that was
+			never tied to the geometry it described, so every change to a leg ring left it
+			further out and nothing said so.
+
+			`lowest` is measured from the real rig parts a few lines above; the loft's
+			drop is derived from its rings. Taking the deeper of the two means neither can
+			end up underground, whichever one is on screen.
+		]]
+		local loftDrop = BodyLoftConfig.Drop() * scale
+		local rigDrop = -lowest
+		humanoid.HipHeight = math.max(0, math.max(loftDrop, rigDrop) - rig.RootSize.Y / 2 * scale)
 	else
 		-- Measured, not assumed: the drop from the root's underside to the lowest thing on
 		-- the body. A hard-coded value was only ever right for one set of leg offsets, and

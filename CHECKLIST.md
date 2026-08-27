@@ -2736,3 +2736,51 @@ traffic exists:
       rises monotonically from 0.73 at the neck to 2.90 at the shoulder and stays flat down
       the arm instead of spiking and falling back. **Not verified: how it looks.** Studio's
       screen capture hung on every attempt this round after working earlier in the session.
+
+- [x] 187. **Three reported bugs, and two of my three hypotheses were wrong.**
+      **The skin tone was never wrong — the customiser was lying about it.** I chased this
+      through the whole pipeline and it was correct at every step: the swatch sends an id, the
+      server paints BodyColors, `paletteOf` reads the rig, and the texture's flat-skin pixel
+      comes back *bit-exact* against the chosen RGB (verified by reading the live body's own
+      EditableImage back and histogramming it). The rebuild lag is 0.12s. What was wrong is
+      `CustomizerStageController`, which grades the creator stage to **Saturation = -0.45** for
+      mood. ColorCorrection does not touch a ScreenGui, so the swatch buttons showed true
+      colour while the body beside them was desaturated by nearly half: Umber (129,84,52)
+      previewed as a pale peach. The player then walked out into a world graded at only -0.12
+      and got a third colour again. Brightness and contrast stay; saturation is now 0, because
+      this is the one screen whose entire job is choosing a colour.
+      Two hypotheses I had to abandon on the way, both killed by measurement rather than
+      argument. `MeshPart.Color` was never assigned, so it sits at default grey — I "fixed"
+      that and it changed nothing, because painting every face of a body pure red rendered it
+      red while its part was Tan: **a vertex colour replaces `BasePart.Color`**, so part colour
+      is inert on this mesh. That resolves the open question `BodySkinPainter`'s header had
+      been carrying ("not something this project can check right now"), and the header now
+      states it. And the body looked paler than a Tan cube purely because a cube is flat and a
+      body is convex — against a Tan *sphere* it matched.
+      **The boss's sink was mine to a degree, and older than me for the rest.** `HipHeight`
+      came from a hand-measured `LOFT_ROOT_HEIGHT = 1.199` that nothing tied to the geometry.
+      My first fix used the mesh's half-height (1.930) and was still wrong: the mesh is
+      *skinned*, so the bounding box is not where it renders — every vertex is placed by its
+      bone, and the ankle bone is 2.86 under the root. Measured on a live boss, the rig's foot
+      was **2.31 studs under the floor**. Both the loft and the rig exist at once and end at
+      different heights, so `MobService` now stands a boss on whichever reaches lower — the
+      loft's derived drop or the rig's measured lowest part. Lowest rig part went from -2.31
+      to -0.15 below ground; `HipHeight` 0.418 → 4.609.
+      **The love handle had a precise cause.** The ring authored as "the waist" at y = -0.60
+      was **55% UpperTorso**, so the chest's x1.648 growth reached down and widened it by
+      x1.448 while the hips below grew on x1.293 — at full size it sat 0.074 *proud* of the
+      ring beneath it, which is what a love handle is, and training Chest or Back made it
+      worse. Rebalanced to the waist's own bone, and given a new `Cinch` field: how far a ring
+      pulls in as the body grows, 0 everywhere else. Not a negative `PhysiqueConfig` weight,
+      which was the obvious move and wrong twice over — those weights also scale the real R15
+      parts and hitboxes, and PhysiqueConfig's self-test requires every part to actually grow.
+      The waist now *shrinks* (0.640 → 0.618) and chest:waist goes 1.90 → **3.04**, with the
+      minimum back where it was authored. Core's payoff moved from girth to definition, and a
+      new `ObliqueGap` cuts the flank — nothing in the file grooved below y ~= -0.39, so the
+      oblique swelled out of an ungrooved band with no edge, which is why it read as fat. The
+      "surface survives its own grooves" test now measures the cinched radius, or a narrowed
+      ring would quietly get a bigger cut budget than it has.
+      Bosses inherit all of the waist work with no boss-specific code.
+      Verified by eye this session — screen capture came back when Studio regained focus.
+      Twenty self-test suites pass; `check.sh` clean but for the two `MenuController` selene
+      warnings that predate this branch.

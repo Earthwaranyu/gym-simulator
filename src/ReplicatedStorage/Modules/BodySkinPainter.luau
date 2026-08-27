@@ -11,11 +11,22 @@
 
 	**It bakes the base colour rather than relying on vertex tint.** The mesh could
 	supply skin and shorts as vertex colours and let the texture carry only shading,
-	which would need one texture for everybody. But whether Roblox multiplies a vertex
-	colour into a MeshPart's texture or ignores it is not something this project can
-	check right now — `screen_capture` is unavailable — and guessing wrong turns every
-	player grey or white. Baking the colour in is correct under either behaviour, at
-	the cost of one texture per palette.
+	which would need one texture for everybody rather than one per palette.
+
+	That was written as an open question, because `screen_capture` was unavailable and
+	guessing wrong "turns every player grey or white". It has now been measured, in
+	Studio, by painting every face of a body pure red and rendering it:
+
+	  * A vertex colour **replaces** `BasePart.Color`. The red body rendered red while
+	    its part was set to Tan, so `part.Color` is inert on a mesh whose faces all
+	    carry colours — which every generated body's do.
+	  * Flat skin therefore renders as the *texture*, because `ReliefTint` returns
+	    exactly 1 there and the neutral vertex colour is white.
+
+	Baking the colour in is still the right call, and now for a stated reason rather
+	than as a hedge. The alternative — white texture, colour on the vertices — is
+	viable and would collapse the cache to one texture, but it would put the skin tone
+	on the same channel the groove shading uses, and those want to multiply.
 
 	**Textures are cached globally, never per character.** A busy server has many
 	players sharing a handful of skin tones, and a 512x512 fill is 14ms. Keyed by

@@ -131,6 +131,22 @@ export type Ring = {
 	Z: number,
 	RX: number,
 	RZ: number,
+	--[[
+		How far this ring pulls *in* as the body grows, 0..1, and 0 almost everywhere.
+
+		The waist has the opposite problem to everything else: it is the one place a
+		physique reads better for being smaller, and growth alone can only ever make it
+		bigger. LowerTorso still grows on x1.204, so without a term that subtracts, a
+		maxed body's waist is a maxed body's waist — thicker than the one it started
+		with, under a chest that grew half again as much.
+
+		Deliberately not a negative PhysiqueConfig weight, which was the obvious move
+		and the wrong one: those weights also drive MuscleController, which scales the
+		real R15 parts and their hitboxes, and PhysiqueConfig's own self-test requires
+		every part to actually grow. The taper belongs to the generated surface, not to
+		the skeleton underneath it.
+	]]
+	Cinch: number?,
 	Bones: { Influence },
 	-- "Skin" or "Pants". AppearanceService paints the rig through BodyColors, so the
 	-- live rig part is the source of truth for what colour this band should be.
@@ -167,9 +183,19 @@ local function ring(
 	bones: { Influence },
 	slot: string?,
 	x: number?,
-	z: number?
+	z: number?,
+	cinch: number?
 ): Ring
-	return { X = x or 0, Y = y, Z = z or 0, RX = rx, RZ = rz, Bones = bones, Slot = slot or "Skin" }
+	return {
+		X = x or 0,
+		Y = y,
+		Z = z or 0,
+		RX = rx,
+		RZ = rz,
+		Cinch = cinch,
+		Bones = bones,
+		Slot = slot or "Skin",
+	}
 end
 
 local tubes: { Tube } = {}
@@ -182,26 +208,41 @@ table.insert(tubes, {
 	U0 = 0,
 	U1 = 0.4,
 	Rings = {
-		ring(-1.55, 0.60, 0.40, { { Bone = "LowerTorso", Weight = 1 } }, "Pants"),
-		ring(-1.20, 0.66, 0.42, { { Bone = "LowerTorso", Weight = 1 } }, "Pants"),
+		ring(-1.55, 0.60, 0.40, { { Bone = "LowerTorso", Weight = 1 } }, "Pants", nil, nil, 0.10),
+		ring(-1.20, 0.66, 0.42, { { Bone = "LowerTorso", Weight = 1 } }, "Pants", nil, nil, 0.16),
 		ring(
 			-0.90,
 			0.66,
 			0.42,
-			{ { Bone = "LowerTorso", Weight = 0.8 }, { Bone = "UpperTorso", Weight = 0.2 } },
-			"Pants"
+			{ { Bone = "LowerTorso", Weight = 0.85 }, { Bone = "UpperTorso", Weight = 0.15 } },
+			"Pants",
+			nil,
+			nil,
+			0.22
 		),
-		-- The waist, pinched hard on purpose. A chest reads as big because of what
-		-- sits under it: the V-taper does more for the silhouette than the chest's
-		-- own width ever does, and the previous 1.22 ratio is why this looked like
-		-- a barrel however wide the shoulders got.
+		--[[
+			The waist, pinched hard on purpose — and it stopped being the pinch.
+
+			This ring was 55% UpperTorso, so the chest's x1.648 growth reached down and
+			widened it by x1.448 while the hips below it grew on x1.293. At full size
+			the authored minimum was no longer the minimum: this ring ended up sitting
+			0.074 *proud* of the ring beneath it, and a local bulge above a narrower
+			ring is exactly what a love handle is. Training Chest or Back — neither of
+			which has any business touching a waistline — made it worse.
+
+			Weighted to the waist's own bone now, and cinched hardest of the band.
+		]]
 		ring(
 			-0.60,
 			0.64,
 			0.42,
-			{ { Bone = "LowerTorso", Weight = 0.45 }, { Bone = "UpperTorso", Weight = 0.55 } }
+			{ { Bone = "LowerTorso", Weight = 0.85 }, { Bone = "UpperTorso", Weight = 0.15 } },
+			"Skin",
+			nil,
+			nil,
+			0.24
 		),
-		ring(-0.30, 0.68, 0.44, { { Bone = "UpperTorso", Weight = 1 } }),
+		ring(-0.30, 0.68, 0.44, { { Bone = "UpperTorso", Weight = 1 } }, "Skin", nil, nil, 0.12),
 		ring(0.00, 0.82, 0.52, { { Bone = "UpperTorso", Weight = 1 } }),
 		ring(0.28, 0.98, 0.60, { { Bone = "UpperTorso", Weight = 1 } }),
 		-- The pec shelf and the yoke of the shoulders above it.
@@ -622,7 +663,7 @@ for row, t in { 0.56, 0.46, 0.36 } do
 			t,
 			sign * 0.20,
 			0.70,
-			0.26,
+			0.31,
 			0.09,
 			0.30 + (row - 1) * 0.08,
 			0.92
@@ -656,9 +697,9 @@ local function groove(
 end
 
 -- The abdominal grid: one channel down the middle, three across it.
-groove("LineaAlba", "Core", "Torso", 0.46, 0, 0.16, 0.16, 0.16, 0.18, 0.75)
+groove("LineaAlba", "Core", "Torso", 0.46, 0, 0.16, 0.16, 0.19, 0.18, 0.75)
 for row, t in { 0.57, 0.47, 0.37 } do
-	groove(`AbGap{row}`, "Core", "Torso", t, 0, 0.028, 0.42, 0.13, 0.22 + row * 0.05, 0.85)
+	groove(`AbGap{row}`, "Core", "Torso", t, 0, 0.030, 0.42, 0.16, 0.22 + row * 0.05, 0.85)
 end
 
 for _, sign in { -1, 1 } do
@@ -716,6 +757,15 @@ for _, sign in { -1, 1 } do
 	groove(`ScapulaGap{tag}`, "Back", "Torso", 0.70, sign * (PI - 0.16), 0.10, 0.11, 0.12, SPLIT_START, 0.95)
 	-- The serratus fingers along the ribs, under the armpit and above the oblique.
 	groove(`Serratus{tag}`, "Core", "Torso", 0.50, sign * 1.20, 0.055, 0.16, 0.11, 0.55, 1.00)
+	--[[
+		The line under the oblique, and the reason the waist read as soft.
+
+		Nothing in this file cut below y ~= -0.39: the whole hip and lower-waist band
+		was ungrooved, so the oblique swelled out of the flank with no edge anywhere and
+		the eye read the result as fat rather than muscle. A belly and an oblique are the
+		same shape without this line.
+	]]
+	groove(`ObliqueGap{tag}`, "Core", "Torso", 0.29, sign * 1.32, 0.09, 0.20, 0.13, 0.45, 1.00)
 end
 
 for _, side in { "Left", "Right" } do
@@ -821,6 +871,47 @@ BodyLoftConfig.DETAIL = {
 	config change away at all times, since one extra ring or a bumped Sides can cross it.
 	RunSelfTest prices every detail tier against it.
 ]]
+--[[
+	How far the generated body reaches above and below the HumanoidRootPart.
+
+	Exactly the authored ring span, and that is not an approximation: `ringScale`
+	returns only X and Z, and `RayExit` is called with `dy = 0`, so **no lobe and no
+	groove ever moves a vertex vertically**. The surface bulges outward from the axis
+	and never along it.
+
+	This exists because the number was previously measured by hand and written into
+	MobService, where it went stale the moment anyone touched a leg ring — and stale in
+	a way that puts a boss's shins through the floor rather than raising an error.
+]]
+function BodyLoftConfig.Extents(): (number, number)
+	local lowest, highest = math.huge, -math.huge
+	for _, tube in tubes do
+		for _, r in tube.Rings do
+			lowest = math.min(lowest, r.Y)
+			highest = math.max(highest, r.Y)
+		end
+	end
+	return lowest, highest
+end
+
+--[[
+	How far the body's lowest geometry hangs below the root, as a positive drop.
+
+	This — not half the bounding box — is what decides where a dressed character has to
+	stand. The bounding box is tempting because the MeshPart is created from it and
+	centred on it, but the mesh is **skinned**: at runtime every vertex is placed by its
+	bone, and the bones sit at their authored offsets from the root. The part's own
+	CFrame does not move the surface, so the ankle lands wherever the ankle bone lands,
+	2.86 studs under the root.
+
+	Getting this wrong is worth 0.93 studs per unit of scale, which on a boss at 2.1 is
+	nearly two studs of leg through the floor.
+]]
+function BodyLoftConfig.Drop(): number
+	local lowest, _ = BodyLoftConfig.Extents()
+	return -lowest
+end
+
 BodyLoftConfig.MAX_TRIANGLES = 20000
 
 export type Detail = { Sides: number, Subdivisions: number, MaxDistance: number }
@@ -1453,6 +1544,16 @@ function BodyLoftConfig.RunSelfTest(): { string }
 		local SAMPLES = 48
 		for _, tube in tubes do
 			for index, r in tube.Rings do
+				--[[
+					Against the *cinched* radius, not the authored one.
+
+					A waist ring is deliberately narrower at full growth than it is on
+					paper, and this check asks whether the surface survives its own
+					grooves at full growth — so measuring the paper radius quietly hands
+					the cut a bigger budget than it really has, exactly where the rings
+					are thinnest and the grooves are deepest.
+				]]
+				local cinched = 1 - (r.Cinch or 0)
 				local t = (index - 1) / math.max(1, #tube.Rings - 1)
 				for step = 0, SAMPLES - 1 do
 					local angle = step / SAMPLES * 2 * PI
@@ -1462,7 +1563,7 @@ function BodyLoftConfig.RunSelfTest(): { string }
 							push += BodyLoftConfig.Displacement(m, t, angle, 1)
 						end
 					end
-					local smallest = math.min(r.RX, r.RZ)
+					local smallest = math.min(r.RX, r.RZ) * cinched
 					if smallest + push < smallest * 0.25 then
 						table.insert(
 							failures,

@@ -551,10 +551,26 @@ function CustomizerStageController:Enter()
 	grade.Contrast = 0
 	grade.Saturation = 0
 	grade.Parent = Lighting
+	--[[
+		Mood, but **no saturation change**, and that is not a style choice.
+
+		This graded the stage to -0.45 saturation, which is a lot: it turned Umber
+		(129, 84, 52) into a pale peach on screen while the swatch button beside it —
+		a ScreenGui, which no ColorCorrection touches — went on showing the true brown.
+		So the player compared a graded body against an ungraded swatch, picked the
+		colour that looked right under the grade, and then walked out into a world
+		graded at only -0.12 and got something else again. "The skin I chose is not the
+		skin I got" was exactly true, and nothing in the appearance pipeline was wrong.
+
+		This is the one screen whose entire job is choosing a colour, so it is the one
+		screen that may not restate it. Brightness and contrast stay — they set the mood
+		without moving a hue — and the world's own grade still applies underneath, which
+		is what makes the preview match where the player is about to stand.
+	]]
 	TweenService:Create(grade, TweenInfo.new(0.6), {
 		Brightness = -0.12,
 		Contrast = 0.1,
-		Saturation = -0.45,
+		Saturation = 0,
 	}):Play()
 
 	-- Only what was actually on screen is remembered, so leaving does not switch on a
