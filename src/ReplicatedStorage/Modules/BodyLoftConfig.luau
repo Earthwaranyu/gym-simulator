@@ -85,9 +85,20 @@ BodyLoftConfig.BONES = BONES
 -- "More skinning elements than allowed".
 BodyLoftConfig.MAX_INFLUENCES = 4
 
--- How dark the deepest groove goes, as a fraction toward black. Only grooves are
--- tinted at all; see ReliefTint.
-BodyLoftConfig.GROOVE_SHADE = 0.18
+--[[
+	How dark the deepest groove goes, as a fraction toward black.
+
+	Only grooves are tinted at all; see ReliefTint. This was 0.18 and read as nothing,
+	but the number was never really the problem — the builder divided every groove by
+	the largest relief on the tube, which is a *lobe peak* a full stud proud, so a cut a
+	quarter of a stud deep arrived pre-divided by four. With that fixed, 0.18 would put
+	the deepest crease at 0.82; 0.42 puts it at 0.58, which is a shadow you can see
+	across a room, and is what separates a bodybuilder's muscles from a smooth mass.
+
+	A boss at leanness 1.7 wants 0.714 and gets clamped to 0.6 by ReliefTint — the first
+	time that clamp has ever been reachable rather than dead code.
+]]
+BodyLoftConfig.GROOVE_SHADE = 0.42
 
 --[[
 	How cut a body is, independently of how big it is.
@@ -556,7 +567,7 @@ for _, side in { "Left", "Right" } do
 	lobe(`{side}ForearmExtensor`, "Arms", arm, 0.66, PI, 0.44, 0.30, 0.13, SPLIT_START, 1.00, { 1, 1.25, 1 })
 
 	local leg = `{side}Leg`
-	lobe(`{side}Glute`, "Legs", leg, 0.05, PI, 0.46, 0.60, 0.20, 0.10, 0.80)
+	lobe(`{side}Glute`, "Legs", leg, 0.05, PI, 0.46, 0.60, 0.15, 0.10, 0.80)
 
 	lobe(`{side}Quad`, "Legs", leg, 0.32, 0, 0.46, 0.56, 0.17, 0.12, 0.84, { 1, 1.3, 1 })
 	lobe(`{side}VastusLateralis`, "Legs", leg, 0.38, outward * 0.42, 0.46, 0.38, 0.15, SPLIT_START, 1.00)
@@ -582,14 +593,14 @@ for _, sign in { -1, 1 } do
 		"Torso",
 		0.705,
 		sign * 0.44,
-		0.58,
-		0.52,
-		0.13,
+		0.62,
+		0.72,
+		0.11,
 		0.10,
 		0.80,
 		{ 1.15, 0.62, 1 }
 	)
-	lobe(`{side}PecUpper`, "Chest", "Torso", 0.775, sign * 0.40, 0.58, 0.48, 0.14, 0.34, 0.92, { 1, 0.85, 1 })
+	lobe(`{side}PecUpper`, "Chest", "Torso", 0.775, sign * 0.40, 0.62, 0.64, 0.12, 0.34, 0.92, { 1, 0.85, 1 })
 
 	--[[
 		The lat, and the reason Stretch exists at all.
@@ -606,9 +617,9 @@ for _, sign in { -1, 1 } do
 		"Torso",
 		0.60,
 		sign * (PI / 2 - 0.15),
-		0.56,
-		0.54,
-		0.20,
+		0.60,
+		0.74,
+		0.14,
 		0.16,
 		0.88,
 		{ 1.15, 1.7, 0.6 }
@@ -619,9 +630,9 @@ for _, sign in { -1, 1 } do
 		"Torso",
 		0.44,
 		sign * (PI / 2 + 0.22),
-		0.56,
-		0.44,
-		0.22,
+		0.60,
+		0.60,
+		0.15,
 		0.40,
 		0.95,
 		{ 1.1, 1.5, 0.65 }
@@ -662,9 +673,9 @@ for row, t in { 0.56, 0.46, 0.36 } do
 			"Torso",
 			t,
 			sign * 0.20,
-			0.70,
-			0.31,
-			0.09,
+			0.72,
+			0.40,
+			0.08,
 			0.30 + (row - 1) * 0.08,
 			0.92
 		)
@@ -1428,6 +1439,23 @@ function BodyLoftConfig.RunSelfTest(): { string }
 		-- division by zero.
 		if BodyLoftConfig.ReliefTint(0, 0) ~= 1 then
 			table.insert(failures, "ReliefTint mishandles a body with no relief")
+		end
+		--[[
+			A groove at full depth must actually be a shadow.
+
+			The failure this exists for shipped and survived three passes: the deepest
+			crease on a maxed torso rendered 4.7% darker than flat skin and the typical
+			one 0.02% darker, because the builder normalised grooves against lobe peaks.
+			Every assertion above passed throughout — they only ever checked that flat
+			skin is untouched and that a groove is neither absent nor black, and 0.9998
+			is comfortably both. Nothing said "and it has to be visible".
+		]]
+		if BodyLoftConfig.ReliefTint(-1, 1) > 0.7 then
+			table.insert(
+				failures,
+				`a groove at full depth only darkens to {BodyLoftConfig.ReliefTint(-1, 1)}, `
+					.. "which does not read as a shadow"
+			)
 		end
 	end
 

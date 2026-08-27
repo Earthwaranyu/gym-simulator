@@ -260,16 +260,17 @@ function BodyLoftBuilder.Build(
 		-- AppearanceService paints the rig through BodyColors, so the caller reads
 		-- the real colours off the live rig and hands them in here.
 		--[[
-			A light tint following the surface relief: how far this vertex ended up
-			from the plain tube it would have been without any muscle. Positive on a
-			lobe, negative inside a groove, so muscles catch a highlight and the
-			channels between them fall into shadow.
+			A shadow following the surface relief: how far this vertex ended up from the
+			plain tube it would have been without any muscle. Zero on flat skin and on a
+			lobe, negative inside a groove, so the channels between muscles fall into
+			shadow while the muscles themselves are left to the world's lighting.
 
-			Deliberately gentle. The painted texture carries the definition now, and a
-			strong vertex tint on top of it reads as blotching rather than muscle.
+			This used to be described as "deliberately gentle… the painted texture
+			carries the definition now". It was gentle by accident rather than by
+			judgement — see the reach comment below — and gentle enough to be invisible.
+			The texture does carry most of the definition, but a texture cannot put a
+			shadow in a valley that the geometry has and the shading refuses to admit to.
 		]]
-		-- Light touch: the painted texture is doing the definition now, and a strong
-		-- vertex tint on top of it reads as blotches rather than muscle.
 		--[[
 			The vertex tint is a shading multiplier, never a colour.
 
@@ -491,7 +492,24 @@ function BodyLoftBuilder.Build(
 					posRow[side] = position
 					local relief = radius - baseRadius
 					pushRow[side] = relief
-					reach = math.max(reach, math.abs(relief))
+					--[[
+						Only grooves set the scale that grooves are measured against.
+
+						This took `max(abs(relief))`, so the denominator was whatever
+						moved the surface furthest *in either direction* — and on a maxed
+						torso that is a lat peaking a full stud proud of the tube, while
+						the deepest cut on the same body reaches a quarter of one. Every
+						groove was then divided by four times its own range: the deepest
+						crease on a player rendered 4.7% darker than flat skin, and the
+						median groove vertex 0.02% darker, which is to say not at all.
+						Deepening a groove only grew the divisor along with it, which is
+						why several rounds of doing exactly that changed nothing.
+
+						A cut is now measured against the deepest cut on its own tube.
+					]]
+					if relief < 0 then
+						reach = math.max(reach, -relief)
+					end
 					-- Rotated half a turn so the front centre line lands mid-column;
 					-- the wrap seam then falls down the back rather than the abs.
 					local u = tube.U0 + ((side / sides + 0.5) % 1) * (tube.U1 - tube.U0)
@@ -530,15 +548,70 @@ function BodyLoftBuilder.Build(
 				vertex gives a normal shared by every face touching it, so the shading
 				runs smoothly around and along the limb.
 			]]
+			--[[
+				A symmetric difference cannot see a one-vertex groove.
+
+				`positions[next] - positions[prev]` is a smoothing kernel exactly one
+				facet wide. At the floor of a narrow crease both walls sit at the same
+				height, the two terms cancel, and the normal comes out pointing straight
+				off the body — so the crease renders perfectly flat no matter how deep it
+				is cut. Most grooves in this file are 0.9 to 1.4 vertices across at Hero
+				detail, which is to say: most of them were invisible to the shading even
+				where the mesh had them.
+
+				So: where a vertex is a local extremum — both neighbours above it, or
+				both below — take a *one-sided* difference toward the steeper of the two
+				instead of spanning them. The normal then tilts into the wall, which is
+				what makes a valley look like a valley. On flat surface both neighbours
+				agree, the test fails, and the smooth central difference is used exactly
+				as before, so nothing that already looked right changes.
+			]]
+			-- Both differences must clear this before a vertex counts as a trough or a
+			-- ridge; below it the surface is flat and wants the smooth normal.
+			local EXTREMUM = 0.02
+			local function tangent(
+				here: Vector3,
+				prev: Vector3,
+				next: Vector3,
+				dp: number,
+				dn: number
+			): Vector3
+				if dp > EXTREMUM and dn > EXTREMUM then
+					-- A trough: both neighbours stand above this vertex.
+					return if dn >= dp then next - here else here - prev
+				elseif dp < -EXTREMUM and dn < -EXTREMUM then
+					-- A ridge: both neighbours fall away from it.
+					return if -dn >= -dp then next - here else here - prev
+				end
+				return next - prev
+			end
+
 			for rowIndex = 1, #samples do
 				local normalRow = {}
 				local above = positions[math.min(rowIndex + 1, #samples)]
 				local below = positions[math.max(rowIndex - 1, 1)]
+				local pushHere = pushGrid[rowIndex]
+				local pushAbove = pushGrid[math.min(rowIndex + 1, #samples)]
+				local pushBelow = pushGrid[math.max(rowIndex - 1, 1)]
 				for side = 0, sides - 1 do
 					local nextSide = (side + 1) % sides
 					local prevSide = (side - 1 + sides) % sides
-					local alongRing = positions[rowIndex][nextSide] - positions[rowIndex][prevSide]
-					local alongTube = above[side] - below[side]
+					local here = positions[rowIndex][side]
+					local relief = pushHere[side]
+					local alongRing = tangent(
+						here,
+						positions[rowIndex][prevSide],
+						positions[rowIndex][nextSide],
+						pushHere[prevSide] - relief,
+						pushHere[nextSide] - relief
+					)
+					local alongTube = tangent(
+						here,
+						below[side],
+						above[side],
+						pushBelow[side] - relief,
+						pushAbove[side] - relief
+					)
 					local normal = alongTube:Cross(alongRing)
 					if normal.Magnitude < 1e-6 then
 						normal = Vector3.new(positions[rowIndex][side].X, 0, positions[rowIndex][side].Z)

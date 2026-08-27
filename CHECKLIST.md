@@ -2784,3 +2784,45 @@ traffic exists:
       Verified by eye this session — screen capture came back when Studio regained focus.
       Twenty self-test suites pass; `check.sh` clean but for the two `MenuController` selene
       warnings that predate this branch.
+
+- [x] 188. **The creases were being divided by the bulges.** The body had the reference's muscles
+      — 56 lobes, 52 grooves, a 3.04 chest-to-waist V — and still read as a smooth mass with
+      faint smudges. Measuring the shading end to end found the reason, and it was not that the
+      numbers were a bit gentle.
+      `ReliefTint` takes `depth = -relief / reach`, and the builder set `reach` to a running
+      `max(abs(relief))` over the whole tube. On a maxed torso that is **1.001 studs**, set by a
+      lat peaking a full stud *proud* of the tube — while the deepest cut on the same body
+      reaches −0.26. Every groove was divided by four times its own range. The deepest crease on
+      an entire player torso rendered **4.7% darker than flat skin, on one vertex**, and the
+      median groove vertex 0.02% darker. Deepening a groove only grew its own divisor, which is
+      why several passes of doing exactly that changed nothing on screen. A cut is now measured
+      against the deepest cut on its own tube.
+      `GROOVE_SHADE` 0.18 → 0.42 on top of that. Deepest crease goes 0.901 → **0.580** for a
+      player and **0.400** for a boss — which finally makes the `min(..., 0.6)` clamp inside
+      `ReliefTint` live code rather than unreachable, since `MAX_LEANNESS` is 2 and 0.18 × 2
+      could never reach it. Verified by reading the vertex colours the builder actually wrote,
+      not by trusting the config value: darkest 0.580 at leanness 1, 0.400 at 1.7.
+      **The normals could not see a narrow groove either.** `positions[next] - positions[prev]`
+      is a smoothing kernel exactly one facet wide, so at the floor of a one-vertex crease both
+      walls sit level, the terms cancel, and the normal points straight off the body — the cut
+      renders flat however deep it is. Most grooves here are 0.9–1.4 vertices across at Hero
+      detail. Where a vertex is now a local extremum in relief, the tangent is taken *one-sided*
+      toward the steeper wall instead of spanning both; flat surface fails the test and keeps the
+      smooth central difference, so nothing that already looked right moved.
+      Shape, unevenly, because uniform inflation is what produced the smooth barrel two passes
+      ago. The torso was the weak half: pecs stood proud 24–29% of local radius and lats 19–22%,
+      against a deltoid at 76%. Pecs → 50–60%, lats → 47–50%, abs → 40%. And the lats had the
+      softest rim on the body — `Blend` 0.20/0.22 is an effective fillet of 0.25–0.27 studs at
+      full growth against 0.167 studs of arc per vertex, so the edge dissolved over 1.5
+      vertices; down to 0.14/0.15, and the glute with them. Left alone: abs and delts, whose
+      fillets were already inside a single vertex, and the small accents (teres, trap, forearm
+      extensor) that are meant to be accents.
+      Added the self-test whose absence let a tint of 0.9998 ship and survive three passes: a
+      groove at full depth must darken past 0.7. The five existing `ReliefTint` assertions all
+      passed throughout — they only ever checked that flat skin is untouched and that a groove is
+      neither absent nor black, and 0.9998 is comfortably both.
+      Verified: twenty self-test suites pass; `check.sh` clean but for the two `MenuController`
+      selene warnings that predate this branch; mesh build unchanged at 50 ms (the 236 ms in the
+      first reading was the one-off 1024 texture fill for a fresh stage — cold is 80 ms).
+      **Not verified: how it looks.** Studio's screen capture timed out on every attempt this
+      round after working earlier in the session; it needs Studio in the foreground.
