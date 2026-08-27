@@ -179,7 +179,7 @@ for _, side in { -1, 1 } do
 		0.5 + side * 0.175,
 		0.695,
 		0.0324,
-		0.40,
+		0.30,
 		0.40,
 		0.90
 	)
@@ -193,7 +193,7 @@ for _, side in { -1, 1 } do
 		0.5 + side * 0.15,
 		0.80,
 		0.0216,
-		0.30,
+		0.22,
 		SPLIT_START,
 		0.95
 	)
@@ -222,7 +222,7 @@ for _, side in { -1, 1 } do
 		u + side * -0.075,
 		0.78,
 		0.0288,
-		0.40,
+		0.32,
 		0.30,
 		0.92
 	)
@@ -236,7 +236,7 @@ for _, side in { -1, 1 } do
 		u + side * 0.03,
 		0.86,
 		0.0252,
-		0.34,
+		0.24,
 		SPLIT_START,
 		0.95
 	)
@@ -250,7 +250,7 @@ for _, side in { -1, 1 } do
 		u + side * -0.12,
 		0.88,
 		0.0216,
-		0.30,
+		0.22,
 		SPLIT_START,
 		0.95
 	)
@@ -264,7 +264,7 @@ for _, side in { -1, 1 } do
 		u + side * -0.17,
 		0.52,
 		0.0216,
-		0.28,
+		0.20,
 		0.55,
 		1.00
 	)
@@ -299,12 +299,12 @@ for _, side in { "Left", "Right" } do
 	stroke(`{side}Forearm`, region, "Arms", 0.5, 0.60, 0.5, 0.82, 0.0252, 0.243, 0.35, 1.00)
 	-- The two lines down the deltoid cap separating its three heads. Short and
 	-- vertical, where DeltEdge above runs horizontally around the arm.
-	stroke(`{side}DeltFrontGap`, region, "Arms", 0.36, 0.05, 0.38, 0.19, 0.0216, 0.34, SPLIT_START, 0.95)
-	stroke(`{side}DeltRearGap`, region, "Arms", 0.64, 0.05, 0.62, 0.19, 0.0216, 0.34, SPLIT_START, 0.95)
+	stroke(`{side}DeltFrontGap`, region, "Arms", 0.36, 0.05, 0.38, 0.19, 0.0216, 0.26, SPLIT_START, 0.95)
+	stroke(`{side}DeltRearGap`, region, "Arms", 0.64, 0.05, 0.62, 0.19, 0.0216, 0.26, SPLIT_START, 0.95)
 	-- The horseshoe line between the tricep's long and lateral heads.
-	stroke(`{side}TricepHorseshoe`, region, "Arms", 0.12, 0.30, 0.16, 0.50, 0.0216, 0.32, SPLIT_START, 1.00)
+	stroke(`{side}TricepHorseshoe`, region, "Arms", 0.12, 0.30, 0.16, 0.50, 0.0216, 0.24, SPLIT_START, 1.00)
 	-- The flexor/extensor seam down the side of the forearm.
-	stroke(`{side}ForearmSeam`, region, "Arms", 0.26, 0.60, 0.26, 0.84, 0.0216, 0.28, SPLIT_START, 1.00)
+	stroke(`{side}ForearmSeam`, region, "Arms", 0.26, 0.60, 0.26, 0.84, 0.0216, 0.22, SPLIT_START, 1.00)
 end
 
 -- === Legs ===================================================================
@@ -319,8 +319,8 @@ for _, side in { "Left", "Right" } do
 	stroke(`{side}CalfSplit`, region, "Legs", 0.0, 0.70, 0.0, 0.86, 0.0324, 0.324, 0.28, 0.95)
 	stroke(`{side}CalfSplit2`, region, "Legs", 1.0, 0.70, 1.0, 0.86, 0.0324, 0.324, 0.28, 0.95)
 	-- The outer thigh seam, and the teardrop's upper border above the knee.
-	stroke(`{side}QuadSeam`, region, "Legs", 0.66, 0.36, 0.62, 0.56, 0.0252, 0.30, SPLIT_START, 1.00)
-	stroke(`{side}Teardrop`, region, "Legs", 0.40, 0.50, 0.44, 0.60, 0.0252, 0.30, 0.66, 1.00)
+	stroke(`{side}QuadSeam`, region, "Legs", 0.66, 0.36, 0.62, 0.56, 0.0252, 0.24, SPLIT_START, 1.00)
+	stroke(`{side}Teardrop`, region, "Legs", 0.40, 0.50, 0.44, 0.60, 0.0252, 0.24, 0.66, 1.00)
 end
 
 BodySkinConfig.STROKES = strokes

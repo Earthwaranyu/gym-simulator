@@ -2657,3 +2657,32 @@ traffic exists:
       the only question that matters here and it needs `PhysiquePreview.show()` in Studio
       Edit mode and human eyes — front row and back row, checking that stage 0 still reads
       as a normal person and stage 1 reads as segmented rather than merely lumpy.
+
+- [x] 185. **Looked at it, and found the real problem is older than this branch.** #184 shipped
+      unverified by eye, so I built the preview in Studio Edit and took the shots.
+      What the change did do: the maxed body is visibly wider (mesh X from 4.11 at stage 0 to
+      5.78 at stage 1) and the arms now read as separated pieces — delt heads and the bicep
+      split are legible on the silhouette where before the arm was one smooth mass. All ten
+      preview bodies build, 46–65ms each at the Near LOD.
+      What it did not fix: the torso reads as a muddy dark smear rather than a cut chest, and
+      an A/B against HEAD~2 shows **the pre-change body has exactly the same smear**. This is
+      not a regression from #184 — it is the state the body was already in, and it is now the
+      dominant visual problem, ahead of segmentation. The likely cause is resolution, not
+      authoring: `BodySkinConfig.RESOLUTION` is 512 for the entire body, and the torso's
+      atlas column is u 0..0.5, so roughly 256 pixels carry the front *and* back of a chest
+      that is 5.8 studs wide at full growth. Every stroke on it is magnified and filtered
+      into a blur. Not changed here, because doubling a texture every client holds is a
+      memory call that wants making deliberately rather than as a side effect of a shape pass.
+      Two mistakes of mine caught in the process, both now fixed: the new strokes were
+      authored at the same depths as the deepest existing rows and then stacked on top of
+      them in the same place, which put a near-black band across the upper chest — depths
+      dropped to 0.20–0.32. And the first control build was invalid: `BodySkinPainter` caches
+      textures in a module upvalue keyed by palette and stage, so building a second variant
+      inside one cloned Modules folder silently reuses the first one's image. Every variant
+      after that got its own clone.
+      Also noted, unfixed and pre-existing: a stair-stepped notch in the surface at the
+      armpit, visible on both the old and the new body, where the arm tube's rings blend from
+      UpperTorso weight to UpperArm weight.
+      Verified: `check.sh` clean but for the two `MenuController` selene warnings that predate
+      this branch; nineteen self-tests pass; Studio preview cleaned up afterwards and the
+      real `ReplicatedStorage.Modules` tree left untouched (every build ran from a clone).
