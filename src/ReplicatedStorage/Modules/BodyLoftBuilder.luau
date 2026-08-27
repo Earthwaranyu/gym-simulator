@@ -367,20 +367,31 @@ function BodyLoftBuilder.Build(
 				})
 			end
 
+			--[[
+				The grooves on this tube, and the progress each is being grown at.
+
+				Hoisted for the same reason `placed` is above: this used to walk every
+				groove in the config once per vertex and test its tube inside the loop,
+				which is five thousand vertices times the whole table. Splitting the
+				muscles into their separate heads roughly doubled that table, so the
+				per-vertex work stopped being negligible — a torso only ever cares
+				about the torso's own grooves, and the filter belongs out here where it
+				runs once instead of thirty times a ring.
+			]]
+			local cuts: { { Groove: BodyLoftConfig.Groove, Progress: number } } = {}
+			for _, g in BodyLoftConfig.GROOVES do
+				if g.Tube == tube.Id then
+					table.insert(cuts, { Groove = g, Progress = progressByStat[g.StatId] or 0 })
+				end
+			end
+
 			for rowIndex, sample in samples do
 				local row, uvRow, posRow, pushRow = {}, {}, {}, {}
 				for side = 0, sides - 1 do
 					local angle = side / sides * twoPi
 					local push = 0
-					for _, g in BodyLoftConfig.GROOVES do
-						if g.Tube == tube.Id then
-							push += BodyLoftConfig.Displacement(
-								g,
-								sample.T,
-								angle,
-								progressByStat[g.StatId] or 0
-							)
-						end
+					for _, cut in cuts do
+						push += BodyLoftConfig.Displacement(cut.Groove, sample.T, angle, cut.Progress)
 					end
 					-- Angle 0 is the front, and the avatar faces -Z.
 					local scaleX, scaleZ = ringScale(sample.Bones, scales, partOfBone)

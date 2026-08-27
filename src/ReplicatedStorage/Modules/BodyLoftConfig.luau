@@ -319,6 +319,19 @@ export type Groove = {
 local grooves: { Groove } = {}
 local PI = math.pi
 
+--[[
+	Where a secondary muscle head begins to separate out of its group.
+
+	Late on purpose. Every group's primary head keeps the early ramp it always had, so
+	a beginner grows a recognisable body on the same curve as before; the second and
+	third heads arrive only near the top. That is what makes maxing out a change in
+	*kind* rather than one more increment of size — the arms do not merely get bigger,
+	they come apart into pieces. Shared by the lobes and the grooves that cut between
+	them, because a head and its channel must arrive together or the split reads as a
+	dent in a smooth muscle.
+]]
+local SPLIT_START = 0.58
+
 local function addGroove(
 	id: string,
 	statId: string,
@@ -431,30 +444,145 @@ local function lobe(
 	})
 end
 
+--[[
+	Muscles come in heads, and heads are what the eye counts.
+
+	Every group below used to be a single lobe: one deltoid, one bicep, one pec, one
+	lat. That reads as a *smooth* big arm rather than a segmented one, and no amount of
+	raising a radius fixes it — a bigger ball is still one ball. Splitting a group into
+	the heads it actually has, with a groove between them, is what makes an arm read as
+	built rather than inflated. Two half-size lobes side by side look bigger than one
+	large one, because the channel between them gives the eye an edge to measure.
+
+	The primary head of each group keeps its original early ramp, so a beginner grows a
+	recognisable body on the same curve as before. The secondary heads start late
+	(SPLIT_START and after), which is what makes the top of the grind a visible change
+	in *kind* rather than one more increment of size: the arms do not merely get bigger,
+	they come apart into pieces.
+]]
+
 for _, side in { "Left", "Right" } do
 	local arm = `{side}Arm`
 	-- The deltoid wraps the outside of the shoulder: +pi/2 is the character's right,
 	-- -pi/2 their left.
 	local outward = if side == "Left" then -PI / 2 else PI / 2
-	lobe(`{side}Deltoid`, "Arms", arm, 0.11, outward, 0.50, 0.58, 0.16, 0.08, 0.72)
-	lobe(`{side}Bicep`, "Arms", arm, 0.33, 0, 0.46, 0.52, 0.14, 0.12, 0.82)
-	lobe(`{side}Tricep`, "Arms", arm, 0.37, PI, 0.46, 0.46, 0.17, 0.22, 0.95)
-	lobe(`{side}Forearm`, "Arms", arm, 0.64, 0, 0.44, 0.34, 0.13, 0.30, 1.00)
+
+	-- Three heads on a shoulder cap barely half a stud wide, so they are deliberately
+	-- tight and hard-edged: a delt that melts into the arm is the thing that made the
+	-- old shoulder read as a sphere. Blend is the lever, not radius.
+	lobe(`{side}DeltSide`, "Arms", arm, 0.12, outward, 0.50, 0.52, 0.10, 0.08, 0.72)
+	lobe(`{side}DeltFront`, "Arms", arm, 0.13, outward * 0.45, 0.50, 0.42, 0.10, SPLIT_START, 0.95)
+	lobe(`{side}DeltRear`, "Arms", arm, 0.13, outward * 1.55, 0.50, 0.40, 0.11, SPLIT_START, 0.95)
+
+	-- StretchY below 1 shortens the lobe *along the arm*, which is what turns a ball
+	-- into a peak. A bicep is short and tall, not a sausage.
+	lobe(`{side}Bicep`, "Arms", arm, 0.31, 0, 0.46, 0.50, 0.13, 0.12, 0.82, { 1, 0.82, 1 })
+	lobe(`{side}Brachialis`, "Arms", arm, 0.43, outward * 0.5, 0.55, 0.34, 0.14, SPLIT_START, 1.00)
+
+	lobe(`{side}Tricep`, "Arms", arm, 0.35, PI, 0.46, 0.44, 0.16, 0.22, 0.95)
+	-- The outer head that makes the horseshoe. Note the angle: PI - outward*0.45 lands
+	-- outboard-and-behind on both sides, where writing PI + a bare offset would put the
+	-- left one on the inside of the arm and pass the mirror test anyway.
+	lobe(`{side}TricepLateral`, "Arms", arm, 0.44, PI - outward * 0.45, 0.55, 0.36, 0.13, SPLIT_START, 1.00)
+
+	-- A trained forearm is nearly as thick as the upper arm, and splitting it front and
+	-- back is most of why. StretchY above 1 is right here for the opposite reason it is
+	-- wrong on a bicep: these are long straps, not peaks.
+	lobe(`{side}Forearm`, "Arms", arm, 0.62, 0, 0.44, 0.33, 0.13, 0.30, 1.00, { 1, 1.25, 1 })
+	lobe(`{side}ForearmExtensor`, "Arms", arm, 0.66, PI, 0.44, 0.30, 0.13, SPLIT_START, 1.00, { 1, 1.25, 1 })
 
 	local leg = `{side}Leg`
 	lobe(`{side}Glute`, "Legs", leg, 0.05, PI, 0.46, 0.60, 0.20, 0.10, 0.80)
-	lobe(`{side}Quad`, "Legs", leg, 0.33, 0, 0.46, 0.58, 0.17, 0.12, 0.84)
+
+	lobe(`{side}Quad`, "Legs", leg, 0.32, 0, 0.46, 0.56, 0.17, 0.12, 0.84, { 1, 1.3, 1 })
+	lobe(`{side}VastusLateralis`, "Legs", leg, 0.38, outward * 0.42, 0.46, 0.38, 0.15, SPLIT_START, 1.00)
+	-- The teardrop just above the knee. Small and low, and the last thing to arrive.
+	lobe(`{side}VastusMedialis`, "Legs", leg, 0.52, -outward * 0.38, 0.46, 0.30, 0.12, 0.66, 1.00)
+
 	lobe(`{side}Hamstring`, "Legs", leg, 0.36, PI, 0.46, 0.52, 0.19, 0.25, 0.95)
-	lobe(`{side}Calf`, "Legs", leg, 0.72, PI, 0.42, 0.44, 0.15, 0.28, 1.00)
+	lobe(`{side}Calf`, "Legs", leg, 0.70, PI - outward * 0.20, 0.42, 0.42, 0.14, 0.28, 1.00)
+	lobe(`{side}CalfLateral`, "Legs", leg, 0.76, PI + outward * 0.20, 0.42, 0.34, 0.14, SPLIT_START, 1.00)
 end
 
 -- Chest and Back share the torso tube but listen to different stats, so training
 -- pecs never grows lats and vice versa.
 for _, sign in { -1, 1 } do
 	local side = if sign < 0 then "Left" else "Right"
-	lobe(`{side}Pec`, "Chest", "Torso", 0.735, sign * 0.42, 0.58, 0.62, 0.15, 0.10, 0.80)
-	lobe(`{side}Lat`, "Back", "Torso", 0.52, sign * (PI / 2), 0.56, 0.58, 0.22, 0.16, 0.88)
+
+	-- A pec is a shelf, not a dome, and the shelf is the lower head: wide across the
+	-- body (StretchX) and squashed vertically (StretchY) so it ends in an edge rather
+	-- than curving away. The upper head sits above and behind it toward the collarbone.
+	lobe(
+		`{side}PecLower`,
+		"Chest",
+		"Torso",
+		0.705,
+		sign * 0.44,
+		0.58,
+		0.52,
+		0.13,
+		0.10,
+		0.80,
+		{ 1.15, 0.62, 1 }
+	)
+	lobe(`{side}PecUpper`, "Chest", "Torso", 0.775, sign * 0.40, 0.58, 0.48, 0.14, 0.34, 0.92, { 1, 0.85, 1 })
+
+	--[[
+		The lat, and the reason Stretch exists at all.
+
+		A latissimus is a broad flat sheet down the side of the ribs. Rendered as a
+		sphere — which is what every lobe here was until now — it is a lump on an
+		otherwise smooth back, and the wide V that makes the whole silhouette read
+		simply is not there. Stretched tall in Y and flattened in Z it becomes the
+		sheet, and the flare is what pushes the arms out.
+	]]
+	lobe(
+		`{side}Lat`,
+		"Back",
+		"Torso",
+		0.60,
+		sign * (PI / 2 - 0.15),
+		0.56,
+		0.54,
+		0.20,
+		0.16,
+		0.88,
+		{ 1.15, 1.7, 0.6 }
+	)
+	lobe(
+		`{side}LatSweep`,
+		"Back",
+		"Torso",
+		0.44,
+		sign * (PI / 2 + 0.22),
+		0.56,
+		0.44,
+		0.22,
+		0.40,
+		0.95,
+		{ 1.1, 1.5, 0.65 }
+	)
+	-- Between the lat and the rear delt. Small, but the armpit reads as a hollow
+	-- without it and the back loses its outline against the arm.
+	lobe(`{side}Teres`, "Back", "Torso", 0.66, sign * (PI / 2 + 0.55), 0.62, 0.46, 0.14, SPLIT_START, 0.95)
+
 	lobe(`{side}Trap`, "Back", "Torso", 0.86, sign * 0.55 + PI, 0.50, 0.44, 0.19, 0.24, 0.90)
+	-- The shoulder blade slab. Wide and shallow, so it is a plate between spine and
+	-- trap rather than another ball.
+	lobe(
+		`{side}Rhomboid`,
+		"Back",
+		"Torso",
+		0.70,
+		sign * (PI - 0.40),
+		0.62,
+		0.40,
+		0.15,
+		SPLIT_START,
+		0.95,
+		{ 1.3, 0.9, 1 }
+	)
+
 	lobe(`{side}Erector`, "Back", "Torso", 0.44, sign * 0.30 + PI, 0.54, 0.36, 0.16, 0.30, 0.95)
 	lobe(`{side}Oblique`, "Core", "Torso", 0.34, sign * 1.05, 0.58, 0.34, 0.14, 0.42, 1.00)
 end
@@ -521,6 +649,52 @@ for _, sign in { -1, 1 } do
 end
 groove("PecCleft", "Chest", "Torso", 0.72, 0, 0.09, 0.14, 0.18, 0.12, 0.70)
 
+--[[
+	The cuts that come with the split heads.
+
+	Every lobe added above needs the channel that separates it from its neighbour, or
+	the two simply fuse into a larger version of the single lobe they replaced — which
+	is the failure this file's header describes at its very start. They share the split
+	heads' late Start for the same reason: the body comes apart into pieces at the top
+	of the curve, rather than arriving pre-cut.
+]]
+for _, sign in { -1, 1 } do
+	local tag = if sign < 0 then "L" else "R"
+	-- The shelf under the pec. Tight in T and wide in angle: an under-pec line is a
+	-- horizontal edge, and the old PecUnder is a nick beside it rather than the line
+	-- itself. This is what stops the chest curving away into the ribs.
+	groove(`PecShelf{tag}`, "Chest", "Torso", 0.678, sign * 0.44, 0.022, 0.46, 0.16, 0.40, 0.90)
+	-- Between the two pec heads.
+	groove(`PecSplit{tag}`, "Chest", "Torso", 0.742, sign * 0.42, 0.030, 0.34, 0.12, SPLIT_START, 0.95)
+	--[[
+		The lat's outer edge, from armpit to waist.
+
+		The single most recognisable line in the silhouette: it is the outside of the V,
+		and it is what makes a back read as wide rather than merely thick. Deliberately
+		long in T and narrow in angle — it is one continuous line down the side of the
+		body, not a dimple.
+	]]
+	groove(`LatEdge{tag}`, "Back", "Torso", 0.52, sign * (PI / 2 + 0.42), 0.22, 0.12, 0.15, 0.30, 0.92)
+	-- Above it, cutting the lat free of the teres and the rear delt so the armpit
+	-- reads as a hollow instead of a fused mass.
+	groove(
+		`TeresGap{tag}`,
+		"Back",
+		"Torso",
+		0.70,
+		sign * (PI / 2 + 0.30),
+		0.045,
+		0.20,
+		0.13,
+		SPLIT_START,
+		0.95
+	)
+	-- The shoulder blade's inner border, between rhomboid and spine.
+	groove(`ScapulaGap{tag}`, "Back", "Torso", 0.70, sign * (PI - 0.16), 0.10, 0.11, 0.12, SPLIT_START, 0.95)
+	-- The serratus fingers along the ribs, under the armpit and above the oblique.
+	groove(`Serratus{tag}`, "Core", "Torso", 0.50, sign * 1.20, 0.055, 0.16, 0.11, 0.55, 1.00)
+end
+
 for _, side in { "Left", "Right" } do
 	local arm = `{side}Arm`
 	local outward = if side == "Left" then -PI / 2 else PI / 2
@@ -531,12 +705,25 @@ for _, side in { "Left", "Right" } do
 	groove(`{side}ArmSeamB`, "Arms", arm, 0.34, -outward, 0.16, 0.22, 0.13, 0.18, 0.82)
 	-- The elbow.
 	groove(`{side}ElbowGap`, "Arms", arm, 0.53, 0, 0.030, 2.4, 0.11, 0.28, 0.90)
+	-- Between the three deltoid heads. Very tight in T, wide in angle: these run
+	-- down the cap rather than around it, which is the opposite of DeltGap above.
+	groove(`{side}DeltFrontGap`, "Arms", arm, 0.13, outward * 0.72, 0.10, 0.075, 0.13, SPLIT_START, 0.95)
+	groove(`{side}DeltRearGap`, "Arms", arm, 0.13, outward * 1.28, 0.10, 0.075, 0.13, SPLIT_START, 0.95)
+	-- The horseshoe: the line between the tricep's long and lateral heads.
+	groove(`{side}TricepSplit`, "Arms", arm, 0.40, PI - outward * 0.22, 0.11, 0.11, 0.12, SPLIT_START, 1.00)
+	-- Bicep down the middle, and the forearm's flexor/extensor seam.
+	groove(`{side}BicepSplit`, "Arms", arm, 0.31, 0, 0.10, 0.075, 0.12, 0.62, 1.00)
+	groove(`{side}ForearmSeam`, "Arms", arm, 0.64, outward, 0.12, 0.16, 0.11, SPLIT_START, 1.00)
 
 	local leg = `{side}Leg`
 	-- Between the quads, and up the back of the calf.
 	groove(`{side}QuadGap`, "Legs", leg, 0.36, 0, 0.15, 0.18, 0.13, 0.15, 0.84)
 	groove(`{side}KneeGap`, "Legs", leg, 0.60, 0, 0.030, 2.4, 0.11, 0.25, 0.88)
 	groove(`{side}CalfGap`, "Legs", leg, 0.74, PI, 0.13, 0.20, 0.12, 0.28, 0.95)
+	-- Down the outside of the thigh, between rectus femoris and vastus lateralis.
+	groove(`{side}QuadOuter`, "Legs", leg, 0.36, outward * 0.22, 0.14, 0.13, 0.12, SPLIT_START, 1.00)
+	-- And the medial teardrop's upper border, just above the knee.
+	groove(`{side}TeardropGap`, "Legs", leg, 0.47, -outward * 0.30, 0.055, 0.16, 0.11, 0.66, 1.00)
 end
 
 BodyLoftConfig.GROOVES = grooves
@@ -936,6 +1123,17 @@ function BodyLoftConfig.RunSelfTest(): { string }
 			if l.Radius <= 0 or l.Blend < 0 then
 				table.insert(failures, `{l.Id} has a non-positive radius or negative blend`)
 			end
+			--[[
+				Stretch is divided by, not multiplied by, inside RayExit — the ray is
+				worked in the ellipsoid's own space. A zero is therefore a division by
+				zero that comes back as nan, and a nan radius propagates through
+				SmoothMax into every vertex on the tube: the whole limb disappears with
+				no error anywhere. Cheap to assert, impossible to diagnose from a
+				screenshot of nothing.
+			]]
+			if l.StretchX <= 0 or l.StretchY <= 0 or l.StretchZ <= 0 then
+				table.insert(failures, `{l.Id} has a non-positive stretch axis`)
+			end
 			if l.Start < 0 or l.Full > 1 or l.Start >= l.Full then
 				table.insert(failures, `{l.Id} has an invalid growth range`)
 			end
@@ -980,6 +1178,14 @@ function BodyLoftConfig.RunSelfTest(): { string }
 					local o = partner :: Lobe
 					if o.T ~= l.T or o.Radius ~= l.Radius or o.Out ~= l.Out then
 						table.insert(failures, `{l.Id} and {o.Id} are not mirrors`)
+					end
+					-- Stretch mirrors as-is rather than negating: the reflection is
+					-- about the front-back axis, and an ellipsoid's extent along X is
+					-- the same either side of it. A lat sheeted on one side and balled
+					-- on the other is the exact kind of asymmetry the comment above
+					-- calls impossible to unsee.
+					if o.StretchX ~= l.StretchX or o.StretchY ~= l.StretchY or o.StretchZ ~= l.StretchZ then
+						table.insert(failures, `{l.Id} and {o.Id} are stretched differently`)
 					end
 				end
 			end

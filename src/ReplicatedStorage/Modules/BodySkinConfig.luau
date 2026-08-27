@@ -80,6 +80,17 @@ local function stroke(
 	})
 end
 
+--[[
+	Where a secondary muscle head's line is painted, matching
+	BodyLoftConfig.SPLIT_START.
+
+	Stated again rather than imported because this module is deliberately free of
+	dependencies — it describes a texture, not a body. Kept equal to the geometry's
+	copy by hand: a head and its painted line must arrive together, or the split reads
+	as a scratch on a smooth muscle for the whole span where only one of them exists.
+]]
+local SPLIT_START = 0.58
+
 -- === Torso ==================================================================
 -- v: 0 at the waist, 1 at the neck. u: 0.5 dead centre front, 0 and 1 the spine.
 
@@ -155,6 +166,39 @@ for _, side in { -1, 1 } do
 	)
 end
 
+for _, side in { -1, 1 } do
+	local tag = if side < 0 then "L" else "R"
+	-- The hard line the pec shelf ends on, drawn flatter and further out than
+	-- PecUnder above: that one is the shadow in the fold, this is the edge itself.
+	stroke(
+		`PecShelf{tag}`,
+		"Torso",
+		"Chest",
+		0.5 + side * 0.045,
+		0.665,
+		0.5 + side * 0.175,
+		0.695,
+		0.0324,
+		0.40,
+		0.40,
+		0.90
+	)
+	-- Between the pec's two heads, angled up toward the collarbone.
+	stroke(
+		`PecSplit{tag}`,
+		"Torso",
+		"Chest",
+		0.5 + side * 0.05,
+		0.755,
+		0.5 + side * 0.15,
+		0.80,
+		0.0216,
+		0.30,
+		SPLIT_START,
+		0.95
+	)
+end
+
 -- Back: the spine channel, the lat sweep and the trapezius wedge. u near 0 and 1.
 stroke("SpineL", "Torso", "Back", 0.015, 0.35, 0.015, 0.80, 0.0252, 0.351, 0.25, 0.88)
 stroke("SpineR", "Torso", "Back", 0.985, 0.35, 0.985, 0.80, 0.0252, 0.351, 0.25, 0.88)
@@ -162,6 +206,68 @@ for _, side in { -1, 1 } do
 	local tag = if side < 0 then "L" else "R"
 	local u = if side < 0 then 0.07 else 0.93
 	stroke(`Lat{tag}`, "Torso", "Back", u, 0.40, u + side * -0.045, 0.74, 0.0432, 0.378, 0.18, 0.85)
+	--[[
+		The outer edge of the lat, from armpit to waist.
+
+		The longest stroke in the file, and the one that does the most work: it is the
+		outside of the V. Drawn just inboard of the Lat sweep above so the two read as
+		a sheet with a border rather than as one wide smudge.
+	]]
+	stroke(
+		`LatEdge{tag}`,
+		"Torso",
+		"Back",
+		u + side * -0.015,
+		0.36,
+		u + side * -0.075,
+		0.78,
+		0.0288,
+		0.40,
+		0.30,
+		0.92
+	)
+	-- The hollow under the armpit, cutting lat from teres.
+	stroke(
+		`TeresGap{tag}`,
+		"Torso",
+		"Back",
+		u + side * -0.03,
+		0.80,
+		u + side * 0.03,
+		0.86,
+		0.0252,
+		0.34,
+		SPLIT_START,
+		0.95
+	)
+	-- The shoulder blade's inner border.
+	stroke(
+		`ScapulaGap{tag}`,
+		"Torso",
+		"Back",
+		u + side * -0.14,
+		0.74,
+		u + side * -0.12,
+		0.88,
+		0.0216,
+		0.30,
+		SPLIT_START,
+		0.95
+	)
+	-- The serratus fingers along the ribs, under the armpit and above the oblique.
+	stroke(
+		`Serratus{tag}`,
+		"Torso",
+		"Core",
+		u + side * -0.10,
+		0.44,
+		u + side * -0.17,
+		0.52,
+		0.0216,
+		0.28,
+		0.55,
+		1.00
+	)
 	stroke(
 		`Trap{tag}`,
 		"Torso",
@@ -191,6 +297,14 @@ for _, side in { "Left", "Right" } do
 	-- Elbow, then the forearm's central channel.
 	stroke(`{side}Elbow`, region, "Arms", 0.0, 0.55, 1.0, 0.55, 0.0288, 0.27, 0.30, 0.90)
 	stroke(`{side}Forearm`, region, "Arms", 0.5, 0.60, 0.5, 0.82, 0.0252, 0.243, 0.35, 1.00)
+	-- The two lines down the deltoid cap separating its three heads. Short and
+	-- vertical, where DeltEdge above runs horizontally around the arm.
+	stroke(`{side}DeltFrontGap`, region, "Arms", 0.36, 0.05, 0.38, 0.19, 0.0216, 0.34, SPLIT_START, 0.95)
+	stroke(`{side}DeltRearGap`, region, "Arms", 0.64, 0.05, 0.62, 0.19, 0.0216, 0.34, SPLIT_START, 0.95)
+	-- The horseshoe line between the tricep's long and lateral heads.
+	stroke(`{side}TricepHorseshoe`, region, "Arms", 0.12, 0.30, 0.16, 0.50, 0.0216, 0.32, SPLIT_START, 1.00)
+	-- The flexor/extensor seam down the side of the forearm.
+	stroke(`{side}ForearmSeam`, region, "Arms", 0.26, 0.60, 0.26, 0.84, 0.0216, 0.28, SPLIT_START, 1.00)
 end
 
 -- === Legs ===================================================================
@@ -204,6 +318,9 @@ for _, side in { "Left", "Right" } do
 	stroke(`{side}Knee`, region, "Legs", 0.36, 0.63, 0.64, 0.63, 0.0324, 0.243, 0.25, 0.85)
 	stroke(`{side}CalfSplit`, region, "Legs", 0.0, 0.70, 0.0, 0.86, 0.0324, 0.324, 0.28, 0.95)
 	stroke(`{side}CalfSplit2`, region, "Legs", 1.0, 0.70, 1.0, 0.86, 0.0324, 0.324, 0.28, 0.95)
+	-- The outer thigh seam, and the teardrop's upper border above the knee.
+	stroke(`{side}QuadSeam`, region, "Legs", 0.66, 0.36, 0.62, 0.56, 0.0252, 0.30, SPLIT_START, 1.00)
+	stroke(`{side}Teardrop`, region, "Legs", 0.40, 0.50, 0.44, 0.60, 0.0252, 0.30, 0.66, 1.00)
 end
 
 BodySkinConfig.STROKES = strokes

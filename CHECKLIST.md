@@ -2614,3 +2614,46 @@ traffic exists:
       `MenuController` and predate this branch). **Not verified: how it looks.** The angle is
       derived from the mesh rather than eyeballed, which is the best a number can do, but
       whether 33° reads as a lat spread or as a penguin wants human eyes.
+
+- [x] 184. **The muscles come apart into heads.** The physique everyone pictures when they
+      say "gym simulator body" is not bigger than ours was — it is *segmented*. Ours had one
+      lobe per group: one deltoid, one bicep, one pec, one lat per side. That reads as a
+      smooth big arm rather than a built one, and no amount of raising a radius fixes it,
+      because a bigger ball is still one ball. The taper was never the problem: at the 2.2
+      cap the chest already reaches 1.88 against a 0.77 waist, a 2.4:1 V.
+      The lever that was sitting unused was `StretchX/Y/Z`, which was 1 on all 26 lobes —
+      every muscle in the game was a sphere. A latissimus is a broad flat sheet, and
+      rendered as a ball it is a lump on an otherwise smooth back, which is exactly why the
+      wide V never appeared however far the amplitudes went up. Stretched tall in Y and
+      flattened in Z it becomes the sheet, and the flare is what pushes the arms out.
+      So: 26 lobes to 56 and 22 grooves to 51. Three deltoid heads instead of one, a bicep
+      peak plus brachialis, the tricep's horseshoe, a forearm split front and back, a pec as
+      an upper head over a squashed wide shelf, the lat as flare plus sweep, teres and
+      rhomboid on the back, three quad heads and two calf heads. Every new head got the
+      channel that separates it from its neighbour, because grooves are what make swells
+      read as separate muscles — the header of that file records that the first version had
+      26 muscles, no grooves, and produced a barrel.
+      Gated at the top of the curve. Each group's primary head keeps the early ramp it
+      always had, so a beginner grows the same recognisable body on the same curve; the
+      second and third heads start at `SPLIT_START = 0.58`. Maxing out is now a change in
+      kind rather than one more increment of size — the arms do not merely get bigger, they
+      come apart. `BodySkinConfig` gained the matching painted strokes at the same
+      threshold, because at the Mid LOD (14 sides) geometry stops resolving a narrow channel
+      and the texture has to carry it; a head and its line must arrive together or the split
+      reads as a scratch on a smooth muscle.
+      The self-test caught four buried lobes on the first run — Brachialis, TricepLateral,
+      Teres and Rhomboid all sat inside the surface and would have cost a build while
+      changing nothing visible. That check is the reason this took one iteration instead of
+      a screenshot hunt. Added two it was missing: every stretch axis must be positive
+      (RayExit *divides* by them, so a zero is a nan that propagates through SmoothMax and
+      makes an entire limb vanish with no error anywhere), and mirrored lobes must be
+      stretched identically.
+      Doubling the tables made the builder's per-vertex work stop being negligible, so the
+      groove loop now hoists a per-tube list before the ring loop instead of walking all 51
+      grooves per vertex and testing the tube inside — the same shape the lobe loop one
+      block above already used. The lobe loop already pruned by tube, so it needed nothing.
+      Verified: all nineteen self-tests pass, `check.sh` clean except the two selene warnings
+      in `MenuController` that predate this branch. **Not verified: how it looks.** That is
+      the only question that matters here and it needs `PhysiquePreview.show()` in Studio
+      Edit mode and human eyes — front row and back row, checking that stage 0 still reads
+      as a normal person and stage 1 reads as segmented rather than merely lumpy.
