@@ -721,7 +721,16 @@ function BodyLoftBuilder.Build(
 		part.CanTouch = false
 		part.Massless = true
 		part.CastShadow = true
-		part.Material = Enum.Material.SmoothPlastic
+		--[[
+			Plastic, not SmoothPlastic, for two reasons that agree.
+
+			SmoothPlastic takes a hard specular highlight, and on a body covered in
+			convex muscle that reads as *wet* — long glossy sweeps down the pecs and a
+			patent-leather shine on the shorts, which is the opposite of the matte look
+			this physique is copying. And the stock R15 head is Plastic, so the body was
+			finishing differently from the face sitting on top of it.
+		]]
+		part.Material = Enum.Material.Plastic
 
 		--[[
 			The painted physique. A failure here is not fatal: the body still carries

@@ -2824,5 +2824,16 @@ traffic exists:
       Verified: twenty self-test suites pass; `check.sh` clean but for the two `MenuController`
       selene warnings that predate this branch; mesh build unchanged at 50 ms (the 236 ms in the
       first reading was the one-off 1024 texture fill for a fresh stage — cold is 80 ms).
-      **Not verified: how it looks.** Studio's screen capture timed out on every attempt this
-      round after working earlier in the session; it needs Studio in the foreground.
+      **Verified by eye after all** — a capture that had been left for dead came back once
+      Studio regained focus. The pecs now read as two shelves with a cleft and a hard under-line,
+      the abs as bands rather than scratches, and the lat V is legible on the back. That is the
+      thing every previous pass failed at.
+      One more found by looking, which no numeric probe would ever have raised: the body was
+      `SmoothPlastic` and took a hard specular highlight, so a surface made entirely of convex
+      muscle read as *wet* — long glossy sweeps down the pecs and a patent-leather shine on the
+      shorts, against a reference that is flat matte. The stock R15 head is `Plastic`, so the
+      body was also finishing differently from the face on top of it. Now `Plastic`, and the
+      wet look is gone.
+      Still short of the reference, and honestly: the shoulder still reads as a wide flat shelf
+      from a high angle, and the crease shading is streaky rather than crisp — 4.7% of
+      face-corners carry it, which is sparse. Call it half way there, up from about a quarter.
