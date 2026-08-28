@@ -184,6 +184,11 @@ function PurchaseService:_processReceipt(receiptInfo: any): Enum.ProductPurchase
 
 	local data = DataService:GetData(player)
 	if data == nil then
+		-- Their profile has not loaded, or failed to. Roblox will retry, but a wave of
+		-- these on launch day is a fulfilment outage, and it used to be invisible: these
+		-- paths only reached the server log. Reported through the same signal a granted
+		-- purchase uses, so the dashboard shows it beside the successes.
+		PurchaseService.PurchaseResolved:Fire(player, "Unknown", "NoData")
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
@@ -195,7 +200,12 @@ function PurchaseService:_processReceipt(receiptInfo: any): Enum.ProductPurchase
 
 	local product = devProductsByAssetId[receiptInfo.ProductId]
 	if product == nil then
+		-- A real purchase of something this build does not define — a product removed
+		-- from Products/ after it had sold, or a dashboard id that never landed in the
+		-- code. Roblox retries this forever and the player never receives it, so it has
+		-- to be visible somewhere other than a server log nobody is reading.
 		warn(`[PurchaseService] Receipt for unknown product id {receiptInfo.ProductId}`)
+		PurchaseService.PurchaseResolved:Fire(player, tostring(receiptInfo.ProductId), "UnknownProduct")
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
@@ -210,10 +220,26 @@ function PurchaseService:_processReceipt(receiptInfo: any): Enum.ProductPurchase
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
-	-- Recorded before acknowledging, so a crash between the two costs the player
-	-- nothing: the retry finds the record and returns PurchaseGranted.
+	--[[
+		Recorded and *persisted* before acknowledging.
+
+		The record alone was not enough, though the comment here used to claim it was:
+		it went into the in-memory profile and waited for ProfileStore's own ~30-second
+		autosave. A crash inside that window loses the record but not the charge, so
+		Roblox's retry finds no history and grants a second time — or, if the grant
+		itself was the thing that persisted, the player pays twice for one item. Forcing
+		the save closes the window to the width of one UpdateAsync.
+
+		Ordered before the acknowledgement for the same reason it always was: if the
+		save fails we return NotProcessedYet and Roblox re-delivers, which is the outcome
+		that costs the player nothing.
+	]]
 	data.PurchaseHistory[purchaseKey] = true
 	DataService:MarkDirty(player)
+	if not DataService:Save(player) then
+		PurchaseService.PurchaseResolved:Fire(player, product.Id, "SaveFailed")
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
 
 	PurchaseService.PurchaseResolved:Fire(player, product.Id, "Granted")
 
