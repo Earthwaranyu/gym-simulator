@@ -98,40 +98,15 @@ local function appearanceFor(player: Player)
 end
 
 --[[
-	Paints the uniform. BodyColors rather than per-part Color so that a part replaced
-	by Roblox later (a limb re-added after a state change) still comes back right.
+	Paints the uniform, then names the hair and face for the client to draw.
+
+	The painting itself is AppearanceConfig.ApplyTo, shared with the customizer's
+	preview. It used to be written out here and again there, which is how a screen whose
+	whole job is showing you your choice ends up able to disagree with the result.
 ]]
 local function paint(player: Player, character: Model)
 	local appearance = appearanceFor(player)
-	local skin = AppearanceConfig.Color(AppearanceConfig.SkinTones, appearance.SkinId)
-	local pants = AppearanceConfig.Color(AppearanceConfig.PantColors, appearance.PantId)
-
-	local existing = character:FindFirstChildOfClass("BodyColors")
-	local body: BodyColors
-	if existing ~= nil then
-		body = existing
-	else
-		body = Instance.new("BodyColors")
-		body.Parent = character
-	end
-
-	body.HeadColor3 = skin
-	body.TorsoColor3 = skin
-	body.LeftArmColor3 = skin
-	body.RightArmColor3 = skin
-	body.LeftLegColor3 = pants
-	body.RightLegColor3 = pants
-
-	-- BodyColors' Leg entries cover the whole leg on R15, so the lower legs have to be
-	-- painted back to skin individually. That split — dark thigh, bare shin — is what
-	-- makes it read as shorts rather than as trousers.
-	for _, name in { "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot" } do
-		local part = character:FindFirstChild(name)
-		if part ~= nil and part:IsA("BasePart") then
-			part.Color = skin
-		end
-	end
-
+	AppearanceConfig.ApplyTo(character, appearance.SkinId, appearance.PantId)
 	character:SetAttribute(HAIR_ATTRIBUTE, appearance.HairId)
 	character:SetAttribute(FACE_ATTRIBUTE, appearance.FaceId)
 end

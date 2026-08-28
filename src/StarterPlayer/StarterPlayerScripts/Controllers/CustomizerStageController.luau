@@ -93,7 +93,21 @@ local LETTERBOX_SECONDS = 0.7
 local FADE_SECONDS = 0.32
 
 local BACKDROP_COLOR = Color3.fromRGB(16, 14, 18)
-local KEY_COLOR = Color3.fromRGB(255, 244, 226)
+--[[
+	The key light is white, and that is a correctness rule rather than a taste.
+
+	It was 255,244,226 — a warm studio key, and a good-looking one. But this light sits
+	front-and-above the figure and *fills* it, so its colour is multiplied into every
+	skin tone on screen: the player judged a tan under warm light and then walked out
+	into a gym that has no such lamp. The note further down about saturation says the
+	rest of it — this is the one screen whose entire job is choosing a colour, so it is
+	the one screen that may not restate it. A tint in the key restates it exactly as
+	surely as a tint in the grade does.
+
+	The mood is not lost, it moved: the backdrop, the floor pool and the rank-coloured
+	rim still carry it, and none of those decide what the skin looks like.
+]]
+local KEY_COLOR = Color3.new(1, 1, 1)
 
 local player = Players.LocalPlayer
 
@@ -225,12 +239,23 @@ local function buildStage(character: Model)
 
 	lamp("KeyLight", KEY_COLOR, 3.4, height * 5)
 
-	-- The rim is the player's rank colour, which is the one place in this screen where
-	-- how far they have come shows up as light rather than as a number.
+	--[[
+		The rim is the player's rank colour, which is the one place in this screen where
+		how far they have come shows up as light rather than as a number. It is worth
+		keeping, and it is safe to keep, because it sits *behind* the figure — see its
+		placement in `place`, at (-0.9, +0.5, +0.9) in camera space.
+
+		Safe at 2.0, that is. At 5.5 with a range of four figure-heights a point light
+		does not stay a rim: it wraps past the silhouette and fills the front of the
+		body with the rank's hue, so Guardian green and Hero gold produced two visibly
+		different skins from the same swatch. A rim light that changes the colour of the
+		thing being colour-picked is a fill with good intentions. Tightened in range as
+		well, so it grazes the edge it is named for.
+	]]
 	local data = ProfileController:Get()
 	local rank = if data ~= nil then RankConfig.GetById(data.SelectedTitleId) else nil
 	local rimColor = if rank ~= nil then rank.Color else UI.Dark.Accent
-	lamp("RimLight", rimColor, 5.5, height * 4)
+	lamp("RimLight", rimColor, 2.0, height * 2.2)
 
 	-- Aimed at the backdrop rather than the body: this is what makes the wall fall off
 	-- into black at the edges instead of reading as a flat grey sheet.
@@ -552,7 +577,7 @@ function CustomizerStageController:Enter()
 	grade.Saturation = 0
 	grade.Parent = Lighting
 	--[[
-		Mood, but **no saturation change**, and that is not a style choice.
+		Mood, but **nothing that moves a colour**, and that is not a style choice.
 
 		This graded the stage to -0.45 saturation, which is a lot: it turned Umber
 		(129, 84, 52) into a pale peach on screen while the swatch button beside it —
@@ -563,13 +588,24 @@ function CustomizerStageController:Enter()
 		skin I got" was exactly true, and nothing in the appearance pipeline was wrong.
 
 		This is the one screen whose entire job is choosing a colour, so it is the one
-		screen that may not restate it. Brightness and contrast stay — they set the mood
-		without moving a hue — and the world's own grade still applies underneath, which
-		is what makes the preview match where the player is about to stand.
+		screen that may not restate it.
+
+		Brightness and contrast were kept at the time, on the reasoning that they "set
+		the mood without moving a hue". Hue was the wrong thing to have been protecting.
+		A player comparing two neighbouring skin tones is reading lightness, and −0.12
+		brightness with +0.1 contrast pushes the dark end of the palette apart and
+		crushes the light end together: Espresso and Umber separated on this screen and
+		then looked like each other in the gym. Zeroed, all three, and the mood comes
+		from the lamps and the backdrop instead.
+
+		The effect itself stays rather than being deleted, because the world's own grade
+		still applies underneath it and that layering is what makes the preview match
+		where the player is about to stand. An empty layer composes correctly; a missing
+		one is a different code path.
 	]]
 	TweenService:Create(grade, TweenInfo.new(0.6), {
-		Brightness = -0.12,
-		Contrast = 0.1,
+		Brightness = 0,
+		Contrast = 0,
 		Saturation = 0,
 	}):Play()
 

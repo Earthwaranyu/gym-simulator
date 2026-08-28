@@ -34,6 +34,7 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local Net = require(ReplicatedStorage.Modules.Net)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local ProfileTemplate = require(ReplicatedStorage.Modules.ProfileTemplate)
 local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
 local UI = require(ReplicatedStorage.Modules.UI)
 
@@ -71,11 +72,25 @@ local nameLabel: TextLabel
 local powerLabel: TextLabel
 
 local isOpen = false
+--[[
+	The working look, seeded from the same template the server gives a new player.
+
+	These four ids were written out here as literals — a fourth copy of the new-player
+	defaults, after ProfileTemplate, AppearanceConfig's DEFAULT_* constants, and the
+	server's own fallback. Nothing held them together, and the failure they invite is
+	silent rather than loud: retune the default skin and the creator keeps opening on
+	the old one, showing every new player a tone they were not given and cannot tell
+	they are not being shown. Read from the template instead, which is the thing that is
+	actually true.
+
+	Copied field by field rather than aliased, because this table is mutated by every
+	swatch press and the template is shared.
+]]
 local choice = {
-	SkinId = "Tan",
-	PantId = "Charcoal",
-	HairId = "Buzz",
-	FaceId = "Neutral",
+	SkinId = ProfileTemplate.Appearance.SkinId,
+	PantId = ProfileTemplate.Appearance.PantId,
+	HairId = ProfileTemplate.Appearance.HairId,
+	FaceId = ProfileTemplate.Appearance.FaceId,
 }
 
 local function currentCharacter(): Model?
@@ -89,9 +104,10 @@ end
 --[[
 	Repaints the live body from the working choice.
 
-	Skin and shorts are written straight onto the character's BodyColors: the server
-	owns that instance, but a client-side write is local-only and the server repaints
-	it on the next Refresh, which is exactly the preview semantics wanted here.
+	Skin and shorts go through the same AppearanceConfig.ApplyTo the server paints with,
+	so a preview cannot drift from the thing it is previewing. The server owns that
+	BodyColors instance, but a client-side write is local-only and the server repaints it
+	on the next Refresh, which is exactly the preview semantics wanted here.
 ]]
 local function preview()
 	local character = currentCharacter()
@@ -99,24 +115,7 @@ local function preview()
 		return
 	end
 
-	local body = character:FindFirstChildOfClass("BodyColors")
-	if body ~= nil then
-		local skin = AppearanceConfig.Color(AppearanceConfig.SkinTones, choice.SkinId)
-		local pants = AppearanceConfig.Color(AppearanceConfig.PantColors, choice.PantId)
-		body.HeadColor3 = skin
-		body.TorsoColor3 = skin
-		body.LeftArmColor3 = skin
-		body.RightArmColor3 = skin
-		body.LeftLegColor3 = pants
-		body.RightLegColor3 = pants
-		for _, name in { "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot" } do
-			local part = character:FindFirstChild(name)
-			if part ~= nil and part:IsA("BasePart") then
-				part.Color = skin
-			end
-		end
-	end
-
+	AppearanceConfig.ApplyTo(character, choice.SkinId, choice.PantId)
 	AppearanceController:Preview(character, choice.HairId, choice.FaceId)
 end
 
@@ -603,10 +602,26 @@ function CustomizerController:Close()
 	screen.Enabled = false
 	CustomizerStageController:Exit()
 
-	-- Anything left unapplied is undone by repainting from what the server still says
-	-- this character looks like.
+	--[[
+		Anything left unapplied is undone by repainting from what the player actually
+		owns — the saved profile for skin and shorts, the character's own attributes for
+		hair and face.
+
+		Skin and shorts were missing here, and the omission was invisible in the obvious
+		way: this file's header says the panel is "a preview, not a transaction", and
+		closing it did put the hair and face back but left an uncommitted *colour* on the
+		rig. It stayed there until the server happened to Refresh, so backing out of the
+		creator was a way to wear a skin you had not chosen.
+	]]
 	local character = currentCharacter()
 	if character ~= nil then
+		local data = ProfileController:Get()
+		local saved = if data ~= nil then data.Appearance else nil
+		AppearanceConfig.ApplyTo(
+			character,
+			if saved ~= nil then saved.SkinId else nil,
+			if saved ~= nil then saved.PantId else nil
+		)
 		AppearanceController:Preview(
 			character,
 			character:GetAttribute("HairId") :: string,

@@ -210,20 +210,41 @@ end
 ]]
 local function watch(player: Player)
 	local function onCharacter(character: Model)
+		--[[
+			Wait for the head, not for the clock.
+
+			This used to sleep a flat `task.wait(0.4)` here, on the stated grounds that
+			"BodyMeshController waits a beat for the rig to assemble" and that measuring
+			its generated head meant waiting for that head to exist. Both halves have
+			since stopped being true: BodyMeshController is disabled — it is
+			`_BodyMeshController`, underscored, and its own header explains it can never
+			be revived as written — and nothing else creates a `GeneratedBody/Head`, so
+			`headSize` above always falls through to the stock part. The wait was buying
+			a measurement nobody takes any more, and spending four hundred milliseconds
+			of bare scalp to do it. That is most of a second on a respawn, and it lands
+			squarely on top of the first-join creator, whose entire subject is the face.
+
+			Waiting on `Head` is the honest version of what the sleep was approximating,
+			and it returns the instant the part is there rather than at a fixed delay.
+		]]
 		if character:WaitForChild("Humanoid", 10) == nil then
 			return
 		end
-		-- BodyMeshController waits a beat for the rig to assemble before it dresses;
-		-- measuring the generated head means waiting for it to exist.
-		task.wait(0.4)
+		if character:WaitForChild("Head", 10) == nil then
+			return
+		end
 
-		render(character)
+		-- Connected before the first render, not after it. These used to be wired up
+		-- on the far side of the sleep, so an id written during that window — which is
+		-- exactly when the creator opens — changed an attribute nothing was listening
+		-- to, and the change was only ever picked up by the delayed initial draw.
 		character:GetAttributeChangedSignal(HAIR_ATTRIBUTE):Connect(function()
 			render(character)
 		end)
 		character:GetAttributeChangedSignal(FACE_ATTRIBUTE):Connect(function()
 			render(character)
 		end)
+		render(character)
 	end
 
 	if player.Character ~= nil then
@@ -246,6 +267,19 @@ function AppearanceController:Preview(character: Model, hairId: string, faceId: 
 	-- write does not replicate, so nobody else sees an uncommitted choice.
 	character:SetAttribute(HAIR_ATTRIBUTE, hairId)
 	character:SetAttribute(FACE_ATTRIBUTE, faceId)
+	--[[
+		Then draw, rather than trusting the writes above to have caused one.
+
+		Setting an attribute to the value it already holds fires no change signal, and
+		the customizer's very first call is exactly that case: it opens seeded from the
+		profile the server already painted, so every id matches and nothing redraws. The
+		face the player came to look at was left to whatever the initial render had done,
+		which is what made it look like it arrived late.
+
+		`render` clears and rebuilds the whole folder, so calling it when a signal is
+		also about to fire costs one rebuild of a dozen primitives and cannot go wrong.
+	]]
+	render(character)
 end
 
 function AppearanceController:Start()

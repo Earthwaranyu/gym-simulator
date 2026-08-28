@@ -95,6 +95,52 @@ function AppearanceConfig.Color(list: { Swatch }, id: string?): Color3
 	return Color3.fromRGB(swatch.R, swatch.G, swatch.B)
 end
 
+--[[
+	Paints a character's skin and shorts from two palette ids.
+
+	This lives here, rather than in whichever file happens to need it, because it was
+	written twice: once in AppearanceService.paint for the committed look and once in
+	CustomizerController.preview for the uncommitted one. Two copies of "what a body
+	looks like" is the exact shape of the bug the customizer keeps being accused of —
+	the preview not matching the result — and the two copies agreeing today is not the
+	same as their agreeing after the next edit to either.
+
+	BodyColors rather than per-part Color, so a limb Roblox replaces later (a re-added
+	part after a state change) still comes back right. The BodyColors instance is
+	created if it is missing: BodyLoftController treats its absence as "this rig has not
+	been painted yet" and will not dress a body without one.
+]]
+function AppearanceConfig.ApplyTo(character: Instance, skinId: string?, pantId: string?)
+	local skin = AppearanceConfig.Color(AppearanceConfig.SkinTones, skinId)
+	local pants = AppearanceConfig.Color(AppearanceConfig.PantColors, pantId)
+
+	local existing = character:FindFirstChildOfClass("BodyColors")
+	local colors: BodyColors
+	if existing ~= nil then
+		colors = existing
+	else
+		colors = Instance.new("BodyColors")
+		colors.Parent = character
+	end
+
+	colors.HeadColor3 = skin
+	colors.TorsoColor3 = skin
+	colors.LeftArmColor3 = skin
+	colors.RightArmColor3 = skin
+	colors.LeftLegColor3 = pants
+	colors.RightLegColor3 = pants
+
+	-- BodyColors' Leg entries cover the whole leg on R15, so the lower legs have to be
+	-- painted back to skin individually. That split — dark thigh, bare shin — is what
+	-- makes it read as shorts rather than as trousers.
+	for _, name in { "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot" } do
+		local part = character:FindFirstChild(name)
+		if part ~= nil and part:IsA("BasePart") then
+			part.Color = skin
+		end
+	end
+end
+
 -- Whether an id is one this palette actually offers. The server validates with this
 -- before saving; `Color` is deliberately forgiving, so it cannot do that job.
 function AppearanceConfig.IsValid(list: { Swatch }, id: any): boolean
