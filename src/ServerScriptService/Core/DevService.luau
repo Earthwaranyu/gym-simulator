@@ -30,7 +30,7 @@
 	    /boss [zone]      raise a boss now: /boss Storm, or /boss for all seven. They
 	                      are otherwise on a staggered thirty-minute clock
 	    /fasttravel       toggle Fast Travel for yourself, so Go teleports instead of
-	                      tracking (the real gamepass is still AssetId 0)
+	                      tracking, without owning the gamepass
 	    /autoload         toggle the Auto Load gamepass override and its setting
 	    /help             print this list in the output window
 ]]

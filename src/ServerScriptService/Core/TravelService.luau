@@ -45,9 +45,11 @@ local TRAVEL_COOLDOWN = 4
 -- from anywhere, including the plaza: a non-owner who picks a destination is given a
 -- tracked waypoint and walks or flies there.
 --
--- It is stubbed at AssetId 0 until it exists in the dashboard, and HasFastTravel
--- returns false for that — so today nobody teleports and everybody tracks. That is the
--- correct behaviour for the state the product is in, not a bug.
+-- This was stubbed at AssetId 0 for a long time, and the note here used to say so —
+-- that nobody teleports and everybody tracks. The id is live now
+-- (Products/FastTravelGamepass.luau), so the teleport path is reachable and is being
+-- sold. It has not been exercised on a live server against a real owner and a real
+-- non-owner; see docs/PLAYTEST.md section 8.
 local FAST_TRAVEL_PRODUCT = "FastTravel"
 -- How long to wait for the destination to stream in before going anyway.
 local STREAM_WAIT = 1
