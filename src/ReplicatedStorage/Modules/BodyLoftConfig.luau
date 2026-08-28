@@ -219,17 +219,17 @@ table.insert(tubes, {
 	U0 = 0,
 	U1 = 0.4,
 	Rings = {
-		ring(-1.55, 0.60, 0.40, { { Bone = "LowerTorso", Weight = 1 } }, "Pants", nil, nil, 0.10),
-		ring(-1.20, 0.66, 0.42, { { Bone = "LowerTorso", Weight = 1 } }, "Pants", nil, nil, 0.16),
+		ring(-1.55, 0.60, 0.40, { { Bone = "LowerTorso", Weight = 1 } }, "Pants", nil, nil, 0.14),
+		ring(-1.20, 0.63, 0.41, { { Bone = "LowerTorso", Weight = 1 } }, "Pants", nil, nil, 0.26),
 		ring(
 			-0.90,
-			0.66,
-			0.42,
+			0.61,
+			0.39,
 			{ { Bone = "LowerTorso", Weight = 0.85 }, { Bone = "UpperTorso", Weight = 0.15 } },
 			"Pants",
 			nil,
 			nil,
-			0.22
+			0.34
 		),
 		--[[
 			The waist, pinched hard on purpose — and it stopped being the pinch.
@@ -245,15 +245,15 @@ table.insert(tubes, {
 		]]
 		ring(
 			-0.60,
-			0.64,
-			0.42,
+			0.59,
+			0.385,
 			{ { Bone = "LowerTorso", Weight = 0.85 }, { Bone = "UpperTorso", Weight = 0.15 } },
 			"Skin",
 			nil,
 			nil,
-			0.24
+			0.38
 		),
-		ring(-0.30, 0.68, 0.44, { { Bone = "UpperTorso", Weight = 1 } }, "Skin", nil, nil, 0.12),
+		ring(-0.30, 0.66, 0.44, { { Bone = "UpperTorso", Weight = 1 } }, "Skin", nil, nil, 0.16),
 		ring(0.00, 0.82, 0.52, { { Bone = "UpperTorso", Weight = 1 } }),
 		ring(0.28, 0.98, 0.60, { { Bone = "UpperTorso", Weight = 1 } }),
 		-- The pec shelf and the yoke of the shoulders above it.
@@ -542,12 +542,24 @@ for _, side in { "Left", "Right" } do
 	-- -pi/2 their left.
 	local outward = if side == "Left" then -PI / 2 else PI / 2
 
-	-- Three heads on a shoulder cap barely half a stud wide, so they are deliberately
-	-- tight and hard-edged: a delt that melts into the arm is the thing that made the
-	-- old shoulder read as a sphere. Blend is the lever, not radius.
-	lobe(`{side}DeltSide`, "Arms", arm, 0.20, outward, 0.50, 0.58, 0.10, 0.08, 0.72)
-	lobe(`{side}DeltFront`, "Arms", arm, 0.15, outward * 0.45, 0.50, 0.48, 0.10, SPLIT_START, 0.95)
-	lobe(`{side}DeltRear`, "Arms", arm, 0.25, outward * 1.55, 0.50, 0.46, 0.11, SPLIT_START, 0.95)
+	--[[
+		Three heads on a shoulder cap barely half a stud wide.
+
+		These used to run at a blend of 0.10 — the smallest fillet on the body — on the
+		theory that a delt melting into the arm was what made the old shoulder read as a
+		sphere. The theory was right and the lever was wrong. A blend of 0.10 is roughly
+		the vertex spacing at Hero detail, so `SmoothMax` had nothing to fillet across
+		and every head kept the raw rim of its own sphere: the cap came out as three
+		flats meeting at edges, which is the "blocky" it was actually being accused of.
+
+		What was really squaring the shoulder off was DeltGap, not the blend — see the
+		note on it in the groove block below. With that moved off the belly, these can
+		fillet properly and the cap reads as one round mass. Radius and Out are
+		deliberately untouched: the shoulder should stay exactly this bold.
+	]]
+	lobe(`{side}DeltSide`, "Arms", arm, 0.20, outward, 0.50, 0.58, 0.20, 0.08, 0.72)
+	lobe(`{side}DeltFront`, "Arms", arm, 0.15, outward * 0.45, 0.50, 0.48, 0.19, SPLIT_START, 0.95)
+	lobe(`{side}DeltRear`, "Arms", arm, 0.25, outward * 1.55, 0.50, 0.46, 0.19, SPLIT_START, 0.95)
 
 	-- StretchY below 1 shortens the lobe *along the arm*, which is what turns a ball
 	-- into a peak. A bicep is short and tall, not a sausage.
@@ -692,6 +704,16 @@ end
 -- The abdominal wall: six small lobes in two columns, cut apart by the grooves
 -- below. Small on purpose — an ab block that protrudes as far as a pec reads as a
 -- tumour, and the separation does the work.
+--
+-- It was not small enough, and the reason took measuring the body from the *side*
+-- rather than head-on. Every guard in RunSelfTest judges the waist on half-width, and
+-- on half-width the waist was fine; in profile these lobes ran Out 0.74 at radius
+-- 0.46 and pushed the front of the midsection out to 0.744 studs against hips of
+-- 0.417, so the abdomen bulged forward half again as far as the hips while the sides
+-- were pulled in. A wall that curves out between the ribs and the pelvis is a gut, and
+-- it does not stop being one for having six panels drawn on it. Pulled back onto a
+-- flatter wall; the grid below is what makes them read, exactly as this note always
+-- claimed. See the profile check in RunSelfTest, which now measures the depth too.
 for row, t in { 0.56, 0.46, 0.36 } do
 	for _, sign in { -1, 1 } do
 		lobe(
@@ -700,8 +722,8 @@ for row, t in { 0.56, 0.46, 0.36 } do
 			"Torso",
 			t,
 			sign * 0.20,
-			0.74,
-			0.46,
+			0.60,
+			0.40,
 			0.08,
 			0.30 + (row - 1) * 0.08,
 			0.92
@@ -809,17 +831,40 @@ end
 for _, side in { "Left", "Right" } do
 	local arm = `{side}Arm`
 	local outward = if side == "Left" then -PI / 2 else PI / 2
-	-- A ring around the deltoid, cutting it free of both pec and bicep.
-	groove(`{side}DeltGap`, "Arms", arm, 0.19, outward, 0.035, 1.8, 0.15, 0.10, 0.72)
+	--[[
+		The line under the deltoid, cutting it free of the bicep and tricep.
+
+		This was at T = 0.19 with a SpreadAngle of 1.8, and between them those two
+		numbers were the reason the shoulder looked blocky. DeltSide's belly is at
+		T = 0.20, so the cut was landing on the *crown of the muscle it was supposed to
+		outline*, and 1.8 radians wrapped it most of the way around the arm. Measured
+		straight outward, the finished surface ran 0.794 at the top of the cap, down to
+		0.611 at T = 0.20, back up to 0.701 below it: a canyon through the middle of the
+		delt, with the slope reversing by about 3 studs per unit T across two adjacent
+		samples. That is not a shoulder with an edge on it, it is a shoulder in two
+		pieces.
+
+		At T = 0.30 it sits below all three heads and above the bicep at 0.31, which is
+		where a delt actually ends, and a SpreadAngle of 0.85 keeps it on the outer face
+		instead of ringing the armpit.
+	]]
+	groove(`{side}DeltGap`, "Arms", arm, 0.30, outward, 0.035, 0.85, 0.09, 0.10, 0.72)
 	-- The two channels down the sides of the upper arm, between bicep and tricep.
 	groove(`{side}ArmSeamF`, "Arms", arm, 0.34, outward, 0.16, 0.22, 0.13, 0.18, 0.82)
 	groove(`{side}ArmSeamB`, "Arms", arm, 0.34, -outward, 0.16, 0.22, 0.13, 0.18, 0.82)
 	-- The elbow.
 	groove(`{side}ElbowGap`, "Arms", arm, 0.53, 0, 0.030, 2.4, 0.11, 0.28, 0.90)
-	-- Between the three deltoid heads. Very tight in T, wide in angle: these run
-	-- down the cap rather than around it, which is the opposite of DeltGap above.
-	groove(`{side}DeltFrontGap`, "Arms", arm, 0.13, outward * 0.72, 0.10, 0.075, 0.13, SPLIT_START, 0.95)
-	groove(`{side}DeltRearGap`, "Arms", arm, 0.13, outward * 1.28, 0.10, 0.075, 0.13, SPLIT_START, 0.95)
+	--[[
+		Between the three deltoid heads. Very tight in T, wide in angle: these run
+		down the cap rather than around it, which is the opposite of DeltGap above.
+
+		SpreadAngle was 0.075 against a floor of SPREAD_FLOOR_FACTOR * 2pi/64 = 0.059,
+		so each of these was about one vertex wide and stair-stepped rather than
+		creasing. Widened to something the mesh can actually hold, and shallowed to
+		match: the heads still read as three, without notching the outline.
+	]]
+	groove(`{side}DeltFrontGap`, "Arms", arm, 0.13, outward * 0.72, 0.10, 0.11, 0.10, SPLIT_START, 0.95)
+	groove(`{side}DeltRearGap`, "Arms", arm, 0.13, outward * 1.28, 0.10, 0.11, 0.10, SPLIT_START, 0.95)
 	-- The horseshoe: the line between the tricep's long and lateral heads.
 	groove(`{side}TricepSplit`, "Arms", arm, 0.40, PI - outward * 0.22, 0.11, 0.11, 0.12, SPLIT_START, 1.00)
 	-- Bicep down the middle, and the forearm's flexor/extensor seam.
@@ -1482,10 +1527,22 @@ function BodyLoftConfig.RunSelfTest(): { string }
 				}
 			end
 
-			-- Half-width of the finished surface at a height, looking head-on.
-			local function halfWidthAt(t: number): number
+			--[[
+				The finished surface at a height: half-width looking head-on, and how
+				far it reaches forward looking from the side.
+
+				The depth is the half of this that was missing, and its absence is what
+				let a gut ship under a passing taper. Everything below judged the body on
+				width alone, so a midsection pulled in at the sides and pushed out at the
+				front measured as a *narrow waist* — the abdominal lobes ran out to 0.744
+				studs of forward reach against hips of 0.417 while the half-width read a
+				perfectly respectable 0.607. Head-on the physique was fine. From the side
+				it had a belly, which is exactly what was reported.
+			]]
+			local function profileAt(t: number): (number, number)
 				local here = sampleAt(t)
 				local widest = 0
+				local deepest = 0
 				for step = 0, 63 do
 					local angle = step / 64 * 2 * PI
 					local dirX, dirZ = math.sin(angle), -math.cos(angle)
@@ -1526,24 +1583,51 @@ function BodyLoftConfig.RunSelfTest(): { string }
 							push += BodyLoftConfig.Displacement(m, t, angle, 1)
 						end
 					end
-					widest = math.max(widest, math.abs(dirX) * (radius + push * here.Girth))
+					local surface = radius + push * here.Girth
+					widest = math.max(widest, math.abs(dirX) * surface)
+					-- The avatar faces -Z, so -dirZ is the direction of the belly.
+					deepest = math.max(deepest, -dirZ * surface)
 				end
-				return widest
+				return widest, deepest
 			end
 
 			local chest, waist, waistY = 0, math.huge, 0
+			local paunch, paunchY = 0, 0
 			for step = 0, 20 do
 				local t = step / 20
 				local y = sampleAt(t).Y
-				local width = halfWidthAt(t)
+				local width, depth = profileAt(t)
 				chest = math.max(chest, width)
 				-- The waist band: below the ribs, above the hips.
-				if y <= -0.25 and y >= -1.30 and width < waist then
-					waist, waistY = width, y
+				if y <= -0.25 and y >= -1.30 then
+					if width < waist then
+						waist, waistY = width, y
+					end
+					if depth / width > paunch then
+						paunch, paunchY = depth / width, y
+					end
 				end
 			end
+			--[[
+				An abdomen is wider than it is deep. A belly is the other way round.
+
+				This is the guard the width checks could not be: it does not care how
+				narrow the waist measures head-on, only whether the front wall between
+				the ribs and the hips bows out further than the sides do. The shipped
+				body peaked at 1.17 here; a flat wall sits near 1.0, and anything past
+				1.10 is a gut however good the taper looks from the front.
+			]]
+			local MAX_PAUNCH = 1.10
+			if paunch > MAX_PAUNCH then
+				table.insert(
+					failures,
+					`the waist is {string.format("%.2f", paunch)}x deeper than it is wide at `
+						.. `y={string.format("%.2f", paunchY)}, over the {MAX_PAUNCH} that separates `
+						.. "an abdomen from a belly"
+				)
+			end
 			-- A physique is its taper. Below this it is a barrel with shoulders.
-			local MIN_TAPER = 2.4
+			local MIN_TAPER = 4.2
 			if chest < waist * MIN_TAPER then
 				table.insert(
 					failures,
@@ -1560,6 +1644,130 @@ function BodyLoftConfig.RunSelfTest(): { string }
 					`the narrowest point of the torso is at y={string.format("%.2f", waistY)}, `
 						.. "which is not where the waist is"
 				)
+			end
+		end
+	end
+
+	--[[
+		The shoulder cap has to be one mass, not two.
+
+		A deltoid is judged on its outline, and an outline is a *slope*: nothing in this
+		file measured one, so a groove sitting on the crown of the muscle it was meant
+		to outline was invisible to every check here. DeltGap did exactly that — it was
+		centred at T = 0.19 against DeltSide's belly at 0.20, and 1.8 radians wide, so
+		the finished surface measured straight outward ran 0.794 at the top of the cap,
+		fell to 0.611 at the cut, and climbed back to 0.701 below it. A pit in the middle
+		of a convex mass reads as two blocks with a seam, which is the "blocky shoulder"
+		this check exists to make impossible to ship again.
+
+		So: walk the cap at the density the builder actually samples it, and refuse any
+		interior dip. Past the cap a dip is correct and wanted — that is DeltGap in its
+		new home, cutting the delt free of the bicep — so the walk stops where the heads
+		do.
+	]]
+	do
+		local CAP_END = 0.26
+		-- Below this a wiggle is sampling noise rather than a crease.
+		local DIP = 0.02
+		for _, tube in tubes do
+			if not string.find(tube.Id, "Arm") then
+				continue
+			end
+			local outward = if tube.Side == "Left" then -PI / 2 else PI / 2
+			local hero = BodyLoftConfig.DETAIL.Hero
+			local samples = (#tube.Rings - 1) * (hero.Subdivisions + 1) + 1
+
+			-- The tube's own profile at a T, by walking its rings — the same shape the
+			-- builder lofts, before any muscle is added to it.
+			local function radiiAt(t: number): (number, number)
+				local rings = tube.Rings
+				local at = math.clamp(t, 0, 1) * (#rings - 1) + 1
+				local lower = math.clamp(math.floor(at), 1, #rings)
+				local upper = math.clamp(lower + 1, 1, #rings)
+				local frac = at - lower
+				local a, b = rings[lower], rings[upper]
+				return a.RX + (b.RX - a.RX) * frac, a.RZ + (b.RZ - a.RZ) * frac
+			end
+
+			-- How far the finished surface reaches straight outward at a T.
+			local function reachAt(t: number): number
+				local rx, rz = radiiAt(t)
+				local dirX, dirZ = math.sin(outward), -math.cos(outward)
+				local radius = math.sqrt((dirX * rx) ^ 2 + (dirZ * rz) ^ 2)
+				for _, l in lobes do
+					if l.Tube ~= tube.Id then
+						continue
+					end
+					local lobeRadius = BodyLoftConfig.LobeRadius(l, 1)
+					if lobeRadius <= 1e-4 then
+						continue
+					end
+					local thereX, thereZ = radiiAt(l.T)
+					local localRadius =
+						math.sqrt((math.sin(l.Angle) * thereX) ^ 2 + (math.cos(l.Angle) * thereZ) ^ 2)
+					-- Along the tube rather than in world Y: an arm is authored downward,
+					-- so the two differ by a sign the profile cannot afford to get wrong.
+					local rings = tube.Rings
+					local span = rings[#rings].Y - rings[1].Y
+					local hit = BodyLoftConfig.RayExit(
+						0,
+						0,
+						0,
+						dirX,
+						0,
+						dirZ,
+						math.sin(l.Angle) * localRadius * l.Out,
+						(l.T - t) * span,
+						-math.cos(l.Angle) * localRadius * l.Out,
+						lobeRadius,
+						l.StretchX,
+						l.StretchY,
+						l.StretchZ
+					)
+					if hit ~= nil then
+						radius = BodyLoftConfig.SmoothMax(radius, hit, l.Blend)
+					end
+				end
+				local push = 0
+				for _, m in grooves do
+					if m.Tube == tube.Id then
+						push += BodyLoftConfig.Displacement(m, t, outward, 1)
+					end
+				end
+				return radius + push
+			end
+
+			local profile: { number } = {}
+			local last = 0
+			for index = 0, samples - 1 do
+				local t = index / (samples - 1)
+				if t > CAP_END then
+					break
+				end
+				table.insert(profile, reachAt(t))
+				last = t
+			end
+			for index = 2, #profile - 1 do
+				local here = profile[index]
+				local dropBefore = profile[index - 1] - here
+				local riseAfter = profile[index + 1] - here
+				if dropBefore > DIP and riseAfter > DIP then
+					table.insert(
+						failures,
+						`{tube.Id}'s shoulder cap dips at T={string.format(
+							"%.3f",
+							(index - 1) / (samples - 1)
+						)}: `
+							.. `{string.format("%.3f", profile[index - 1])} down to `
+							.. `{string.format("%.3f", here)} and back up to `
+							.. `{string.format("%.3f", profile[index + 1])}, which reads as two blocks `
+							.. "with a seam rather than one round delt"
+					)
+					break
+				end
+			end
+			if last < CAP_END - 1e-6 and #profile < 4 then
+				table.insert(failures, `{tube.Id}'s cap is too coarsely sampled to judge its outline`)
 			end
 		end
 	end
