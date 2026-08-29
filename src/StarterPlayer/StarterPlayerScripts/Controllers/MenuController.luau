@@ -13,6 +13,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Signal = require(ReplicatedStorage.Packages.Signal)
@@ -58,6 +59,22 @@ local tabButtons: { [string]: TextButton } = {}
 local isOpen = false
 local activeTab = "Info"
 local quests: { any } = {}
+
+-- Which tab the scroller is currently positioned for. A refresh is not always a new
+-- page: the profile is replicated on every training rep, so a player reading a long
+-- list while a set runs gets one rebuild per rep. Resetting the canvas on all of them
+-- snapped the page back to the top a few times a second. Only a genuine change of tab
+-- earns the reset; a re-render of the tab already showing keeps the player's place.
+local scrolledTab: string? = nil
+
+-- How long a page waits before redrawing for replicated profile data. Slow enough that
+-- a rep every frame costs one redraw rather than sixty, fast enough that a number the
+-- player is watching still looks live.
+local PROFILE_REFRESH_INTERVAL = 0.25
+
+-- The product catalogue for this visit to the shop, or nil to fetch it again. Cleared
+-- on entering the tab, so a Dashboard price change lands on the next open.
+local catalogueCache: { any }? = nil
 
 type Destination = MapRender.Destination
 
@@ -1633,9 +1650,16 @@ end
 ]]
 function MenuController:_renderShop(parent: Frame)
 	local generation = renderGeneration
-	local ok, catalogue = pcall(function()
-		return Net.Function("GetProductCatalogue"):InvokeServer()
-	end)
+	local ok = true
+	local catalogue: any = catalogueCache
+	if catalogue == nil then
+		ok, catalogue = pcall(function()
+			return Net.Function("GetProductCatalogue"):InvokeServer()
+		end)
+		if ok and type(catalogue) == "table" then
+			catalogueCache = catalogue
+		end
+	end
 
 	-- Another refresh landed while the catalogue was in flight; that one owns the body
 	-- now. Claiming the VIP daily is the reliable way to hit this: it marks the profile
@@ -2528,19 +2552,48 @@ function MenuController:_refresh()
 	bodyScroll.ScrollingEnabled = not fixedPage
 	bodyScroll.ScrollBarThickness = if fixedPage then 0 else 4
 	bodyScroll.AutomaticCanvasSize = if fixedPage then Enum.AutomaticSize.None else Enum.AutomaticSize.Y
-	bodyScroll.CanvasPosition = Vector2.zero
+
+	-- A new page starts at the top; a redraw of the page already open does not.
+	--
+	-- Holding the canvas is what keeps the redraw invisible. Clearing the body while
+	-- AutomaticCanvasSize is on collapses the canvas to nothing for a frame, and Roblox
+	-- clamps CanvasPosition against it — so the page flicked to the top and back on
+	-- every redraw even once the position was being restored. Pinning the old height
+	-- across the rebuild means the position is never out of range to begin with.
+	local heldCanvas = false
+	if scrolledTab ~= activeTab then
+		bodyScroll.CanvasPosition = Vector2.zero
+		scrolledTab = activeTab
+	elseif not fixedPage then
+		bodyScroll.AutomaticCanvasSize = Enum.AutomaticSize.None
+		bodyScroll.CanvasSize = UDim2.fromOffset(0, bodyScroll.AbsoluteCanvasSize.Y)
+		heldCanvas = true
+	end
 
 	renderGeneration += 1
 	body:ClearAllChildren()
 	local layout = UI.VerticalList(body, 6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 
+	local generation = renderGeneration
 	for _, tab in tabs do
 		if tab.Id == activeTab then
 			titleLabel.Text = string.upper(tab.DisplayName)
 			tab.Render(body)
 			break
 		end
+	end
+
+	if heldCanvas then
+		-- Hand the canvas back to the layout once it has had a frame to measure the
+		-- rebuilt rows. The generation guard drops this if a newer render, or a tab
+		-- switch that is entitled to the top, has happened in the meantime.
+		task.spawn(function()
+			RunService.Heartbeat:Wait()
+			if renderGeneration == generation and isOpen then
+				bodyScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			end
+		end)
 	end
 end
 
@@ -2573,6 +2626,9 @@ function MenuController:Toggle(tabId: string?)
 		-- Closing invalidates any in-flight Train poll, so a panel nobody is looking
 		-- at stops asking the server questions.
 		trainPollToken += 1
+		-- Reopening a page is a new page, so it starts at the top even if it is the
+		-- same tab that was showing when the menu closed.
+		scrolledTab = nil
 	end
 
 	self:_publish()
@@ -2655,6 +2711,15 @@ end
 ]]
 function MenuController:_enterTab()
 	trainPollToken += 1
+
+	-- The shop re-renders on every profile push, and training pushes constantly, so
+	-- asking the server for the catalogue inside the render meant a round trip several
+	-- times a second — with the body already cleared, which is a blank shop for as long
+	-- as the trip takes. Prices still come from the Creator Dashboard rather than from
+	-- code; they are simply read once per visit instead of once per redraw.
+	if activeTab == "Shop" then
+		catalogueCache = nil
+	end
 end
 
 function MenuController:_build()
@@ -2773,10 +2838,16 @@ function MenuController:Start()
 		end
 	end)
 
+	-- The profile replicates once per Heartbeat in which anything marked it dirty, and
+	-- training marks it on every rep. Rebuilding a whole page that often is work the
+	-- player can see as flicker, so refreshes are coalesced: the first one schedules a
+	-- redraw, and everything that lands inside the window rides along with it.
+	local profileRefreshPending = false
 	ProfileController.Changed:Connect(function()
 		if
-			isOpen
-			and (
+			not isOpen
+			or profileRefreshPending
+			or not (
 				activeTab == "Info"
 				or activeTab == "Muscles"
 				or activeTab == "Titles"
@@ -2784,8 +2855,16 @@ function MenuController:Start()
 				or activeTab == "Settings"
 			)
 		then
-			self:_refresh()
+			return
 		end
+
+		profileRefreshPending = true
+		task.delay(PROFILE_REFRESH_INTERVAL, function()
+			profileRefreshPending = false
+			if isOpen then
+				self:_refresh()
+			end
+		end)
 	end)
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
