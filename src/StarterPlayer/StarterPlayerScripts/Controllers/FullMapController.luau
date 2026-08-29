@@ -19,6 +19,7 @@
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Signal = require(ReplicatedStorage.Packages.Signal)
@@ -52,6 +53,15 @@ local FullMapController = {
 FullMapController.Changed = Signal.new()
 
 local PANEL_SIZE = Vector2.new(980, 620)
+-- Breathing room kept between the panel and the window edge at every scale, so the map
+-- reads as a page over the world rather than as something jammed against the frame.
+local PANEL_MARGIN = 24
+-- How far the map may be dragged past the edge of its own canvas, as a fraction of the
+-- board. Without slack there is nothing to drag to at the default zoom — the canvas is
+-- exactly the viewport, so the offset clamps to zero and the map only starts responding
+-- to a drag once you have zoomed in, which is not something a player can guess. It is
+-- also the honest way to reach a pin sitting under the filter bar or the zoom buttons.
+local PAN_SLACK = 0.35
 local HEADER_HEIGHT = 48
 local CONTENT_GAP = 12
 local SIDEBAR_WIDTH = 250
@@ -68,6 +78,23 @@ local SELECTED_PIN_SIZE = 30
 local HOSTILE_PIN_SIZE = 18
 local SELECTED_HOSTILE_PIN_SIZE = 22
 
+--[[
+	Board pixels reserved for the chrome drawn *over* the map.
+
+	The filter bar spans the full width of the board's top; the status strip and the zoom
+	buttons sit along its bottom. A pin underneath any of them is exactly as unreachable
+	as one past the edge, so the map is drawn between them rather than behind them.
+
+	The legend is deliberately not counted: it covers one corner rather than a full band,
+	and reserving its height would cost the map far more area than it saves.
+]]
+local MAP_TOP_CHROME = 52
+local MAP_BOTTOM_CHROME = 48
+
+-- Breathing room past whatever the widest item needs, for the stroke drawn outside a
+-- pin's frame and for the 1.12 hover scale, neither of which is in its measured size.
+local MAP_EDGE_PADDING = 4
+
 local MAP_PAPER = MapRender.Paper
 local MAP_INK = MapRender.Ink
 
@@ -79,6 +106,17 @@ local screen: ScreenGui
 local content: Frame
 local isOpen = false
 local hasFastTravel = false
+-- Bumped on every _render. The whole panel is torn down and rebuilt, so anything that
+-- has to touch the new tree a frame later checks this first and gives up if a newer
+-- render has already replaced what it was going to write to.
+local renderGeneration = 0
+
+-- How long the panel waits before redrawing for replicated profile data. Slow enough
+-- that a rep every frame costs one redraw, fast enough to still look live.
+local PROFILE_RENDER_INTERVAL = 0.25
+
+-- What the profile looked like, in map terms, at the last render. See profileSignature.
+local lastRenderedSignature = ""
 -- Exactly one of these is ever set. The sidebar shows a machine or a monster, and
 -- selecting either kind clears the other, so there is no state where the panel has to
 -- choose which of two selections it is describing.
@@ -250,6 +288,26 @@ function FullMapController:_track(position: Vector3, label: string, color: Color
 	self:Close()
 end
 
+--[[
+	Stops tracking, and stays on the map.
+
+	Tracking closes the map because you are done with it — you have somewhere to go.
+	Clearing a waypoint is the opposite: it usually means this was not the place, so the
+	map stays open on the board you were reading, with the button flipped back to TRACK.
+]]
+function FullMapController:_untrack(label: string)
+	local WaypointController = Loader.Get("WaypointController")
+	WaypointController:Clear()
+	toast(`Stopped tracking {label}`)
+	self:_render()
+end
+
+-- Whether the arrow is already pointing here, which is what turns TRACK into UNTRACK.
+function FullMapController:_isTracking(position: Vector3): boolean
+	local WaypointController = Loader.Get("WaypointController")
+	return WaypointController:IsTracking(position)
+end
+
 function FullMapController:_teleport(id: string)
 	-- The client lock is presentation only. TravelService repeats every check and is
 	-- the sole authority that can move the character.
@@ -276,6 +334,38 @@ end
 
 local function destinationUnlocked(data: any?, destination: Destination): boolean
 	return statValue(data, destination.StatId) >= destination.RequiredStat
+end
+
+--[[
+	Everything the map draws out of the profile, as one comparable string.
+
+	Deliberately not a hash of the profile: stats tick every rep and the map does not
+	show them. What it shows is which circles are open, whether Fast Travel is owned,
+	and — only while a locked site is selected — how far short the player still is. That
+	last one does move per rep, which is correct: it is a number the player is watching.
+]]
+local function profileSignature(): string
+	local data = ProfileController:Get()
+	local parts = { if hasFastTravel then "1" else "0" }
+	for _, destination in destinations do
+		table.insert(parts, if destinationUnlocked(data, destination) then "1" else "0")
+	end
+
+	if selectedDestination ~= nil then
+		local destination = MapRender.GetDestination(selectedDestination)
+		if destination ~= nil then
+			table.insert(parts, tostring(destination.RequiredStat - statValue(data, destination.StatId)))
+		end
+	end
+	if selectedHostile ~= nil then
+		local hostile = MapRender.GetHostile(selectedHostile)
+		if hostile ~= nil then
+			local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+			table.insert(parts, tostring(hostile.RequiredPower - power))
+		end
+	end
+
+	return table.concat(parts, ",")
 end
 
 function FullMapController:_currentMultiplier(data: any?, statId: string): number?
@@ -674,9 +764,22 @@ function FullMapController:_renderHostile(parent: Frame, data: any?, hostile: Ho
 		then `This tier caps your class bonus at ×{NumberFormat.Format(definition.RewardCap)}. Stronger monsters pay more.`
 		else "Track is free. Teleport needs Fast Travel and enough Power."
 
-	self:_sideButton(parent, "Track", "TRACK", UDim2.new(0, 10, 1, -108), accent, true, function()
-		self:_track(hostile.Position, hostile.DisplayName, accent)
-	end)
+	local trackingHostile = self:_isTracking(hostile.Position)
+	self:_sideButton(
+		parent,
+		"Track",
+		if trackingHostile then "UNTRACK" else "TRACK",
+		UDim2.new(0, 10, 1, -108),
+		if trackingHostile then UI.Palette.Glass else accent,
+		true,
+		function()
+			if trackingHostile then
+				self:_untrack(hostile.DisplayName)
+			else
+				self:_track(hostile.Position, hostile.DisplayName, accent)
+			end
+		end
+	)
 
 	if not hasFastTravel then
 		self:_sideButton(
@@ -846,9 +949,22 @@ function FullMapController:_renderSidebar(parent: Frame, data: any?)
 	actionHint.Text = `Track is free. Teleport needs Fast Travel and enough {stat.DisplayName}.`
 
 	local trackLabel, trackColor = destinationLabel(destination)
-	self:_sideButton(parent, "Track", "TRACK", UDim2.new(0, 10, 1, -108), stat.Color, true, function()
-		self:_track(destination.Position, trackLabel, trackColor)
-	end)
+	local tracking = self:_isTracking(destination.Position)
+	self:_sideButton(
+		parent,
+		"Track",
+		if tracking then "UNTRACK" else "TRACK",
+		UDim2.new(0, 10, 1, -108),
+		if tracking then UI.Palette.Glass else stat.Color,
+		true,
+		function()
+			if tracking then
+				self:_untrack(trackLabel)
+			else
+				self:_track(destination.Position, trackLabel, trackColor)
+			end
+		end
+	)
 
 	if not hasFastTravel then
 		self:_sideButton(
@@ -906,6 +1022,17 @@ function FullMapController:_render()
 		end
 	end
 
+	-- The tier list is rebuilt from scratch on every render, and the profile replicates
+	-- on every training rep, so without this the list a player was reading snapped back
+	-- to the top a few times a second while their set ran.
+	local previousTierList = content:FindFirstChild("TierList", true)
+	local tierScroll: Vector2? = if previousTierList ~= nil and previousTierList:IsA("ScrollingFrame")
+		then previousTierList.CanvasPosition
+		else nil
+
+	renderGeneration += 1
+	local generation = renderGeneration
+	lastRenderedSignature = profileSignature()
 	content:ClearAllChildren()
 
 	local board = Instance.new("Frame")
@@ -926,6 +1053,20 @@ function FullMapController:_render()
 	sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, 0)
 	sidebar.BackgroundTransparency = 0.02
 	self:_renderSidebar(sidebar, data)
+
+	if tierScroll ~= nil then
+		-- AutomaticCanvasSize has not measured the new rows yet, and a write against a
+		-- canvas of zero height is clamped to the top — which is the jump being undone.
+		task.spawn(function()
+			RunService.Heartbeat:Wait()
+			local list = if isOpen and renderGeneration == generation
+				then content:FindFirstChild("TierList", true)
+				else nil
+			if list ~= nil and list:IsA("ScrollingFrame") then
+				list.CanvasPosition = tierScroll :: Vector2
+			end
+		end)
+	end
 
 	if #destinations == 0 then
 		local loading = UI.Label("Loading", board)
@@ -984,6 +1125,10 @@ function FullMapController:_render()
 			layout.Size = size
 		end
 	end
+
+	-- Declared here because selecting a pin has to re-run the layout, and that happens
+	-- in a handler written long before the viewport maths below exists.
+	local layoutMapItems: () -> ()
 
 	local featureSource = Instance.new("Frame")
 	featureSource.Name = "FeatureSource"
@@ -1211,6 +1356,10 @@ function FullMapController:_render()
 				record.Stroke.Color = if nowSelected then MAP_PAPER else MAP_INK
 				record.Stroke.Thickness = if nowSelected then 2 else 1
 			end
+			-- The selected pin grew, so its containment has to be decided again: without
+			-- this it keeps the position and the visibility it was given at 26 px while
+			-- drawing at 30.
+			layoutMapItems()
 			-- Redraw only the small detail card. Recreating thousands of map-feature
 			-- Frames for every pin click made destination selection needlessly heavy.
 			for _, child in sidebar:GetChildren() do
@@ -1282,19 +1431,62 @@ function FullMapController:_render()
 		return viewport.AbsoluteSize * mapZoom
 	end
 
-	local function layoutMapItems()
+	--[[
+		How much room, in pixels, the fixed-size items need at the edges of the map.
+
+		Measured rather than assumed. A pin is 26 px, but a clustered pin also carries a
+		fan-out offset of up to about 40, and the spawn label is 72 wide — a constant
+		guess that covers a lone pin hides the ones that need it most, which is what a
+		flat inset did. Only items sized purely in pixels are counted: geography is
+		scale-sized and is meant to run to the edges of the paper, and folding a
+		building's half-width into this would shrink the city to a stamp.
+	]]
+	local function itemMargins(): Vector2
+		local margin = Vector2.zero
+		for object, layout in mapItems do
+			if object.Parent == nil or layout.Size.X.Scale ~= 0 or layout.Size.Y.Scale ~= 0 then
+				continue
+			end
+			local halfX, halfY = MapViewportMath.RotatedHalfExtents(
+				layout.Size.X.Offset,
+				layout.Size.Y.Offset,
+				object.Rotation
+			)
+			margin = Vector2.new(
+				math.max(margin.X, halfX + math.abs(layout.Position.X.Offset)),
+				math.max(margin.Y, halfY + math.abs(layout.Position.Y.Offset))
+			)
+		end
+		return margin + Vector2.new(MAP_EDGE_PADDING, MAP_EDGE_PADDING)
+	end
+
+	function layoutMapItems()
 		local canvasSize = theoreticalCanvasSize()
 		local viewportSize = viewport.AbsoluteSize
 		local offset = Vector2.new(canvas.Position.X.Offset, canvas.Position.Y.Offset)
+		-- The drawing rect, not the canvas rect: everything scale-positioned maps into
+		-- the inset area so no pin can land under an edge or under the board's chrome.
+		-- The inset grows with zoom because it is part of the map, not part of the
+		-- window — insetting in window pixels would slide the map under the cursor as
+		-- you zoomed. Position and size share the rect; insetting one and not the other
+		-- would walk the pins off their buildings.
+		local margin = itemMargins()
+		local topLeft = Vector2.new(margin.X, margin.Y + MAP_TOP_CHROME) * mapZoom
+		local bottomRight = Vector2.new(margin.X, margin.Y + MAP_BOTTOM_CHROME) * mapZoom
+		local usable = Vector2.new(
+			math.max(canvasSize.X - topLeft.X - bottomRight.X, 1),
+			math.max(canvasSize.Y - topLeft.Y - bottomRight.Y, 1)
+		)
+		local origin = offset + topLeft
 		for object, layout in mapItems do
 			if object.Parent == nil then
 				mapItems[object] = nil
 				continue
 			end
-			local centerX = offset.X + layout.Position.X.Scale * canvasSize.X + layout.Position.X.Offset
-			local centerY = offset.Y + layout.Position.Y.Scale * canvasSize.Y + layout.Position.Y.Offset
-			local width = layout.Size.X.Scale * canvasSize.X + layout.Size.X.Offset
-			local height = layout.Size.Y.Scale * canvasSize.Y + layout.Size.Y.Offset
+			local centerX = origin.X + layout.Position.X.Scale * usable.X + layout.Position.X.Offset
+			local centerY = origin.Y + layout.Position.Y.Scale * usable.Y + layout.Position.Y.Offset
+			local width = layout.Size.X.Scale * usable.X + layout.Size.X.Offset
+			local height = layout.Size.Y.Scale * usable.Y + layout.Size.Y.Offset
 			object.Position = UDim2.fromOffset(centerX, centerY)
 			object.Size = UDim2.fromOffset(width, height)
 			-- This software containment is deliberately stricter than clipping: a rotated
@@ -1321,15 +1513,22 @@ function FullMapController:_render()
 		end
 		local overflow =
 			Vector2.new(math.max(canvasSize.X - windowSize.X, 0), math.max(canvasSize.Y - windowSize.Y, 0))
-		local offset =
-			Vector2.new(math.clamp(rawOffset.X, -overflow.X, 0), math.clamp(rawOffset.Y, -overflow.Y, 0))
+		local slack = windowSize * PAN_SLACK
+		local offset = Vector2.new(
+			math.clamp(rawOffset.X, -overflow.X - slack.X, slack.X),
+			math.clamp(rawOffset.Y, -overflow.Y - slack.Y, slack.Y)
+		)
 		canvas.Position = UDim2.fromOffset(offset.X, offset.Y)
 		mapShade.Position = canvas.Position
 		mapShade.Size = canvas.Size
 		layoutMapItems()
+		-- Deliberately unclamped: a view dragged into the slack is outside 0..1, and
+		-- clamping here would silently snap the map back the next time anything fed
+		-- this centre through applyCenter. The real limits are enforced above, which is
+		-- where applyCenter's result lands anyway.
 		mapCenter = Vector2.new(
-			math.clamp((windowSize.X / 2 - offset.X) / canvasSize.X, 0, 1),
-			math.clamp((windowSize.Y / 2 - offset.Y) / canvasSize.Y, 0, 1)
+			(windowSize.X / 2 - offset.X) / canvasSize.X,
+			(windowSize.Y / 2 - offset.Y) / canvasSize.Y
 		)
 		canvas:SetAttribute("CenterX", mapCenter.X)
 		canvas:SetAttribute("CenterY", mapCenter.Y)
@@ -1556,6 +1755,19 @@ function FullMapController:_render()
 	addCorner(status, 7)
 	addBorder(status, UI.Palette.GlassStroke, 0.5, 1)
 
+	-- Every map item is registered Visible = false and only turned on by a layout pass,
+	-- and a layout pass gives up while the viewport still measures zero. That left the
+	-- whole map on one deferred call landing after the panel had been measured — win the
+	-- race and you get a map, lose it and you get an empty board until you happen to
+	-- drag. Watching the size instead means the map lays out the moment there is
+	-- something to lay it out in, and re-frames whenever the window changes size.
+	local sizeConnection = viewport:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		applyCenter()
+	end)
+	viewport.Destroying:Connect(function()
+		sizeConnection:Disconnect()
+	end)
+
 	task.defer(function()
 		if viewport.Parent ~= nil then
 			applyCenter()
@@ -1574,7 +1786,41 @@ function FullMapController:_build()
 	screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screen.Enabled = false
 	screen.Parent = playerGui
-	UI.ScaleWithViewport(screen)
+
+	--[[
+		This screen sizes itself, rather than taking UI.ScaleWithViewport.
+
+		That helper applies UI.LayoutScale — viewport *height* over 720, clamped to
+		[0.85, 1.25]. Every other screen can live with it because it is smaller than the
+		window in both directions at any scale it will meet. This panel is 980 wide, and
+		the 0.85 floor still puts it at 833 — so on a window with less width than that,
+		the panel is scaled larger than the space it has and its own ClipsDescendants
+		crops the board. Since the map's zoom floor is "the whole city", nothing the
+		player can do brings back the part that was cut away.
+
+		So: the same scale as every other screen, but never larger than the window can
+		hold. A small window gets a small map, which is legible where a cropped one is
+		not. Letting it grow *past* UI.LayoutScale was tried and is not wanted — the map
+		is a page laid over the world, and a page that fills the screen stops reading as
+		one.
+	]]
+	local panelScale = Instance.new("UIScale")
+	panelScale.Parent = screen
+
+	local function applyPanelScale()
+		local available = screen.AbsoluteSize
+		if available.X <= 0 or available.Y <= 0 then
+			return
+		end
+		panelScale.Scale = math.min(
+			UI.LayoutScale(available.Y),
+			(available.X - PANEL_MARGIN * 2) / PANEL_SIZE.X,
+			(available.Y - PANEL_MARGIN * 2) / PANEL_SIZE.Y
+		)
+	end
+
+	applyPanelScale()
+	screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(applyPanelScale)
 
 	-- The scrim is deliberately visual-only. A full-screen TextButton used to treat
 	-- the mouse-up at the end of some map drags as an activation and close the page.
@@ -1742,11 +1988,26 @@ function FullMapController:Start()
 		end
 	end)
 
+	-- Training marks the profile dirty on every rep, and this panel rebuilds itself
+	-- whole. Coalesce so a running set costs one redraw per interval instead of one per
+	-- replicated frame, then drop the redraw entirely unless something the map actually
+	-- draws has moved. A stat ticking up changes nothing here until it crosses a
+	-- threshold, so an open map normally sits perfectly still through a whole set.
+	local profileRenderPending = false
 	ProfileController.Changed:Connect(function()
-		if not isOpen then
+		if not isOpen or profileRenderPending then
 			return
 		end
-		self:_render()
+		if profileSignature() == lastRenderedSignature then
+			return
+		end
+		profileRenderPending = true
+		task.delay(PROFILE_RENDER_INTERVAL, function()
+			profileRenderPending = false
+			if isOpen then
+				self:_render()
+			end
+		end)
 	end)
 
 	-- A successful purchase should unlock the button before the player closes the map.

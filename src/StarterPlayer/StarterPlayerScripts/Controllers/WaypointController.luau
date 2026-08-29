@@ -279,6 +279,18 @@ function WaypointController:HasTarget(): boolean
 	return target ~= nil
 end
 
+--[[
+	Whether the arrow is already pointing at this place.
+
+	Compared by position rather than by an id because that is what SetTarget is given —
+	a machine and a monster site are the same request here, and neither carries a name
+	the beacon could be trusted to match on.
+]]
+function WaypointController:IsTracking(position: Vector3): boolean
+	local current = target
+	return current ~= nil and (current - position).Magnitude < 1
+end
+
 function WaypointController:Start()
 	-- The beacon lives under CurrentCamera, which Roblox replaces on respawn. Rebuild
 	-- it rather than leaving the player following an arrow attached to nothing.
