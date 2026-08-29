@@ -3,9 +3,9 @@
 	Fast Travel — 149 Robux gamepass.
 
 	The map lets everyone track any training location. This pass unlocks the separate
-	Teleport action for every destination the player has enough Power to enter.
+	Teleport action for every destination where the relevant muscle is strong enough.
 
-	It sells convenience, not progress. The power requirement on every district
+	It sells convenience, not progress. The muscle requirement on every district
 	still applies to owners exactly as it does to everyone else, which is the line
 	this game draws for immortality potions and VIP too — you can buy your way past
 	an inconvenience, never past the grind.
@@ -24,10 +24,10 @@ local Types = require(ReplicatedStorage.Modules.Types)
 local Product: Types.Product = {
 	Id = "FastTravel",
 	Kind = "Gamepass",
-	AssetId = 0,
+	AssetId = 1954945633,
 	DisplayName = "Fast Travel",
-	Description = "Unlock the Teleport button for every map destination you have enough Power to enter.",
-	RobuxPrice = 149,
+	Description = "Teleport to any map destination your relevant muscle has unlocked.",
+	RobuxPrice = 299,
 
 	Grant = function(_player: Player): boolean
 		return true

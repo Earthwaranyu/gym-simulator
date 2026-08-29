@@ -16,10 +16,10 @@ Freeze these before the first session. Every later comparison is against this ro
 | What | Value |
 |---|---|
 | Commit | checklist #126 build (record the final commit in each filled sheet) |
-| World build hash | `ffc81d90b4ee` (35 stations, 35 unique exercises, 3,927 instances) |
+| World build hash | `6210fe298938` (35 destinations, 105 single-user physical machine copies, 35 unique exercises, 6,887 instances) |
 | Interruption rule | kill-only |
-| Abilities | Punch only |
-| Products | all four `AssetId` still `0` — nothing purchasable |
+| Abilities | Punch, Ground Slam, Hard Punch (plus Block and Dash services) |
+| Products | all eleven `AssetId` still `0` — nothing purchasable |
 | Model prediction, active player | first upgrade 2.5m, first rank 12.1m, second tier 4.0m |
 
 If any of these changed, note it in the filled sheet. A session run against a different

@@ -46,13 +46,43 @@ end
 	on timeout so callers can degrade rather than hang forever.
 ]]
 function ProfileController:WaitFor(timeout: number?): Types.ProfileView?
-	local deadline = os.clock() + (timeout or 15)
+	if current ~= nil then
+		return current
+	end
 
-	while current == nil do
-		if os.clock() > deadline then
-			return nil
+	--[[
+		Woken by the Changed signal rather than polled.
+
+		This used to spin on task.wait(0.1), which meant every caller paid up to a tenth
+		of a second *after* the data had already arrived. That is invisible in a panel
+		that opens later and very visible on the join screen, which is the first thing
+		waiting on it.
+	]]
+	local thread = coroutine.running()
+	local resumed = false
+	local expired = false
+
+	local function finish()
+		if resumed then
+			return
 		end
-		task.wait(0.1)
+		resumed = true
+		task.spawn(thread)
+	end
+
+	local connection = ProfileController.Changed:Connect(finish)
+	local expiry = task.delay(timeout or 15, function()
+		expired = true
+		finish()
+	end)
+
+	coroutine.yield()
+
+	connection:Disconnect()
+	-- Only cancel a timer that has not already run: cancelling a finished thread
+	-- throws, and the timeout firing is the ordinary path when a profile never lands.
+	if not expired then
+		task.cancel(expiry)
 	end
 
 	return current

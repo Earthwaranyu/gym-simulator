@@ -164,7 +164,7 @@ AnalyticsSchema.EVENTS = EVENTS
 ]]
 local CURRENCIES: { [string]: boolean } = {
 	Tokens = true,
-	Cash = true,
+	FightTokens = true,
 }
 
 AnalyticsSchema.CURRENCIES = CURRENCIES
@@ -316,6 +316,10 @@ function AnalyticsSchema.RunSelfTest(): { string }
 
 	check("economy source passes", (AnalyticsSchema.ValidateEconomy("Source", "Tokens", 5, "Accrual")))
 	check("unknown currency rejected", not AnalyticsSchema.ValidateEconomy("Source", "Doubloons", 5))
+	check(
+		"Fight Token source passes",
+		(AnalyticsSchema.ValidateEconomy("Source", "FightTokens", 1, "RewardedKO"))
+	)
 	check("unknown flow rejected", not AnalyticsSchema.ValidateEconomy("Sideways", "Tokens", 5))
 	check("negative amount rejected", not AnalyticsSchema.ValidateEconomy("Source", "Tokens", -1))
 	check("NaN amount rejected", not AnalyticsSchema.ValidateEconomy("Source", "Tokens", 0 / 0))

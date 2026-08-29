@@ -43,6 +43,14 @@ local npcs: { Npc } = {
 		Tab = "Quests",
 		Color = Color3.fromRGB(126, 211, 155),
 	},
+	{
+		Id = "Shopkeeper",
+		DisplayName = "Shop",
+		Title = "Supplements & boosts",
+		ActionText = "Browse",
+		Tab = "Shop",
+		Color = Color3.fromRGB(255, 190, 62),
+	},
 }
 
 local NpcConfig = {}

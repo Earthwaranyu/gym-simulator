@@ -5,8 +5,7 @@
 	Reference implementation of Types.Product. Copy this shape into a new file in this
 	folder to add a product; nothing else changes.
 
-	AssetId must be set from the Roblox Creator Dashboard. Until it is, PurchaseService
-	logs a warning at startup and refuses to prompt this product.
+	Live dev product on the Creator Dashboard; PurchaseService registers it at startup.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,7 +18,7 @@ local ONE_HOUR = 60 * 60
 local Product: Types.Product = {
 	Id = "ImmortalPotion1Hour",
 	Kind = "DevProduct",
-	AssetId = 0,
+	AssetId = 3709768660,
 	DisplayName = "Immortal Potion (1 Hour)",
 	Description = "No one can touch you for one hour. Train in peace.",
 	RobuxPrice = 19,

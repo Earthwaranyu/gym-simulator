@@ -48,11 +48,12 @@ export type EquipmentDefinition = {
 	ExerciseFamily: Types.StatId,
 	-- Which stat reps on this machine train.
 	StatId: Types.StatId,
-	-- Stat awarded per rep before multipliers. Tiers scale this exponentially, which
-	-- is where the billions and trillions actually come from.
+	-- Stat awarded per completed visual rep before multipliers. It equals the rep
+	-- duration, keeping every machine at exactly +1 equipment stat per second while
+	-- slower exercises pay a larger, less frequent popup.
 	BaseGain: number,
-	-- Seconds between reps. Also the period of one cycle of the pose below, so the
-	-- animation and the stat ticks stay in step without being wired together.
+	-- Seconds for one unloaded visual rep. The server payout, pose, moving weight stack,
+	-- popup and rep sound all share the effective interval after load tempo is applied.
 	RepInterval: number,
 	-- Total power needed before this machine can be used. 0 is the starter machine.
 	UnlockPower: number,
@@ -81,6 +82,8 @@ local HELD_NAMES: { [string]: string } = {
 	Both = "HeldBoth",
 	Right = "HeldRight",
 	Left = "HeldLeft",
+	Waist = "HeldWaist",
+	Back = "HeldBack",
 }
 
 -- ObjectValue the server puts in a training character, pointing at the anchor they
@@ -113,8 +116,8 @@ local function equipment(
 		ExerciseFamily = family,
 		StatId = family,
 		-- Normalized to one equipment stat per second. The location multiplier is the
-		-- honest advertised bonus: x1 = +1/s through x64 = +64/s, added to the
-		-- universal +1/s training base by Formulas.MachineTrainingRate.
+		-- honest advertised rate: x1 = +1/s through x64 = +64/s. Manual training's
+		-- separate +1/s is not added again while mounted.
 		BaseGain = repInterval,
 		RepInterval = repInterval,
 		UnlockPower = 0,
@@ -125,49 +128,51 @@ end
 
 local definitions: { EquipmentDefinition } = {
 	-- Chest — seven different pressing/fly/dip patterns.
-	equipment("BenchPress", "Bench Press", "Chest", 0.9, "BenchPress", "Bench"),
-	equipment("InclinePress", "Incline Dumbbell Press", "Chest", 1.0, "InclinePress", "Press"),
-	equipment("PecDeck", "Pec Deck", "Chest", 0.85, "PecDeck", "Fly"),
-	equipment("PushUps", "Weighted Push-Up Deck", "Chest", 0.75, "PushUps", "Push Up"),
-	equipment("CableCrossover", "Cable Crossover", "Chest", 0.9, "CableCrossover", "Cross Over"),
-	equipment("ChestDip", "Chest Dip Bars", "Chest", 1.0, "ChestDip", "Dip"),
-	equipment("DeclinePress", "Decline Barbell Press", "Chest", 1.1, "DeclinePress", "Press"),
+	equipment("BenchPress", "Bench Press", "Chest", 1.8, "BenchPress", "Bench"),
+	equipment("InclinePress", "Incline Dumbbell Press", "Chest", 1.9, "InclinePress", "Press"),
+	equipment("PecDeck", "Pec Deck", "Chest", 1.7, "PecDeck", "Fly"),
+	equipment("PushUps", "Weighted Push-Up Deck", "Chest", 1.45, "PushUps", "Push Up"),
+	equipment("CableCrossover", "Cable Crossover", "Chest", 1.7, "CableCrossover", "Cross Over"),
+	equipment("ChestDip", "Chest Dip Bars", "Chest", 1.6, "ChestDip", "Dip"),
+	equipment("DeclinePress", "Decline Barbell Press", "Chest", 1.9, "DeclinePress", "Press"),
 
 	-- Arms — curls, extensions and conditioning all read differently in silhouette.
-	equipment("Dumbbells", "Alternating Dumbbell Curls", "Arms", 0.7, "Curl", "Curl"),
-	equipment("BarbellCurl", "Barbell Curl Rack", "Arms", 0.9, "BarbellCurl", "Curl"),
-	equipment("TricepsPushdown", "Triceps Pushdown", "Arms", 0.8, "TricepsPushdown", "Push Down"),
-	equipment("HammerCurl", "Hammer Curl Rack", "Arms", 0.75, "HammerCurl", "Hammer Curl"),
-	equipment("PreacherCurl", "Preacher Curl Bench", "Arms", 0.95, "PreacherCurl", "Preacher Curl"),
-	equipment("SkullCrusher", "EZ-Bar Skull Crusher", "Arms", 1.0, "SkullCrusher", "Extend"),
-	equipment("BattleRopes", "Battle Ropes", "Arms", 0.6, "BattleRopes", "Work Ropes"),
+	equipment("Dumbbells", "Alternating Dumbbell Curls", "Arms", 2.0, "Curl", "Curl"),
+	equipment("BarbellCurl", "Barbell Curl Rack", "Arms", 1.8, "BarbellCurl", "Curl"),
+	equipment("TricepsPushdown", "Triceps Pushdown", "Arms", 1.6, "TricepsPushdown", "Push Down"),
+	equipment("HammerCurl", "Hammer Curl Rack", "Arms", 2.0, "HammerCurl", "Hammer Curl"),
+	equipment("PreacherCurl", "Preacher Curl Bench", "Arms", 2.0, "PreacherCurl", "Preacher Curl"),
+	equipment("SkullCrusher", "EZ-Bar Skull Crusher", "Arms", 1.8, "SkullCrusher", "Extend"),
+	equipment("BattleRopes", "Battle Ropes", "Arms", 1.4, "BattleRopes", "Work Ropes"),
 
 	-- Back — vertical pulls, horizontal rows and hip-hinge work.
-	equipment("PullUpBar", "Pull-Up Bar", "Back", 1.1, "PullUp", "Pull Up"),
-	equipment("SeatedRow", "Seated Cable Row", "Back", 1.0, "SeatedRow", "Row"),
-	equipment("LatPulldown", "Lat Pulldown", "Back", 1.05, "LatPulldown", "Pull Down"),
-	equipment("Deadlift", "Deadlift Platform", "Back", 1.2, "Deadlift", "Deadlift"),
-	equipment("TBarRow", "T-Bar Row", "Back", 1.0, "TBarRow", "Row"),
-	equipment("BackExtension", "Back Extension Bench", "Back", 0.9, "BackExtension", "Extend"),
-	equipment("RopeClimb", "Rope Climb Tower", "Back", 1.1, "RopeClimb", "Climb"),
+	equipment("PullUpBar", "Pull-Up Bar", "Back", 2.0, "PullUp", "Pull Up"),
+	equipment("SeatedRow", "Seated Cable Row", "Back", 1.8, "SeatedRow", "Row"),
+	equipment("LatPulldown", "Lat Pulldown", "Back", 1.9, "LatPulldown", "Pull Down"),
+	equipment("Deadlift", "Deadlift Platform", "Back", 2.2, "Deadlift", "Deadlift"),
+	equipment("TBarRow", "T-Bar Row", "Back", 1.9, "TBarRow", "Row"),
+	equipment("BackExtension", "Back Extension Bench", "Back", 1.8, "BackExtension", "Extend"),
+	equipment("RopeClimb", "Rope Climb Tower", "Back", 2.0, "RopeClimb", "Climb"),
 
 	-- Core — flexion, anti-extension and rotation.
-	equipment("SitUpBench", "Decline Sit-Up Bench", "Core", 0.8, "SitUp", "Sit Up"),
-	equipment("KneeRaise", "Captain's Chair", "Core", 0.95, "KneeRaise", "Raise Knees"),
-	equipment("TorsoTwist", "Torso Rotation", "Core", 0.75, "TorsoTwist", "Twist"),
-	equipment("Plank", "Weighted Plank Deck", "Core", 1.0, "Plank", "Plank"),
-	equipment("CableCrunch", "Kneeling Cable Crunch", "Core", 0.85, "CableCrunch", "Crunch"),
-	equipment("AbWheel", "Ab Wheel Runway", "Core", 0.9, "AbWheel", "Roll Out"),
-	equipment("WoodChop", "Cable Wood Chop", "Core", 0.8, "WoodChop", "Wood Chop"),
+	equipment("SitUpBench", "Decline Sit-Up Bench", "Core", 1.8, "SitUp", "Sit Up"),
+	equipment("KneeRaise", "Captain's Chair", "Core", 1.8, "KneeRaise", "Raise Knees"),
+	equipment("TorsoTwist", "Torso Rotation", "Core", 1.7, "TorsoTwist", "Twist"),
+	equipment("Plank", "Weighted Plank Deck", "Core", 2.0, "Plank", "Plank"),
+	equipment("CableCrunch", "Kneeling Cable Crunch", "Core", 1.7, "CableCrunch", "Crunch"),
+	equipment("AbWheel", "Ab Wheel Runway", "Core", 2.2, "AbWheel", "Roll Out"),
+	equipment("WoodChop", "Cable Wood Chop", "Core", 1.8, "WoodChop", "Wood Chop"),
 
-	-- Legs — running, squatting, pressing and isolated knee/ankle work.
-	equipment("Treadmill", "Treadmill", "Legs", 0.5, "Run", "Run"),
-	equipment("SquatRack", "Squat Rack", "Legs", 1.1, "SquatRack", "Squat"),
-	equipment("LegPress", "Seated Leg Press", "Legs", 1.0, "LegPress", "Leg Press"),
-	equipment("LegExtension", "Leg Extension", "Legs", 0.85, "LegExtension", "Extend Legs"),
-	equipment("HamstringCurl", "Lying Hamstring Curl", "Legs", 0.9, "HamstringCurl", "Curl Legs"),
-	equipment("CalfRaise", "Standing Calf Raise", "Legs", 0.65, "CalfRaise", "Raise Calves"),
-	equipment("StairClimber", "Stair Climber", "Legs", 0.55, "StairClimber", "Climb"),
+	-- Legs — loaded squatting, pressing and isolated knee/ankle work.
+	-- The starter movement deliberately uses a carried plate: every load choice is
+	-- now visible on the avatar instead of a treadmill pretending to use plates.
+	equipment("GobletSquat", "Plate Goblet Squat", "Legs", 2.0, "GobletSquat", "Squat"),
+	equipment("SquatRack", "Squat Rack", "Legs", 2.2, "SquatRack", "Squat"),
+	equipment("LegPress", "Seated Leg Press", "Legs", 2.0, "LegPress", "Leg Press"),
+	equipment("LegExtension", "Leg Extension", "Legs", 1.7, "LegExtension", "Extend Legs"),
+	equipment("HamstringCurl", "Lying Hamstring Curl", "Legs", 1.8, "HamstringCurl", "Curl Legs"),
+	equipment("CalfRaise", "Standing Calf Raise", "Legs", 1.4, "CalfRaise", "Raise Calves"),
+	equipment("StairClimber", "Stair Climber", "Legs", 1.3, "StairClimber", "Climb"),
 }
 
 local EquipmentConfig = {}

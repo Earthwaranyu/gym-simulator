@@ -28,7 +28,7 @@ local ToastController = {
 }
 
 local container: Frame? = nil
-local active: { Frame } = {}
+local active: { TextLabel } = {}
 
 function ToastController:_build()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
@@ -57,8 +57,19 @@ function ToastController:_build()
 end
 
 --[[
-	Shows a message. `accent` tints the left edge, which is how kill-feed lines are
+	Shows a message. `accent` colours the text, which is how kill-feed lines are
 	distinguished from ordinary notices without a second widget.
+
+	A toast is a bare line of text — no panel, no corner, no stroke, no accent rail.
+	That was a lot of furniture around one sentence that lives four seconds, and the
+	furniture was the loudest thing on screen.
+
+	Losing the panel means losing the background the text was legible against. The old
+	colour was near-black ink, which only worked because it sat on a light glass fill;
+	over the world it would disappear against dark terrain or a night sky. So the line
+	carries its own contrast the way the immortality badge and the nameplates do —
+	light text with an outline — and that outline is the whole reason the panel could
+	go.
 ]]
 function ToastController:Show(text: string, accent: Color3?)
 	local parent = container
@@ -66,24 +77,17 @@ function ToastController:Show(text: string, accent: Color3?)
 		return
 	end
 
-	local panel = UI.Panel("Toast", parent)
-	panel.Size = UDim2.fromOffset(400, 34)
-	panel.BackgroundTransparency = 0.15
-
-	local stripe = Instance.new("Frame")
-	stripe.Name = "Accent"
-	stripe.BackgroundColor3 = accent or UI.Palette.Accent
-	stripe.BorderSizePixel = 0
-	stripe.Size = UDim2.new(0, 3, 1, 0)
-	stripe.Position = UDim2.fromOffset(-8, 0)
-	stripe.Parent = panel
-
-	local label = UI.Label("Text", panel)
-	label.Size = UDim2.fromScale(1, 1)
+	local label = UI.Label("Toast", parent)
+	label.Size = UDim2.fromOffset(400, 22)
 	label.TextSize = 15
+	-- Centred now that there is no left edge or rail to hang off; the container
+	-- already stacks its rows centred.
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextColor3 = accent or UI.Palette.OnAccent
+	label.TextStrokeTransparency = 0.4
 	label.Text = text
 
-	table.insert(active, panel)
+	table.insert(active, label)
 
 	-- Oldest first: a burst pushes out stale lines rather than piling up.
 	while #active > MAX_TOASTS do
@@ -94,22 +98,29 @@ function ToastController:Show(text: string, accent: Color3?)
 	end
 
 	task.delay(TOAST_SECONDS, function()
-		if panel.Parent == nil then
+		if label.Parent == nil then
 			return
 		end
 
-		local fade = TweenService:Create(panel, TweenInfo.new(FADE_SECONDS), { BackgroundTransparency = 1 })
-		local fadeText = TweenService:Create(label, TweenInfo.new(FADE_SECONDS), { TextTransparency = 1 })
-		fade:Play()
+		--[[
+			The fade used to end on the panel's background tween. There is no panel now,
+			so the text tween is what the removal waits on — and the stroke has to fade
+			with it, or the outline hangs in the air for a moment after the glyphs have
+			gone.
+		]]
+		local fadeText = TweenService:Create(label, TweenInfo.new(FADE_SECONDS), {
+			TextTransparency = 1,
+			TextStrokeTransparency = 1,
+		})
 		fadeText:Play()
 
-		fade.Completed:Wait()
+		fadeText.Completed:Wait()
 
-		local index = table.find(active, panel)
+		local index = table.find(active, label)
 		if index ~= nil then
 			table.remove(active, index)
 		end
-		panel:Destroy()
+		label:Destroy()
 	end)
 end
 

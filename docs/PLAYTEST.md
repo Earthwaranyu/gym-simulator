@@ -21,8 +21,9 @@ economy events. Two real bugs were found that way — a DataStore error aborting
 boot, and gym zones tagged on floor slabs so tokens never accrued.
 
 **Explicitly *not* carried forward.** The world has since been rebuilt twice (commits
-`57edbb3`, `9830780`) and now again into a **35-location, seven-tier scattered
-archipelago**. Flight is enabled from spawn and training interruption is **kill-only**. Every
+`57edbb3`, `9830780`) and now again into a **35-location, seven-tier coastal mainland
+with one tier per yard along a single promenade**. Flight is enabled from spawn and
+training interruption is **kill-only**. Every
 box below is therefore unchecked: the old session is context, not evidence.
 
 **Two standing caveats from that session.** Poses were verified by *measuring* joint
@@ -34,45 +35,101 @@ session, so the hold-E mount path has **never** been exercised by any automated 
 bounties), real DataStore persistence, Robux purchases, flight and Fast Travel at scale,
 and whether any balance number feels right.
 
+### 2026-08-24 — section 1 verified by machine
+
+Section 1 is ticked, and only section 1. Every box there was read out of a live Studio
+session rather than inferred: server ignition at 32 systems and client at 39, three
+combat abilities loaded, the DevService and MOCK-store warnings present, exactly eleven
+AssetId-0 warnings, zero station warnings, zero non-DataStore errors, 35 tagged gym zones,
+`./scripts/check.sh` green and `validate_gym.py` reporting 35/35 against build
+`319220b972df`.
+
+Also exercised in that session, though it is not a box here: `Migrations.Apply` was fed
+the profile shapes a real DataStore can return and the Studio mock never produces — a
+`SchemaVersion` of zero, negative, fractional, a string, a boolean, absent, and one
+stamped far in the future. Before this session six of those threw inside the join path.
+All now migrate cleanly or are correctly left alone.
+
+**What that run still does not tell you.** No box outside section 1 was touched, because
+nothing outside it can be settled without a human: proximity prompts do not render in an
+MCP-driven session so the hold-E mount path remains unexercised, poses are still measured
+rather than watched, and PvP, real persistence, Robux and balance feel all remain
+untested. A machine can confirm the game boots correctly. It cannot confirm the game is
+any good.
+
 ---
 
 ## 1. It boots
 
-- [ ] `wally install` then `./scripts/check.sh` — all checks pass.
-- [ ] `python3 scripts/validate_gym.py` reports **35 stations, 7 tiers × 5 muscles / 35 unique exercises** and a build hash.
-- [ ] `rojo serve`, connect the Studio plugin, press Play.
-- [ ] Output shows `[Loader/Server] Ignited 26 systems` and `[Loader/Client] Ignited 20
+- [x] `wally install` then `./scripts/check.sh` — all checks pass.
+- [x] `python3 scripts/validate_gym.py` reports **35 destinations / 35 usable stations, 7 tiers × 5 muscles / 35 unique exercises** and a build hash.
+- [x] `rojo serve`, connect the Studio plugin, press Play.
+- [x] Output shows `[Loader/Server] Ignited 32 systems` and `[Loader/Client] Ignited 39
       systems`. A lower number means a system failed to load silently.
-- [ ] Output shows `[DevService] Studio session — dev commands are ACTIVE`. This warning
+- [x] Output shows `[DevService] Studio session — dev commands are ACTIVE`. This warning
       must **never** appear on a live server.
-- [ ] Output shows `[CombatService] Loaded 1 abilities` — **one**, not three. Slam and Dash
-      are deferred.
-- [ ] No red errors in Output. No station warnings — every one of the 35 stations must
-      resolve its definition, its `TrainAnchor` spots, and its prompt.
-- [ ] Expected warnings, and only these:
+- [x] Output shows `[CombatService] Loaded 3 abilities` — Punch, Ground Slam and Hard
+      Punch. Dash is its own service, not an ability.
+- [x] No red errors in Output. No station warnings — every one of the 35 destination
+      models must resolve its definition, all three physical copies, their `TrainAnchor`
+      spots, and one prompt per copy.
+- [x] Expected warnings, and only these:
   - `[DataService] Studio session using the MOCK store` — see step 7 before launch.
-  - `[PurchaseService] "..." has AssetId 0` — one per product, four total, see step 8.
+  - `[PurchaseService] "..." has AssetId 0` — one per product, eleven total, see step 8.
   - `[LeaderboardService] Studio session` — global boards need API access.
 
 ## 2. Training loop
 
+- [ ] On a fresh profile, mount each Muscle Beach machine. The selector begins at
+      `BARE / 0 KG`; no held plate or weight-stack slice is visible.
+- [ ] On Alternating Dumbbell Curls, the player holds only the chrome iron handles
+      at 0 kg. The list reads `+10 KG` through `+100 KG`; choosing a row swaps both
+      ends to that complete symmetric Olympic plate configuration.
+- [ ] Confirm the selector states whether the displayed number means `EACH HAND`,
+      `MACHINE RESISTANCE`, or `TOTAL ADDED LOAD`.
+- [ ] Train until another load becomes available. The guidance names its exact kg and
+      its preset row turns green with the word `RECOMMENDED`; after selecting it, the
+      guidance shows the exact muscle-stat requirement for the next step.
+- [ ] Confirm unavailable rows state `NEED … ARMS/CHEST/
+      BACK/CORE/LEGS`, and the current row says `CURRENT` without relying on colour.
+- [ ] Check free weights at +10, +20, +30, +50, and +100 kg. Plate pairs are symmetric,
+      the heaviest plates are nearest the grip/bar, and colors match the authored
+      denominations: 25 red, 20 blue, 15 yellow, 10 green, 5 white, 2.5 red.
+- [ ] On every selectorized cable machine, choose a non-zero load. The selected stack
+      plates rise together and return smoothly once per repetition; unselected plates
+      remain parked and hidden.
+
 - [ ] Walk up to any station. A "Hold E to …" prompt appears. **Still the one step with no
       automated evidence behind it at all** — prompts do not render in MCP sessions.
 - [ ] Hold **E**. You are placed on the machine, locked there, and start repping.
+- [ ] Start a three-player local server. Put all three players on different copies of
+      one muscle court at once; each prompt mounts its own copy, each load animation
+      stays on that copy, and each player dismounts beside the copy they used.
+- [ ] Try to put a fourth player on a dumbbell rack, pull-up rig, or any other court.
+      Every visible equipment copy has exactly one prompt/seat: three copies means
+      exactly three simultaneous players, never extra invisible capacity.
+- [ ] Visit the rear-right shop in all seven active campuses. Each has exactly one
+      Shopkeeper; holding **E** shows `Browse Shop` and opens the existing Shop tab.
 - [ ] You spawn in the safe-zone bubble, not loose on the gym floor.
 - [ ] The trained stat climbs in the HUD; total power climbs with it.
-- [ ] Time the floating stat awards on the fastest animation (Treadmill, 0.5s), a
-      middle animation, and the slowest (Deadlift, 1.2s). All three award exactly once
-      per second; animation speed changes motion only. Repeat across all five muscles.
+- [ ] Time the floating stat awards on a fast animation (Stair Climber, 1.3s), a
+      middle animation, and the slowest (Deadlift, 2.2s). All three award once at the
+      end of each visible exercise cycle. The amount is proportional to its duration,
+      so their measured per-second progression remains equal. Repeat across all five muscles.
 - [ ] Hold each of the five bottom stat cards while unmounted, using mouse and touch.
-      The pressed stat updates by exactly +1 once per second before owned multipliers,
+      The pressed stat popup lands once per completed visible rep; its amount equals
+      that rep's duration at x1, preserving exactly +1 per second before owned multipliers,
       even if selection changes during the hold. Holding world-space left mouse trains
       the selected card by the same rule. Release before the next second: no delayed
       reward appears. Mount a machine without releasing: only the machine award
       continues, with no second manual payout stacked on it.
-- [ ] Mount any x1 starter machine with no owned multiplier. Its sign distinguishes
-      `+1 EQUIP` from `+2 Muscle/s TRAINING`, and every tick adds exactly +2: +1 universal
-      training base plus +1 equipment bonus. Check an x4 district too: raw total is +5.
+- [ ] Mount an x1 starter machine normalized to 1/s with no owned multiplier. Every
+      tick adds exactly +1; the manual +1 does not stack underneath it. At 10 kg the
+      load bonus reaches 2x, seamlessly matching the next district's 10 kg minimum.
+- [ ] For one muscle, progress from 1 to 10 kg. At 100 of that stat its next district
+      opens; the other four muscle routes stay locked until their own stat reaches 100.
+- [ ] Type `/autoload` in Studio. Ownership and Auto Load both turn on and the selected
+      load follows the server recommendation each tick. Type it again to turn both off.
 - [ ] Watch one uninterrupted set. Ticks 1–49 stay at the same whole rate; tick 50
       activates the clearly labelled full-set x2. There are no fractional 2% steps and
       no unexplained alternating +1/+2 changes in the visible stat.
@@ -87,14 +144,20 @@ and whether any balance number feels right.
 - [ ] **Hold E again** to dismount. Then remount and **press Space** — that must also
       dismount you (`StopTraining`). Then remount and **jump** — same. All three paths work
       and the combo resets on each.
-- [ ] **Watch the pose on all five playable exercises.** Angles in `PoseConfig` are the
+- [ ] **Watch the pose on all 35 exercises.** Angles in `PoseConfig` are the
       thing most likely to look wrong: you should lie *on* the bench not through it, hang
       *from* the bar not above it, and limbs should bend the way a body bends. Tune in that
       one file.
-- [ ] Fill a multi-spot station to capacity with several characters. The next player is
-      refused with "in use", and the billboard counts down free spots.
+- [ ] Walk between all three physical copies of dumbbell curls, pull-ups, and several
+      ordinary machines. Every copy's own prompt and billboard reads `1/1 free`.
+      Mount one: only that copy becomes `0/1 free`; the other two remain `1/1 free`.
+      A second player is refused at the occupied copy but can mount either free copy.
 - [ ] Billboards show each machine's stat and its per-second rate.
-- [ ] Locked stations read "Locked" with their power requirement until you meet it.
+- [ ] Locked stations read "Locked" with their relevant muscle requirement until met.
+- [ ] Free-weight discs, dumbbell heads and cable-stack slices visibly respond to the
+      selected load. Pull-ups/dips/rope work use a belt and hanging chain; sit-ups and
+      back extensions hold a plate at the chest; weighted push-ups/planks carry a back
+      plate. Nothing remains parked at the rack once it should be attached to the body.
 - [ ] Your muscles visibly thicken as stats climb. **Watch the joints at high scale** —
       limbs stay in their sockets and the character stands on the floor rather than sinking.
 
@@ -103,6 +166,10 @@ and whether any balance number feels right.
 The rule under test: **a hit does not dismount; only death does.**
 
 - [ ] Player B presses **F** near player A. A takes damage; both see feed lines.
+- [ ] The local bottom-left health bar is visibly large and its centered current/max
+      values remain readable. Other players' overhead bars are also large enough to
+      read both values during combat; test ordinary, million, and billion-scale HP to
+      confirm suffixes fit without clipping.
 - [ ] Hit A *while A is training*. A **stays on the machine**, keeps repping, and keeps the
       combo. Only the health bar moves. If A pops off on a hit, `CombatService` has
       regressed to the old stagger behavior.
@@ -111,11 +178,30 @@ The rule under test: **a hit does not dismount; only death does.**
       that is a balance finding for step 10, not a bug.
 - [ ] A mounted player cannot dodge — B can walk up and swing freely, and A is genuinely
       stuck rather than sliding under the hit.
+- [ ] Stand within 18 studs at the side of or slightly behind another player and click
+      without aiming the camera at them. The nearest living player is hit. Repeat with
+      the client target briefly unavailable; the server fallback still acquires the
+      nearby player instead of producing an empty swing.
 - [ ] A hit **grounds** a flying victim; they cannot simply fly off mid-fight.
-- [ ] A respawns after ~4s with stats, cash, and tokens **fully intact**.
+- [ ] Set both players to 1K Arms/Chest/Back/Core. Equal defense neither blocks nor
+      reflects: the punch lands for the full 1K against 10.1K HP.
+- [ ] Against 1K Arms, verify documented Back bands: 1K blocks 0%, 1,001 through
+      9,999 block 10%, and 10K blocks 100%.
+- [ ] Against 1K Arms, verify documented Core bands: 1K reflects 0%, 1,001 through
+      9,999 reflect 10%, and 10K fully nullifies the direct hit. The full counter is
+      at least `100 + Core`, bypasses Back, and does not reflect again.
+- [ ] Give defender `/power 1000` and attacker `/power 0`. The defender has 200 Core;
+      the attacker's one-damage punch is nullified and returns 300, instantly killing
+      their 100-HP character. The defender receives reflection KO credit.
+- [ ] Reflected damage bypasses the attacker's Back and cannot trigger another Core.
+      Let it kill the attacker and confirm the defender receives KO credit and one
+      Fight Token (unless the anti-farm window suppresses the reward).
+- [ ] A reflected hit shows `REFLECTED` / `CORE RETURN`, but never displays the reflected
+      numeric damage as a floating number.
+- [ ] A respawns after ~4s with stats and tokens **fully intact**.
 - [ ] Both players' kill/death counts update in the tab bar.
 - [ ] Inside the spawn safe zone, damage is nullified for attacker and victim both.
-- [ ] Kill the same victim twice inside 2 minutes: the second kill lands but pays no cash
+- [ ] Kill the same victim twice inside 2 minutes: the second kill lands but pays no Fight Tokens
       and no reputation, and shows "no reward for farming".
 
 ## 4. Movement, flight, and travel
@@ -135,12 +221,24 @@ The rule under test: **a hit does not dismount; only death does.**
       than the old 140-stud launch; even maximum Legs never exceeds 120.
 - [ ] Fly between distant districts with StreamingEnabled on — machines must not pop in
       late. If they do, raise `StreamingMinRadius` in `default.project.json`.
-- [ ] Traverse the expanded world edge to edge. Ten irregular training islands plus the
-      spawn island should be scattered with no ring/grid and no bridges, roads or causeways.
-      Visible land spans roughly 8,037 × 6,547 studs inside the 10,000 × 9,000 foundation.
-- [ ] Step down the hub's shore stairs and walk across the water. The character stands at
-      root Y≈-4.5 on Glass, can sprint 16→24+ with Shift, and can climb the ten shallow
-      shore steps onto every island without flying.
+- [ ] Walk the promenade from spawn to the far end without flying. One landmass, one
+      paved path, sea on the left the whole way. Visible land spans 5,200 × 2,600 studs
+      inside the 10,000 × 9,000 foundation.
+- [ ] Confirm each yard holds exactly one multiplier tier — all five muscles of that
+      tier and nothing else — and that the tiers ascend as you walk east: Iron ×2 at
+      x=600, then ×4, ×8, ×16, ×32 every 600 studs, Storm ×64 at x=3,600.
+- [ ] Stand in one yard. Five mats alternate either side of the painted lane, cover
+      blocks around each, chain-link fence on both long sides, gate arches at both ends.
+      A trainee must stay visible and shootable from the path and from the next mat.
+- [ ] Step down the shore stairs and walk on the water. The character stands at root
+      Y≈-4.5 on Glass, can sprint 16→24+ with Shift, and can climb back out at either
+      of the two step flights without flying.
+- [ ] Try to reach the Storm deck on foot. There must be no ramp, stairs or shore steps:
+      it floats at 300 studs over the end of the promenade and only flight gets there.
+      Fly at its open ends fast enough to overshoot — the ForceField rails must stop you
+      rather than dropping you 300 studs.
+- [ ] Look up from the launch ring at the end of the path. The beacon mast and lamp must
+      make the deck findable without already knowing it is there.
 - [ ] Dive into the water while flying. The avatar must stop with its root at or above
       Y=-4.5, never pass beneath the surface, and remain flying/controllable.
 - [ ] Fly into every outer edge at maximum Legs speed. The persistent wall and safety
@@ -168,15 +266,14 @@ The rule under test: **a hit does not dismount; only death does.**
       mouse drag, touch drag, and touch-friendly zoom buttons as well.
 - [ ] Drag the map repeatedly, including releasing the mouse over the panel edge and
       dimmed background. The map must stay open. Only **X**, **Escape**, or **M** closes it.
-- [ ] On open, no single muscle is preselected or enlarged. All five locations in the
-      player's highest Power-unlocked multiplier tier are equally bright: ×1 at 0
-      Power, then ×2, ×4, ×8, ×16, ×32 and ×64 at their configured thresholds. Earlier
-      unlocked tiers and future locked tiers stay readable but subdued.
+- [ ] On open, each muscle highlights its own highest unlocked tier. Set Arms to 100
+      and leave the other stats at zero: Arms ×2 becomes current while Back, Chest,
+      Core and Legs remain current at ×1. Earlier and future pins stay readable.
 - [ ] Pan and zoom, then select several circles. Only the manually selected circle
       receives a thin light outline, and the sidebar updates without resetting the
-      current map view. Selection must not change which five multiplier-tier pins are bright.
+      current map view. Selection must not change the per-muscle current-tier pins.
 - [ ] The selected-location sidebar shows machine, muscle, gain rate, access type,
-      required Power, and two distinct actions: **TRACK** and **TELEPORT**.
+      required relevant muscle stat, and two distinct actions: **TRACK** and **TELEPORT**.
 - [ ] Run and fly through scenery — containers, palms, bollards, kerbs. None of it
       blocks you. Buildings, ground and platforms still do.
 - [ ] **Without the Fast Travel pass**, Teleport visibly reads
@@ -214,16 +311,27 @@ The rule under test: **a hit does not dismount; only death does.**
 
 ## 4d. Body and growth
 
-- [ ] Every player looks identical on spawn: no shirt, no accessories, one skin tone,
-      dark shorts (the R15 UpperLegs) over bare shins. Join with an avatar wearing a
-      hat and confirm it does not appear.
-- [ ] Train **one** muscle and confirm only its parts grow: Chest → UpperTorso only,
-      Arms → both arms only, Legs → both legs only, Core → LowerTorso only.
+- [ ] Every player has the same asset-free uniform on spawn: no shirt or accessories,
+      current physique-class body colour, and dark shorts (the R15 UpperLegs) over
+      class-coloured shins. Join with an avatar wearing a hat and confirm it does not appear.
+- [ ] Train **one** muscle and confirm only its parts grow: Chest → chest/UpperTorso,
+      Arms → both arms, Back → upper-back/UpperTorso, Core → abs/waist, Legs → both legs.
+- [ ] Definition follows the trained group: Arms creates deltoids/biceps/triceps/forearms;
+      Chest creates paired pecs but no lats; Back creates lats/traps but no pecs; Core
+      creates six abdominal blocks and obliques; Legs creates quads, hamstrings and calves.
+- [ ] While training, only that anatomical group carries the white cue: the supporting
+      R15 part is faint and its sculpted contours are bright. Releasing a dock card,
+      pressing Space, dying, or otherwise leaving a machine removes every white highlight
+      immediately; `TrainingMuscleHighlights` is absent or empty when idle.
 - [ ] Train Chest and Back together — UpperTorso takes the larger of the two, and does
       not compound into a runaway size.
 - [ ] At full growth the body is a **taper, not a box**: chest clearly wider than waist,
       arms visibly longer than they are thick. If any limb looks like a disc or the
       torso like a crate, `PhysiqueConfig`'s weights regressed.
+- [ ] At lean progress, `MuscleDefinition` contains no shells or contours and every R15
+      body part has `LocalTransparencyModifier == 0`. At full progress it contains 12
+      `MuscleShellStats` parts and 28 `MuscleStatId` contours; the original rectangular
+      torso and trained limbs are locally invisible beneath the rounded cosmetic shell.
 - [ ] Veins fade in on arms and chest as scale passes ~1.35 and are absent on a fresh
       character — check a beginner has no `Veins` folder at all.
 - [ ] Check the joints at full scale: limbs stay in their sockets, character stands on
@@ -245,13 +353,40 @@ The rule under test: **a hit does not dismount; only death does.**
 
 - [ ] Token counter rises on a timer while alive on the gym floor.
 - [ ] Stand in a safe zone or stay dead — tokens do **not** accrue.
-- [ ] Press **M** → Upgrades. Buy a multiplier. The value **doubles** (1x → 2x → 4x) and
-      is shown through `NumberFormat`, not as `2.00x`. The stat's rate visibly increases.
-- [ ] Quests page shows progress for the three shipped quests (`DailyReps`,
-      `DailyBounties`, `FirstMillion`); completing one awards tokens with a toast.
+- [ ] Press **M** → Info. The profile and five stat rows use the same flat dark card
+      style as the other menu pages. Each row shows its current multiplier and a
+      circular `+`, rather than a wide purchase banner.
+- [ ] Click a stat's `+`. A centered confirmation names the next multiplier and exact
+      token cost, with green confirm and orange cancel. Cancel spends nothing.
+      With that muscle at 0, spend 10 tokens on Arms: only Arms changes x1 → x2 and
+      its payout doubles; Chest/Back/Core/Legs remain x1. Buy Arms again to see x4.
+      There is no Power or muscle-stat requirement—only the server-checked token cost.
+- [ ] Press **M** → Muscles on Natural. Only Conditioned can be the next transform;
+      later cards read order-locked. Below 10K total Power, Conditioned is Power-locked.
+      At 10K with zero Fight Tokens, it becomes token-locked.
+- [ ] Kill another player directly. The HUD and Info header gain exactly one Fight
+      Token and show a reward toast. Kill that same player again inside the anti-farm
+      window: the KO counts but pays no Fight Token. Repeat with a Core-reflection kill;
+      the defender receives the token.
+- [ ] Reach 10K Power, retain five Fight Tokens and some training tokens, and
+      transform into Conditioned. All five stats and saved weights remain unchanged,
+      the player stays where they stand, and exactly five Fight Tokens are spent.
+      The body immediately uses Conditioned green and returns to a lean silhouette;
+      its `MuscleProgress` values are all 0 and definition contours are gone.
+- [ ] After transforming, train only Arms. Arms grows from lean toward its Conditioned
+      cap while Chest, Back, Core and Legs stay lean. At 18K new Arms (one fifth of the
+      90K Power gap to Defined), Arms reaches its visual cap and further Arms training
+      increases combat Power without making the limb exceed the 2.2 safety cap.
+- [ ] After transforming, Defined is the only next class and requires 100K total Power.
+      Attempt a forged request for a later class: the server refuses the skip.
+- [ ] Leave and rejoin. The earned physique and permanent muscle multipliers return.
+- [ ] Quests page shows exactly **one** active quest from the rotation
+      (`CycleUpperBody` → `CycleLowerBody` → `CycleMobHunt`); completing it awards tokens
+      with a toast and immediately advances to the next step. Completing the last step
+      wraps to the first with goals and rewards grown by one loop.
 - [ ] Hold manual training for ten displayed Power. Gym Rat also rises by ten—not by
       event count—and machine, combo and multiplier gains match visible Power too.
-- [ ] Shop tab: buy a Protein Shake with cash and confirm the boost applies and expires.
+- [ ] Shop tab: buy a Protein Shake with Robux and confirm the boost applies and expires.
 - [ ] Reputation drops toward Criminal after killing a peaceful player, and rises after
       killing someone already marked Criminal.
 - [ ] Each muscle's seven locations use seven different machine silhouettes and seven
@@ -266,7 +401,7 @@ The rule under test: **a hit does not dismount; only death does.**
 ## 7. Before launch — data
 
 - [ ] Set `USE_MOCK_IN_STUDIO = false` in `DataService`, enable Studio API access, and
-      repeat: leave and rejoin, and confirm stats, tokens, multiplier levels, cash,
+      repeat: leave and rejoin, and confirm stats, tokens, multiplier levels,
       reputation, kills, and quest progress all return.
 - [ ] Immortality: grant a potion, rejoin, confirm the remaining time survived.
 - [ ] Confirm `PlayerData` is the store name you want. Renaming it later abandons every
@@ -276,14 +411,17 @@ The rule under test: **a hit does not dismount; only death does.**
 
 ## 8. Before launch — monetisation
 
-Nothing is purchasable until these are filled in. **All four ids are currently `0`.**
+Nothing is purchasable until these are filled in. **All eleven ids are currently `0`.**
 
 - [ ] Create the dev products and gamepasses in the Creator Dashboard.
 - [ ] Paste each `AssetId` into the matching file in `PurchaseService/Products/`:
-  - `ImmortalPotion1Hour.luau` — 19 R$
-  - `ImmortalPotion1Day.luau` — 79 R$
-  - `VipGamepass.luau` — 199 R$
-  - `FastTravelGamepass.luau`
+  - `VipGamepass.luau` — gamepass, 199 R$
+  - `FastTravelGamepass.luau` — gamepass, 149 R$
+  - `AutoLoadGamepass.luau` — gamepass, 99 R$
+  - `ImmortalPotion1Hour.luau` — dev product, 19 R$
+  - `ImmortalPotion1Day.luau` — dev product, 79 R$
+  - `ProteinShake.luau`, `PreWorkout.luau` — dev products
+  - `TokenPack200/400/800/1600.luau` — dev products
 - [ ] Restart and confirm the AssetId-0 warnings are gone.
 - [ ] Buy each product **on a live server** and confirm: the grant lands, the barrier
       appears, and re-buying while active *stacks* the time rather than replacing it.

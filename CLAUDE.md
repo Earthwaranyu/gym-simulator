@@ -22,7 +22,7 @@
 3. **Client-Server Boundary**: Client handles UI/inputs. Server handles stat math, the automatic training loop, and DataStores.
 4. **Muscle Deformation**: Avatar scaling relies on `NumberValue` instances inside the player's character model to drive server-sided MeshPart scaling.
 5. **Player can pvp**: Players can kill other players while they are training to annoy them. Training starts by holding **E** at a machine, which teleports the player onto it, locks them there, and plays the exercise animation while reps tick automatically (no stamina, no clicking). Holding **E** again, or pressing **Space**, gets them off. Because they are locked in place they cannot dodge — but a hit only deals damage; **only dying dismounts them** and resets the combo, so an attacker has to commit to a full kill to break a set.
-6. **Player can avoid pvp**: Players can avoid pvp by buying immortal potion for 1 hour costing 19 robux per potion. We can have 1 day potion for 79 robux also. Players can buy VIP gamepass costing 199 robux which give you 1 hour immortal potion per day. Player who drink immortal potion will have a barrier between body.
+6. **Player can avoid pvp**: Players can avoid pvp by buying immortal potion for 1 hour costing 19 robux per potion. We can have 1 day potion for 199 robux also. Players can buy VIP gamepass costing 699 robux which give you 1 hour immortal potion per day. Player who drink immortal potion will have a barrier between body. Prices live on the Creator Dashboard and the game reads them at runtime — never hardcode one.
 7. **Player can have reputation**: Criminal, guardian, Hero, etc.
 8. **In the tab bar**: it shows that player overall power, and reputation.
 
@@ -34,9 +34,33 @@
   `scripts/build_gym.py` — edit the script, not the JSON.
 
 ## Assets
-No Toolbox models, no imported meshes, no uploaded animations. Machines are built from
-Roblox primitives and training animations are generated from joint angles in
-`PoseConfig.luau`, so nothing in the game is someone else's copyrighted work.
+No Toolbox models, no third-party meshes, no uploaded animations. Nothing in the game
+may be someone else's copyrighted work. Machines are built from Roblox primitives and
+training animations are generated from joint angles in `PoseConfig.luau`.
+
+Audio is the one category we do not generate, since Roblox cannot synthesise sound at
+runtime. It comes from Roblox's own licensed library only — `ProSoundEffects` and other
+verified first-party catalogues, free for use in any experience. Community audio uploads
+are off-limits for the same reason Toolbox models are: much of that pool is ripped from
+commercial games, and an asset that gets moderated takes the sound with it. See the
+header of `EffectsConfig.luau`.
+
+Shop artwork is uploaded, and allowed on the same terms: the pass, potion, supplement
+and currency images in `ShopIcons.luau` were made for this project. An image from the
+Toolbox or an outside artist still is not. Everything without uploaded art stays drawn
+in `Icons.luau`, which remains the default for interface glyphs.
+
+There is no mesh asset in the shipped game at all. The player's body — and, since it is
+the same system, a boss's — is generated at runtime by `BodyLoftBuilder`: one skinned
+`EditableMesh` lofted from numbers in `BodyLoftConfig`, with no uploaded geometry
+anywhere. Nothing here is anyone else's work because nothing here is authored art.
+
+`BodyMeshConfig`/`BodyMeshBuilder` describe an earlier attempt that cut an AI-generated
+sculpt into fourteen R15 parts. It is **disabled** (`_BodyMeshController`, underscore) and
+cannot be revived as written: a Play client allows only seven or eight `EditableMesh`
+instances at once, so fourteen pieces can never render. Read its header before reaching
+for it. Should a mesh ever be uploaded, the rule is unchanged — ours is allowed because
+it is ours, not because meshes in general are.
 
 
 ## Git

@@ -49,12 +49,38 @@ export type JointMotion = {
 	-- Where in the cycle this joint starts, 0-1. 0.5 puts a limb in opposition,
 	-- which is what makes alternating curls and a running stride read correctly.
 	Phase: number?,
+	-- A third key, halfway through the joint's travel by default. Two states can
+	-- only ever describe a straight line between them, so a bar path that should
+	-- arc — around the chest on a press, in toward the shoulders on a curl — has
+	-- to be faked by compromising both ends. Mid is the point the joint actually
+	-- passes through; MidAt moves it earlier or later in the stroke.
+	Mid: Vector3?,
+	MidAt: number?,
+	MidOffset: Vector3?,
+	-- Shifts this joint's clock against the pose's, in cycles. Small negative
+	-- values make a joint lead and positive ones make it follow, which is the
+	-- cheapest source of overlapping action available: without it every joint in
+	-- the body starts and stops on the same frame, and a body that moves as one
+	-- rigid piece is the single clearest tell that an animation was generated.
+	-- Unlike Phase this is meant to be tiny — 0.02-0.06, not half a cycle.
+	Lead: number?,
 }
 
 export type Pose = {
 	Id: string,
 	-- Full out-and-back cycles per rep.
 	Cycles: number,
+	-- Strength reps briefly settle at both turnarounds. Continuous motions such as
+	-- ropes and stairs keep flowing through them instead.
+	-- Snapped holds near both extremes and crosses fast between them; see
+	-- PosePlayback.AlphaAt. It is what the gait uses, and nothing in this file does.
+	MotionStyle: ("Controlled" | "Continuous" | "Snapped")?,
+	-- The four beats of a Controlled rep as fractions of the cycle: how long the
+	-- lift takes, the squeeze at the top, the eccentric back down, and the settle
+	-- at the bottom. They are normalised, so they need not sum to 1. Omitted, a
+	-- pose gets PosePlayback.DEFAULT_TEMPO. A deadlift and a curl are not the same
+	-- tempo, and before this they were.
+	Tempo: { Lift: number, Squeeze: number, Lower: number, Settle: number }?,
 	Joints: { JointMotion },
 }
 
@@ -68,19 +94,38 @@ local poses: { Pose } = {
 		Id = "BenchPress",
 		Cycles = 1,
 		Joints = {
-			-- The bar is a fixed prop, so the bottom of the stroke is deliberately
-			-- shallow: a full bench-press range of motion drops the hands far enough
-			-- below it to read as letting go rather than lowering the weight.
-			{ Joint = "RightShoulder", Rest = deg(66, 0, 26), Peak = deg(88, 0, 8) },
-			{ Joint = "LeftShoulder", Rest = deg(66, 0, -26), Peak = deg(88, 0, -8) },
-			{ Joint = "RightElbow", Rest = deg(66, 0, 0), Peak = deg(5, 0, 0) },
-			{ Joint = "LeftElbow", Rest = deg(66, 0, 0), Peak = deg(5, 0, 0) },
-			{ Joint = "RightHip", Rest = deg(-50, 0, 8), Peak = deg(-50, 0, 8) },
-			{ Joint = "LeftHip", Rest = deg(-50, 0, -8), Peak = deg(-50, 0, -8) },
-			{ Joint = "RightKnee", Rest = deg(-55, 0, 0), Peak = deg(-55, 0, 0) },
-			{ Joint = "LeftKnee", Rest = deg(-55, 0, 0), Peak = deg(-55, 0, 0) },
-			{ Joint = "Waist", Rest = deg(-6, 0, 0), Peak = deg(-6, 0, 0) },
-			{ Joint = "Neck", Rest = deg(12, 0, 0), Peak = deg(12, 0, 0) },
+			-- The torso is completely braced against the pad. Nearly all visible travel
+			-- comes from elbow extension, so the carried bar moves perpendicular to the
+			-- chest instead of the avatar folding around it.
+			--
+			-- Two things were making this read as a bar swinging rather than a bar being
+			-- pressed, both measured on the rig by tracking the hand midpoint in the
+			-- torso's own frame (chest faces local -Z, the head/foot axis is local Y):
+			--
+			--   old  sh 68->86 / el 88->4 : travel 0.69, of which 0.43 was Y
+			--   new  sh -20->85 / el 145->5 : travel 0.81, of which 0.02 was Y
+			--
+			-- The old numbers spent 62% of the motion sliding the hands toward the head
+			-- instead of away from the chest, so the bar tracked a path about 39 degrees
+			-- off perpendicular — it visibly tilted through an arc rather than rising.
+			-- Starting the shoulder *behind* the chest and taking the elbow through a
+			-- much larger fold sends the hands almost straight up off the sternum.
+			--
+			-- Shoulder Z is also held constant now. Narrowing it through the press (it
+			-- used to run 24 -> 8) walks the hands together on the way up, and the line
+			-- joining them is exactly what orients the barbell, so a grip that changes
+			-- width mid-rep is a bar that rolls. Grip width is set before the lift.
+			{ Joint = "Root", Rest = deg(0, 0, 0), Peak = deg(0, 0, 0) },
+			{ Joint = "RightShoulder", Rest = deg(-20, 0, 20), Peak = deg(85, 0, 20) },
+			{ Joint = "LeftShoulder", Rest = deg(-20, 0, -20), Peak = deg(85, 0, -20) },
+			{ Joint = "RightElbow", Rest = deg(145, 0, 0), Peak = deg(5, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(145, 0, 0), Peak = deg(5, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(-42, 0, 8), Peak = deg(-42, 0, 8) },
+			{ Joint = "LeftHip", Rest = deg(-42, 0, -8), Peak = deg(-42, 0, -8) },
+			{ Joint = "RightKnee", Rest = deg(-68, 0, 0), Peak = deg(-68, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-68, 0, 0), Peak = deg(-68, 0, 0) },
+			{ Joint = "Waist", Rest = deg(0, 0, 0), Peak = deg(0, 0, 0) },
+			{ Joint = "Neck", Rest = deg(8, 0, 0), Peak = deg(8, 0, 0) },
 		},
 	},
 	{
@@ -128,10 +173,12 @@ local poses: { Pose } = {
 		Joints = {
 			{ Joint = "Waist", Rest = deg(-10, 0, 0), Peak = deg(55, 0, 0) },
 			{ Joint = "Neck", Rest = deg(0, 0, 0), Peak = deg(18, 0, 0) },
-			{ Joint = "RightShoulder", Rest = deg(120, 0, 35), Peak = deg(120, 0, 35) },
-			{ Joint = "LeftShoulder", Rest = deg(120, 0, -35), Peak = deg(120, 0, -35) },
-			{ Joint = "RightElbow", Rest = deg(120, 0, 0), Peak = deg(120, 0, 0) },
-			{ Joint = "LeftElbow", Rest = deg(120, 0, 0), Peak = deg(120, 0, 0) },
+			-- The load stays against the chest rather than being swung overhead. This
+			-- keeps the hands quiet and makes the trunk, not momentum, drive the rep.
+			{ Joint = "RightShoulder", Rest = deg(52, 0, 22), Peak = deg(52, 0, 22) },
+			{ Joint = "LeftShoulder", Rest = deg(52, 0, -22), Peak = deg(52, 0, -22) },
+			{ Joint = "RightElbow", Rest = deg(92, 0, 0), Peak = deg(92, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(92, 0, 0), Peak = deg(92, 0, 0) },
 			{ Joint = "RightHip", Rest = deg(20, 0, 8), Peak = deg(20, 0, 8) },
 			{ Joint = "LeftHip", Rest = deg(20, 0, -8), Peak = deg(20, 0, -8) },
 			{ Joint = "RightKnee", Rest = deg(-70, 0, 0), Peak = deg(-70, 0, 0) },
@@ -139,25 +186,28 @@ local poses: { Pose } = {
 		},
 	},
 	{
-		-- Treadmill stride. Knees trail their hip by a quarter cycle, and the arms
-		-- run half a cycle against the legs on the same side.
-		Id = "Run",
+		-- Goblet squat: the plate stays tight to the sternum while the hips travel
+		-- down and slightly back. Hip and knee flexion move together, the torso leans
+		-- only enough to keep the combined centre of mass over the mid-foot, and the
+		-- knees remain mirrored instead of becoming a running stride.
+		Id = "GobletSquat",
 		Cycles = 1,
 		Joints = {
-			{ Joint = "RightHip", Rest = deg(-30, 0, 4), Peak = deg(35, 0, 4) },
-			{ Joint = "LeftHip", Rest = deg(-30, 0, -4), Peak = deg(35, 0, -4), Phase = 0.5 },
-			{ Joint = "RightKnee", Rest = deg(-8, 0, 0), Peak = deg(-80, 0, 0), Phase = 0.25 },
-			{ Joint = "LeftKnee", Rest = deg(-8, 0, 0), Peak = deg(-80, 0, 0), Phase = 0.75 },
-			{ Joint = "RightShoulder", Rest = deg(32, 0, 8), Peak = deg(-30, 0, 8), Phase = 0.5 },
-			{ Joint = "LeftShoulder", Rest = deg(32, 0, -8), Peak = deg(-30, 0, -8) },
-			{ Joint = "RightElbow", Rest = deg(78, 0, 0), Peak = deg(78, 0, 0) },
-			{ Joint = "LeftElbow", Rest = deg(78, 0, 0), Peak = deg(78, 0, 0) },
+			{ Joint = "Waist", Rest = deg(0, 0, 0), Peak = deg(0, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(2, 0, 7), Peak = deg(42, 0, 9) },
+			{ Joint = "LeftHip", Rest = deg(2, 0, -7), Peak = deg(42, 0, -9) },
+			{ Joint = "RightKnee", Rest = deg(-3, 0, 0), Peak = deg(-68, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-3, 0, 0), Peak = deg(-68, 0, 0) },
+			{ Joint = "RightShoulder", Rest = deg(48, 0, 24), Peak = deg(48, 0, 24) },
+			{ Joint = "LeftShoulder", Rest = deg(48, 0, -24), Peak = deg(48, 0, -24) },
+			{ Joint = "RightElbow", Rest = deg(102, 0, 0), Peak = deg(102, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(102, 0, 0), Peak = deg(102, 0, 0) },
 			{
 				Joint = "Root",
 				Rest = deg(0, 0, 0),
 				Peak = deg(0, 0, 0),
-				RestOffset = Vector3.new(0, -0.18, 0),
-				PeakOffset = Vector3.new(0, 0.18, 0),
+				RestOffset = Vector3.new(0, 0, 0),
+				PeakOffset = Vector3.new(0, -0.82, 0),
 			},
 		},
 	},
@@ -197,15 +247,21 @@ local poses: { Pose } = {
 		Id = "InclinePress",
 		Cycles = 1,
 		Joints = {
-			{ Joint = "RightShoulder", Rest = deg(55, 0, 24), Peak = deg(82, 0, 8) },
-			{ Joint = "LeftShoulder", Rest = deg(55, 0, -24), Peak = deg(82, 0, -8) },
-			{ Joint = "RightElbow", Rest = deg(75, 0, 0), Peak = deg(8, 0, 0) },
-			{ Joint = "LeftElbow", Rest = deg(75, 0, 0), Peak = deg(8, 0, 0) },
-			{ Joint = "Waist", Rest = deg(-5, 0, 0), Peak = deg(-2, 0, 0) },
-			{ Joint = "RightHip", Rest = deg(-45, 0, 8), Peak = deg(-42, 0, 8) },
-			{ Joint = "LeftHip", Rest = deg(-45, 0, -8), Peak = deg(-42, 0, -8) },
-			{ Joint = "RightKnee", Rest = deg(-60, 0, 0), Peak = deg(-60, 0, 0) },
-			{ Joint = "LeftKnee", Rest = deg(-60, 0, 0), Peak = deg(-60, 0, 0) },
+			{ Joint = "Root", Rest = deg(0, 0, 0), Peak = deg(0, 0, 0) },
+			-- Same correction as BenchPress, and for the same measured reason: press
+			-- from behind the chest through a deep elbow fold so the weights travel
+			-- perpendicular to it, and hold shoulder Z constant so the hands do not
+			-- converge on the way up.
+			{ Joint = "RightShoulder", Rest = deg(-18, 0, 22), Peak = deg(88, 0, 22) },
+			{ Joint = "LeftShoulder", Rest = deg(-18, 0, -22), Peak = deg(88, 0, -22) },
+			{ Joint = "RightElbow", Rest = deg(142, 0, 0), Peak = deg(4, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(142, 0, 0), Peak = deg(4, 0, 0) },
+			{ Joint = "Waist", Rest = deg(0, 0, 0), Peak = deg(0, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(-38, 0, 8), Peak = deg(-38, 0, 8) },
+			{ Joint = "LeftHip", Rest = deg(-38, 0, -8), Peak = deg(-38, 0, -8) },
+			{ Joint = "RightKnee", Rest = deg(-65, 0, 0), Peak = deg(-65, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-65, 0, 0), Peak = deg(-65, 0, 0) },
+			{ Joint = "Neck", Rest = deg(6, 0, 0), Peak = deg(6, 0, 0) },
 		},
 	},
 	{
@@ -214,13 +270,13 @@ local poses: { Pose } = {
 		Id = "PecDeck",
 		Cycles = 1,
 		Joints = {
-			{ Joint = "RightShoulder", Rest = deg(20, 0, 78), Peak = deg(70, 0, 12) },
-			{ Joint = "LeftShoulder", Rest = deg(20, 0, -78), Peak = deg(70, 0, -12) },
-			{ Joint = "RightElbow", Rest = deg(85, 0, 0), Peak = deg(78, 0, 0) },
-			{ Joint = "LeftElbow", Rest = deg(85, 0, 0), Peak = deg(78, 0, 0) },
-			{ Joint = "Waist", Rest = deg(-4, 0, 0), Peak = deg(2, 0, 0) },
-			{ Joint = "RightHip", Rest = deg(72, 0, 7), Peak = deg(70, 0, 7) },
-			{ Joint = "LeftHip", Rest = deg(72, 0, -7), Peak = deg(70, 0, -7) },
+			{ Joint = "RightShoulder", Rest = deg(58, 0, 72), Peak = deg(82, -8, 16) },
+			{ Joint = "LeftShoulder", Rest = deg(58, 0, -72), Peak = deg(82, 8, -16) },
+			{ Joint = "RightElbow", Rest = deg(76, 0, 0), Peak = deg(64, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(76, 0, 0), Peak = deg(64, 0, 0) },
+			{ Joint = "Waist", Rest = deg(-3, 0, 0), Peak = deg(0, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(70, 0, 7), Peak = deg(70, 0, 7) },
+			{ Joint = "LeftHip", Rest = deg(70, 0, -7), Peak = deg(70, 0, -7) },
 			{ Joint = "RightKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
 			{ Joint = "LeftKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
 		},
@@ -288,6 +344,7 @@ local poses: { Pose } = {
 		-- stays visible on rigs that do not expose a separate waist joint.
 		Id = "TorsoTwist",
 		Cycles = 1,
+		MotionStyle = "Continuous",
 		Joints = {
 			{ Joint = "Root", Rest = deg(0, -12, 0), Peak = deg(0, 12, 0) },
 			{ Joint = "Waist", Rest = deg(0, -35, 0), Peak = deg(0, 35, 0) },
@@ -306,23 +363,49 @@ local poses: { Pose } = {
 		-- hip and knee flexion keeps the movement compact inside the rack.
 		Id = "SquatRack",
 		Cycles = 1,
+		-- Read against this pose's direction: Rest is standing and Peak is the hole,
+		-- so Lift is the descent and Lower is the drive out of it. The ascent gets
+		-- the longest beat because that is the half a squat grinds through.
+		Tempo = { Lift = 0.34, Squeeze = 0.06, Lower = 0.52, Settle = 0.08 },
 		Joints = {
 			{
 				Joint = "Root",
 				Rest = deg(0, 0, 0),
-				Peak = deg(8, 0, 0),
+				Peak = deg(0, 0, 0),
 				RestOffset = Vector3.new(0, 0, 0),
-				PeakOffset = Vector3.new(0, -1.4, 0),
+				-- How deep the body may drop is not a free choice: it is exactly how
+				-- far the folded leg lifts the feet, or they leave the floor (too
+				-- shallow) or sink through it (too deep). Measured on the rig by
+				-- holding the leg angles and reading the sole height against a
+				-- straight-legged reference:
+				--
+				--   hip  42, knee  -68  ->  0.303   (what this pose used to hold)
+				--   hip  78, knee  -90  ->  0.670
+				--   hip 110, knee -125  ->  1.133
+				--
+				-- The old pose paired the first of those with a 0.82 drop, so it drove
+				-- the feet half a stud into the platform every rep and still only read
+				-- as a dip. Going to a genuinely deep fold buys 1.13 studs of honest
+				-- travel with the soles staying exactly on the floor.
+				PeakOffset = Vector3.new(0, -1.13, 0),
 			},
-			{ Joint = "RightShoulder", Rest = deg(-8, 0, 58), Peak = deg(-2, 0, 54) },
-			{ Joint = "LeftShoulder", Rest = deg(-8, 0, -58), Peak = deg(-2, 0, -54) },
+			-- The bar on the back settles a beat behind the legs, same reasoning as
+			-- the deadlift's waist.
+			{ Joint = "RightShoulder", Rest = deg(-8, 0, 58), Peak = deg(-2, 0, 54), Lead = 0.02 },
+			{ Joint = "LeftShoulder", Rest = deg(-8, 0, -58), Peak = deg(-2, 0, -54), Lead = 0.02 },
 			{ Joint = "RightElbow", Rest = deg(95, 0, 0), Peak = deg(100, 0, 0) },
 			{ Joint = "LeftElbow", Rest = deg(95, 0, 0), Peak = deg(100, 0, 0) },
-			{ Joint = "Waist", Rest = deg(0, 0, 0), Peak = deg(18, 0, 0) },
-			{ Joint = "RightHip", Rest = deg(0, 0, 6), Peak = deg(65, 0, 8) },
-			{ Joint = "LeftHip", Rest = deg(0, 0, -6), Peak = deg(65, 0, -8) },
-			{ Joint = "RightKnee", Rest = deg(-5, 0, 0), Peak = deg(-90, 0, 0) },
-			{ Joint = "LeftKnee", Rest = deg(-5, 0, 0), Peak = deg(-90, 0, 0) },
+			{ Joint = "Waist", Rest = deg(0, 0, 0), Peak = deg(0, 0, 0) },
+			{ Joint = "RightHip", Rest = deg(0, 0, 7), Peak = deg(110, 0, 9) },
+			{ Joint = "LeftHip", Rest = deg(0, 0, -7), Peak = deg(110, 0, -9) },
+			{ Joint = "RightKnee", Rest = deg(-3, 0, 0), Peak = deg(-125, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-3, 0, 0), Peak = deg(-125, 0, 0) },
+			-- The shin finishes behind vertical at that fold, so the foot has to come
+			-- forward to stay flat on the platform. Without an ankle the depth above
+			-- would stand the avatar on its heels, which is the reason this squat was
+			-- kept shallow before.
+			{ Joint = "RightAnkle", Rest = deg(0, 0, 0), Peak = deg(15, 0, 0) },
+			{ Joint = "LeftAnkle", Rest = deg(0, 0, 0), Peak = deg(15, 0, 0) },
 		},
 	},
 	{
@@ -378,8 +461,12 @@ local poses: { Pose } = {
 			{ Joint = "RightElbow", Rest = deg(28, 0, 0), Peak = deg(18, 0, 0) },
 			{ Joint = "LeftElbow", Rest = deg(28, 0, 0), Peak = deg(18, 0, 0) },
 			{ Joint = "Waist", Rest = deg(-8, 0, 0), Peak = deg(-14, 0, 0) },
+			-- Both hips brace the same way. The left used to read +8 on X against the
+			-- right's -8, so one leg stood forward and the other back for no reason —
+			-- the Z values mirrored correctly and the X did not, which is the signature
+			-- of a sign typo rather than a stance.
 			{ Joint = "RightHip", Rest = deg(-8, 0, 8), Peak = deg(-8, 0, 8) },
-			{ Joint = "LeftHip", Rest = deg(8, 0, -8), Peak = deg(8, 0, -8) },
+			{ Joint = "LeftHip", Rest = deg(-8, 0, -8), Peak = deg(-8, 0, -8) },
 		},
 	},
 	{
@@ -404,10 +491,15 @@ local poses: { Pose } = {
 		Id = "DeclinePress",
 		Cycles = 1,
 		Joints = {
-			{ Joint = "RightShoulder", Rest = deg(52, 0, 35), Peak = deg(82, 0, 10) },
-			{ Joint = "LeftShoulder", Rest = deg(52, 0, -35), Peak = deg(82, 0, -10) },
-			{ Joint = "RightElbow", Rest = deg(82, 0, 0), Peak = deg(6, 0, 0) },
-			{ Joint = "LeftElbow", Rest = deg(82, 0, 0), Peak = deg(6, 0, 0) },
+			-- Constant shoulder Z and a deep elbow fold, the same correction BenchPress
+			-- and InclinePress needed and for the same reason: running Z from 35 to 10
+			-- walks the hands together as the bar rises, and the line between the hands
+			-- is what orients the barbell, so the bar tracked a diagonal instead of a
+			-- press.
+			{ Joint = "RightShoulder", Rest = deg(-16, 0, 24), Peak = deg(86, 0, 24) },
+			{ Joint = "LeftShoulder", Rest = deg(-16, 0, -24), Peak = deg(86, 0, -24) },
+			{ Joint = "RightElbow", Rest = deg(140, 0, 0), Peak = deg(6, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(140, 0, 0), Peak = deg(6, 0, 0) },
 			{ Joint = "Waist", Rest = deg(8, 0, 0), Peak = deg(5, 0, 0) },
 			{ Joint = "RightHip", Rest = deg(-58, 0, 8), Peak = deg(-58, 0, 8) },
 			{ Joint = "LeftHip", Rest = deg(-58, 0, -8), Peak = deg(-58, 0, -8) },
@@ -433,6 +525,15 @@ local poses: { Pose } = {
 			{ Joint = "RightElbow", Rest = deg(8, 0, 0), Peak = deg(118, 0, 0) },
 			{ Joint = "LeftElbow", Rest = deg(8, 0, 0), Peak = deg(118, 0, 0) },
 			{ Joint = "Waist", Rest = deg(-12, 0, 0), Peak = deg(-8, 0, 0) },
+			-- Actually sit. This pose drove no hip or knee at all, so the lifter stood
+			-- bolt upright at seat height and its straight legs ran down through the
+			-- seat and the base — read as the whole lower body being swallowed by the
+			-- bench. Same fold as every other seated rig, which also carries the thighs
+			-- forward far enough to clear the pad's front edge.
+			{ Joint = "RightHip", Rest = deg(70, 0, 7), Peak = deg(70, 0, 7) },
+			{ Joint = "LeftHip", Rest = deg(70, 0, -7), Peak = deg(70, 0, -7) },
+			{ Joint = "RightKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-82, 0, 0), Peak = deg(-82, 0, 0) },
 		},
 	},
 	{
@@ -449,7 +550,8 @@ local poses: { Pose } = {
 	},
 	{
 		Id = "BattleRopes",
-		Cycles = 2,
+		Cycles = 1,
+		MotionStyle = "Continuous",
 		Joints = {
 			{ Joint = "RightShoulder", Rest = deg(-28, 0, 16), Peak = deg(58, 0, 12) },
 			{ Joint = "LeftShoulder", Rest = deg(-28, 0, -16), Peak = deg(58, 0, -12), Phase = 0.5 },
@@ -463,28 +565,59 @@ local poses: { Pose } = {
 	{
 		Id = "Deadlift",
 		Cycles = 1,
+		-- A deadlift is not a curl. The pull is the slow part, the bar comes back
+		-- down faster than it went up, and the rep genuinely ends — the plates rest
+		-- on the floor before the next one starts, which is what the long settle is.
+		Tempo = { Lift = 0.44, Squeeze = 0.10, Lower = 0.30, Settle = 0.16 },
 		Joints = {
 			{
 				Joint = "Root",
-				Rest = deg(18, 0, 0),
+				Rest = deg(0, 0, 0),
 				Peak = deg(0, 0, 0),
-				RestOffset = Vector3.new(0, -0.9, 0),
-				PeakOffset = Vector3.new(0, 0.15, 0),
+				-- Rest is the floor and Peak is lockout, so the drop lives on Rest, and
+				-- it is sized the same measured way as SquatRack: hip 65 / knee -70
+				-- lifts the soles 0.47 against a straight leg, so the root goes down by
+				-- exactly that and the feet stay on the platform.
+				RestOffset = Vector3.new(0, -0.47, 0),
+				PeakOffset = Vector3.new(0, 0, 0),
 			},
-			{ Joint = "Waist", Rest = deg(45, 0, 0), Peak = deg(-4, 0, 0) },
-			{ Joint = "RightHip", Rest = deg(62, 0, 8), Peak = deg(0, 0, 6) },
-			{ Joint = "LeftHip", Rest = deg(62, 0, -8), Peak = deg(0, 0, -6) },
-			{ Joint = "RightKnee", Rest = deg(-70, 0, 0), Peak = deg(-5, 0, 0) },
-			{ Joint = "LeftKnee", Rest = deg(-70, 0, 0), Peak = deg(-5, 0, 0) },
-			{ Joint = "RightShoulder", Rest = deg(25, 0, 18), Peak = deg(-5, 0, 12) },
-			{ Joint = "LeftShoulder", Rest = deg(25, 0, -18), Peak = deg(-5, 0, -12) },
+			-- The hinge is the Waist, not the hips. Rotating Root would pitch the whole
+			-- avatar including the legs — that is what a T-bar row leans into, but a
+			-- deadlifter's shins stay under them. Waist pitches the trunk over legs
+			-- that are folding underneath it, which is the actual movement, and the
+			-- earlier "rubbery" note came from curling the trunk with nothing else
+			-- moving rather than from using this joint at all.
+			--
+			-- Between the trunk pitch and the leg fold the bar now travels roughly
+			-- 2.1 studs, against the 0.7 it had when the hinge was 34 degrees of hip.
+			-- The trunk finishes a hair after the legs do. Everything arriving on the
+			-- same frame is what made the lift look weightless; letting the heaviest
+			-- segment lag slightly is most of the difference between lifting a loaded
+			-- bar and miming one.
+			{ Joint = "Waist", Rest = deg(55, 0, 0), Peak = deg(0, 0, 0), Lead = 0.04 },
+			{ Joint = "RightHip", Rest = deg(65, 0, 8), Peak = deg(0, 0, 6) },
+			{ Joint = "LeftHip", Rest = deg(65, 0, -8), Peak = deg(0, 0, -6) },
+			{ Joint = "RightKnee", Rest = deg(-70, 0, 0), Peak = deg(-3, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-70, 0, 0), Peak = deg(-3, 0, 0) },
+			-- Shin sits 5 degrees behind vertical at the floor; the foot matches it.
+			{ Joint = "RightAnkle", Rest = deg(5, 0, 0), Peak = deg(0, 0, 0) },
+			{ Joint = "LeftAnkle", Rest = deg(5, 0, 0), Peak = deg(0, 0, 0) },
+			-- Shoulder X is measured against a trunk already pitched 55 forward, so
+			-- -48 hangs the arms all but plumb at the floor. Straight arms throughout:
+			-- a deadlift is not a row, and bending the elbows under load would also
+			-- shorten the bar's travel back toward the arc it used to have.
+			{ Joint = "RightShoulder", Rest = deg(-48, 0, 13), Peak = deg(0, 0, 12), Lead = 0.03 },
+			{ Joint = "LeftShoulder", Rest = deg(-48, 0, -13), Peak = deg(0, 0, -12), Lead = 0.03 },
+			{ Joint = "RightElbow", Rest = deg(4, 0, 0), Peak = deg(4, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(4, 0, 0), Peak = deg(4, 0, 0) },
 		},
 	},
 	{
 		Id = "TBarRow",
 		Cycles = 1,
 		Joints = {
-			{ Joint = "Waist", Rest = deg(38, 0, 0), Peak = deg(30, 0, 0) },
+			{ Joint = "Root", Rest = deg(31, 0, 0), Peak = deg(31, 0, 0) },
+			{ Joint = "Waist", Rest = deg(5, 0, 0), Peak = deg(2, 0, 0) },
 			{ Joint = "RightShoulder", Rest = deg(50, 0, 12), Peak = deg(-12, 0, 20) },
 			{ Joint = "LeftShoulder", Rest = deg(50, 0, -12), Peak = deg(-12, 0, -20) },
 			{ Joint = "RightElbow", Rest = deg(8, 0, 0), Peak = deg(105, 0, 0) },
@@ -497,10 +630,12 @@ local poses: { Pose } = {
 		Id = "BackExtension",
 		Cycles = 1,
 		Joints = {
-			{ Joint = "Root", Rest = deg(20, 0, 0), Peak = deg(-12, 0, 0) },
-			{ Joint = "Waist", Rest = deg(48, 0, 0), Peak = deg(-18, 0, 0) },
-			{ Joint = "RightShoulder", Rest = deg(105, 0, 30), Peak = deg(105, 0, 30) },
-			{ Joint = "LeftShoulder", Rest = deg(105, 0, -30), Peak = deg(105, 0, -30) },
+			{ Joint = "Root", Rest = deg(28, 0, 0), Peak = deg(-4, 0, 0) },
+			{ Joint = "Waist", Rest = deg(7, 0, 0), Peak = deg(0, 0, 0) },
+			{ Joint = "RightShoulder", Rest = deg(52, 0, 22), Peak = deg(52, 0, 22) },
+			{ Joint = "LeftShoulder", Rest = deg(52, 0, -22), Peak = deg(52, 0, -22) },
+			{ Joint = "RightElbow", Rest = deg(92, 0, 0), Peak = deg(92, 0, 0) },
+			{ Joint = "LeftElbow", Rest = deg(92, 0, 0), Peak = deg(92, 0, 0) },
 			{ Joint = "RightHip", Rest = deg(15, 0, 8), Peak = deg(-8, 0, 8) },
 			{ Joint = "LeftHip", Rest = deg(15, 0, -8), Peak = deg(-8, 0, -8) },
 		},
@@ -508,6 +643,7 @@ local poses: { Pose } = {
 	{
 		Id = "RopeClimb",
 		Cycles = 1,
+		MotionStyle = "Continuous",
 		Joints = {
 			{
 				Joint = "Root",
@@ -516,8 +652,14 @@ local poses: { Pose } = {
 				RestOffset = Vector3.new(0, -0.75, 0),
 				PeakOffset = Vector3.new(0, 0.75, 0),
 			},
-			{ Joint = "RightShoulder", Rest = deg(0, 0, 138), Peak = deg(20, 0, 90) },
-			{ Joint = "LeftShoulder", Rest = deg(20, 0, -90), Peak = deg(0, 0, -138) },
+			-- Reaching up in front rather than out to the sides. Abduction on Z can
+			-- never bring a hand onto the centreline — the shoulder gives out at
+			-- about 150 degrees and the hands finished 1.4 studs off the rope —
+			-- whereas flexion on X puts them overhead where the rope now hangs. The
+			-- negative Z adducts each arm across the body so both hands close on the
+			-- same rope instead of straddling it a stud and a half either side.
+			{ Joint = "RightShoulder", Rest = deg(145, 0, -18), Peak = deg(95, 0, -18) },
+			{ Joint = "LeftShoulder", Rest = deg(95, 0, 18), Peak = deg(145, 0, 18) },
 			{ Joint = "RightElbow", Rest = deg(12, 0, 0), Peak = deg(100, 0, 0) },
 			{ Joint = "LeftElbow", Rest = deg(100, 0, 0), Peak = deg(12, 0, 0) },
 			{ Joint = "RightHip", Rest = deg(5, 0, 8), Peak = deg(55, 0, 8) },
@@ -527,6 +669,7 @@ local poses: { Pose } = {
 	{
 		Id = "Plank",
 		Cycles = 1,
+		MotionStyle = "Continuous",
 		Joints = {
 			{
 				Joint = "Root",
@@ -546,14 +689,19 @@ local poses: { Pose } = {
 		Id = "CableCrunch",
 		Cycles = 1,
 		Joints = {
-			{ Joint = "Waist", Rest = deg(-8, 0, 0), Peak = deg(62, 0, 0) },
-			{ Joint = "Neck", Rest = deg(-5, 0, 0), Peak = deg(22, 0, 0) },
+			{ Joint = "Waist", Rest = deg(-6, 0, 0), Peak = deg(44, 0, 0) },
+			{ Joint = "Neck", Rest = deg(-4, 0, 0), Peak = deg(12, 0, 0) },
 			{ Joint = "RightShoulder", Rest = deg(0, 0, 125), Peak = deg(52, 0, 72) },
 			{ Joint = "LeftShoulder", Rest = deg(0, 0, -125), Peak = deg(52, 0, -72) },
 			{ Joint = "RightElbow", Rest = deg(90, 0, 0), Peak = deg(105, 0, 0) },
 			{ Joint = "LeftElbow", Rest = deg(90, 0, 0), Peak = deg(105, 0, 0) },
-			{ Joint = "RightHip", Rest = deg(45, 0, 8), Peak = deg(62, 0, 8) },
-			{ Joint = "LeftHip", Rest = deg(45, 0, -8), Peak = deg(62, 0, -8) },
+			-- Kneeling. The machine has a knee pad and the exercise is done on it,
+			-- but this pose used to leave the legs straight, which stood the lifter
+			-- up with their feet through the floor and read as a standing crunch.
+			{ Joint = "RightHip", Rest = deg(6, 0, 8), Peak = deg(16, 0, 8) },
+			{ Joint = "LeftHip", Rest = deg(6, 0, -8), Peak = deg(16, 0, -8) },
+			{ Joint = "RightKnee", Rest = deg(-95, 0, 0), Peak = deg(-95, 0, 0) },
+			{ Joint = "LeftKnee", Rest = deg(-95, 0, 0), Peak = deg(-95, 0, 0) },
 		},
 	},
 	{
@@ -638,6 +786,7 @@ local poses: { Pose } = {
 	{
 		Id = "StairClimber",
 		Cycles = 1,
+		MotionStyle = "Continuous",
 		Joints = {
 			{
 				Joint = "Root",
@@ -699,6 +848,35 @@ end
 
 function PoseConfig.Get(poseId: string): Pose?
 	return byId[poseId]
+end
+
+function PoseConfig.RunSelfTest(): { string }
+	local failures: { string } = {}
+	local function check(condition: boolean, message: string)
+		if not condition then
+			table.insert(failures, message)
+		end
+	end
+
+	check(#poses == 35, "all 35 equipment poses are defined")
+	for _, pose in poses do
+		check(pose.Cycles == 1, `{pose.Id} has exactly one visual cycle per stat popup`)
+		check(#pose.Joints > 0, `{pose.Id} drives at least one joint`)
+		check(
+			pose.MotionStyle == nil or pose.MotionStyle == "Controlled" or pose.MotionStyle == "Continuous",
+			`{pose.Id} uses a supported motion style`
+		)
+	end
+	for _, id in { "BenchPress", "InclinePress", "PecDeck", "GobletSquat", "SquatRack", "Deadlift" } do
+		local pose = byId[id]
+		check(pose ~= nil and pose.MotionStyle ~= "Continuous", `{id} uses controlled strength timing`)
+	end
+	for _, id in { "BattleRopes", "RopeClimb", "StairClimber" } do
+		local pose = byId[id]
+		check(pose ~= nil and pose.MotionStyle == "Continuous", `{id} stays continuous`)
+	end
+
+	return failures
 end
 
 return PoseConfig

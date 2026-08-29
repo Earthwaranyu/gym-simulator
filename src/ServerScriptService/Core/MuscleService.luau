@@ -18,8 +18,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
 
 local FOLDER_NAME = "MuscleScales"
+local PROGRESS_FOLDER_NAME = "MuscleProgress"
 -- Stats change several times a second while training; the visual does not need to.
 local REFRESH_SECONDS = 0.5
 
@@ -29,9 +31,11 @@ local MuscleService = {
 }
 
 local StatService: any = nil
+local DataService: any = nil
 
 function MuscleService:Init()
 	StatService = Loader.Get("StatService")
+	DataService = Loader.Get("DataService")
 end
 
 local function getFolder(character: Model): Folder
@@ -68,12 +72,21 @@ end
 ]]
 function MuscleService:ComputeScales(player: Player): { [string]: number }
 	local scales: { [string]: number } = {}
+	local data = DataService:GetData(player)
+	if data == nil then
+		return scales
+	end
+
+	local visualGoal = MuscleClassConfig.VisualStatGoal(data.MuscleClassLevel)
 
 	for _, definition in StatConfig.List do
 		local statValue = StatService:GetStat(player, definition.Id)
+		local baseline = data.PhysiqueStatBaselines[definition.Id] or 0
+		local earned = math.max(0, statValue - baseline)
+		local progress = math.clamp(earned / visualGoal, 0, 1)
 
 		for partName, weight in definition.BodyScales do
-			local scale = Formulas.MuscleScale(statValue, weight)
+			local scale = Formulas.MuscleScaleForProgress(progress, weight)
 			if scales[partName] == nil or scale > scales[partName] then
 				scales[partName] = scale
 			end
@@ -81,6 +94,25 @@ function MuscleService:ComputeScales(player: Player): { [string]: number }
 	end
 
 	return scales
+end
+
+-- Per-stat progress is replicated separately from per-part scale. Chest and Back both
+-- shape UpperTorso, so a part scale cannot say which one was trained; definition
+-- overlays need the stat identity to draw pecs and lats independently.
+function MuscleService:ComputeProgress(player: Player): { [string]: number }
+	local progress: { [string]: number } = {}
+	local data = DataService:GetData(player)
+	if data == nil then
+		return progress
+	end
+
+	local visualGoal = MuscleClassConfig.VisualStatGoal(data.MuscleClassLevel)
+	for _, definition in StatConfig.List do
+		local current = StatService:GetStat(player, definition.Id)
+		local baseline = data.PhysiqueStatBaselines[definition.Id] or 0
+		progress[definition.Id] = math.clamp(math.max(0, current - baseline) / visualGoal, 0, 1)
+	end
+	return progress
 end
 
 --[[
@@ -95,11 +127,28 @@ function MuscleService:Refresh(player: Player)
 	end
 
 	local folder = getFolder(character)
+	local existingProgress = character:FindFirstChild(PROGRESS_FOLDER_NAME)
+	local progressFolder: Folder
+	if existingProgress ~= nil and existingProgress:IsA("Folder") then
+		progressFolder = existingProgress
+	else
+		local created = Instance.new("Folder")
+		created.Name = PROGRESS_FOLDER_NAME
+		created.Parent = character
+		progressFolder = created
+	end
 
 	for partName, scale in self:ComputeScales(player) do
 		local value = getValue(folder, partName)
 		if math.abs(value.Value - scale) > 0.001 then
 			value.Value = scale
+		end
+	end
+
+	for statId, progress in self:ComputeProgress(player) do
+		local value = getValue(progressFolder, statId)
+		if math.abs(value.Value - progress) > 0.001 then
+			value.Value = progress
 		end
 	end
 end

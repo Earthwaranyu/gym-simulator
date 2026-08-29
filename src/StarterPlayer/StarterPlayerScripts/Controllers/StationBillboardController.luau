@@ -9,6 +9,14 @@
 
 	Built client-side per tagged station, so they cost the server nothing and appear
 	for machines added or streamed in later.
+
+	The sign is a fixed size and stays one. It was briefly sized against the camera so
+	that it would read large from across the gym and shrink as you walked in, and that
+	is worth writing down as a dead end: holding a billboard to a chosen share of the
+	screen means fighting perspective every frame, and the result read as wrong even
+	when the numbers were right — a sign that grows as you back away does not behave
+	like anything else in the world, so the eye files it as a bug. Perspective alone
+	does the job, and a machine across the room is found by its glyph and its colour.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -19,11 +27,31 @@ local UI = require(ReplicatedStorage.Modules.UI)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local StatConfig = require(ReplicatedStorage.Modules.StatConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local TokenMultiplierConfig = require(ReplicatedStorage.Modules.TokenMultiplierConfig)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
+local Icons = require(ReplicatedStorage.Modules.Icons)
 
 local REFRESH_SECONDS = 1
 -- How far above the machine the label floats.
 local HEADROOM = 2.5
+local AREA_INFO_ANCHOR = "AreaInfoAnchor"
+-- The muscle glyph above the text. Sized to read from the far side of a court, which
+-- is further than the words ever do.
+local ICON_SIZE = 52
+-- Amber, matching the reference's requirement line. Bright enough to survive the black
+-- outline at a distance, and distinct from every stat colour so the gate never reads
+-- as part of the muscle's identity.
+local REQUIREMENT_COLOR = Color3.fromRGB(255, 181, 49)
+
+-- The sign, at a fixed size. It gets smaller with distance the way everything else in
+-- the world does, and nothing in here changes it per frame.
+local SIGN_WIDTH = 340
+local SIGN_HEIGHT = 212
+-- What is left for the text once the glyph has taken its share off the top.
+local BODY_HEIGHT = SIGN_HEIGHT - ICON_SIZE
+-- Further than the old 140, so a machine on the far side of the gym still announces
+-- itself; past this it is a handful of pixels and not worth drawing.
+local SIGN_MAX_DISTANCE = 300
 
 local StationBillboardController = {
 	Name = "StationBillboardController",
@@ -34,31 +62,48 @@ local ProfileController: any = nil
 
 type Entry = {
 	station: Instance,
+	occupancySource: Instance,
 	definition: EquipmentConfig.EquipmentDefinition,
-	label: TextLabel,
-	warningFrame: Frame,
-	warningText: TextLabel,
+	-- One label per line rather than one rich-text block, so each line owns its own
+	-- size. A single block can only be one size, and the reference sign works because
+	-- the machine's name is twice the height of the caption above the requirement.
+	multiplier: TextLabel,
+	name: TextLabel,
+	requiresCaption: TextLabel,
+	requirement: TextLabel,
+	rate: TextLabel,
+	status: TextLabel,
 	gui: BillboardGui,
 }
 
-local billboards: { [Instance]: Entry } = {}
+--[[
+	Every line on the sign is outlined text on nothing.
+
+	It used to sit on a rounded translucent panel, and against a bright sky that panel
+	was a cream slab that hid the machine behind it and washed out its own text. The
+	reference has no panel at all: the words float in the world and stay readable over
+	anything because each glyph carries a hard black outline. So the outline is what
+	does the work here, and there is no background to fight the world for contrast.
+
+]]
+local function signLabel(name: string, parent: GuiObject, order: number, size: number): TextLabel
+	local label = UI.Label(name, parent)
+	label.Size = UDim2.new(1, 0, 0, size + 6)
+	label.LayoutOrder = order
+	label.BackgroundTransparency = 1
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.TextSize = size
+	label.Font = UI.Font.Heading
+	label.TextStrokeColor3 = Color3.new(0, 0, 0)
+	label.TextStrokeTransparency = 0
+	return label
+end
+
+local billboards: { [Instance]: { Entry } } = {}
 
 function StationBillboardController:Init()
 	ProfileController = Loader.Get("ProfileController")
-end
-
---[[
-	Where to float the label so it clears the machine rather than the one part it
-	happens to be adorning — a pull-up rig's Base is its top bar, a bench's is the
-	pad five studs lower.
-]]
-local function headroomOffset(station: Instance, adornee: BasePart): Vector3
-	if station:IsA("Model") then
-		local boundsCFrame, boundsSize = station:GetBoundingBox()
-		local top = boundsCFrame.Position.Y + boundsSize.Y / 2
-		return Vector3.new(0, (top - adornee.Position.Y) + HEADROOM, 0)
-	end
-	return Vector3.new(0, adornee.Size.Y / 2 + HEADROOM, 0)
 end
 
 function StationBillboardController:_bind(station: Instance)
@@ -72,161 +117,191 @@ function StationBillboardController:_bind(station: Instance)
 		return
 	end
 
-	local adornee = EquipmentConfig.GetBase(station)
-	if adornee == nil then
-		return
+	local entries: { Entry } = {}
+	-- One sign per station model. Courts hold a single machine now, so this loop is a
+	-- one-iteration formality kept because occupancy is still read per copy.
+	for _, copy in { station } do
+		local authoredAnchor = station:FindFirstChild(AREA_INFO_ANCHOR, true)
+		local adornee = if authoredAnchor ~= nil and authoredAnchor:IsA("BasePart")
+			then authoredAnchor
+			else EquipmentConfig.GetBase(station)
+		if adornee == nil then
+			continue
+		end
+
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "StationLabel"
+		gui.Adornee = adornee
+		gui.Size = UDim2.fromOffset(SIGN_WIDTH, SIGN_HEIGHT)
+		-- An authored anchor is already placed where the sign belongs; anything else has
+		-- to clear the machine's own bounding box.
+		gui.StudsOffsetWorldSpace = if adornee.Name == AREA_INFO_ANCHOR
+			then Vector3.zero
+			else UI.HeadroomOffset(copy, adornee, HEADROOM)
+		-- Half a sign height, which is the offset that parks the sign's bottom edge on the
+		-- anchor point rather than centring the sign over it.
+		gui.ExtentsOffsetWorldSpace = Vector3.new(0, 0.5, 0)
+		gui.AlwaysOnTop = true
+		gui.MaxDistance = SIGN_MAX_DISTANCE
+		gui.Parent = adornee
+
+		local container = Instance.new("Frame")
+		container.Name = "Container"
+		container.BackgroundTransparency = 1
+		container.Size = UDim2.fromScale(1, 1)
+		container.Parent = gui
+
+		-- The muscle glyph, centred over the sign. It is the part of the sign that reads
+		-- from across the map: the multiplier and the name need you close enough to read
+		-- text, the icon tells you which muscle this court is from any distance.
+		local statDefinition = StatConfig.Get(definition.StatId)
+		local statColor = if statDefinition ~= nil then statDefinition.Color else UI.Palette.Text
+		local iconHolder = Instance.new("Frame")
+		iconHolder.Name = "StatIcon"
+		iconHolder.AnchorPoint = Vector2.new(0.5, 0)
+		iconHolder.Position = UDim2.fromScale(0.5, 0)
+		-- Height-driven with the width following, so the glyph stays square on a sign
+		-- whose own shape is not.
+		iconHolder.Size = UDim2.fromOffset(ICON_SIZE, ICON_SIZE)
+		iconHolder.BackgroundTransparency = 1
+		iconHolder.Parent = container
+		if statDefinition ~= nil and Icons.Has(statDefinition.Icon) then
+			Icons.Draw(statDefinition.Icon, iconHolder, statColor, UI.Palette.Surface)
+		end
+
+		-- The lines below the glyph, stacked by a list layout so no line has to know
+		-- where the one above it ended. Hidden lines cost no height, so shedding detail
+		-- with distance also makes the sign physically smaller.
+		local body = Instance.new("Frame")
+		body.Name = "Body"
+		body.AnchorPoint = Vector2.new(0.5, 0)
+		body.Position = UDim2.new(0.5, 0, 0, ICON_SIZE)
+		body.Size = UDim2.new(1, 0, 0, BODY_HEIGHT)
+		body.BackgroundTransparency = 1
+		body.Parent = container
+
+		local layout = Instance.new("UIListLayout")
+		layout.FillDirection = Enum.FillDirection.Vertical
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Parent = body
+
+		local multiplier = signLabel("Multiplier", body, 1, 24)
+		local name = signLabel("Name", body, 2, 28)
+		local requiresCaption = signLabel("RequiresCaption", body, 3, 14)
+		local requirement = signLabel("Requirement", body, 4, 20)
+		local rate = signLabel("Rate", body, 5, 15)
+		local status = signLabel("Status", body, 6, 14)
+
+		table.insert(entries, {
+			station = station,
+			occupancySource = copy,
+			definition = definition,
+			multiplier = multiplier,
+			name = name,
+			requiresCaption = requiresCaption,
+			requirement = requirement,
+			rate = rate,
+			status = status,
+			gui = gui,
+		})
 	end
 
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "StationLabel"
-	gui.Adornee = adornee
-	gui.Size = UDim2.fromOffset(260, 105)
-	gui.StudsOffsetWorldSpace = headroomOffset(station, adornee)
-	gui.AlwaysOnTop = false
-	gui.MaxDistance = 80
-	gui.Parent = adornee
-
-	-- Container layout to hold warning circle on top and text panel below
-	local container = Instance.new("Frame")
-	container.Name = "Container"
-	container.BackgroundTransparency = 1
-	container.Size = UDim2.fromScale(1, 1)
-	container.Parent = gui
-
-	local warningFrame = Instance.new("Frame")
-	warningFrame.Name = "WarningBadge"
-	warningFrame.AnchorPoint = Vector2.new(0.5, 0)
-	warningFrame.Position = UDim2.fromScale(0.5, 0)
-	warningFrame.Size = UDim2.fromOffset(36, 36)
-	warningFrame.BackgroundColor3 = Color3.fromRGB(235, 75, 60)
-	warningFrame.BackgroundTransparency = 0.05
-	warningFrame.BorderSizePixel = 0
-	warningFrame.Visible = false
-	warningFrame.Parent = container
-
-	local warningCorner = Instance.new("UICorner")
-	warningCorner.CornerRadius = UDim.new(1, 0)
-	warningCorner.Parent = warningFrame
-
-	local warningStroke = Instance.new("UIStroke")
-	warningStroke.Color = Color3.fromRGB(255, 255, 255)
-	warningStroke.Thickness = 2
-	warningStroke.Parent = warningFrame
-
-	local warningText = UI.Label("ExclamationMark", warningFrame)
-	warningText.Size = UDim2.fromScale(1, 1)
-	warningText.Text = "!"
-	warningText.Font = UI.Font.Heading
-	warningText.TextSize = 24
-	warningText.TextColor3 = Color3.fromRGB(255, 255, 255)
-	warningText.TextXAlignment = Enum.TextXAlignment.Center
-	warningText.TextYAlignment = Enum.TextYAlignment.Center
-
-	local panel = UI.Panel("Body", container)
-	panel.AnchorPoint = Vector2.new(0.5, 1)
-	panel.Position = UDim2.fromScale(0.5, 1)
-	panel.Size = UDim2.new(1, 0, 1, -40)
-	panel.BackgroundTransparency = 0.2
-
-	local label = UI.Label("Text", panel)
-	label.Size = UDim2.fromScale(1, 1)
-	label.TextXAlignment = Enum.TextXAlignment.Center
-	label.TextSize = 13
-
-	billboards[station] = {
-		station = station,
-		definition = definition,
-		label = label,
-		warningFrame = warningFrame,
-		warningText = warningText,
-		gui = gui,
-	}
+	billboards[station] = entries
 end
 
 function StationBillboardController:_unbind(station: Instance)
-	local entry = billboards[station]
-	if entry ~= nil then
-		entry.gui:Destroy()
+	local entries = billboards[station]
+	if entries ~= nil then
+		for _, entry in entries do
+			entry.gui:Destroy()
+		end
 		billboards[station] = nil
 	end
 end
 
 --[[
-	The third line: how to get on, or why you cannot. Occupancy is read straight off
-	the attributes the server keeps on the station model.
+	The bottom line: how to get on, or why you cannot. Occupancy is read straight off
+	the attributes the server keeps on the station model. Returns the colour with the
+	text now that each line is its own label rather than a rich-text span.
 ]]
-local function statusLine(entry: Entry): string
-	local used = entry.station:GetAttribute(EquipmentConfig.OCCUPANCY_ATTRIBUTE)
-	local capacity = entry.station:GetAttribute(EquipmentConfig.CAPACITY_ATTRIBUTE)
+local function statusLine(entry: Entry): (string, Color3)
+	local used = entry.occupancySource:GetAttribute(EquipmentConfig.OCCUPANCY_ATTRIBUTE)
+	local capacity = entry.occupancySource:GetAttribute(EquipmentConfig.CAPACITY_ATTRIBUTE)
 
 	if type(used) == "number" and type(capacity) == "number" and capacity > 0 then
 		if used >= capacity then
-			return `<font color="#FF5C5C">In use — {used}/{capacity}</font>`
+			return `IN USE — {used}/{capacity}`, UI.Palette.Danger
 		end
-		if capacity > 1 then
-			return `<font color="#8A93A8">Hold E to {entry.definition.ActionText} — {capacity - used}/{capacity} free</font>`
-		end
+		return `HOLD E TO {string.upper(entry.definition.ActionText)}`, Color3.fromRGB(235, 238, 245)
 	end
 
-	return `<font color="#8A93A8">Hold E to {entry.definition.ActionText}</font>`
+	return `HOLD E TO {string.upper(entry.definition.ActionText)}`, Color3.fromRGB(235, 238, 245)
 end
 
 function StationBillboardController:_refresh()
 	local data = ProfileController:Get()
 
-	local power = 0
-	if data ~= nil then
-		power = Formulas.TotalPower(data.Stats)
-	end
+	for _, entries in billboards do
+		for _, entry in entries do
+			local definition = entry.definition
+			local statDefinition = StatConfig.Get(definition.StatId)
+			local statDisplayName = if statDefinition ~= nil
+				then statDefinition.DisplayName
+				else definition.StatId
+			local color = if statDefinition ~= nil then statDefinition.Color else UI.Palette.Text
 
-	for _, entry in billboards do
-		local definition = entry.definition
-		local statDefinition = StatConfig.Get(definition.StatId)
-		local statDisplayName = if statDefinition ~= nil
-			then statDefinition.DisplayName
-			else definition.StatId
-		local color = if statDefinition ~= nil then statDefinition.Color else UI.Palette.Text
+			local reqStatAttribute = entry.station:GetAttribute("RequiredStat")
+			local reqStat = if type(reqStatAttribute) == "number"
+				then reqStatAttribute
+				else definition.UnlockPower
+			local requiredStat = math.max(reqStat, definition.UnlockPower)
+			local relevantStat = if data ~= nil then (data.Stats[definition.StatId] or 0) else 0
 
-		local reqPowerAttribute = entry.station:GetAttribute("RequiredPower")
-		local reqPower = if type(reqPowerAttribute) == "number"
-			then reqPowerAttribute
-			else definition.UnlockPower
-		local requiredPower = math.max(reqPower, definition.UnlockPower)
+			local owned = data ~= nil and data.OwnedEquipment[definition.Id] == true
+			local unlocked = owned or relevantStat >= requiredStat
 
-		local owned = data ~= nil and data.OwnedEquipment[definition.Id] == true
-		local unlocked = owned or power >= requiredPower
+			local level = if data ~= nil then (data.MultiplierLevels[definition.StatId] or 0) else 0
+			local locationMultiplier = entry.station:GetAttribute("GainMultiplier")
+			local zoneRate = if type(locationMultiplier) == "number" then locationMultiplier else 1
+			local totalPerSecond = Formulas.MachineTrainingRate(
+				definition.BaseGain / definition.RepInterval,
+				zoneRate
+			) * TokenMultiplierConfig.Multiplier(level)
 
-		-- Required-power stations carry the warning badge from the reference. Starter
-		-- machines do not shout "warning" when there is no gate to warn about.
-		entry.warningFrame.Visible = requiredPower > 0
-		entry.warningFrame.BackgroundColor3 = Color3.fromRGB(235, 75, 60)
+			-- Reads top to bottom as the reference sign does: what this place multiplies,
+			-- what the machine is, then the gate in brackets under a REQUIRES caption.
+			entry.multiplier.Text = `×{NumberFormat.Format(zoneRate)}`
+			entry.multiplier.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-		local level = if data ~= nil then (data.MultiplierLevels[definition.StatId] or 0) else 0
-		local locationMultiplier = entry.station:GetAttribute("GainMultiplier")
-		local zoneRate = if type(locationMultiplier) == "number" then locationMultiplier else 1
-		local perSecond = definition.BaseGain
-			* zoneRate
-			* Formulas.MultiplierValue(level)
-			/ definition.RepInterval
-		local totalPerSecond = Formulas.MachineTrainingRate(
-			definition.BaseGain / definition.RepInterval,
-			zoneRate
-		) * Formulas.MultiplierValue(level)
+			entry.name.Text = `[{definition.DisplayName}]`
+			entry.name.TextColor3 = color
 
-		local reqLine = if requiredPower > 0
-			then `<font color="#FF7B7B">Require : {NumberFormat.Format(requiredPower)}+ Power</font>\n`
-			else ""
+			-- A starter machine gets no REQUIRES block at all rather than a line saying it
+			-- has no requirement: two fewer lines of nothing on the signs a new player is
+			-- standing among, and the caption keeps its meaning when it does appear.
+			entry.requiresCaption.Visible = requiredStat > 0
+			entry.requirement.Visible = requiredStat > 0
+			if requiredStat > 0 then
+				entry.requiresCaption.Text = "REQUIRES"
+				entry.requiresCaption.TextColor3 = Color3.fromRGB(235, 238, 245)
+				entry.requirement.Text = `[{NumberFormat.Format(requiredStat)}+ {statDisplayName}]`
+				entry.requirement.TextColor3 = if unlocked then REQUIREMENT_COLOR else UI.Palette.Danger
+			end
 
-		if unlocked then
-			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
-				.. reqLine
-				.. `<font color="#{color:ToHex()}">+{NumberFormat.Format(perSecond)} EQUIP · `
-				.. `+{NumberFormat.Format(totalPerSecond)} {statDisplayName}/s TRAINING</font>\n`
-				.. statusLine(entry)
-		else
-			entry.label.Text = `<b>{definition.DisplayName}</b>\n`
-				.. reqLine
-				.. `<font color="#FF5C5C">Locked — {NumberFormat.Format(requiredPower)} total power needed</font>`
+			if unlocked then
+				entry.rate.Text = `+{NumberFormat.Format(totalPerSecond)} {string.upper(statDisplayName)}/SEC`
+				entry.rate.TextColor3 = color
+				local statusText, statusColor = statusLine(entry)
+				entry.status.Text = statusText
+				entry.status.TextColor3 = statusColor
+			else
+				entry.rate.Text = "LOCKED"
+				entry.rate.TextColor3 = UI.Palette.Danger
+				entry.status.Text =
+					`NEEDS {NumberFormat.Format(requiredStat)} {string.upper(statDisplayName)}`
+				entry.status.TextColor3 = UI.Palette.Danger
+			end
 		end
 	end
 end
@@ -249,7 +324,13 @@ function StationBillboardController:Start()
 	task.spawn(function()
 		while true do
 			task.wait(REFRESH_SECONDS)
-			self:_refresh()
+			-- A failure in a cosmetic loop must not stop the loop.
+			local ok, err = pcall(function()
+				self:_refresh()
+			end)
+			if not ok then
+				warn(`[StationBillboardController] {err}`)
+			end
 		end
 	end)
 end

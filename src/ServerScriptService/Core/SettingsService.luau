@@ -21,9 +21,26 @@ local DataService: any = nil
 function SettingsService:Init()
 	DataService = Loader.Get("DataService")
 
-	Net.BindFunction("UpdateSetting", 4, function(player: Player, settingName: any, enabled: any)
-		if type(settingName) ~= "string" or type(enabled) ~= "boolean" then
+	-- The whitelist is the whole security model here: a client may set these three keys
+	-- and nothing else, whatever it sends. Listing them rather than writing
+	-- `data.Settings[name]` is what stops a crafted call rewriting Stats through the
+	-- settings remote.
+	local VOLUME_SETTINGS: { [string]: boolean } = {
+		MasterVolume = true,
+		MusicVolume = true,
+		SfxVolume = true,
+	}
+
+	Net.BindFunction("UpdateSetting", 4, function(player: Player, settingName: any, value: any)
+		if type(settingName) ~= "string" or type(value) ~= "number" then
 			return false, "Invalid setting."
+		end
+		if value ~= value then
+			-- NaN survives every comparison below and would persist into the profile.
+			return false, "Invalid setting."
+		end
+		if not VOLUME_SETTINGS[settingName] then
+			return false, "That setting does not exist."
 		end
 
 		local data = DataService:GetData(player)
@@ -31,16 +48,14 @@ function SettingsService:Init()
 			return false, "Your data is still loading."
 		end
 
-		if settingName == "MusicEnabled" then
-			data.Settings.MusicEnabled = enabled
-		elseif settingName == "SfxEnabled" then
-			data.Settings.SfxEnabled = enabled
-		else
-			return false, "That setting does not exist."
-		end
+		-- Clamped and rounded server-side. The slider already does this, which is exactly
+		-- why the server has to as well.
+		local clamped = math.clamp(math.round(value), 0, 100)
+		local settings: any = data.Settings
+		settings[settingName] = clamped
 
 		DataService:MarkDirty(player)
-		return true, if enabled then "Setting enabled." else "Setting disabled."
+		return true, `Volume set to {clamped}%.`
 	end)
 end
 

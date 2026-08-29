@@ -46,60 +46,67 @@ local ZONE_ATTRIBUTE = "ZoneId"
 -- The seven active training tiers double exactly: x1 through x64. The remaining rows
 -- stay in the catalog as dormant future expansion themes, but the generated world does
 -- not place their GymZones.
+--
+-- A zone is a TIER, not a place. It used to be both -- each tier was one campus and
+-- the campus name was the zone name -- but the machines are scattered across the whole
+-- city now and a tier's five stand up to thirteen thousand studs apart. The names below
+-- described six campuses that no longer exist, so the map, the travel confirmations and
+-- the analytics were all telling players to go somewhere that had been demolished.
+-- These read as ranks now, because that is what they are.
 local zones: { Zone } = {
 	{
 		Id = "Garage",
-		DisplayName = "Garage Gym",
-		Tagline = "Where everybody starts.",
+		DisplayName = "Starter",
+		Tagline = "Where everybody starts. The five machines around spawn.",
 		RequiredPower = 0,
 		GainMultiplier = 1,
 		Color = Color3.fromRGB(126, 211, 155),
 	},
 	{
 		Id = "Iron",
-		DisplayName = "Iron Hall",
-		Tagline = "Warehouse iron, two streets off the plaza.",
-		RequiredPower = 500,
+		DisplayName = "Iron",
+		Tagline = "The second rung. Twice the gain, scattered across the city.",
+		RequiredPower = 50e3,
 		GainMultiplier = 2,
 		Color = Color3.fromRGB(66, 165, 245),
 	},
 	{
 		Id = "Powerhouse",
-		DisplayName = "The Powerhouse",
-		Tagline = "The docks work all night.",
-		RequiredPower = 5e3,
+		DisplayName = "Powerhouse",
+		Tagline = "Four times the gain, for lifters who have put the work in.",
+		RequiredPower = 250e3,
 		GainMultiplier = 4,
 		Color = Color3.fromRGB(239, 108, 61),
 	},
 	{
 		Id = "Strongman",
-		DisplayName = "Strongman Yard",
-		Tagline = "Sand, salt and heavy stone.",
-		RequiredPower = 50e3,
+		DisplayName = "Strongman",
+		Tagline = "Eight times the gain. Heavy steel, and a long walk to it.",
+		RequiredPower = 1e6,
 		GainMultiplier = 8,
 		Color = Color3.fromRGB(190, 120, 70),
 	},
 	{
 		Id = "Titan",
-		DisplayName = "Titan Forge",
-		Tagline = "The pit that ate a mountain.",
-		RequiredPower = 500e3,
+		DisplayName = "Titan",
+		Tagline = "Sixteen times the gain. The upper half of the ladder.",
+		RequiredPower = 5e6,
 		GainMultiplier = 16,
 		Color = Color3.fromRGB(255, 196, 61),
 	},
 	{
 		Id = "Skydeck",
-		DisplayName = "Sky Deck",
-		Tagline = "Above the smog line.",
-		RequiredPower = 5e6,
+		DisplayName = "Skydeck",
+		Tagline = "Thirty-two times the gain. Most of these are up high.",
+		RequiredPower = 25e6,
 		GainMultiplier = 32,
 		Color = Color3.fromRGB(120, 210, 255),
 	},
 	{
 		Id = "Storm",
-		DisplayName = "Storm Peak",
-		Tagline = "Thin air and live cable.",
-		RequiredPower = 50e6,
+		DisplayName = "Storm",
+		Tagline = "Sixty-four times the gain. The last rung before the void.",
+		RequiredPower = 250e6,
 		GainMultiplier = 64,
 		Color = Color3.fromRGB(150, 160, 255),
 	},

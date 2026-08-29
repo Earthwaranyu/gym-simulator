@@ -14,6 +14,11 @@ local RunService = game:GetService("RunService")
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local StrikeConfig = require(ReplicatedStorage.Modules.StrikeConfig)
+local FlightConfig = require(ReplicatedStorage.Modules.FlightConfig)
+local GaitConfig = require(ReplicatedStorage.Modules.GaitConfig)
+local FlinchConfig = require(ReplicatedStorage.Modules.FlinchConfig)
+local StanceConfig = require(ReplicatedStorage.Modules.StanceConfig)
 
 require(ReplicatedStorage.Modules.Net)
 
@@ -27,6 +32,18 @@ if RunService:IsStudio() then
 		{
 			{ Name = "NumberFormat", Failures = NumberFormat.RunSelfTest() },
 			{ Name = "Formulas", Failures = Formulas.RunSelfTest() },
+			-- These two build their poses out of Vector3, so the `luau` CLI cannot
+			-- require them and scripts/selftest.luau cannot reach them. Studio is the
+			-- only place their invariants can be checked at all — that no joint exceeds
+			-- the angle ceiling, that a heavy stays slower to land than a jab, that the
+			-- flight silhouettes actually progress from upright to horizontal.
+			--
+			-- StrikeConfig.RunSelfTest was written and then never called from anywhere.
+			{ Name = "StrikeConfig", Failures = StrikeConfig.RunSelfTest() },
+			{ Name = "FlightConfig", Failures = FlightConfig.RunSelfTest() },
+			{ Name = "GaitConfig", Failures = GaitConfig.RunSelfTest() },
+			{ Name = "FlinchConfig", Failures = FlinchConfig.RunSelfTest() },
+			{ Name = "StanceConfig", Failures = StanceConfig.RunSelfTest() },
 		}
 	do
 		if #suite.Failures > 0 then

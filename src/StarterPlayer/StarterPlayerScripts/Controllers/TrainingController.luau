@@ -8,11 +8,14 @@
 	those fire a lightweight StopTraining remote that the server validates.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Signal = require(ReplicatedStorage.Packages.Signal)
+local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
 local Net = require(ReplicatedStorage.Modules.Net)
 local Types = require(ReplicatedStorage.Modules.Types)
 
@@ -25,6 +28,16 @@ local state: Types.TrainingState = {
 	StationId = nil,
 	Combo = 0,
 	StaggerSeconds = 0,
+	ZoneId = nil,
+	WeightKg = 0,
+	MinWeightKg = 0,
+	MaxWeightKg = 0,
+	StepWeightKg = 0,
+	RecommendedWeightKg = 0,
+	WeightMultiplier = 1,
+	RequiredStat = 0,
+	AutoLoadEnabled = false,
+	HasAutoLoad = false,
 }
 
 -- os.clock() when the current state arrived, so the stagger can be counted down
@@ -33,6 +46,10 @@ local receivedAt = 0
 
 -- (state) — fired whenever the server pushes new training state.
 TrainingController.Changed = Signal.new()
+-- Fired before a local stop request crosses the network. Visual pose cleanup listens
+-- to this so a floor exercise releases on the key press instead of waiting for the
+-- server attribute round trip. The server still owns the real session and movement.
+TrainingController.StopRequested = Signal.new()
 
 function TrainingController:GetState(): Types.TrainingState
 	return state
@@ -61,6 +78,7 @@ function TrainingController:RequestStop()
 	if not self:IsTraining() then
 		return
 	end
+	TrainingController.StopRequested:Fire()
 	Net.Event("StopTraining"):FireServer()
 end
 
@@ -73,6 +91,23 @@ function TrainingController:Init()
 end
 
 function TrainingController:Start()
+	-- Holding E is handled by Roblox's ProximityPrompt on the server rather than by
+	-- RequestStop. Mirror its successful local trigger into the same visual-release
+	-- signal. This also covers switching directly from one nearby machine to another.
+	ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, player: Player)
+		if player ~= Players.LocalPlayer or not self:IsTraining() then
+			return
+		end
+		local current: Instance? = prompt.Parent
+		while current ~= nil do
+			if CollectionService:HasTag(current, EquipmentConfig.STATION_TAG) then
+				TrainingController.StopRequested:Fire()
+				return
+			end
+			current = current.Parent
+		end
+	end)
+
 	-- Space key: cancel training. gameProcessedEvent is respected so typing in chat
 	-- does not dismount the player.
 	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)

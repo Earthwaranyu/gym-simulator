@@ -22,3 +22,10 @@ node_modules/
 
 # Roblox API definitions fetched by scripts/check.sh
 /.luau-defs/
+
+# Python bytecode from scripts/
+__pycache__/
+*.pyc
+
+# Locally built place file
+/default.rbxl

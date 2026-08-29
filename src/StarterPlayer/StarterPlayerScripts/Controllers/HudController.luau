@@ -24,16 +24,21 @@ local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local Types = require(ReplicatedStorage.Modules.Types)
 local Icons = require(ReplicatedStorage.Modules.Icons)
+local AbilityConfig = require(ReplicatedStorage.Modules.AbilityConfig)
+local BoostConfig = require(ReplicatedStorage.Modules.BoostConfig)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
 
--- A slot is big enough to hit with a thumb and small enough that five of them plus
--- their gaps stay narrow under the middle of the screen. The wider cartoon cards still
--- fit comfortably at the 720p reference size: 5*66 + 4*7 + 24 = 382.
+-- A slot is big enough to hit with a thumb and small enough to sit under the middle
+-- of the screen without covering the world.
 local SLOT_WIDTH = 66
 local SLOT_HEIGHT = 76
 local SLOT_GAP = 7
-local DOCK_WIDTH = SLOT_WIDTH * 5 + SLOT_GAP * 4 + 24
-local DOCK_HEIGHT = SLOT_HEIGHT + 20
+
+-- The ability bar, bottom-right. Deliberately smaller than the training dock at the
+-- bottom centre: the dock is a choice you make between fights and the abilities are
+-- reminders of keys you already have your fingers on.
+local ABILITY_SLOT = 52
+local ABILITY_GAP = 6
 -- How much of the slot's width the muscle glyph takes. The rest is the name strip, the
 -- keybind corner, and enough margin that the glyph's motion never touches the edge.
 local SLOT_ICON_SCALE = 0.68
@@ -76,6 +81,48 @@ local PING_INTERVAL = 0.4
 -- anything else that cares cannot quietly disagree about the spelling.
 local ARMS_STAT = "Arms"
 
+-- What the dock holds.
+--
+-- It used to hold all five muscles, and clicking one both selected it and hand-trained
+-- it. That made the bottom of the screen a second, worse training interface competing
+-- with the machines the whole game is built around — and it buried the one thing the
+-- bar needs to be in a fight, which is the fist. So the dock is the fist now.
+--
+-- The other four are still trained the way the game means them to be: on a machine.
+-- Kept as a filtered list rather than a hard-coded single button, because every loop
+-- below already reads a list, and a second combat slot should be one entry here.
+local DOCK_STATS: { StatConfig.StatDefinition } = {}
+for _, definition in StatConfig.List do
+	if definition.Id == ARMS_STAT then
+		table.insert(DOCK_STATS, definition)
+	end
+end
+
+-- Where a stat sits in the canonical display order. Shared by the dock and the gain
+-- boxes so neither can drift from StatConfig's ordering.
+local function statOrder(statId: Types.StatId): number
+	for index, definition in StatConfig.List do
+		if definition.Id == statId then
+			return index
+		end
+	end
+	return #StatConfig.List + 1
+end
+
+-- One entry per AbilityConfig row, built once and refreshed on the HUD's render loop.
+-- Keyed by ability id rather than held as an array so the refresh never depends on the
+-- bar and the config agreeing about order.
+type AbilitySlot = {
+	Sweep: Frame,
+	Key: TextLabel,
+	Root: Frame,
+}
+local abilitySlots: { [string]: AbilitySlot } = {}
+local blockMeterFill: Frame? = nil
+
+local DOCK_WIDTH = SLOT_WIDTH * #DOCK_STATS + SLOT_GAP * math.max(0, #DOCK_STATS - 1) + 24
+local DOCK_HEIGHT = SLOT_HEIGHT + 20
+
 local HudController = {
 	Name = "HudController",
 	Priority = 10,
@@ -108,7 +155,7 @@ type Slot = {
 local slotButtons: { [Types.StatId]: Slot } = {}
 -- Which muscle the left mouse button trains. Never nil once Start has run: the
 -- click has to do something, so there is always a slot selected.
-local selectedStat: Types.StatId = StatConfig.List[1].Id
+local selectedStat: Types.StatId = DOCK_STATS[1].Id
 local clicking = false
 -- The input/stat that owns the current manual hold. A dock press must keep training
 -- the card that was pressed even if a number key changes the visual selection midway.
@@ -116,11 +163,41 @@ local manualInput: InputObject? = nil
 local manualStat: Types.StatId? = nil
 local powerLabel: TextLabel
 local tokenLabel: TextLabel
+local fightTokenLabel: TextLabel
+--[[
+	The buff stack above the health bar: immortality and every timed boost, each row
+	hidden whenever that buff is not running.
+
+	A list rather than three pinned badges. Each one used to hard-code its own Y
+	offset, which works for exactly one badge — with three, hiding the middle one
+	leaves a hole. The UIListLayout re-flows instead, so any combination stacks tidily.
+]]
+local buffStack: Frame
+local immortalRow: Frame
+local immortalLabel: TextLabel
+-- One row per BoostConfig id, built once at startup and toggled thereafter.
+local boostRows: { [string]: { Row: Frame, Time: TextLabel } } = {}
+local totalRow: Frame
+local totalLabel: TextLabel
 local healthBar: UI.Bar
+-- The tracker shows the one active step of the quest rotation. Kept as a row count
+-- rather than a single hard-coded row because every loop below already reads it, so a
+-- second tracked objective would be this number and nothing else.
+local GOAL_ROWS = 1
+local GOAL_ROW_HEIGHT = 46
+
+type GoalRow = {
+	Root: Frame,
+	Name: TextLabel,
+	Bar: UI.Bar,
+}
+
 local goalPanel: Frame
-local goalName: TextLabel
-local goalDetail: TextLabel
-local goalBar: UI.Bar
+local goalHeading: TextLabel
+local goalRows: { GoalRow } = {}
+-- The last view the server sent, so a re-render never has to wait for the next quest
+-- payout to push a fresh one.
+local lastQuestView: { any } = {}
 local minimapCanvas: Frame? = nil
 local minimapPivot: Frame? = nil
 local minimapMarker: Frame? = nil
@@ -131,6 +208,39 @@ local minimapCentre: Vector3? = nil
 local minimapReady = false
 local minimapDrawing = false
 local minimapAt = 0
+--[[
+	The bottom-centre gain boxes.
+
+	One box per stat, built once and shown only while that stat is actually earning.
+	The old readout was a single card bound to the mounted machine, so hand-training
+	produced no feedback at all and a player who had just switched muscles had nothing
+	on screen telling them the previous set had landed. A row of boxes says which
+	muscles are moving right now and by how much, which is the question the number
+	answers.
+]]
+type GainBox = {
+	Root: Frame,
+	Icon: Frame,
+	Value: TextLabel,
+	Gain: TextLabel,
+	Caption: TextLabel,
+	LastSeenAt: number,
+	-- Last reported rate, so the caption can be rebuilt on the ageing sweep without
+	-- another payout having to arrive.
+	Rate: number,
+}
+
+local trainingRow: Frame
+local gainBoxes: { [Types.StatId]: GainBox } = {}
+local trainingStatId: Types.StatId? = nil
+-- How long a box stays up after its last payout. Long enough to survive the gap
+-- between reps on a slow machine, short enough that a stat you stopped training
+-- clears itself off the bar.
+local GAIN_BOX_LIFETIME = 8
+-- The bar reads at a glance up to three boxes wide; beyond that it is a list.
+local GAIN_BOX_LIMIT = 3
+local GAIN_BOX_WIDTH = 168
+local GAIN_BOX_HEIGHT = 62
 
 function HudController:Init()
 	ProfileController = Loader.Get("ProfileController")
@@ -160,7 +270,7 @@ function HudController:_build()
 	-- the button bar so the two cannot drift into each other.
 	UI.ScaleWithViewport(screen)
 
-	-- Top-left: only the two global currencies. Muscle values live in the five-button
+	-- Top-left: global progression and both currencies. Muscle values live in the five-button
 	-- training dock below, where each number is also a direct route to its location.
 	--
 	-- This was two stacked panels 250px tall. The compact header now leaves the
@@ -170,7 +280,7 @@ function HudController:_build()
 	-- this ScreenGui no longer ignores the inset — see the note where it is built.
 	local summary = UI.Panel("Summary", screen)
 	summary.Position = UDim2.fromOffset(16, 16)
-	summary.Size = UDim2.fromOffset(300, 42)
+	summary.Size = UDim2.fromOffset(360, 42)
 
 	UI.VerticalList(summary, 4)
 
@@ -182,20 +292,20 @@ function HudController:_build()
 	headline.Parent = summary
 
 	powerLabel = UI.Label("Power", headline)
-	powerLabel.Size = UDim2.fromScale(0.6, 1)
+	powerLabel.Size = UDim2.fromScale(0.42, 1)
 	powerLabel.Font = UI.Font.Numeric
 	powerLabel.TextSize = 21
 	powerLabel.TextColor3 = UI.Palette.Power
+	UI.Role(powerLabel, { Ink = "Power" })
 
 	tokenLabel = UI.Label("Tokens", headline)
-	tokenLabel.AnchorPoint = Vector2.new(1, 0)
-	-- Shifted left by the glyph's width plus its gap, so the number and the mark sit
-	-- beside each other rather than on top of each other.
-	tokenLabel.Position = UDim2.new(1, -24, 0, 0)
-	tokenLabel.Size = UDim2.new(0.4, -24, 1, 0)
+	tokenLabel.Position = UDim2.fromScale(0.42, 0)
+	tokenLabel.Size = UDim2.fromScale(0.3, 1)
 	tokenLabel.TextXAlignment = Enum.TextXAlignment.Right
 	tokenLabel.Font = UI.Font.Numeric
+	tokenLabel.TextSize = 13
 	tokenLabel.TextColor3 = UI.Palette.Token
+	UI.Role(tokenLabel, { Ink = "Token" })
 
 	-- The dumbbell mark rather than the word "Tokens". The currency is named by its
 	-- glyph everywhere it appears — the goal card's reward, the shop's prices, and
@@ -203,11 +313,200 @@ function HudController:_build()
 	local tokenGlyph = Instance.new("Frame")
 	tokenGlyph.Name = "TokenGlyph"
 	tokenGlyph.BackgroundTransparency = 1
-	tokenGlyph.AnchorPoint = Vector2.new(1, 0.5)
-	tokenGlyph.Position = UDim2.fromScale(1, 0.5)
-	tokenGlyph.Size = UDim2.fromOffset(20, 20)
+	tokenGlyph.AnchorPoint = Vector2.new(0, 0.5)
+	tokenGlyph.Position = UDim2.fromScale(0.73, 0.5)
+	tokenGlyph.Size = UDim2.fromOffset(18, 18)
 	tokenGlyph.Parent = headline
-	Icons.Draw("Token", tokenGlyph, UI.Palette.Token, UI.Palette.Backdrop)
+	-- Dark chrome, so the glyph's knockout colour — whatever shows through the gaps in
+	-- a flat icon — is the dark panel fill, not the cream one.
+	Icons.Draw("Token", tokenGlyph, UI.Dark.Token, UI.Dark.Glass)
+
+	fightTokenLabel = UI.Label("FightTokens", headline)
+	fightTokenLabel.Position = UDim2.new(0.73, 22, 0, 0)
+	fightTokenLabel.Size = UDim2.new(0.27, -22, 1, 0)
+	fightTokenLabel.TextXAlignment = Enum.TextXAlignment.Right
+	fightTokenLabel.Font = UI.Font.Heading
+	fightTokenLabel.TextSize = 13
+	fightTokenLabel.TextColor3 = UI.Palette.FightToken
+	UI.Role(fightTokenLabel, { Ink = "FightToken" })
+
+	--[[
+		Immortality, directly above the health bar and only while it is running.
+
+		A potion is bought in minutes or a day at a time, and until now the only time
+		the player was ever told how much was left was the toast at the moment of
+		purchase. Anyone who rejoined, or simply looked away, had a shield of unknown
+		remaining length — which is the one thing you need to know before deciding to
+		stand in the open.
+
+		It sits with the health bar because both answer the same question — how much
+		punishment can I take right now — and a player checking one is already looking
+		at the other. It is also the corner that can grow: the top-left strip is three
+		numbers that must not reflow when a badge appears and disappears.
+
+		The supplements now share that corner, for the reason the immortality badge
+		exists at all: a Pre-Workout burns in three minutes and the only thing that ever
+		told you it was running was the purchase toast. Same rows, same clock, same
+		formatter — one place to look for "what is running on me right now".
+
+		The shield says what it is, so the label is the time and nothing else, and it
+		carries no panel: a box drawn around two glyphs is furniture, and the corner it
+		sits in already has the health bar giving it an edge to align to.
+	]]
+	buffStack = Instance.new("Frame")
+	buffStack.Name = "Buffs"
+	buffStack.BackgroundTransparency = 1
+	buffStack.AnchorPoint = Vector2.new(0, 1)
+	-- Left edge shared with the health bar below it; 8px of air between.
+	buffStack.Position = UDim2.new(0, 20, 1, -70)
+	buffStack.Size = UDim2.fromOffset(170, 130)
+	buffStack.Parent = screen
+
+	local buffLayout = Instance.new("UIListLayout")
+	buffLayout.FillDirection = Enum.FillDirection.Vertical
+	-- Grows upward from the health bar, so the row nearest the bar keeps its place as
+	-- rows above it come and go.
+	buffLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	buffLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	buffLayout.Padding = UDim.new(0, 2)
+	buffLayout.Parent = buffStack
+
+	immortalRow = Instance.new("Frame")
+	immortalRow.Name = "Immortality"
+	immortalRow.BackgroundTransparency = 1
+	immortalRow.Size = UDim2.new(1, 0, 0, 30)
+	-- Last in the stack: it is the one that is not about training, and it sits closest
+	-- to the health bar because it is the other half of "how much can I take".
+	immortalRow.LayoutOrder = 100
+	immortalRow.Visible = false
+	immortalRow.Parent = buffStack
+
+	-- The same shield the player list puts beside an immune name. One symbol for one
+	-- rule, wherever it appears — which is the only reason to mark it in two places.
+	-- It replaced the drawn Potion glyph, which was rendered in near-white and read as
+	-- a white block rather than a bottle.
+	local immortalGlyph = UI.Label("Shield", immortalRow)
+	immortalGlyph.Size = UDim2.fromOffset(24, 30)
+	immortalGlyph.TextSize = 22
+	immortalGlyph.TextXAlignment = Enum.TextXAlignment.Left
+	immortalGlyph.TextStrokeTransparency = 0.25
+	immortalGlyph.Text = "🛡"
+
+	immortalLabel = UI.Label("Remaining", immortalRow)
+	immortalLabel.Position = UDim2.fromOffset(30, 0)
+	immortalLabel.Size = UDim2.new(1, -30, 1, 0)
+	immortalLabel.Font = UI.Font.Numeric
+	immortalLabel.TextSize = 16
+	immortalLabel.TextXAlignment = Enum.TextXAlignment.Left
+	-- No panel behind it any more, so it carries its own outline the way the
+	-- nameplate labels do. Pink on a bright sky is otherwise unreadable.
+	immortalLabel.TextStrokeTransparency = 0.25
+	immortalLabel.TextColor3 = UI.Palette.CartoonPink
+
+	--[[
+		One row per timed boost, above the shield.
+
+		Built from BoostConfig rather than named here, so a third supplement is a row in
+		that table and nothing in this file. All of them are built hidden at startup:
+		the alternative is creating instances inside the one-second tick, and a boost
+		expiring should not be able to hitch a frame.
+
+		The multiplier is the big number and the clock is the small one. What a player
+		checks mid-set is whether they are still boosted; how long is the follow-up
+		question, and sizing them the other way round makes the badge read as a timer
+		with a decoration rather than a buff with a timer.
+	]]
+	--[[
+		Sorted, because `for id in BoostConfig.Boosts` is hash order: the rows would sit
+		in a different sequence from one session to the next, which is exactly the kind
+		of instability a player reads as a bug. Strongest on top, id as the tie-break so
+		two equal multipliers still land somewhere fixed.
+	]]
+	local boostIds = {}
+	for id in BoostConfig.Boosts do
+		table.insert(boostIds, id)
+	end
+	table.sort(boostIds, function(a: string, b: string): boolean
+		local left, right = BoostConfig.Boosts[a], BoostConfig.Boosts[b]
+		if left.Multiplier ~= right.Multiplier then
+			return left.Multiplier > right.Multiplier
+		end
+		return a < b
+	end)
+
+	for boostOrder, id in boostIds do
+		local boost = BoostConfig.Boosts[id]
+
+		local row = Instance.new("Frame")
+		row.Name = id
+		row.BackgroundTransparency = 1
+		row.Size = UDim2.new(1, 0, 0, 28)
+		row.LayoutOrder = boostOrder
+		row.Visible = false
+		row.Parent = buffStack
+
+		local glyph = UI.Label("Glyph", row)
+		glyph.Size = UDim2.fromOffset(24, 28)
+		glyph.TextSize = 22
+		glyph.TextXAlignment = Enum.TextXAlignment.Left
+		glyph.TextStrokeTransparency = 0.25
+		glyph.Text = boost.Glyph
+
+		local colour = (UI.Palette :: any)[boost.Colour] or UI.Palette.Accent
+
+		local multiplier = UI.Label("Multiplier", row)
+		multiplier.Position = UDim2.fromOffset(30, 0)
+		multiplier.Size = UDim2.fromOffset(40, 28)
+		multiplier.Font = UI.Font.Numeric
+		multiplier.TextSize = 20
+		multiplier.TextXAlignment = Enum.TextXAlignment.Left
+		multiplier.TextStrokeTransparency = 0.25
+		multiplier.TextColor3 = colour
+		multiplier.Text = `x{boost.Multiplier}`
+
+		local time = UI.Label("Remaining", row)
+		time.Position = UDim2.fromOffset(72, 0)
+		time.Size = UDim2.new(1, -72, 1, 0)
+		time.Font = UI.Font.Numeric
+		time.TextSize = 16
+		time.TextXAlignment = Enum.TextXAlignment.Left
+		time.TextStrokeTransparency = 0.25
+		time.TextColor3 = colour
+
+		boostRows[id] = { Row = row, Time = time }
+	end
+
+	--[[
+		The combined multiplier, shown only when more than one boost is running.
+
+		Boosts multiply — a shake and a pre-workout is x6, not x3 — and that product is
+		the thing the player actually paid for. Leaving them to multiply two chips in
+		their head is how a stacking bonus goes unnoticed and unbought. With one boost
+		running the row would just restate that boost, so it hides.
+	]]
+	totalRow = Instance.new("Frame")
+	totalRow.Name = "BoostTotal"
+	totalRow.BackgroundTransparency = 1
+	totalRow.Size = UDim2.new(1, 0, 0, 28)
+	-- Under the boosts it sums, above the shield, which is not part of the sum.
+	totalRow.LayoutOrder = 99
+	totalRow.Visible = false
+	totalRow.Parent = buffStack
+
+	local totalGlyph = UI.Label("Glyph", totalRow)
+	totalGlyph.Size = UDim2.fromOffset(24, 28)
+	totalGlyph.TextSize = 20
+	totalGlyph.TextXAlignment = Enum.TextXAlignment.Left
+	totalGlyph.TextStrokeTransparency = 0.25
+	totalGlyph.Text = "⚙"
+
+	totalLabel = UI.Label("Total", totalRow)
+	totalLabel.Position = UDim2.fromOffset(30, 0)
+	totalLabel.Size = UDim2.new(1, -30, 1, 0)
+	totalLabel.Font = UI.Font.Numeric
+	totalLabel.TextSize = 20
+	totalLabel.TextXAlignment = Enum.TextXAlignment.Left
+	totalLabel.TextStrokeTransparency = 0.25
 
 	-- Bottom-centre: which muscle the left mouse button is currently training.
 	--
@@ -225,10 +524,12 @@ function HudController:_build()
 
 	local dockStroke = chips:FindFirstChildOfClass("UIStroke")
 	if dockStroke ~= nil then
-		dockStroke.Color = Color3.fromRGB(12, 12, 20)
+		dockStroke.Color = UI.Palette.Border
 		dockStroke.Thickness = 3
 		dockStroke.Transparency = 0
 	end
+
+	self:_buildAbilityBar(screen)
 
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = UDim2.fromOffset(SLOT_WIDTH, SLOT_HEIGHT)
@@ -238,7 +539,7 @@ function HudController:_build()
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = chips
 
-	for index, definition in StatConfig.List do
+	for index, definition in DOCK_STATS do
 		local button = Instance.new("TextButton")
 		button.Name = definition.Id
 		button.LayoutOrder = index
@@ -261,7 +562,7 @@ function HudController:_build()
 
 		local gradient = Instance.new("UIGradient")
 		gradient.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, definition.Color:Lerp(Color3.new(1, 1, 1), 0.22)),
+			ColorSequenceKeypoint.new(0, definition.Color:Lerp(UI.Palette.OnAccent, 0.22)),
 			ColorSequenceKeypoint.new(0.42, definition.Color:Lerp(UI.Palette.CartoonInk, 0.48)),
 			ColorSequenceKeypoint.new(1, definition.Color:Lerp(UI.Palette.CartoonInk, 0.8)),
 		})
@@ -271,7 +572,7 @@ function HudController:_build()
 		local shine = Instance.new("Frame")
 		shine.Name = "Shine"
 		shine.Size = UDim2.new(1, 0, 0, 3)
-		shine.BackgroundColor3 = Color3.new(1, 1, 1)
+		shine.BackgroundColor3 = UI.Palette.OnAccent
 		shine.BackgroundTransparency = 0.5
 		shine.BorderSizePixel = 0
 		shine.ZIndex = 2
@@ -330,7 +631,7 @@ function HudController:_build()
 		name.Font = UI.Font.Heading
 		name.TextSize = 10
 		name.TextXAlignment = Enum.TextXAlignment.Center
-		name.TextColor3 = Color3.new(1, 1, 1)
+		name.TextColor3 = UI.Palette.OnAccent
 		name.Text = string.upper(definition.DisplayName)
 		name.ZIndex = 3
 
@@ -397,6 +698,14 @@ function HudController:_build()
 		end)
 	end
 
+	-- The fist card was the only remaining bottom-centre slot, but world clicks already
+	-- punch directly and machines own training. Remove the redundant button and its
+	-- panel entirely so combat has an unobstructed centre-bottom view.
+	chips:Destroy()
+	table.clear(slotButtons)
+
+	self:_buildGainBoxes(screen)
+
 	-- Bottom-left: health, and nothing else.
 	--
 	-- This was a panel in the middle of the screen carrying the health bar and two lines
@@ -411,8 +720,11 @@ function HudController:_build()
 	-- in the corner where a health bar belongs.
 	healthBar = UI.Bar("Health", UI.Palette.Vital, screen, UI.Palette.Health)
 	healthBar.Root.AnchorPoint = Vector2.new(0, 1)
-	healthBar.Root.Position = UDim2.new(0, 16, 1, -16)
-	healthBar.Root.Size = UDim2.fromOffset(240, 26)
+	healthBar.Root.Position = UDim2.new(0, 20, 1, -20)
+	healthBar.Root.Size = UDim2.fromOffset(360, 42)
+	healthBar.Caption.Font = UI.Font.Numeric
+	healthBar.Caption.TextSize = 17
+	healthBar.Caption.TextXAlignment = Enum.TextXAlignment.Center
 
 	-- Under the compact summary: the minimap.
 	--
@@ -427,20 +739,22 @@ function HudController:_build()
 	self:_buildMinimap(screen)
 
 	-- Right-side objective card: the reference game's best UX idea is that the next
-	-- useful action never requires opening a menu. This uses the real quest stream and
-	-- keeps its own original dark gym styling.
+	-- useful action never requires opening a menu. This uses the real quest stream.
 	goalPanel = UI.Panel("MainGoal", screen)
 	goalPanel.AnchorPoint = Vector2.new(1, 0)
 	goalPanel.Position = UDim2.new(1, -16, 0, 206)
-	goalPanel.Size = UDim2.fromOffset(260, 116)
+	-- The heading row, the rows themselves, and the panel's own bottom padding — without
+	-- the last term the third bar is clipped off by a few pixels.
+	goalPanel.Size = UDim2.fromOffset(260, 30 + GOAL_ROWS * GOAL_ROW_HEIGHT + 16)
 	goalPanel.Visible = false
 
-	local goalHeading = UI.Label("Heading", goalPanel)
+	goalHeading = UI.Label("Heading", goalPanel)
 	goalHeading.Size = UDim2.new(1, -76, 0, 18)
 	goalHeading.Font = UI.Font.Heading
 	goalHeading.TextSize = 13
 	goalHeading.TextColor3 = UI.Palette.Token
-	goalHeading.Text = "MAIN GOAL"
+	UI.Role(goalHeading, { Ink = "Token" })
+	goalHeading.Text = "OBJECTIVE"
 
 	local questButton = Instance.new("TextButton")
 	questButton.Name = "OpenQuests"
@@ -452,7 +766,10 @@ function HudController:_build()
 	questButton.AutoButtonColor = false
 	questButton.Font = UI.Font.Heading
 	questButton.TextSize = 11
-	questButton.TextColor3 = UI.Palette.Backdrop
+	questButton.TextColor3 = UI.Palette.OnAccent
+	-- Fill and ink are separate roles: the chip stays Token in both themes, but the
+	-- text on it flips, because OnAccent means "readable against a bright chip".
+	UI.Role(questButton, { Ink = "OnAccent", Fill = "Token" })
 	questButton.Text = "QUESTS"
 	questButton.Parent = goalPanel
 	UI.Pressable(questButton)
@@ -464,22 +781,44 @@ function HudController:_build()
 	questCorner.CornerRadius = UDim.new(0, 6)
 	questCorner.Parent = questButton
 
-	goalName = UI.Label("GoalName", goalPanel)
-	goalName.Position = UDim2.fromOffset(0, 26)
-	goalName.Size = UDim2.new(1, 0, 0, 22)
-	goalName.Font = UI.Font.Heading
-	goalName.TextSize = 15
-	goalName.TextColor3 = UI.Palette.Text
+	-- Several objectives, not one.
+	--
+	-- The card used to pick a single quest by a hard-coded priority table, which meant
+	-- adding a quest meant editing that table or being sorted to the back. It also hid
+	-- the fact that the muscle dailies are five separate goals: a player training legs
+	-- saw an arms goal and concluded the tracker was wrong. Rows are built once and
+	-- filled from whatever the server sends.
+	for index = 1, GOAL_ROWS do
+		local row = Instance.new("Frame")
+		row.Name = `Goal{index}`
+		row.Position = UDim2.fromOffset(0, 26 + (index - 1) * GOAL_ROW_HEIGHT)
+		row.Size = UDim2.new(1, 0, 0, GOAL_ROW_HEIGHT - 6)
+		row.BackgroundTransparency = 1
+		row.Visible = false
+		row.Parent = goalPanel
 
-	goalDetail = UI.Label("GoalDetail", goalPanel)
-	goalDetail.Position = UDim2.fromOffset(0, 49)
-	goalDetail.Size = UDim2.new(1, 0, 0, 20)
-	goalDetail.TextSize = 12
-	goalDetail.TextColor3 = UI.Palette.TextMuted
-	goalDetail.TextTruncate = Enum.TextTruncate.AtEnd
+		local name = UI.Label("Name", row)
+		name.Size = UDim2.new(1, 0, 0, 18)
+		name.Font = UI.Font.Heading
+		name.TextSize = 13
+		name.TextColor3 = UI.Palette.Text
+		name.TextTruncate = Enum.TextTruncate.AtEnd
 
-	goalBar = UI.Bar("GoalProgress", UI.Palette.Token, goalPanel)
-	goalBar.Root.Position = UDim2.fromOffset(0, 78)
+		local bar = UI.Bar("Progress", UI.Palette.Token, row)
+		bar.Root.Position = UDim2.fromOffset(0, 20)
+		bar.Root.Size = UDim2.new(1, 0, 0, 18)
+
+		table.insert(goalRows, { Root = row, Name = name, Bar = bar })
+	end
+
+	-- Chrome goes dark; the menu's content panels stay cream. These two sit over the
+	-- world permanently, and a bright slab in the corner competes with the game behind
+	-- it. The roles the helpers recorded on the way down are what this reads.
+	UI.ApplyTheme(summary, UI.Dark)
+	UI.ApplyTheme(goalPanel, UI.Dark)
+	-- The gain boxes are the same permanent chrome over the world, so they take the same
+	-- dark treatment. Left cream, they read as a menu that had opened over the game.
+	UI.ApplyTheme(trainingRow, UI.Dark)
 end
 
 --[[
@@ -493,6 +832,172 @@ end
 	and slides an oversized canvas underneath them. That is why nothing here rebuilds
 	when the player moves — a move is one Position write on a canvas that was drawn once.
 ]]
+--[[
+	The ability bar: one slot per AbilityConfig row, plus the guard meter under it.
+
+	Built by iterating the config rather than by naming the three abilities, which is
+	the point of AbilityConfig existing — a fourth ability appears here without this
+	function being opened.
+
+	The cooldown sweep is a frame that fills from the bottom of the slot rather than a
+	radial wipe. A radial needs either an image mask or eight rotated frames, and the
+	first is an upload; a vertical wipe reads just as clearly at 52 pixels and is one
+	Size property.
+]]
+function HudController:_buildAbilityBar(screen: ScreenGui)
+	local entries = AbilityConfig.Ordered()
+
+	local bar = Instance.new("Frame")
+	bar.Name = "AbilityBar"
+	bar.BackgroundTransparency = 1
+	bar.AnchorPoint = Vector2.new(1, 1)
+	-- Sits directly above the MENU button, whose own footprint is 54 tall at 18 from
+	-- the bottom-right (MenuBarController). Stacked rather than placed beside it
+	-- because the bar grows with every ability added and the corner does not: the
+	-- first layout put them on the same line and the fourth slot went under MENU.
+	--
+	-- Touch moves MENU up to clear the jump button, so the bar moves with it. Read off
+	-- the same condition rather than a second constant, because the two overlapping
+	-- again on phones is exactly the bug that would go unnoticed on a desktop test.
+	bar.Position = if UserInputService.TouchEnabled
+		then UDim2.new(1, -18, 1, -210)
+		else UDim2.new(1, -18, 1, -82)
+	bar.Size =
+		UDim2.fromOffset(ABILITY_SLOT * #entries + ABILITY_GAP * math.max(0, #entries - 1), ABILITY_SLOT + 14)
+	bar.Parent = screen
+
+	local row = Instance.new("Frame")
+	row.Name = "Slots"
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.new(1, 0, 0, ABILITY_SLOT)
+	row.Parent = bar
+
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.Padding = UDim.new(0, ABILITY_GAP)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = row
+
+	for index, entry in entries do
+		local accent = Color3.fromRGB(entry.Color[1], entry.Color[2], entry.Color[3])
+
+		local slot = Instance.new("Frame")
+		slot.Name = entry.Id
+		slot.LayoutOrder = index
+		slot.Size = UDim2.fromOffset(ABILITY_SLOT, ABILITY_SLOT)
+		slot.BackgroundColor3 = UI.Palette.CartoonInk
+		slot.BackgroundTransparency = 0.08
+		slot.BorderSizePixel = 0
+		slot.ClipsDescendants = true
+		slot.Parent = row
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 8)
+		corner.Parent = slot
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = accent
+		stroke.Thickness = 2
+		stroke.Transparency = 0.35
+		stroke.Parent = slot
+
+		-- Under the text, over the fill. Grows upward from the bottom as the cooldown
+		-- runs, so a slot that is nearly ready looks nearly ready at a glance.
+		local sweep = Instance.new("Frame")
+		sweep.Name = "Sweep"
+		sweep.AnchorPoint = Vector2.new(0, 1)
+		sweep.Position = UDim2.fromScale(0, 1)
+		sweep.Size = UDim2.fromScale(1, 0)
+		sweep.BackgroundColor3 = accent
+		sweep.BackgroundTransparency = 0.6
+		sweep.BorderSizePixel = 0
+		sweep.ZIndex = 2
+		sweep.Parent = slot
+
+		local key = UI.Label("Key", slot)
+		key.Size = UDim2.new(1, 0, 0, 26)
+		key.Position = UDim2.fromOffset(0, 8)
+		key.Font = UI.Font.Heading
+		key.TextSize = 20
+		key.TextColor3 = UI.Palette.OnAccent
+		key.TextXAlignment = Enum.TextXAlignment.Center
+		key.Text = entry.Glyph
+		key.ZIndex = 3
+
+		local name = UI.Label("Name", slot)
+		name.Size = UDim2.new(1, -6, 0, 14)
+		name.Position = UDim2.new(0, 3, 1, -18)
+		name.Font = UI.Font.Body
+		name.TextSize = 10
+		name.TextColor3 = accent
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		name.Text = string.upper(entry.DisplayName)
+		name.ZIndex = 3
+
+		abilitySlots[entry.Id] = { Sweep = sweep, Key = key, Root = slot }
+	end
+
+	-- The guard meter, under the whole bar rather than inside the Block slot. It is the
+	-- one resource in the game that empties in seconds, and a four-pixel sliver inside a
+	-- 52-pixel square is not something anybody reads mid-fight.
+	local meterTrack = Instance.new("Frame")
+	meterTrack.Name = "BlockMeter"
+	meterTrack.AnchorPoint = Vector2.new(1, 1)
+	meterTrack.Position = UDim2.fromScale(1, 1)
+	meterTrack.Size = UDim2.new(1, 0, 0, 6)
+	meterTrack.BackgroundColor3 = UI.Palette.CartoonInk
+	meterTrack.BackgroundTransparency = 0.25
+	meterTrack.BorderSizePixel = 0
+	meterTrack.Parent = bar
+
+	local trackCorner = Instance.new("UICorner")
+	trackCorner.CornerRadius = UDim.new(0, 3)
+	trackCorner.Parent = meterTrack
+
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(1, 1)
+	fill.BackgroundColor3 = Color3.fromRGB(96, 186, 255)
+	fill.BorderSizePixel = 0
+	fill.Parent = meterTrack
+
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0, 3)
+	fillCorner.Parent = fill
+
+	blockMeterFill = fill
+end
+
+--[[
+	Repaints the cooldown sweeps and the guard meter.
+
+	Cooldowns are asked of CombatController rather than tracked here, so the bar can
+	never disagree with the controller about whether a press would be accepted — a slot
+	that looks ready while the input is being declined reads as the game dropping
+	inputs, which is the worst kind of bug because the player blames their connection.
+]]
+function HudController:_refreshAbilityBar()
+	for abilityId, slot in abilitySlots do
+		local remaining, total = CombatController:CooldownRemaining(abilityId)
+		local ratio = if total > 0 then math.clamp(remaining / total, 0, 1) else 0
+		slot.Sweep.Size = UDim2.fromScale(1, ratio)
+		slot.Key.TextTransparency = if ratio > 0 then 0.45 else 0
+	end
+
+	local fill = blockMeterFill
+	if fill == nil then
+		return
+	end
+	local character = Players.LocalPlayer.Character
+	local meter = if character ~= nil then character:GetAttribute("BlockMeter") else nil
+	local ratio = if type(meter) == "number" then math.clamp(meter, 0, 1) else 1
+	fill.Size = UDim2.fromScale(ratio, 1)
+	-- Red once the guard is nearly gone. The moment worth knowing about is not "the
+	-- meter is draining", it is "this is about to shatter and lock you out".
+	fill.BackgroundColor3 = if ratio < 0.25 then UI.Palette.Danger else Color3.fromRGB(96, 186, 255)
+end
+
 function HudController:_buildMinimap(screen: ScreenGui)
 	local panel = Instance.new("TextButton")
 	panel.Name = "Minimap"
@@ -662,7 +1167,7 @@ function HudController:_drawMinimapRegion(centre: Vector3)
 	-- doubled-up map looks like.
 	minimapDrawing = true
 
-	local dests, feats = MapRender.Fetch()
+	local dests, feats, sites = MapRender.Fetch()
 	local bounds = MapRender.BoundsAround(centre.X, centre.Z, MINIMAP_REGION_STUDS / 2)
 	local side = MINIMAP_REGION_STUDS / MINIMAP_STUDS_PER_PIXEL
 
@@ -701,6 +1206,25 @@ function HudController:_drawMinimapRegion(centre: Vector3)
 		-- A dot in the muscle's colour and nothing else. The names, the multipliers and
 		-- the locks are on the full map, and none of them can be read at this size.
 		local pin = MapRender.Dot(canvas, destination.Id, 6, stat.Color, 20)
+		pin.Position = project(at.X, at.Z)
+	end
+
+	-- Monster sites get a dot too, one size up and above the machines. At this scale it
+	-- is only "something dangerous is that way", which is the one thing about a mob
+	-- field worth knowing while you are running past it.
+	for _, hostile in sites do
+		local at = hostile.Position
+		if
+			at.X < bounds.MinX
+			or at.X > bounds.MinX + bounds.Width
+			or at.Z < bounds.MinZ
+			or at.Z > bounds.MinZ + bounds.Depth
+		then
+			continue
+		end
+		local site = MapRender.SiteIcon(hostile.Kind)
+		local color = if hostile.Kind == "Boss" then UI.Palette.Danger else site.Color
+		local pin = MapRender.Dot(canvas, hostile.Id, 5, color, 19)
 		pin.Position = project(at.X, at.Z)
 	end
 
@@ -823,7 +1347,7 @@ function HudController:_select(statId: Types.StatId)
 		slot.Stroke.Transparency = if chosen then 0 else 0.25
 		slot.Gradient.Color = if chosen
 			then ColorSequence.new({
-				ColorSequenceKeypoint.new(0, statColor:Lerp(Color3.new(1, 1, 1), 0.28)),
+				ColorSequenceKeypoint.new(0, statColor:Lerp(UI.Palette.OnAccent, 0.28)),
 				ColorSequenceKeypoint.new(1, statColor:Lerp(UI.Palette.CartoonInk, 0.18)),
 			})
 			else ColorSequence.new({
@@ -833,10 +1357,10 @@ function HudController:_select(statId: Types.StatId)
 		slot.KeyBadge.BackgroundColor3 = if chosen then UI.Palette.CartoonInk else UI.Palette.CartoonCream
 		slot.Number.TextColor3 = if chosen then statColor else UI.Palette.CartoonInk
 		slot.NameBand.BackgroundTransparency = if chosen then 0.08 else 0.18
-		slot.Name.TextColor3 = Color3.new(1, 1, 1)
+		slot.Name.TextColor3 = UI.Palette.OnAccent
 		-- The picture inverts on the selected tile: dark on the stat's colour, because a
 		-- coloured drawing on a tile of its own colour is invisible.
-		local ink = if chosen then UI.Palette.Backdrop else statColor
+		local ink = if chosen then UI.Palette.OnAccent else statColor
 		-- `fill` is the knockout colour for the flat glyph: a gap punched in an icon
 		-- has to be whatever is behind it, and behind it just changed.
 		Icons.Recolour(slot.Icon, ink, fill)
@@ -905,6 +1429,7 @@ function HudController:_beginManualTraining(statId: Types.StatId, input: InputOb
 	manualInput = input
 	manualStat = statId
 	clicking = true
+	Loader.Get("TrainingMuscleHighlightController"):SetLocalStat(statId)
 	self:_trainPing()
 end
 
@@ -915,7 +1440,11 @@ function HudController:_endManualTraining(input: InputObject)
 	manualInput = nil
 	manualStat = nil
 	clicking = false
+	Loader.Get("TrainingMuscleHighlightController"):SetLocalStat(nil)
 	Net.Event("ManualTrain"):FireServer("Stop")
+	-- Clear the gain box on the same frame the button comes up. Waiting for the next
+	-- sweep would leave it on screen for up to half a second after you stopped.
+	self:_refreshTrainingReadout()
 end
 
 -- UI input also reaches UserInputService. Hit-test the dock first so a press on a
@@ -936,38 +1465,101 @@ function HudController:_statSlotAt(position: Vector3): Types.StatId?
 end
 
 function HudController:_refreshGoal(view: { any })
-	-- Training is always the clearest first objective. The quest service may discover
-	-- module files in any order, so choose deliberately instead of accidentally putting
-	-- a three-player PvP goal in front of someone who has just spawned alone.
-	local priority = { DailyReps = 1, FirstMillion = 2, DailyKnockouts = 3 }
-	local selected = nil
-	local selectedPriority = math.huge
-	for _, quest in view do
-		if type(quest) == "table" and quest.Complete ~= true then
-			local questPriority = priority[tostring(quest.Id)] or 100
-			if questPriority < selectedPriority then
-				selected = quest
-				selectedPriority = questPriority
-			end
-		end
-	end
-	selected = selected or view[1]
-	if type(selected) ~= "table" then
+	lastQuestView = view
+
+	--[[
+		One objective, because the server sends one.
+
+		This used to rank three quests by category and completion share, which was the
+		right shape for a log of daily and one-shot quests. The quest system is now a
+		single repeating rotation, so the view is a list of exactly one and the ranking
+		had nothing left to decide.
+	]]
+	local quest = view[1]
+	if type(quest) ~= "table" or type(quest.Goal) ~= "number" then
 		goalPanel.Visible = false
 		return
 	end
 
-	local progress = if type(selected.Progress) == "number" then math.max(0, selected.Progress) else 0
-	local target = if type(selected.Goal) == "number" then math.max(1, selected.Goal) else 1
 	goalPanel.Visible = true
-	goalName.Text = tostring(selected.DisplayName or "Training Goal")
-	goalDetail.Text = tostring(selected.Description or "Keep training")
-	goalBar.Set(
-		math.clamp(progress / target, 0, 1),
-		`{NumberFormat.Format(progress)} / {NumberFormat.Format(target)}  ·  +{NumberFormat.Format(
-			selected.TokenReward or 0
-		)} tokens`
-	)
+
+	local progress = math.max(0, tonumber(quest.Progress) or 0)
+	local target = math.max(1, tonumber(quest.Goal) or 1)
+
+	for index, row in goalRows do
+		if index > 1 then
+			row.Root.Visible = false
+			continue
+		end
+		row.Root.Visible = true
+		row.Name.Text = tostring(quest.Description or quest.DisplayName or "Keep training")
+		row.Bar.Set(
+			math.clamp(progress / target, 0, 1),
+			`{NumberFormat.Format(progress)} / {NumberFormat.Format(target)}  ·  +{NumberFormat.Format(
+				tonumber(quest.TokenReward) or 0
+			)}`
+		)
+	end
+
+	-- The rotation number is the only sense of long-term progress the cycle gives, so
+	-- it goes in the heading rather than being invisible.
+	local loop = tonumber(quest.Loop)
+	goalHeading.Text = if loop ~= nil then `OBJECTIVE · ROTATION {loop}` else "OBJECTIVE"
+end
+
+--[[
+	The countdowns, driven from the profile rather than from a remote of their own.
+
+	`ImmortalUntil` and `BoostUntil` are absolute epochs on the profile and already ride
+	every ProfileChanged push, so the client can tick them locally between pushes and
+	needs no new traffic. That is the whole reason boosts were moved onto the profile:
+	an in-memory boost would have needed a remote of its own, and would still have
+	vanished on rejoin while its badge was mid-count.
+
+	Refreshed on a one-second clock rather than per frame: the text only ever changes
+	once a second, and NumberFormat.Duration is the same function the purchase toasts
+	use, so a badge and the toast that announced it cannot disagree.
+]]
+function HudController:_refreshBuffs()
+	local data = ProfileController:Get()
+
+	local until_ = if data ~= nil then tonumber(data.ImmortalUntil) else nil
+	local remaining = if until_ ~= nil then until_ - os.time() else 0
+
+	immortalRow.Visible = remaining > 0
+	if remaining > 0 then
+		immortalLabel.Text = NumberFormat.Duration(remaining)
+	end
+
+	local boostUntil = if data ~= nil then data.BoostUntil else nil
+	local now = os.time()
+	local product = 1
+	local live = 0
+
+	for id, entry in boostRows do
+		local expiresAt = if boostUntil ~= nil then tonumber(boostUntil[id]) else nil
+		local left = if expiresAt ~= nil then expiresAt - now else 0
+
+		entry.Row.Visible = left > 0
+		if left <= 0 then
+			continue
+		end
+
+		entry.Time.Text = NumberFormat.Duration(left)
+
+		local boost = BoostConfig.Get(id)
+		if boost ~= nil then
+			product *= boost.Multiplier
+			live += 1
+		end
+	end
+
+	-- One boost makes this row a restatement of the row above it, so it only earns its
+	-- space once there is a product the player could not read off a single badge.
+	totalRow.Visible = live > 1
+	if live > 1 then
+		totalLabel.Text = `x{product} TOTAL`
+	end
 end
 
 function HudController:_refreshProfile()
@@ -976,8 +1568,192 @@ function HudController:_refreshProfile()
 		return
 	end
 
-	powerLabel.Text = `POWER  {NumberFormat.Format(Formulas.TotalPower(data.Stats))}`
-	tokenLabel.Text = `Tokens  {NumberFormat.Format(data.Tokens)}`
+	powerLabel.Text = `POWER  {NumberFormat.FormatGain(Formulas.TotalPower(data.Stats))}`
+	tokenLabel.Text = `TOKENS  {NumberFormat.Format(data.Tokens)}`
+	fightTokenLabel.Text = `FIGHT  {NumberFormat.Format(data.FightTokens)}`
+	self:_refreshBuffs()
+	self:_refreshTrainingReadout()
+end
+
+--[[
+	Every stat gets a box up front, hidden. Building them lazily on the first payout
+	would put five icon draws inside the rep that lands them, which is exactly the
+	frame that must not hitch.
+]]
+function HudController:_buildGainBoxes(screen: ScreenGui)
+	trainingRow = Instance.new("Frame")
+	trainingRow.Name = "TrainingGainRow"
+	trainingRow.AnchorPoint = Vector2.new(0.5, 1)
+	trainingRow.Position = UDim2.new(0.5, 0, 1, -116)
+	trainingRow.Size =
+		UDim2.fromOffset(GAIN_BOX_WIDTH * GAIN_BOX_LIMIT + SLOT_GAP * (GAIN_BOX_LIMIT - 1), GAIN_BOX_HEIGHT)
+	trainingRow.BackgroundTransparency = 1
+	trainingRow.Parent = screen
+
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, SLOT_GAP)
+	layout.Parent = trainingRow
+
+	for _, definition in StatConfig.List do
+		local root = UI.Panel(`Gain{definition.Id}`, trainingRow)
+		root.Size = UDim2.fromOffset(GAIN_BOX_WIDTH, GAIN_BOX_HEIGHT)
+		root.BackgroundColor3 = UI.Palette.Backdrop
+		root.BackgroundTransparency = 0.06
+		root.Visible = false
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = definition.Color
+		stroke.Thickness = 2
+		stroke.Transparency = 0.25
+		stroke.Parent = root
+
+		local icon = Instance.new("Frame")
+		icon.Name = "StatIcon"
+		icon.AnchorPoint = Vector2.new(0, 0.5)
+		icon.Position = UDim2.new(0, 10, 0.5, 0)
+		icon.Size = UDim2.fromOffset(38, 38)
+		icon.BackgroundTransparency = 1
+		icon.Parent = root
+		Icons.Draw(definition.Icon, icon, definition.Color, UI.Palette.Backdrop)
+
+		local value = UI.Label("Value", root)
+		value.Position = UDim2.fromOffset(56, 6)
+		value.Size = UDim2.new(1, -66, 0, 26)
+		value.Font = UI.Font.Numeric
+		value.TextSize = 20
+		value.TextColor3 = UI.Palette.Text
+
+		local gain = UI.Label("Gain", root)
+		gain.Position = UDim2.fromOffset(56, 31)
+		gain.Size = UDim2.new(1, -66, 0, 18)
+		gain.Font = UI.Font.Numeric
+		gain.TextSize = 15
+		gain.TextColor3 = definition.Color
+
+		local caption = UI.Label("Caption", root)
+		caption.Position = UDim2.fromOffset(56, 46)
+		caption.Size = UDim2.new(1, -66, 0, 13)
+		caption.Font = UI.Font.Heading
+		caption.TextSize = 10
+		caption.TextColor3 = UI.Palette.TextMuted
+		caption.Text = ""
+
+		gainBoxes[definition.Id] = {
+			Root = root,
+			Icon = icon,
+			Value = value,
+			Gain = gain,
+			Caption = caption,
+			LastSeenAt = 0,
+			Rate = 0,
+		}
+	end
+end
+
+--[[
+	One landed payout. Called for machine reps and hand-training alike — the server
+	sends the same payload for both, and the bar deliberately does not distinguish
+	them: a stat went up, and this is by how much.
+]]
+function HudController:_pushGain(statId: Types.StatId, amount: number, perSecond: number)
+	local box = gainBoxes[statId]
+	if box == nil then
+		return
+	end
+
+	box.LastSeenAt = os.clock()
+	-- The payout is the headline; the rate goes on the caption line, which is the only
+	-- way both fit inside a box narrow enough to sit three abreast.
+	box.Gain.Text = `+{NumberFormat.FormatGain(amount)}`
+	box.Rate = perSecond
+	if not box.Root.Visible then
+		box.Root.Visible = true
+	end
+	UI.Pop(box.Root, 0.06)
+	self:_refreshTrainingReadout()
+end
+
+--[[
+	Shows a box per stat currently earning, and refreshes the totals from the replicated
+	profile so the big number is the authoritative one rather than a client-side sum.
+
+	The boxes belong to the act of training, not to the last payout. They used to age
+	out on a timer, which meant letting go of a machine left the number sitting there
+	for another eight seconds claiming you were still earning. Stopping now clears them
+	on the same frame, and the timer survives only as a backstop for a stat that stops
+	paying while you are still training something else.
+]]
+function HudController:_refreshTrainingReadout()
+	local state = TrainingController:GetState()
+	local station = if state.StationId ~= nil then EquipmentConfig.Get(state.StationId) else nil
+	trainingStatId = if station ~= nil then station.StatId else nil
+
+	local data = ProfileController:Get()
+	local now = os.clock()
+
+	-- Mounted on a machine, or holding the manual train button. Either counts; nothing
+	-- else does.
+	local isTraining = trainingStatId ~= nil or manualStat ~= nil
+	if not isTraining then
+		for _, box in gainBoxes do
+			box.Root.Visible = false
+			box.LastSeenAt = 0
+		end
+		return
+	end
+
+	-- Newest first, so the limit drops the stalest box rather than an arbitrary one.
+	local live: { Types.StatId } = {}
+	for statId, box in gainBoxes do
+		if now - box.LastSeenAt <= GAIN_BOX_LIFETIME and box.LastSeenAt > 0 then
+			table.insert(live, statId)
+		else
+			box.Root.Visible = false
+		end
+	end
+	table.sort(live, function(a, b)
+		return gainBoxes[a].LastSeenAt > gainBoxes[b].LastSeenAt
+	end)
+
+	for rank, statId in live do
+		local box = gainBoxes[statId]
+		if rank > GAIN_BOX_LIMIT then
+			box.Root.Visible = false
+			continue
+		end
+
+		box.Root.Visible = true
+		-- Recency decides which boxes survive the limit, but never where they sit:
+		-- laying them out newest-first made three muscles training at once swap places
+		-- on every rep, so the number you were reading moved out from under your eye.
+		-- StatConfig order is fixed, so a box appears and disappears but never jumps.
+		box.Root.LayoutOrder = statOrder(statId)
+		box.Value.Text = if data ~= nil then NumberFormat.Format(data.Stats[statId] or 0) else "—"
+
+		local rate = `{NumberFormat.FormatGain(box.Rate)}/SEC`
+		box.Caption.Text = if statId == trainingStatId and station ~= nil
+			then `{rate} · {string.upper(station.DisplayName)}`
+			else rate
+	end
+
+	-- Mounted but nothing has paid out yet: say so rather than showing nothing, since
+	-- the first rep on a slow machine is several seconds away.
+	if trainingStatId ~= nil then
+		local box = gainBoxes[trainingStatId]
+		if box ~= nil and not box.Root.Visible then
+			box.Root.Visible = true
+			box.Root.LayoutOrder = 0
+			box.Value.Text = if data ~= nil
+				then NumberFormat.Format(data.Stats[trainingStatId] or 0)
+				else "—"
+			box.Gain.Text = "BUILDING REP…"
+			box.Caption.Text = if station ~= nil then string.upper(station.DisplayName) else ""
+		end
+	end
 end
 
 function HudController:_refreshVitals()
@@ -989,7 +1765,9 @@ function HudController:_refreshVitals()
 	if humanoid ~= nil and humanoid.MaxHealth > 0 then
 		healthBar.Set(
 			humanoid.Health / humanoid.MaxHealth,
-			`HEALTH  {math.floor(humanoid.Health)} / {math.floor(humanoid.MaxHealth)}`
+			`HEALTH  {NumberFormat.Format(math.max(0, humanoid.Health))} / {NumberFormat.Format(
+				humanoid.MaxHealth
+			)}`
 		)
 	else
 		healthBar.Set(0, "HEALTH  —")
@@ -1019,6 +1797,43 @@ function HudController:Start()
 		end
 	end)
 
+	Net.Event("TrainingGain").OnClientEvent:Connect(function(payload: any)
+		if
+			type(payload) == "table"
+			and type(payload.StatId) == "string"
+			and type(payload.Amount) == "number"
+			and type(payload.PerSecond) == "number"
+		then
+			-- No filter on the mounted stat: hand-training and a machine both land here,
+			-- and both deserve a box.
+			self:_pushGain(payload.StatId, math.max(0, payload.Amount), math.max(0, payload.PerSecond))
+		end
+	end)
+
+	-- Boxes age out on their own, so a stat that stops earning clears without needing
+	-- another payout to trigger the sweep.
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			self:_refreshTrainingReadout()
+		end
+	end)
+
+	-- Potions and boosts expire on the server's clock with no message when they do, so
+	-- the badges count themselves down and hide themselves at zero.
+	task.spawn(function()
+		while true do
+			self:_refreshBuffs()
+			task.wait(1)
+		end
+	end)
+
+	TrainingController.Changed:Connect(function()
+		self:_refreshTrainingReadout()
+		-- Mounting changes which objective is most relevant, so re-rank the tracker.
+		self:_refreshGoal(lastQuestView)
+	end)
+
 	self:_select(selectedStat)
 
 	-- Number keys pick a slot, matching the numbers printed on it.
@@ -1038,7 +1853,7 @@ function HudController:Start()
 			return
 		end
 
-		for index, definition in StatConfig.List do
+		for index, definition in DOCK_STATS do
 			if DIGITS[index] ~= nil and input.KeyCode == DIGITS[index] then
 				self:_select(definition.Id)
 				return
@@ -1049,13 +1864,14 @@ function HudController:Start()
 			if self:_statSlotAt(input.Position) ~= nil then
 				return
 			end
-			self:_beginManualTraining(selectedStat, input)
-			-- Arms is the fist, so a click that has someone in reach is a punch as
-			-- well as a rep. CombatService rejects it if the target is out of range
-			-- or immune, and the training ping is unaffected either way.
-			if selectedStat == ARMS_STAT then
-				CombatController:Attack()
-			end
+			-- A click in the world throws a punch, and only a punch.
+			--
+			-- It used to start the manual-training clock as well, which paid one Arms
+			-- a second for holding the button — so fighting was also the fastest way
+			-- to train the stat that makes you hit harder, anywhere, with no machine
+			-- and no travel. Punching now pays only what a landed hit is worth
+			-- (Punch.ARMS_PER_HIT), and training is the dock card and the machines.
+			CombatController:Attack()
 		end
 	end)
 
@@ -1081,6 +1897,7 @@ function HudController:Start()
 
 	RunService.RenderStepped:Connect(function()
 		self:_refreshVitals()
+		self:_refreshAbilityBar()
 
 		-- The map pans on its own clock. Nothing on it changes between frames except
 		-- where the player is standing, and ten updates a second is already smoother

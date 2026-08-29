@@ -42,19 +42,6 @@ function NpcController:Init()
 	MenuController = Loader.Get("MenuController")
 end
 
---[[
-	Floats the plate over the whole figure rather than over its torso, which is the
-	part the plate is actually attached to.
-]]
-local function headroomOffset(model: Instance, adornee: BasePart): Vector3
-	if model:IsA("Model") then
-		local boundsCFrame, boundsSize = model:GetBoundingBox()
-		local top = boundsCFrame.Position.Y + boundsSize.Y / 2
-		return Vector3.new(0, (top - adornee.Position.Y) + HEADROOM, 0)
-	end
-	return Vector3.new(0, adornee.Size.Y / 2 + HEADROOM, 0)
-end
-
 function NpcController:_bind(model: Instance)
 	if bound[model] ~= nil then
 		return
@@ -88,7 +75,7 @@ function NpcController:_bind(model: Instance)
 	gui.Name = "NpcLabel"
 	gui.Adornee = base
 	gui.Size = UDim2.fromOffset(170, 54)
-	gui.StudsOffsetWorldSpace = headroomOffset(model, base)
+	gui.StudsOffsetWorldSpace = UI.HeadroomOffset(model, base, HEADROOM)
 	gui.AlwaysOnTop = false
 	gui.MaxDistance = 90
 	gui.Parent = base

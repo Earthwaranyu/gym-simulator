@@ -27,6 +27,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Net = require(ReplicatedStorage.Modules.Net)
 local UI = require(ReplicatedStorage.Modules.UI)
+local Icons = require(ReplicatedStorage.Modules.Icons)
 
 local MapRender = {}
 
@@ -35,7 +36,7 @@ export type Destination = {
 	ZoneId: string,
 	EquipmentId: string,
 	StatId: string,
-	RequiredPower: number,
+	RequiredStat: number,
 	GainMultiplier: number,
 	Position: Vector3,
 	AccessKind: string,
@@ -46,6 +47,23 @@ export type Destination = {
 	RequiresFlight: boolean,
 	LocationName: string,
 	LocationTagline: string,
+}
+
+-- A mob field or boss arena. The site, not the monsters standing in it: how many are
+-- alive right now arrives separately over BossStateChanged, because that changes while
+-- the map is open and this list does not.
+export type Hostile = {
+	Id: string,
+	ZoneId: string,
+	Kind: string,
+	DisplayName: string,
+	Position: Vector3,
+	Radius: number,
+	RequiredPower: number,
+	Health: number,
+	Damage: number,
+	Reward: number,
+	Color: Color3,
 }
 
 export type Feature = {
@@ -73,8 +91,12 @@ export type Bounds = {
 -- it is a shade of the city's own concrete and asphalt — dark grey shapes on a dark
 -- grey board, which is unreadable no matter how carefully the greys are chosen.
 -- Lifting the whole thing to paper gives every feature somewhere to contrast against.
-MapRender.Paper = Color3.fromRGB(232, 234, 238)
-MapRender.Ink = Color3.fromRGB(38, 42, 52)
+-- Warmed to sit on the same cream as UI.Palette.Backdrop. The board used to be the
+-- one light surface in a dark suite and could pick its own neutral; now the panel
+-- around it is paper too, and a cooler board inside a warmer frame reads as a
+-- mismatch rather than as a map.
+MapRender.Paper = Color3.fromRGB(232, 228, 216)
+MapRender.Ink = Color3.fromRGB(38, 33, 26)
 -- How far each feature's real colour is pulled toward white. High, because the source
 -- colours are city-dark; the tint that survives is enough to tell water from park.
 MapRender.WashAmount = 0.62
@@ -92,10 +114,22 @@ local FEATURE_LAYERS: { [string]: number } = {
 	SkyPlatform = 7,
 	Plaza = 8,
 	SafeZone = 9,
+	-- Points of interest sit above every terrain layer, because they are the reason to
+	-- look at the map rather than part of the picture of the city.
+	MobField = 10,
+	BossArena = 11,
+}
+
+-- The glyph drawn in the middle of each hostile site, and the colour it is drawn in.
+local SITE_ICONS: { [string]: { Icon: string, Color: Color3 } } = {
+	MobField = { Icon = "Thief", Color = Color3.fromRGB(52, 58, 74) },
+	BossArena = { Icon = "Brute", Color = Color3.fromRGB(150, 96, 62) },
 }
 
 local destinations: { Destination } = {}
 local destinationsById: { [string]: Destination } = {}
+local hostiles: { Hostile } = {}
+local hostilesById: { [string]: Hostile } = {}
 local features: { Feature } = {}
 local loaded = false
 
@@ -119,21 +153,23 @@ end
 	than allowed to poison the bounds, where one bad coordinate would squash the entire
 	map into a corner.
 ]]
-function MapRender.Fetch(): ({ Destination }, { Feature })
+function MapRender.Fetch(): ({ Destination }, { Feature }, { Hostile })
 	if loaded then
-		return destinations, features
+		return destinations, features, hostiles
 	end
 
-	local ok, list, rawFeatures = pcall(function()
+	local ok, list, rawFeatures, rawHostiles = pcall(function()
 		return Net.Function("GetDestinations"):InvokeServer()
 	end)
 	if not ok or type(list) ~= "table" then
-		return destinations, features
+		return destinations, features, hostiles
 	end
 
 	table.clear(destinations)
 	table.clear(destinationsById)
 	table.clear(features)
+	table.clear(hostiles)
+	table.clear(hostilesById)
 
 	for _, entry in list do
 		if
@@ -142,7 +178,7 @@ function MapRender.Fetch(): ({ Destination }, { Feature })
 			or type(entry.ZoneId) ~= "string"
 			or type(entry.EquipmentId) ~= "string"
 			or type(entry.StatId) ~= "string"
-			or type(entry.RequiredPower) ~= "number"
+			or type(entry.RequiredStat) ~= "number"
 			or type(entry.GainMultiplier) ~= "number"
 			or type(entry.X) ~= "number"
 			or type(entry.Y) ~= "number"
@@ -155,7 +191,7 @@ function MapRender.Fetch(): ({ Destination }, { Feature })
 			ZoneId = entry.ZoneId,
 			EquipmentId = entry.EquipmentId,
 			StatId = entry.StatId,
-			RequiredPower = entry.RequiredPower,
+			RequiredStat = entry.RequiredStat,
 			GainMultiplier = entry.GainMultiplier,
 			Position = Vector3.new(entry.X, entry.Y, entry.Z),
 			AccessKind = if type(entry.AccessKind) == "string" then entry.AccessKind else "Street",
@@ -201,8 +237,42 @@ function MapRender.Fetch(): ({ Destination }, { Feature })
 		end
 	end
 
+	if type(rawHostiles) == "table" then
+		for _, entry in rawHostiles do
+			if
+				type(entry) ~= "table"
+				or type(entry.Id) ~= "string"
+				or type(entry.ZoneId) ~= "string"
+				or type(entry.Kind) ~= "string"
+				or type(entry.DisplayName) ~= "string"
+				or type(entry.X) ~= "number"
+				or type(entry.Y) ~= "number"
+				or type(entry.Z) ~= "number"
+				or type(entry.RequiredPower) ~= "number"
+				or typeof(entry.Color) ~= "Color3"
+			then
+				continue
+			end
+			local hostile: Hostile = {
+				Id = entry.Id,
+				ZoneId = entry.ZoneId,
+				Kind = entry.Kind,
+				DisplayName = entry.DisplayName,
+				Position = Vector3.new(entry.X, entry.Y, entry.Z),
+				Radius = if type(entry.Radius) == "number" then entry.Radius else 60,
+				RequiredPower = entry.RequiredPower,
+				Health = if type(entry.Health) == "number" then entry.Health else 0,
+				Damage = if type(entry.Damage) == "number" then entry.Damage else 0,
+				Reward = if type(entry.Reward) == "number" then entry.Reward else 0,
+				Color = entry.Color,
+			}
+			table.insert(hostiles, hostile)
+			hostilesById[hostile.Id] = hostile
+		end
+	end
+
 	loaded = #destinations > 0
-	return destinations, features
+	return destinations, features, hostiles
 end
 
 function MapRender.IsLoaded(): boolean
@@ -211,6 +281,18 @@ end
 
 function MapRender.GetDestination(id: string): Destination?
 	return destinationsById[id]
+end
+
+function MapRender.GetHostile(id: string): Hostile?
+	return hostilesById[id]
+end
+
+--[[
+	The glyph and colour a hostile site is drawn with, keyed by mob kind rather than by
+	map-feature kind so callers holding a Hostile do not have to translate.
+]]
+function MapRender.SiteIcon(kind: string): { Icon: string, Color: Color3 }
+	return SITE_ICONS[if kind == "Boss" then "BossArena" else "MobField"]
 end
 
 --[[
@@ -245,11 +327,23 @@ function MapRender.Bounds(
 		minZ, maxZ = math.min(minZ, feature.Z - halfZ), math.max(maxZ, feature.Z + halfZ)
 	end
 
+	-- Frame the playable mainland first. The ocean is a traversal/fall-catcher surface
+	-- and deliberately extends well past the coast; including all of it made the city
+	-- occupy a small stripe in the middle of the full map. Water remains the fallback
+	-- for worlds with no authored land footprint.
 	local foundWorld = false
 	for _, feature in worldFeatures do
-		if feature.Kind == "Land" or feature.Kind == "Water" then
+		if feature.Kind == "Land" then
 			include(feature)
 			foundWorld = true
+		end
+	end
+	if not foundWorld then
+		for _, feature in worldFeatures do
+			if feature.Kind == "Water" then
+				include(feature)
+				foundWorld = true
+			end
 		end
 	end
 	if not foundWorld then
@@ -272,7 +366,12 @@ function MapRender.Bounds(
 
 	local width = math.max(maxX - minX, 1)
 	local depth = math.max(maxZ - minZ, 1)
-	local pad = math.max(width, depth) * 0.025
+	-- Full-map destinations are drawn as fixed-size UI circles, and each five-muscle
+	-- tier fans those circles around its world position. A 2.5% gutter framed the
+	-- geography but left the outer Core/Legs circles of the x1 starter cluster past
+	-- the software containment edge, where they were correctly (but confusingly)
+	-- hidden. Seven percent reserves enough paper for the complete five-pin fan.
+	local pad = math.max(width, depth) * 0.07
 	minX, maxX = minX - pad, maxX + pad
 	minZ, maxZ = minZ - pad, maxZ + pad
 	width, depth = maxX - minX, maxZ - minZ
@@ -430,6 +529,33 @@ function MapRender.DrawFeatures(
 			stroke.Color = Color3.fromRGB(96, 132, 168)
 			stroke.Thickness = 1.5
 			stroke.Parent = shape
+		end
+
+		local site = SITE_ICONS[feature.Kind]
+		if site ~= nil then
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = site.Color
+			stroke.Thickness = 2
+			stroke.Parent = shape
+
+			-- Sized against the drawn circle rather than the screen, so the glyph fills
+			-- a big arena on the full map and stays a legible mark on a small one. It
+			-- lives inside the `wantsDetail` branch on purpose: the minimap draws these
+			-- as plain tinted circles, because a figure at eight pixels is a smudge.
+			local glyph = Instance.new("Frame")
+			glyph.Name = "SiteIcon"
+			glyph.AnchorPoint = Vector2.new(0.5, 0.5)
+			glyph.Position = UDim2.fromScale(0.5, 0.5)
+			glyph.Size = UDim2.fromScale(0.62, 0.62)
+			glyph.BackgroundTransparency = 1
+			glyph.ZIndex = shape.ZIndex + 1
+			glyph.Parent = shape
+
+			local aspect = Instance.new("UIAspectRatioConstraint")
+			aspect.AspectRatio = 1
+			aspect.Parent = glyph
+
+			Icons.Draw(site.Icon, glyph, site.Color, shape.BackgroundColor3)
 		end
 	end
 end

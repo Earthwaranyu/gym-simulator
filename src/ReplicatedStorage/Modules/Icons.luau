@@ -35,6 +35,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ShopIcons = require(ReplicatedStorage.Modules.ShopIcons)
 local UI = require(ReplicatedStorage.Modules.UI)
 
 local Icons = {}
@@ -269,6 +270,52 @@ local function drawArrow(parent: GuiObject, color: Color3, _hole: Color3)
 end
 
 --[[
+	Close — the cross on every panel's corner.
+
+	This one is here because the typed version was broken in a way nobody could see
+	from the code: the buttons carried the text `✕` (U+2715), and Roblox's Gotham faces
+	do not have that character, so every close control in the game rendered as an empty
+	box. The `×` those same panels use for multipliers is a different character from
+	Latin-1, which is why only this one was affected and why the bug survived so long.
+
+	Drawn from two Frames, it cannot go missing on a font that lacks a glyph, and it
+	scales with its tile like everything else here.
+]]
+local function drawClose(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "BarA", 0.5, 0.5, 0.74, 0.15, color, 45, 0.5)
+	shape(parent, "BarB", 0.5, 0.5, 0.74, 0.15, color, -45, 0.5)
+end
+
+--[[
+	Plus and Minus — the map's zoom controls.
+
+	Typed, these were `+` and `−`, and the second one is U+2212, which Gotham does not
+	have. It had been rendering as a box for as long as it existed and nobody could
+	report it, because the muscle filter bar was drawn on top of both buttons.
+]]
+local function drawMinus(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "Bar", 0.5, 0.5, 0.66, 0.15, color, 0, 0.5)
+end
+
+local function drawPlus(parent: GuiObject, color: Color3, _hole: Color3)
+	shape(parent, "BarH", 0.5, 0.5, 0.66, 0.15, color, 0, 0.5)
+	shape(parent, "BarV", 0.5, 0.5, 0.15, 0.66, color, 0, 0.5)
+end
+
+--[[
+	Recenter — put the map back where it started.
+
+	A viewfinder: a frame with a dot in the middle. Not the map pin, even though one
+	already exists and would have been free — a pin on a reset button reads as "go
+	somewhere", which is the opposite of what this does.
+]]
+local function drawRecenter(parent: GuiObject, color: Color3, hole: Color3)
+	local frame = shape(parent, "Frame", 0.5, 0.5, 0.76, 0.66, color, 0, 0.16)
+	knockout(frame, "Window", 0.5, 0.5, 0.76, 0.7, hole, 0, 0.14)
+	shape(parent, "Centre", 0.5, 0.5, 0.2, 0.2, color, 0, 1)
+end
+
+--[[
 	Potion — a flask: narrow neck, round body. Reads as "drink this" without needing
 	the bubbles that vanish at tile size.
 ]]
@@ -300,6 +347,47 @@ local function drawQuest(parent: GuiObject, color: Color3, hole: Color3)
 	knockout(parent, "TickLong", 0.56, 0.48, 0.1, 0.46, hole, -40, 1)
 end
 
+--[[
+	Thief — a hooded head with the face covered and one lit eye-slit.
+
+	Everything here is chosen to survive being 28 pixels wide on a map. The hood is a
+	rounded square drawn behind and slightly above the head, because at that size a real
+	cowl silhouette and a rounded square are the same picture and one of them is a single
+	frame. The slit is a knockout rather than a dark shape so the glyph reads on a light
+	paper map and on a dark HUD tile without being redrawn.
+]]
+local function drawThief(parent: GuiObject, color: Color3, hole: Color3)
+	-- Hood first, so the face overlaps its lower edge and reads as sitting inside it.
+	shape(parent, "Hood", 0.5, 0.44, 0.78, 0.72, color, 0, 0.42)
+	-- The peak is what stops the hood reading as a helmet.
+	shape(parent, "Peak", 0.5, 0.16, 0.5, 0.22, color, 0, 0.3)
+
+	local face = shape(parent, "Face", 0.5, 0.56, 0.5, 0.46, hole, 0, 0.3)
+	-- One slit, the way the rig wears one. Two eyes here would read as the old goblin.
+	knockout(face, "Slit", 0.5, 0.36, 0.72, 0.16, color, 0, 0.4)
+end
+
+--[[
+	Brute — head and shoulders, and the shoulders are the whole glyph.
+
+	Deliberately *not* built from the thief. The two used to be the same head with horns
+	added, because they were the same creature at two sizes; they are not any more, and
+	the map has to say "this is a different thing" rather than "this is the big one".
+
+	At map size a muscular figure is legible only as a silhouette ratio, so this is a
+	small circle on a very wide trapezoid and nothing else.
+]]
+local function drawBrute(parent: GuiObject, color: Color3, hole: Color3)
+	-- Shoulders first and wide: the ratio between these and the head is the read.
+	shape(parent, "Shoulders", 0.5, 0.72, 0.96, 0.44, color, 0, 0.3)
+	shape(parent, "TrapLeft", 0.26, 0.52, 0.3, 0.22, color, 18, 0.2)
+	shape(parent, "TrapRight", 0.74, 0.52, 0.3, 0.22, color, -18, 0.2)
+
+	local head = shape(parent, "Head", 0.5, 0.34, 0.38, 0.38, color, 0, 0.5)
+	knockout(head, "EyeLeft", 0.32, 0.46, 0.16, 0.16, hole, 0, 1)
+	knockout(head, "EyeRight", 0.68, 0.46, 0.16, 0.16, hole, 0, 1)
+end
+
 local ICONS: { [string]: Builder } = {
 	Map = drawMap,
 	Train = drawTrain,
@@ -314,9 +402,15 @@ local ICONS: { [string]: Builder } = {
 	Core = drawCore,
 	Legs = drawLegs,
 	Arrow = drawArrow,
+	Close = drawClose,
+	Plus = drawPlus,
+	Minus = drawMinus,
+	Recenter = drawRecenter,
 	Potion = drawPotion,
 	Vip = drawVip,
 	Quest = drawQuest,
+	Thief = drawThief,
+	Brute = drawBrute,
 	-- The dumbbell is the token mark throughout the HUD, and Train already is one.
 	-- Aliased rather than copied so the two cannot drift apart in a restyle.
 	Token = drawTrain,
@@ -343,7 +437,7 @@ end
 ]]
 function Icons.Draw(name: string, parent: GuiObject, color: Color3, hole: Color3): Frame
 	local holder = Instance.new("Frame")
-	holder.Name = `Icon_{name}`
+	holder.Name = if string.sub(name, 1, 7) == "rbxasse" then "Icon_Art" else `Icon_{name}`
 	holder.AnchorPoint = Vector2.new(0.5, 0.5)
 	holder.Position = UDim2.fromScale(0.5, 0.5)
 	holder.Size = UDim2.fromScale(1, 1)
@@ -351,6 +445,22 @@ function Icons.Draw(name: string, parent: GuiObject, color: Color3, hole: Color3
 	-- Square whatever the tile does, so nothing skews on an odd aspect.
 	UI.AspectRatio(holder, 1)
 	holder.Parent = parent
+
+	-- Uploaded artwork wins where it exists; everything else is still drawn. A caller
+	-- may pass an id straight through — the shop hands over the icon the Creator
+	-- Dashboard already has for each product — or a ShopIcons key whose upload has not
+	-- happened yet, which falls through to its glyph.
+	local image = if string.match(name, "^rbxassetid://%d+$") ~= nil then name else ShopIcons.Get(name)
+	if image ~= nil then
+		local label = Instance.new("ImageLabel")
+		label.Name = "Art"
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.ScaleType = Enum.ScaleType.Fit
+		label.Image = image
+		label.Parent = holder
+		return holder
+	end
 
 	local builder = ICONS[name]
 	if builder == nil then
@@ -361,6 +471,77 @@ function Icons.Draw(name: string, parent: GuiObject, color: Color3, hole: Color3
 
 	builder(holder, color, hole)
 	return holder
+end
+
+export type CloseOptions = {
+	-- Side of the square button in pixels.
+	Size: number?,
+	-- The page this closes.
+	OnActivated: (() -> ())?,
+	-- Fires on the way down, for the click sound. Icons is a shared module and cannot
+	-- reach EffectsController, so the caller hands it in like every other Pressable.
+	OnPress: (() -> ())?,
+}
+
+--[[
+	The close button every page corner gets.
+
+	It lives in Icons rather than UI because the dependency only runs one way: UI
+	requires nothing at all and this file requires UI, so a `UI.CloseButton` that drew a
+	glyph would close the loop and fail at load. The button is the glyph plus the chrome
+	that makes it pressable, so this is the end of the arrow it belongs on.
+
+	The cross is hardcoded white rather than given an Ink role, which matters more than
+	it looks: `OnAccent` is the obvious choice and is cream in the light palette and
+	near-black in the dark one, so a themed page would turn the cross black on red. It
+	sits on a red fill in both palettes, so it is white in both.
+]]
+function Icons.CloseButton(parent: Instance, options: CloseOptions?): TextButton
+	-- Annotated, not inferred, for the reason UI.Pressable records: `options or {}`
+	-- widens to `CloseOptions | {}` and every field read below fails on the empty half.
+	local settings: CloseOptions = options or {}
+	local side = settings.Size or 32
+
+	local button = Instance.new("TextButton")
+	button.Name = "Close"
+	button.Size = UDim2.fromOffset(side, side)
+	button.BackgroundColor3 = UI.Palette.Danger
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = false
+	button.Text = ""
+	UI.Role(button, { Fill = "Danger" })
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = button
+
+	-- The glyph sits inside the circle rather than filling it, or the bars run off the
+	-- curve at the corners.
+	local holder = Instance.new("Frame")
+	holder.Name = "Glyph"
+	holder.AnchorPoint = Vector2.new(0.5, 0.5)
+	holder.Position = UDim2.fromScale(0.5, 0.5)
+	holder.Size = UDim2.fromScale(0.52, 0.52)
+	holder.BackgroundTransparency = 1
+	holder.Parent = button
+
+	local white = Color3.new(1, 1, 1)
+	Icons.Draw("Close", holder, white, white)
+
+	button.Parent = parent
+
+	UI.Pressable(button, {
+		PressScale = 0.9,
+		HoverScale = 1.08,
+		OnPress = settings.OnPress,
+	})
+
+	local activated = settings.OnActivated
+	if activated ~= nil then
+		button.Activated:Connect(activated)
+	end
+
+	return button
 end
 
 --[[

@@ -13,6 +13,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Signal = require(ReplicatedStorage.Packages.Signal)
@@ -24,11 +25,16 @@ local RankConfig = require(ReplicatedStorage.Modules.RankConfig)
 local ReputationConfig = require(ReplicatedStorage.Modules.ReputationConfig)
 local Icons = require(ReplicatedStorage.Modules.Icons)
 local EquipmentConfig = require(ReplicatedStorage.Modules.EquipmentConfig)
-local ShopConfig = require(ReplicatedStorage.Modules.ShopConfig)
 local ZoneConfig = require(ReplicatedStorage.Modules.ZoneConfig)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
 local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 local MapRender = require(ReplicatedStorage.Modules.MapRender)
+local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
+local ShopIcons = require(ReplicatedStorage.Modules.ShopIcons)
+local TokenMultiplierConfig = require(ReplicatedStorage.Modules.TokenMultiplierConfig)
+local MuscleIcons = require(ReplicatedStorage.Modules.MuscleIcons)
+local AbilityConfig = require(ReplicatedStorage.Modules.AbilityConfig)
+local MovementConfig = require(ReplicatedStorage.Modules.MovementConfig)
 
 local MenuController = {
 	Name = "MenuController",
@@ -53,6 +59,22 @@ local tabButtons: { [string]: TextButton } = {}
 local isOpen = false
 local activeTab = "Info"
 local quests: { any } = {}
+
+-- Which tab the scroller is currently positioned for. A refresh is not always a new
+-- page: the profile is replicated on every training rep, so a player reading a long
+-- list while a set runs gets one rebuild per rep. Resetting the canvas on all of them
+-- snapped the page back to the top a few times a second. Only a genuine change of tab
+-- earns the reset; a re-render of the tab already showing keeps the player's place.
+local scrolledTab: string? = nil
+
+-- How long a page waits before redrawing for replicated profile data. Slow enough that
+-- a rep every frame costs one redraw rather than sixty, fast enough that a number the
+-- player is watching still looks live.
+local PROFILE_REFRESH_INTERVAL = 0.25
+
+-- The product catalogue for this visit to the shop, or nil to fetch it again. Cleared
+-- on entering the tab, so a Dashboard price change lands on the next open.
+local catalogueCache: { any }? = nil
 
 type Destination = MapRender.Destination
 
@@ -84,6 +106,20 @@ local mapCenter = Vector2.new(0.5, 0.5)
 
 -- The map's paper palette lives in MapRender, so the minimap in the HUD and this board
 -- cannot drift into being two different-looking maps of the same city.
+--[[
+	The panel's header band, in pixels.
+
+	CLOSE_SIZE is the close button, which sits in the top-right corner; HEADER_BAND is
+	how far down a page's content has to start to clear it. They were bare numbers
+	inside the layout code, and the standalone pages were using the button's height as
+	their content offset — which put the first card's corner flush against the button
+	with no gap at all.
+]]
+local CLOSE_SIZE = 28
+local HEADER_BAND = CLOSE_SIZE + 10
+-- Tabbed pages clear the header and the tab strip under it.
+local TABBED_BAND = 82
+
 local MAP_PAPER = MapRender.Paper
 local MAP_INK = MapRender.Ink
 
@@ -110,6 +146,14 @@ type Tab = {
 local tabs: { Tab } = {}
 
 local wash = MapRender.Tint
+
+local function statValue(data: any?, statId: string): number
+	return if data ~= nil then (data.Stats[statId] or 0) else 0
+end
+
+local function destinationUnlocked(data: any?, destination: Destination): boolean
+	return statValue(data, destination.StatId) >= destination.RequiredStat
+end
 
 local function row(parent: Frame, height: number, order: number): Frame
 	local frame = Instance.new("Frame")
@@ -141,7 +185,7 @@ local function button(parent: Frame, text: string, color: Color3, onClick: () ->
 	btn.Size = UDim2.fromOffset(104, 28)
 	btn.Font = UI.Font.Heading
 	btn.TextSize = 14
-	btn.TextColor3 = UI.Palette.Backdrop
+	btn.TextColor3 = UI.Palette.OnAccent
 	btn.Text = text
 	btn.AutoButtonColor = true
 	btn.Parent = parent
@@ -181,6 +225,14 @@ function MenuController:Init()
 			end,
 		},
 		{
+			Id = "Muscles",
+			DisplayName = "Muscles",
+			Icon = "Train",
+			Render = function(parent)
+				self:_renderMuscleClasses(parent)
+			end,
+		},
+		{
 			Id = "Shop",
 			DisplayName = "Shop",
 			Render = function(parent)
@@ -200,6 +252,15 @@ function MenuController:Init()
 			OnBar = false,
 			Render = function(parent)
 				self:_renderQuests(parent)
+			end,
+		},
+		{
+			Id = "Titles",
+			DisplayName = "Titles",
+			Icon = "Rank",
+			OnBar = false,
+			Render = function(parent)
+				self:_renderTitles(parent)
 			end,
 		},
 		{
@@ -225,11 +286,10 @@ function MenuController:_renderMap(parent: Frame)
 	self:_fetchDestinations()
 
 	local data = ProfileController:Get()
-	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
 
 	if selectedDestination == nil then
 		for _, destination in destinations do
-			if power >= destination.RequiredPower then
+			if destinationUnlocked(data, destination) then
 				selectedDestination = destination.Id
 			end
 		end
@@ -272,7 +332,7 @@ function MenuController:_renderMap(parent: Frame)
 	local viewport = Instance.new("ScrollingFrame")
 	viewport.Name = "MapViewport"
 	viewport.Active = true
-	viewport.BackgroundColor3 = Color3.fromRGB(20, 24, 25)
+	viewport.BackgroundColor3 = UI.Palette.Backdrop
 	viewport.BorderSizePixel = 0
 	viewport.Size = UDim2.fromScale(1, 1)
 	viewport.CanvasSize = UDim2.fromScale(mapZoom, mapZoom)
@@ -317,7 +377,7 @@ function MenuController:_renderMap(parent: Frame)
 	hub.Size = UDim2.fromOffset(74, 16)
 	hub.TextXAlignment = Enum.TextXAlignment.Center
 	hub.TextSize = 11
-	hub.TextColor3 = Color3.fromRGB(0, 118, 160)
+	hub.TextColor3 = UI.Palette.Token
 	hub.Text = "SPAWN"
 	hub.ZIndex = 24
 
@@ -328,7 +388,7 @@ function MenuController:_renderMap(parent: Frame)
 			continue
 		end
 
-		local unlocked = power >= destination.RequiredPower
+		local unlocked = destinationUnlocked(data, destination)
 		if unlocked then
 			unlockedCount += 1
 		end
@@ -606,7 +666,7 @@ function MenuController:_renderMap(parent: Frame)
 	count.TextColor3 = UI.Palette.TextMuted
 	count.Text = `{unlockedCount} of {#destinations} training locations open  ·  all locations shown`
 
-	self:_renderDestination(parent, power)
+	self:_renderDestination(parent, data)
 
 	-- Point of sale for the pass that lifts the "from the plaza only" rule. The
 	-- price is left to Roblox's own prompt rather than repeated here: the product
@@ -633,7 +693,7 @@ function MenuController:_renderMap(parent: Frame)
 end
 
 -- The selected machine, its stat, tier multiplier and travel button.
-function MenuController:_renderDestination(parent: Frame, power: number)
+function MenuController:_renderDestination(parent: Frame, data: any?)
 	local destination = if selectedDestination ~= nil
 		then MapRender.GetDestination(selectedDestination)
 		else nil
@@ -671,9 +731,9 @@ function MenuController:_renderDestination(parent: Frame, power: number)
 	detail.Size = UDim2.new(1, -120, 1, 0)
 	detail.TextSize = 13
 
-	local shortfall = destination.RequiredPower - power
+	local shortfall = destination.RequiredStat - statValue(data, destination.StatId)
 	if shortfall > 0 then
-		detail.Text = `<font color="#FF5C5C">Needs {NumberFormat.Format(shortfall)} more power</font>`
+		detail.Text = `<font color="#FF5C5C">Needs {NumberFormat.Format(shortfall)} more {stat.DisplayName}</font>`
 			.. `  ·  x{NumberFormat.Format(destination.GainMultiplier)} gains`
 		local locked = UI.Label("Locked", action)
 		locked.AnchorPoint = Vector2.new(1, 0.5)
@@ -799,7 +859,6 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 	self:_fetchDestinations()
 
 	local data = ProfileController:Get()
-	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
 
 	if selectedMuscle == nil then
 		-- Default to the muscle the player is furthest behind on, which is the reason
@@ -843,7 +902,7 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 		chip.AutoButtonColor = false
 		chip.Font = UI.Font.Heading
 		chip.TextSize = 13
-		chip.TextColor3 = if selected then UI.Palette.Backdrop else definition.Color
+		chip.TextColor3 = if selected then UI.Palette.OnAccent else definition.Color
 		chip.Text = string.upper(definition.DisplayName)
 		chip.Parent = chips
 		UI.Pressable(chip)
@@ -881,7 +940,7 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 			Destination = destination,
 			Equipment = equipment,
 			PerSecond = perSecond,
-			Unlocked = power >= destination.RequiredPower,
+			Unlocked = destinationUnlocked(data, destination),
 		})
 	end
 
@@ -898,7 +957,7 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 			-- puts the one entry you cannot use for twenty hours where your eye lands.
 			return a.PerSecond < b.PerSecond
 		end
-		return a.Destination.RequiredPower < b.Destination.RequiredPower
+		return a.Destination.RequiredStat < b.Destination.RequiredStat
 	end)
 
 	local summary = UI.Label("Summary", parent)
@@ -970,8 +1029,8 @@ function MenuController:_renderTrain(parent: Frame, baseOrder: number?)
 				self:_goTo(destination, `{spot.Equipment.DisplayName} · {zoneName}`, stat.Color)
 			end)
 		else
-			local shortfall = destination.RequiredPower - power
-			detail.Text = `<font color="#FF5C5C">needs {NumberFormat.Format(shortfall)} more power</font>`
+			local shortfall = destination.RequiredStat - statValue(data, destination.StatId)
+			detail.Text = `<font color="#FF5C5C">needs {NumberFormat.Format(shortfall)} more {stat.DisplayName}</font>`
 				.. `  ·  {NumberFormat.Format(spot.PerSecond)}/s  ·  {access}`
 
 			local locked = UI.Label("Locked", line)
@@ -1020,7 +1079,7 @@ function MenuController:_renderInfo(parent: Frame)
 	portrait.AnchorPoint = Vector2.new(0, 0.5)
 	portrait.Position = UDim2.new(0, 8, 0.5, 0)
 	portrait.Size = UDim2.fromOffset(48, 48)
-	portrait.BackgroundColor3 = UI.Palette.CartoonCream
+	portrait.BackgroundColor3 = UI.Palette.Backdrop
 	portrait.BorderSizePixel = 0
 	portrait.ScaleType = Enum.ScaleType.Crop
 	portrait.Parent = header
@@ -1030,12 +1089,12 @@ function MenuController:_renderInfo(parent: Frame)
 	portraitAspect.Parent = portrait
 
 	local portraitCorner = Instance.new("UICorner")
-	portraitCorner.CornerRadius = UDim.new(0, 10)
+	portraitCorner.CornerRadius = UDim.new(0, 6)
 	portraitCorner.Parent = portrait
 
 	local portraitStroke = Instance.new("UIStroke")
-	portraitStroke.Color = UI.Palette.CartoonInk
-	portraitStroke.Thickness = 3
+	portraitStroke.Color = rank.Color
+	portraitStroke.Thickness = 1
 	portraitStroke.Parent = portrait
 
 	task.spawn(function()
@@ -1056,7 +1115,7 @@ function MenuController:_renderInfo(parent: Frame)
 	name.Position = UDim2.fromOffset(68, 6)
 	name.Font = Enum.Font.GothamBold
 	name.TextSize = 17
-	name.TextColor3 = UI.Palette.CartoonCream
+	name.TextColor3 = UI.Palette.Text
 	name.Text = Players.LocalPlayer.DisplayName
 
 	local rankLabel = UI.Label("Rank", header)
@@ -1064,7 +1123,7 @@ function MenuController:_renderInfo(parent: Frame)
 	rankLabel.Position = UDim2.fromOffset(68, 27)
 	rankLabel.Font = UI.Font.Heading
 	rankLabel.TextSize = 12
-	rankLabel.TextColor3 = Color3.new(1, 1, 1)
+	rankLabel.TextColor3 = UI.Palette.Text
 	rankLabel.Text = `{rank.DisplayName}  ·  {reputation.DisplayName}`
 
 	local record = UI.Label("Record", header)
@@ -1072,7 +1131,7 @@ function MenuController:_renderInfo(parent: Frame)
 	record.Position = UDim2.fromOffset(68, 44)
 	record.Font = UI.Font.Heading
 	record.TextSize = 11
-	record.TextColor3 = UI.Palette.CartoonCream
+	record.TextColor3 = UI.Palette.Text
 	record.Text =
 		`{if data ~= nil then data.Kills else 0} KOs  ·  {if data ~= nil then data.Deaths else 0} downs`
 
@@ -1084,17 +1143,27 @@ function MenuController:_renderInfo(parent: Frame)
 	heroPower.TextSize = 21
 	heroPower.TextXAlignment = Enum.TextXAlignment.Right
 	heroPower.TextColor3 = UI.Palette.Power
-	heroPower.Text = `{NumberFormat.Format(power)} POWER`
+	heroPower.Text = `{NumberFormat.FormatGain(power)} POWER`
 
 	local heroTokens = UI.Label("Tokens", header)
 	heroTokens.AnchorPoint = Vector2.new(1, 0)
-	heroTokens.Position = UDim2.new(1, -12, 0, 36)
-	heroTokens.Size = UDim2.new(0.48, -10, 0, 20)
+	heroTokens.Position = UDim2.new(1, -12, 0, 32)
+	heroTokens.Size = UDim2.new(0.48, -10, 0, 15)
 	heroTokens.Font = Enum.Font.GothamBold
-	heroTokens.TextSize = 12
+	heroTokens.TextSize = 11
 	heroTokens.TextXAlignment = Enum.TextXAlignment.Right
 	heroTokens.TextColor3 = UI.Palette.Token
-	heroTokens.Text = `{NumberFormat.Format(if data ~= nil then data.Tokens else 0)} TOKENS READY`
+	heroTokens.Text = `{NumberFormat.Format(if data ~= nil then data.Tokens else 0)} TRAINING TOKENS`
+
+	local heroFightTokens = UI.Label("FightTokens", header)
+	heroFightTokens.AnchorPoint = Vector2.new(1, 0)
+	heroFightTokens.Position = UDim2.new(1, -12, 0, 47)
+	heroFightTokens.Size = UDim2.new(0.48, -10, 0, 15)
+	heroFightTokens.Font = Enum.Font.GothamBold
+	heroFightTokens.TextSize = 11
+	heroFightTokens.TextXAlignment = Enum.TextXAlignment.Right
+	heroFightTokens.TextColor3 = UI.Palette.FightToken
+	heroFightTokens.Text = `{NumberFormat.Format(if data ~= nil then data.FightTokens else 0)} FIGHT TOKENS`
 
 	-- Five equal rows mirror the five-slot training dock. They deliberately fit in the
 	-- fixed body height, so the character sheet never hides Legs below a scrollbar.
@@ -1110,17 +1179,16 @@ function MenuController:_renderInfo(parent: Frame)
 
 	local function statCard(definition: StatConfig.StatDefinition, index: number)
 		local level = if data ~= nil then (data.MultiplierLevels[definition.Id] or 0) else 0
-		local cost = Formulas.MultiplierCost(level)
-		local current = Formulas.MultiplierValue(level)
-		local next = Formulas.MultiplierValue(level + 1)
+		local currentMultiplier = TokenMultiplierConfig.Get(level)
+		local nextMultiplier = TokenMultiplierConfig.Next(level)
 		local card = UI.CartoonCard(definition.Id, definition.Color, statList)
 		card.LayoutOrder = index
 		card.Size = UDim2.new(1, 0, 0, 63)
 
 		local glyphHolder = Instance.new("Frame")
 		glyphHolder.Name = "Glyph"
-		glyphHolder.BackgroundColor3 = UI.Palette.CartoonInk
-		glyphHolder.BackgroundTransparency = 0.18
+		glyphHolder.BackgroundColor3 = UI.Palette.Backdrop
+		glyphHolder.BackgroundTransparency = 0.3
 		glyphHolder.BorderSizePixel = 0
 		glyphHolder.AnchorPoint = Vector2.new(0, 0.5)
 		glyphHolder.Position = UDim2.new(0, 8, 0.5, 0)
@@ -1128,7 +1196,7 @@ function MenuController:_renderInfo(parent: Frame)
 		glyphHolder.Parent = card
 
 		local glyphCorner = Instance.new("UICorner")
-		glyphCorner.CornerRadius = UDim.new(1, 0)
+		glyphCorner.CornerRadius = UDim.new(0, 6)
 		glyphCorner.Parent = glyphHolder
 
 		local glyphAspect = Instance.new("UIAspectRatioConstraint")
@@ -1141,88 +1209,243 @@ function MenuController:_renderInfo(parent: Frame)
 		glyphPadding.PaddingLeft = UDim.new(0, 8)
 		glyphPadding.PaddingRight = UDim.new(0, 8)
 		glyphPadding.Parent = glyphHolder
-		Icons.Draw(definition.Icon, glyphHolder, UI.Palette.CartoonCream, UI.Palette.CartoonInk)
+		Icons.Draw(definition.Icon, glyphHolder, definition.Color, UI.Palette.Backdrop)
 
 		local label = UI.Label("Name", card)
 		label.Position = UDim2.fromOffset(68, 6)
-		label.Size = UDim2.fromOffset(132, 20)
+		label.Size = UDim2.fromOffset(146, 20)
 		label.Font = Enum.Font.GothamBold
 		label.TextSize = 14
-		label.TextColor3 = UI.Palette.CartoonCream
-		label.Text = `{string.upper(definition.DisplayName)}  ·  x{NumberFormat.Format(current)}`
+		label.TextColor3 = definition.Color
+		label.Text = string.upper(definition.DisplayName)
 
 		local value = UI.Label("Value", card)
 		value.Position = UDim2.fromOffset(68, 26)
 		value.Size = UDim2.fromOffset(132, 32)
 		value.Font = UI.Font.Numeric
 		value.TextSize = 20
-		value.TextColor3 = Color3.new(1, 1, 1)
-		value.Text = NumberFormat.Format(stats[definition.Id] or 0)
+		value.TextColor3 = UI.Palette.Text
+		value.Text = NumberFormat.FormatGain(stats[definition.Id] or 0)
 
 		local effect = UI.Label("Effect", card)
 		effect.AnchorPoint = Vector2.new(0, 0.5)
 		effect.Position = UDim2.new(0, 210, 0.5, 0)
-		effect.Size = UDim2.new(1, -416, 0, 30)
+		effect.Size = UDim2.new(1, -360, 0, 30)
 		effect.Font = UI.Font.Heading
 		effect.TextSize = 13
-		effect.TextColor3 = Color3.new(1, 1, 1)
+		effect.TextColor3 = UI.Palette.Text
 		effect.TextTruncate = Enum.TextTruncate.AtEnd
 		effect.Text = definition.Effect(stats)
+
+		local multiplier = UI.Label("Multiplier", card)
+		multiplier.AnchorPoint = Vector2.new(1, 0.5)
+		multiplier.Position = UDim2.new(1, -60, 0.5, 0)
+		multiplier.Size = UDim2.fromOffset(82, 30)
+		multiplier.Font = UI.Font.Numeric
+		multiplier.TextSize = 18
+		multiplier.TextXAlignment = Enum.TextXAlignment.Right
+		multiplier.TextColor3 = UI.Palette.Token
+		multiplier.Text = `×{NumberFormat.FormatGain(currentMultiplier.Multiplier)}`
 
 		local upgrade = Instance.new("TextButton")
 		upgrade.Name = "Upgrade"
 		upgrade.AnchorPoint = Vector2.new(1, 0.5)
-		upgrade.Position = UDim2.new(1, -9, 0.5, 0)
-		upgrade.Size = UDim2.fromOffset(188, 42)
-		upgrade.BackgroundColor3 = UI.Palette.Token
+		upgrade.Position = UDim2.new(1, -10, 0.5, 0)
+		upgrade.Size = UDim2.fromOffset(38, 38)
+		upgrade.BackgroundColor3 = if nextMultiplier ~= nil
+			then UI.Palette.FightToken
+			else UI.Palette.Backdrop
 		upgrade.BorderSizePixel = 0
 		upgrade.AutoButtonColor = false
 		upgrade.Font = Enum.Font.GothamBold
-		upgrade.TextSize = 13
-		upgrade.TextColor3 = UI.Palette.CartoonInk
-		upgrade.Text = `UPGRADE TO x{NumberFormat.Format(next)}  ·  {NumberFormat.Format(cost)} TOKENS`
+		upgrade.TextSize = 24
+		upgrade.TextColor3 = UI.Palette.OnAccent
+		upgrade.Text = if nextMultiplier ~= nil then "+" else "✓"
+		upgrade.Active = nextMultiplier ~= nil
 		upgrade.Parent = card
 
 		local upgradeCorner = Instance.new("UICorner")
-		upgradeCorner.CornerRadius = UDim.new(0, 10)
+		upgradeCorner.CornerRadius = UDim.new(1, 0)
 		upgradeCorner.Parent = upgrade
 
 		local upgradeStroke = Instance.new("UIStroke")
-		upgradeStroke.Color = UI.Palette.CartoonInk
-		upgradeStroke.Thickness = 3
+		upgradeStroke.Color = if nextMultiplier ~= nil then UI.Palette.Accent else UI.Palette.GlassStroke
+		upgradeStroke.Thickness = 1
 		upgradeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		upgradeStroke.Parent = upgrade
 
-		local upgradeGradient = Instance.new("UIGradient")
-		upgradeGradient.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(165, 245, 255)),
-			ColorSequenceKeypoint.new(1, UI.Palette.Token),
-		})
-		upgradeGradient.Rotation = 90
-		upgradeGradient.Parent = upgrade
-
-		UI.Pressable(upgrade, { PressScale = 0.94, HoverScale = 1.03 })
-		upgrade.Activated:Connect(function()
-			UI.Confirm(screen, {
-				Title = `Upgrade {definition.DisplayName} Multiplier`,
-				Body = `Raise your {definition.DisplayName} multiplier from ` .. `x{NumberFormat.Format(
-					current
-				)} to x{NumberFormat.Format(next)} ` .. `for {NumberFormat.Format(cost)} tokens?`,
-				ConfirmText = "Confirm",
-				CancelText = "Cancel",
-				OnConfirm = function()
-					local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)
-					toast(message)
-					if ok then
-						self:_refresh()
-					end
-				end,
-			})
-		end)
+		if nextMultiplier ~= nil then
+			UI.Pressable(upgrade, { PressScale = 0.94, HoverScale = 1.03 })
+			upgrade.Activated:Connect(function()
+				UI.Confirm(screen, {
+					Title = `Upgrade {definition.DisplayName} Multiplier`,
+					Body = `Spend {NumberFormat.Format(nextMultiplier.CostToUnlock)} tokens to raise {definition.DisplayName} gains from ×{NumberFormat.FormatGain(
+						currentMultiplier.Multiplier
+					)} to ×{NumberFormat.FormatGain(nextMultiplier.Multiplier)}?`,
+					ConfirmText = `UPGRADE TO ×{NumberFormat.FormatGain(nextMultiplier.Multiplier)}`,
+					CancelText = "Cancel",
+					OnConfirm = function()
+						local ok, message = Net.Function("PurchaseMultiplier"):InvokeServer(definition.Id)
+						toast(message)
+						if ok then
+							Loader.Get("EffectsController"):Play("Purchase")
+							self:_refresh()
+						end
+					end,
+				})
+			end)
+		end
 	end
 
 	for index, definition in StatConfig.List do
 		statCard(definition, index)
+	end
+end
+
+function MenuController:_renderMuscleClasses(parent: Frame)
+	local data = ProfileController:Get()
+	local currentLevel =
+		math.clamp(if data ~= nil then data.MuscleClassLevel else 0, 0, MuscleClassConfig.MAX_LEVEL)
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+	local fightTokens = if data ~= nil then data.FightTokens else 0
+	local nextClass = MuscleClassConfig.Next(currentLevel)
+
+	local intro = UI.Label("Intro", parent)
+	intro.Size = UDim2.new(1, 0, 0, 58)
+	intro.LayoutOrder = 1
+	intro.TextWrapped = true
+	intro.TextSize = 13
+	intro.TextColor3 = UI.Palette.TextMuted
+	intro.Text =
+		`PHYSIQUE TRANSFORMATION · YOU HAVE {NumberFormat.Format(fightTokens)} FIGHT TOKENS · Every stat, token and multiplier stays. Your body takes the new class colour and returns lean, ready to visibly build each muscle again.`
+
+	for _, class in MuscleClassConfig.List do
+		local current = class.Level == currentLevel
+		local previouslyUnlocked = class.Level < currentLevel
+		local isNext = nextClass ~= nil and class.Level == nextClass.Level
+		local powerReady = power >= class.RequiredPower
+		local tokensReady = fightTokens >= class.FightTokenCost
+		local eligible = isNext and powerReady and tokensReady
+		local accent = MuscleClassConfig.Color(class.Level)
+		-- The class colours are the physique tints the avatar itself is painted with,
+		-- so they are chosen to read on a body rather than as type on paper, and the
+		-- early ones are pale enough to vanish on the cream card. Darkened here, at
+		-- the one place they are used as text, rather than in the config — moving them
+		-- there would repaint every dummy in the game.
+		local accentInk = accent:Lerp(UI.Palette.Text, 0.45)
+		local card = UI.CartoonCard(`Class{class.Level}`, accent, parent)
+		card.LayoutOrder = 10 + class.Level
+		-- Taller than the quest cards beside it because it carries one line more: the
+		-- token rate the class earns, under the power and the price it costs.
+		card.Size = UDim2.new(1, 0, 0, 118)
+		card.BackgroundTransparency = 0.04
+
+		local preview = Instance.new("Frame")
+		preview.Name = "Preview"
+		preview.Position = UDim2.fromOffset(8, 8)
+		preview.Size = UDim2.fromOffset(88, 88)
+		preview.BackgroundColor3 = UI.Palette.Backdrop
+		preview.BackgroundTransparency = 0.2
+		preview.BorderSizePixel = 0
+		preview.Parent = card
+		local previewCorner = Instance.new("UICorner")
+		previewCorner.CornerRadius = UDim.new(0, 9)
+		previewCorner.Parent = preview
+		local figure = MuscleIcons.Build(preview, "Overall", accent)
+		if figure ~= nil then
+			figure.SetFlex(class.Level / MuscleClassConfig.MAX_LEVEL)
+		end
+
+		local title = UI.Label("ClassName", card)
+		title.Position = UDim2.fromOffset(108, 12)
+		title.Size = UDim2.new(1, -300, 0, 24)
+		title.Font = UI.Font.Heading
+		title.TextSize = 16
+		title.TextColor3 = accentInk
+		title.Text = `CLASS {class.Level + 1} · {string.upper(class.DisplayName)}`
+
+		local multiplier = UI.Label("Multiplier", card)
+		multiplier.Position = UDim2.fromOffset(108, 39)
+		multiplier.Size = UDim2.new(1, -300, 0, 23)
+		multiplier.Font = UI.Font.Numeric
+		multiplier.TextSize = 19
+		multiplier.TextColor3 = UI.Palette.Text
+		multiplier.Text = if class.Level == 0
+			then "STARTING PHYSIQUE"
+			else `{NumberFormat.Format(class.RequiredPower)} POWER · {NumberFormat.Format(
+				class.FightTokenCost
+			)} FIGHT TOKENS`
+
+		-- The reason to buy one. A class doubles the playtime token tick, and none of
+		-- this screen said so — it read as a price for a colour.
+		local rate = UI.Label("Rate", card)
+		rate.Position = UDim2.fromOffset(108, 90)
+		rate.Size = UDim2.new(1, -300, 0, 18)
+		rate.Font = UI.Font.Heading
+		rate.TextSize = 11
+		rate.TextColor3 = accentInk
+		rate.Text = `×{NumberFormat.Format(class.TokenMultiplier)} TOKENS WHILE YOU PLAY`
+
+		local detail = UI.Label("Detail", card)
+		detail.Position = UDim2.fromOffset(108, 67)
+		detail.Size = UDim2.new(1, -300, 0, 20)
+		detail.TextSize = 12
+		detail.TextColor3 = UI.Palette.TextMuted
+		detail.Text = if current
+			then "CURRENT · permanent physique class"
+			elseif previouslyUnlocked then "COMPLETED · permanent"
+			elseif isNext and eligible then "READY · token multipliers will be kept"
+			elseif
+				isNext and not powerReady
+			then `NEED {NumberFormat.Format(class.RequiredPower - power)} MORE POWER`
+			elseif
+				isNext
+			then `NEED {NumberFormat.Format(class.FightTokenCost - fightTokens)} MORE FIGHT TOKENS`
+			else `LOCKED · transform into class {class.Level} first`
+
+		local action = Instance.new("TextButton")
+		action.Name = "Action"
+		action.AnchorPoint = Vector2.new(1, 0.5)
+		action.Position = UDim2.new(1, -10, 0.5, 0)
+		action.Size = UDim2.fromOffset(178, 48)
+		action.BackgroundColor3 = if eligible then UI.Palette.Token else UI.Palette.Backdrop
+		action.BackgroundTransparency = if eligible then 0 else 0.35
+		action.BorderSizePixel = 0
+		action.Font = UI.Font.Heading
+		action.TextSize = 12
+		action.TextColor3 = if eligible then UI.Palette.CartoonInk else UI.Palette.TextMuted
+		action.Text = if current
+			then "CURRENT"
+			elseif previouslyUnlocked then "COMPLETED"
+			elseif eligible then "TRANSFORM"
+			elseif isNext and not powerReady then "POWER LOCKED"
+			elseif isNext then "TOKEN LOCKED"
+			else "ORDER LOCKED"
+		action.Active = eligible
+		action.Parent = card
+		local actionCorner = Instance.new("UICorner")
+		actionCorner.CornerRadius = UDim.new(0, 9)
+		actionCorner.Parent = action
+		if action.Active then
+			UI.Pressable(action)
+			action.Activated:Connect(function()
+				UI.Confirm(screen, {
+					Title = `Transform into {class.DisplayName}?`,
+					Body = `Spend {NumberFormat.Format(class.FightTokenCost)} Fight Tokens to unlock the {class.DisplayName} physique? You will earn ×{NumberFormat.Format(
+						class.TokenMultiplier
+					)} tokens for time played from then on. Your power is safe. Your appearance becomes lean in the new class colour, then Arms, Chest, Back, Core and Legs grow again only when you train that group.`,
+					ConfirmText = "TRANSFORM",
+					CancelText = "Cancel",
+					OnConfirm = function()
+						local ok, message = Net.Function("SelectPhysiqueClass"):InvokeServer(class.Level)
+						toast(message)
+						if ok then
+							self:_refresh()
+						end
+					end,
+				})
+			end)
+		end
 	end
 end
 
@@ -1241,8 +1464,8 @@ function MenuController:_renderQuests(parent: Frame)
 		local complete = quest.Complete == true
 		local accent = if complete
 			then UI.Palette.Vital
-			elseif quest.Id == "DailyKnockouts" then UI.Palette.Danger
-			elseif quest.Id == "FirstMillion" then UI.Palette.Power
+			elseif quest.Id == "CycleMobHunt" then UI.Palette.Danger
+			elseif quest.Id == "CycleUpperBody" then UI.Palette.Power
 			else UI.Palette.Token
 
 		local card = UI.CartoonCard(tostring(quest.Id), accent, parent)
@@ -1275,14 +1498,14 @@ function MenuController:_renderQuests(parent: Frame)
 		name.Size = UDim2.new(1, -238, 0, 24)
 		name.Font = UI.Font.Heading
 		name.TextSize = 16
-		name.TextColor3 = UI.Palette.CartoonCream
+		name.TextColor3 = UI.Palette.Text
 		name.Text = string.upper(tostring(quest.DisplayName))
 
 		local detail = UI.Label("Description", card)
 		detail.Position = UDim2.fromOffset(76, 31)
 		detail.Size = UDim2.new(1, -88, 0, 32)
 		detail.TextSize = 13
-		detail.TextColor3 = Color3.new(1, 1, 1)
+		detail.TextColor3 = UI.Palette.Text
 		detail.TextWrapped = true
 		detail.Text = tostring(quest.Description)
 
@@ -1294,7 +1517,9 @@ function MenuController:_renderQuests(parent: Frame)
 		reward.BackgroundTransparency = 0
 		reward.Font = UI.Font.Heading
 		reward.TextSize = 12
-		reward.TextColor3 = UI.Palette.CartoonInk
+		-- Completed fills the chip with the dark Vital green, so the label has to
+		-- flip to the light ink or it disappears into its own badge.
+		reward.TextColor3 = if complete then UI.Palette.OnAccent else UI.Palette.CartoonInk
 		reward.TextXAlignment = Enum.TextXAlignment.Center
 		reward.Text = if complete then "COMPLETED" else `+{quest.TokenReward} TOKENS`
 
@@ -1316,8 +1541,106 @@ function MenuController:_renderQuests(parent: Frame)
 end
 
 --[[
-	Shop — Robux products first, then the cash catalogue, in headed sections you
-	scroll through.
+	Bumped every time the body is cleared for a re-render.
+
+	A page that asks the server for anything yields, and the body can be cleared and
+	re-rendered while it is waiting. The stale render then resumes and appends its
+	sections to a body that already belongs to the newer one — the shop came back with
+	every shelf twice. Each yielding page captures this on entry and drops what it
+	built if the number moved underneath it.
+]]
+local renderGeneration = 0
+
+-- Which catalogue rows belong on the supplements shelf. An explicit set because these
+-- used to be recognised by having a ShopConfig entry, and that config went with the
+-- token-priced shelf; a new supplement is one id here plus its product file.
+local SUPPLEMENT_IDS: { [string]: boolean } = {
+	PreWorkout = true,
+	ProteinShake = true,
+}
+
+--[[
+	Products that carry a daily claim, and the remote that claims it.
+
+	A table rather than an `if product.Id == "Vip"` branch in the card loop, so a
+	second recurring entitlement is a row here and nothing else.
+]]
+local DAILY_CLAIMS: { [string]: { Remote: string, Label: string } } = {
+	Vip = { Remote = "ClaimVipDaily", Label = "CLAIM" },
+}
+
+--[[
+	The level each volume was at before it was muted.
+
+	Module scope, not inside `_renderSettings`, because that function re-runs on every
+	profile push — a table declared in there would forget the pre-mute level within a
+	second or two of the player muting, and unmute would silently jump to the default
+	instead of going back where they were.
+
+	A rejoin still loses it: a muted setting is just 0 on the profile, with nowhere to
+	record what it used to be. Unmute then falls back to the channel's default, which is
+	the honest answer rather than a guess.
+]]
+local mutedFrom: { [string]: number } = {}
+
+local VOLUME_DEFAULTS: { [string]: number } = {
+	MasterVolume = 100,
+	MusicVolume = 70,
+	SfxVolume = 100,
+}
+
+-- One click of a step button.
+local VOLUME_STEP = 10
+
+--[[
+	What a key is called on a keycap, where that differs from what Roblox calls it.
+
+	Enum names are precise and nobody says them. A player looking for the sprint key is
+	looking at a cap marked SHIFT, not LeftShift.
+]]
+local KEY_CAPTIONS: { [string]: string } = {
+	LeftShift = "SHIFT",
+	RightShift = "SHIFT",
+	LeftControl = "CTRL",
+	RightControl = "CTRL",
+	LeftAlt = "ALT",
+	RightAlt = "ALT",
+	Space = "SPACE",
+	Return = "ENTER",
+	Escape = "ESC",
+}
+
+local function keyCaption(key: Enum.KeyCode | string): string
+	local name = if typeof(key) == "EnumItem" then key.Name else key :: string
+	return KEY_CAPTIONS[name] or string.upper(name)
+end
+
+--[[
+	How long until the daily claim comes back.
+
+	The daily resets on the UTC calendar day, which is what VipService.today() means by
+	"once a day". So the wait is the rest of today in UTC — not a rolling twenty-four
+	hours from the claim, which would be a different promise and a longer one. A player
+	who claims at 23:59 can claim again at 00:01, and that is deliberate.
+
+	This is why the button says RESETS rather than READY IN: an eighteen-hour countdown
+	under "READY IN" reads as a broken twenty-four hour timer, because it never says
+	what it is counting toward.
+
+	Derived on the client rather than asked for: VipLastClaimDay is on the profile and
+	already reaches this client with every push, so the countdown costs no traffic.
+]]
+local function secondsUntilReset(): number
+	return 86400 - (os.time() % 86400)
+end
+
+local function claimedToday(): boolean
+	local data = ProfileController:Get()
+	return data ~= nil and data.VipLastClaimDay == os.date("!%Y-%m-%d")
+end
+
+--[[
+	Shop — the Robux catalogue, in headed sections you scroll through.
 
 	The Robux rows come from the server's product registry rather than from a table
 	here, so a new file in PurchaseService/Products appears in this list with no
@@ -1326,19 +1649,45 @@ end
 	player has already committed to buying it.
 ]]
 function MenuController:_renderShop(parent: Frame)
-	local ok, catalogue = pcall(function()
-		return Net.Function("GetProductCatalogue"):InvokeServer()
-	end)
+	local generation = renderGeneration
+	local ok = true
+	local catalogue: any = catalogueCache
+	if catalogue == nil then
+		ok, catalogue = pcall(function()
+			return Net.Function("GetProductCatalogue"):InvokeServer()
+		end)
+		if ok and type(catalogue) == "table" then
+			catalogueCache = catalogue
+		end
+	end
 
-	local sections: { [string]: { any } } = { Gamepass = {}, Potion = {}, Token = {} }
+	-- Another refresh landed while the catalogue was in flight; that one owns the body
+	-- now. Claiming the VIP daily is the reliable way to hit this: it marks the profile
+	-- dirty and refreshes, so a push arrives mid-round-trip.
+	if generation ~= renderGeneration then
+		return
+	end
+
+	-- This render runs again on every profile push while the shop is open, so reading
+	-- the class from here is what keeps a pack's quoted payout current the moment a
+	-- transformation lands.
+	local data = ProfileController:Get()
+	local classLevel = if data ~= nil then data.MuscleClassLevel else 0
+
+	local sections: { [string]: { any } } = { Gamepass = {}, Potion = {}, Supplement = {}, Token = {} }
 	if ok and type(catalogue) == "table" then
 		for _, product in catalogue do
 			-- Grouped by what the thing is to the player, not by Roblox's product
 			-- kind: a potion and a token pack are both DevProducts and belong in
 			-- different parts of a shop.
+			-- Supplements keep their own row rather than sitting under the immortality
+			-- potions, which was never true of them. Named explicitly: they used to be
+			-- recognised by having a ShopConfig entry, and that file is gone with the
+			-- token-priced shelf.
 			local group = if product.Kind == "Gamepass"
 				then "Gamepass"
 				elseif string.find(tostring(product.Id), "TokenPack") ~= nil then "Token"
+				elseif SUPPLEMENT_IDS[tostring(product.Id)] then "Supplement"
 				else "Potion"
 			table.insert(sections[group], product)
 		end
@@ -1346,7 +1695,7 @@ function MenuController:_renderShop(parent: Frame)
 
 	-- VIP is the game's flagship pass and should be read first. Catalogue prices are
 	-- sorted server-side, which otherwise puts the cheaper Fast Travel card before it.
-	local gamepassOrder: { [string]: number } = { Vip = 1, FastTravel = 2 }
+	local gamepassOrder: { [string]: number } = { Vip = 1, AutoLoad = 2, FastTravel = 3 }
 	table.sort(sections.Gamepass, function(left, right): boolean
 		local leftOrder = gamepassOrder[tostring(left.Id)] or 100
 		local rightOrder = gamepassOrder[tostring(right.Id)] or 100
@@ -1367,8 +1716,22 @@ function MenuController:_renderShop(parent: Frame)
 		accent: Color3,
 		actionText: string,
 		enabled: boolean,
-		onClick: () -> ()
-	)
+		onClick: () -> (),
+		-- Drawn in the corner regardless of what the button says. The button reads
+		-- OWNED once a pass is bought, and that used to be the only place a price
+		-- appeared — so an owner, the developer included, could never see what their
+		-- own pass costs.
+		priceText: string?,
+		--[[
+			An optional second button sharing the action row.
+
+			Only the VIP card uses one today, for its daily claim. It is a parameter
+			rather than a special case inside this function because a card should not
+			know which product it is drawing — the caller knows that already, and the
+			nil case has to stay byte-identical to what every other product renders.
+		]]
+		secondary: { Text: string, Enabled: boolean, OnClick: () -> () }?
+	): TextButton?
 		local card = UI.CartoonCard(title, accent, grid)
 		card.LayoutOrder = layoutOrder
 
@@ -1402,48 +1765,98 @@ function MenuController:_renderShop(parent: Frame)
 		name.Size = UDim2.new(1, -92, 0, 22)
 		name.Font = UI.Font.Heading
 		name.TextSize = 14
-		name.TextColor3 = UI.Palette.CartoonCream
+		name.TextColor3 = UI.Palette.Text
 		name.TextTruncate = Enum.TextTruncate.AtEnd
 		name.Text = string.upper(title)
+
+		if priceText ~= nil then
+			local price = UI.Label("Price", card)
+			price.AnchorPoint = Vector2.new(1, 0)
+			price.Position = UDim2.new(1, -10, 0, 10)
+			price.Size = UDim2.fromOffset(64, 22)
+			price.Font = UI.Font.Heading
+			price.TextSize = 12
+			price.TextXAlignment = Enum.TextXAlignment.Right
+			price.TextColor3 = accent
+			price.Text = priceText
+			-- The name shares this row, so it yields the width the price takes.
+			name.Size = UDim2.new(1, -160, 0, 22)
+		end
 
 		local detail = UI.Label("Description", card)
 		detail.Position = UDim2.fromOffset(82, 32)
 		detail.Size = UDim2.new(1, -92, 0, 38)
 		detail.TextSize = 11
-		detail.TextColor3 = Color3.new(1, 1, 1)
+		detail.TextColor3 = UI.Palette.Text
 		detail.TextWrapped = true
 		detail.TextYAlignment = Enum.TextYAlignment.Top
 		detail.TextTruncate = Enum.TextTruncate.AtEnd
 		detail.Text = description
 
-		local action = Instance.new("TextButton")
-		action.Name = "Buy"
+		--[[
+			The action row. One full-width button, or two half-width ones when the
+			caller passed a secondary.
+
+			Split horizontally rather than stacked: the card is 108px and the
+			description already runs to y=70, so there is no second band to put a
+			button in without resizing every cell in the grid.
+		]]
+		local function actionButton(name: string, text: string, active: boolean): TextButton
+			local button = Instance.new("TextButton")
+			button.Name = name
+			button.BackgroundColor3 = if active then UI.Palette.CartoonCream else UI.Palette.TextMuted
+			button.BackgroundTransparency = if active then 0 else 0.28
+			button.BorderSizePixel = 0
+			button.AutoButtonColor = false
+			button.Font = UI.Font.Heading
+			button.TextSize = 12
+			button.TextColor3 = UI.Palette.CartoonInk
+			button.Text = text
+			button.Parent = card
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 8)
+			corner.Parent = button
+
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = UI.Palette.CartoonInk
+			stroke.Thickness = 2
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.Parent = button
+
+			return button
+		end
+
+		local action = actionButton("Buy", actionText, enabled)
 		action.Position = UDim2.fromOffset(10, 78)
-		action.Size = UDim2.new(1, -20, 0, 26)
-		action.BackgroundColor3 = if enabled then UI.Palette.CartoonCream else UI.Palette.TextMuted
-		action.BackgroundTransparency = if enabled then 0 else 0.28
-		action.BorderSizePixel = 0
-		action.AutoButtonColor = false
-		action.Font = UI.Font.Heading
-		action.TextSize = 12
-		action.TextColor3 = UI.Palette.CartoonInk
-		action.Text = actionText
-		action.Parent = card
-
-		local actionCorner = Instance.new("UICorner")
-		actionCorner.CornerRadius = UDim.new(0, 8)
-		actionCorner.Parent = action
-
-		local actionStroke = Instance.new("UIStroke")
-		actionStroke.Color = UI.Palette.CartoonInk
-		actionStroke.Thickness = 2
-		actionStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		actionStroke.Parent = action
+		action.Size = if secondary ~= nil then UDim2.new(0.5, -13, 0, 26) else UDim2.new(1, -20, 0, 26)
 
 		if enabled then
 			UI.Pressable(action, { PressScale = 0.95, HoverScale = 1.02 })
 			action.Activated:Connect(onClick)
 		end
+
+		if secondary == nil then
+			return nil
+		end
+
+		local extra = actionButton("Secondary", secondary.Text, secondary.Enabled)
+		extra.AnchorPoint = Vector2.new(1, 0)
+		extra.Position = UDim2.new(1, -10, 0, 78)
+		extra.Size = UDim2.new(0.5, -13, 0, 26)
+		-- Half a cell is narrower than the settings row this moved from, and the
+		-- countdown is the longest string either button ever carries.
+		extra.TextSize = 11
+
+		if secondary.Enabled then
+			UI.Pressable(extra, { PressScale = 0.95, HoverScale = 1.02 })
+			extra.Activated:Connect(secondary.OnClick)
+		else
+			extra.Active = false
+			extra.TextColor3 = UI.Palette.TextMuted
+		end
+
+		return extra
 	end
 
 	local function section(
@@ -1504,6 +1917,12 @@ function MenuController:_renderShop(parent: Frame)
 			Accent = UI.Palette.CartoonPink,
 			Icon = "Potion",
 		},
+		Supplement = {
+			Title = "SUPPLEMENTS",
+			Detail = "Temporary boosts, bought outright",
+			Accent = UI.Palette.CartoonPink,
+			Icon = "Potion",
+		},
 		Token = {
 			Title = "TOKEN DUMBBELLS",
 			Detail = "Permanent multiplier currency",
@@ -1512,22 +1931,74 @@ function MenuController:_renderShop(parent: Frame)
 		},
 	}
 
-	for _, group in { "Gamepass", "Potion", "Token" } do
+	for _, group in { "Gamepass", "Potion", "Supplement", "Token" } do
 		local products = sections[group]
 		local visual = groupVisuals[group]
 		section(visual.Title, visual.Detail, visual.Accent, #products, function(grid)
 			for index, product in products do
 				local enabled = product.Available and not product.Owned
+				-- The price rides the button wherever the button has room for it. It
+				-- moves to the corner label only when the button is already spent on
+				-- OWNED or COMING SOON — so a price is always on the card, never twice.
+				local sellable = not product.Owned and product.Available
+				local priceText = `R$ {NumberFormat.Format(product.RobuxPrice)}`
 				local actionText = if product.Owned
 					then "OWNED"
 					elseif not product.Available then "COMING SOON"
-					else `BUY  ·  R$ {NumberFormat.Format(product.RobuxPrice)}`
-				productCard(
+					else `BUY  ·  {priceText}`
+				-- The dashboard icon if the product has one, then any artwork bundled
+				-- with the game, then the shelf's shared glyph.
+				local iconName = product.Icon
+					or (if ShopIcons.Get(product.Id) ~= nil then product.Id else visual.Icon)
+				-- A token pack's real payout depends on the buyer's physique class, so
+				-- the card quotes what this player would receive rather than the
+				-- Natural figure the product is written in. Scaled here rather than on
+				-- the server: this render already runs on every profile push, so the
+				-- figure follows a transformation the frame it happens instead of
+				-- trailing a round trip behind it. Same formatter as the HUD counter,
+				-- so "384K" means the same thing in both places.
+				local description = product.Description
+				if type(product.TokenGrant) == "number" then
+					local granted = MuscleClassConfig.ScaleTokens(classLevel, product.TokenGrant)
+					description =
+						`<font color="#{UI.Palette.Token:ToHex()}">≈ {NumberFormat.Format(granted)} TOKENS</font>\n{description}`
+				end
+				--[[
+					A daily claim sits beside the card's own button, and only for an
+					owner: offering CLAIM to someone who does not own the pass is an
+					invitation to be refused.
+
+					It used to be a row in the Settings tab, which is not where anyone
+					goes after buying VIP. The card that sold them the pass is.
+				]]
+				local daily = DAILY_CLAIMS[product.Id]
+				local secondary = nil
+				if daily ~= nil and product.Owned then
+					local waiting = claimedToday()
+					secondary = {
+						Text = if waiting
+							then `RESETS {NumberFormat.Duration(secondsUntilReset())}`
+							else daily.Label,
+						Enabled = not waiting,
+						OnClick = function()
+							local claimed, message = Net.Function(daily.Remote):InvokeServer()
+							toast(message)
+							-- Re-rendered on success so the button becomes its own
+							-- countdown rather than inviting a second press the
+							-- server would refuse.
+							if claimed then
+								self:_refresh()
+							end
+						end,
+					}
+				end
+
+				local claimButton = productCard(
 					grid,
 					index,
 					product.DisplayName,
-					product.Description,
-					visual.Icon,
+					description,
+					iconName,
 					visual.Accent,
 					actionText,
 					enabled,
@@ -1536,45 +2007,144 @@ function MenuController:_renderShop(parent: Frame)
 						if not bought then
 							toast(message)
 						end
-					end
+					end,
+					if sellable then nil else priceText,
+					secondary
 				)
+
+				--[[
+					The countdown rewrites itself once a second.
+
+					Guarded on IsDescendantOf rather than a Parent check: the shop page
+					is rebuilt on every profile push, and a destroyed button still
+					reports whatever parent it had. Without the guard every push would
+					leave another loop writing to a button nobody can see.
+				]]
+				if claimButton ~= nil and secondary ~= nil and not secondary.Enabled then
+					task.spawn(function()
+						while claimButton:IsDescendantOf(game) do
+							task.wait(1)
+							if not claimButton:IsDescendantOf(game) then
+								break
+							end
+							local left = secondsUntilReset()
+							if left <= 0 then
+								self:_refresh()
+								break
+							end
+							claimButton.Text = `RESETS {NumberFormat.Duration(left)}`
+						end
+					end)
+				end
 			end
 		end)
 	end
+end
 
-	section(
-		"SUPPLEMENTS",
-		"Temporary boosts bought with earned cash",
-		UI.Palette.CartoonLime,
-		#ShopConfig.List,
-		function(grid)
-			for index, item in ShopConfig.List do
-				productCard(
-					grid,
-					index,
-					item.DisplayName,
-					item.Description,
-					"Train",
-					UI.Palette.CartoonLime,
-					`BUY  ·  $ {NumberFormat.Format(item.Price)}`,
-					true,
-					function()
-						local bought, message = Net.Function("PurchaseShopItem"):InvokeServer(item.Id)
+function MenuController:_renderTitles(parent: Frame)
+	local data = ProfileController:Get()
+	local power = if data ~= nil then Formulas.TotalPower(data.Stats) else 0
+	local selectedId = if data ~= nil then data.SelectedTitleId else "Newbie"
+
+	local intro = UI.Label("Intro", parent)
+	intro.Size = UDim2.new(1, 0, 0, 38)
+	intro.LayoutOrder = 1
+	intro.TextSize = 13
+	intro.TextWrapped = true
+	intro.TextColor3 = UI.Palette.TextMuted
+	intro.Text =
+		"Power unlocks titles permanently, and the VIP pass unlocks its own. Select any unlocked title to display it above your player."
+
+	-- The pass the title needs, answered from the attribute its grant sets. The server
+	-- checks ownership itself before equipping anything; this only decides what the row
+	-- draws, so a stale attribute costs a redraw rather than a free title.
+	local function ownsGamepass(productId: string): boolean
+		return Players.LocalPlayer:GetAttribute(`{productId}Owned`) == true
+	end
+
+	for index, rank in RankConfig.List do
+		local unlocked = RankConfig.IsUnlocked(rank.Id, power, ownsGamepass)
+		local selected = selectedId == rank.Id
+		local pass = rank.RequiresGamepass
+		local line = row(parent, 64, index + 1)
+		line.BackgroundColor3 = if selected
+			then rank.Color:Lerp(UI.Palette.Backdrop, 0.68)
+			else UI.Palette.Backdrop
+
+		local name = UI.Label("Name", line)
+		name.Position = UDim2.fromOffset(4, 6)
+		name.Size = UDim2.new(0.45, 0, 0, 24)
+		name.Font = UI.Font.Heading
+		name.TextSize = 17
+		name.TextColor3 = rank.Color
+		name.Text = string.upper(rank.DisplayName)
+
+		local requirement = UI.Label("Requirement", line)
+		requirement.Position = UDim2.fromOffset(4, 32)
+		requirement.Size = UDim2.new(0.62, 0, 0, 19)
+		requirement.TextSize = 12
+		requirement.TextColor3 = UI.Palette.TextMuted
+		requirement.Text = if pass ~= nil
+			then (if unlocked
+				then "GAMEPASS · UNLOCKED"
+				else `REQUIRES THE {string.upper(rank.DisplayName)} GAMEPASS`)
+			elseif unlocked then `{NumberFormat.Format(rank.MinPower)} POWER · UNLOCKED`
+			else `NEED {NumberFormat.Format(rank.MinPower - power)} MORE POWER`
+
+		local choose = Instance.new("TextButton")
+		choose.AnchorPoint = Vector2.new(1, 0.5)
+		choose.Position = UDim2.new(1, -8, 0.5, 0)
+		choose.Size = UDim2.fromOffset(150, 40)
+		choose.BackgroundColor3 = if selected
+			then UI.Palette.Vital
+			elseif unlocked then rank.Color
+			else UI.Palette.Glass
+		choose.BackgroundTransparency = if unlocked then 0 else 0.5
+		choose.BorderSizePixel = 0
+		choose.Font = UI.Font.Heading
+		choose.TextSize = 12
+		choose.TextColor3 = if unlocked then UI.Palette.OnAccent else UI.Palette.TextMuted
+		-- A locked power rank is a matter of training; a locked pass is a matter of
+		-- buying, and the shop is one prompt away, so that row stays pressable.
+		choose.Text = if selected
+			then "EQUIPPED"
+			elseif unlocked then "SELECT TITLE"
+			elseif pass ~= nil then `GET {string.upper(rank.DisplayName)}`
+			else "LOCKED"
+		choose.Active = not selected and (unlocked or pass ~= nil)
+		choose.Parent = line
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 8)
+		corner.Parent = choose
+		if choose.Active then
+			UI.Pressable(choose)
+			choose.Activated:Connect(function()
+				if not unlocked and pass ~= nil then
+					local bought, message = Net.Function("PromptProduct"):InvokeServer(pass)
+					if not bought then
 						toast(message)
-						if bought then
-							self:_refresh()
-						end
 					end
-				)
-			end
+					return
+				end
+				local ok, message = Net.Function("SelectTitle"):InvokeServer(rank.Id)
+				toast(message)
+				if ok then
+					self:_refresh()
+				end
+			end)
 		end
-	)
+	end
 end
 
 function MenuController:_renderLeaderboard(parent: Frame)
+	local generation = renderGeneration
 	local ok, boards = pcall(function()
 		return Net.Function("GetLeaderboard"):InvokeServer()
 	end)
+
+	if generation ~= renderGeneration then
+		return
+	end
 
 	if not ok or type(boards) ~= "table" or #boards == 0 then
 		local empty = UI.Label("Empty", parent)
@@ -1618,46 +2188,185 @@ end
 
 function MenuController:_renderSettings(parent: Frame)
 	local data = ProfileController:Get()
-	local settings = if data ~= nil then data.Settings else { MusicEnabled = true, SfxEnabled = true }
+	local settings = if data ~= nil then data.Settings else VOLUME_DEFAULTS
 	local order = 0
 
-	local function toggleRow(settingName: string, displayName: string, detail: string, enabled: boolean)
+	--[[
+		A volume row. The mix follows the handle live and only the release is sent.
+
+		Two separate reasons, both learned the hard way elsewhere in this file: `Net` rate
+		limits the settings remote to four calls, so a per-frame invoke during a drag
+		would spend a player's whole budget and start failing mid-slide; and `_refresh`
+		rebuilds this whole page, which would destroy the slider under the finger still
+		dragging it. So the drag writes straight to SoundBus and nothing is redrawn until
+		the player lets go.
+	]]
+	local function volumeRow(settingName: string, displayName: string, detail: string, colour: Color3)
 		order += 1
-		local line = row(parent, 58, order)
+		local line = row(parent, 64, order)
 
 		local label = UI.Label("Text", line)
-		label.Size = UDim2.new(1, -132, 1, 0)
+		label.Size = UDim2.fromScale(0.46, 1)
 		label.TextSize = 14
 		label.Text = `<b>{displayName}</b>\n<font color="#8A93A8">{detail}</font>`
 
-		button(
-			line,
-			if enabled then "ON" else "OFF",
-			if enabled then UI.Palette.Vital else UI.Palette.Danger,
-			function()
-				local ok, message = Net.Function("UpdateSetting"):InvokeServer(settingName, not enabled)
-				toast(message)
-				if ok then
-					self:_refresh()
-				end
+		local current = (settings :: any)[settingName]
+		local level = if type(current) == "number" then current else VOLUME_DEFAULTS[settingName] or 100
+
+		local slider: UI.Slider
+		local muteButton: TextButton
+		local commitPending: thread? = nil
+
+		--[[
+			Applies a level locally at once and writes it to the server on a delay.
+
+			The delay is not politeness. `Net` rate limits UpdateSetting to four calls,
+			which is the same reason UI.Slider splits OnChanged from OnCommitted — a
+			player tapping `+` ten times would spend the whole budget and start getting
+			failures. The mix follows every click; only the last one is sent.
+		]]
+		local function apply(value: number, commit: boolean)
+			local live = ProfileController:Get()
+			if live ~= nil then
+				(live.Settings :: any)[settingName] = value
+				Loader.Get("EffectsController"):_applyVolumes()
 			end
-		)
+
+			-- The speaker reads the state, so it has to follow every path that changes
+			-- the level — including a drag, which never touches the buttons.
+			muteButton.Text = if value <= 0 then "🔇" else "🔊"
+
+			if not commit then
+				return
+			end
+
+			if commitPending ~= nil then
+				task.cancel(commitPending)
+			end
+			commitPending = task.delay(0.3, function()
+				commitPending = nil
+				local ok, message = Net.Function("UpdateSetting"):InvokeServer(settingName, value)
+				if not ok then
+					toast(message)
+				end
+			end)
+		end
+
+		slider = UI.Slider(settingName, line, {
+			Value = level,
+			Colour = colour,
+			OnChanged = function(value: number)
+				-- Live during a drag, but not sent: the release commits.
+				apply(value, false)
+			end,
+			OnCommitted = function(value: number)
+				apply(value, true)
+			end,
+		})
+		-- Room at both ends for the step buttons and the speaker.
+		slider.Root.Size = UDim2.new(0.5, -104, 0, 22)
+		slider.Root.Position = UDim2.new(0.5, 40, 0.5, -11)
+
+		--[[
+			A square control on the row's right half.
+
+			The settings `button` helper is the wrong shape here — it is a fixed 104x28
+			pinned to the row's right edge, which is one button's worth of room, and this
+			row needs three alongside a slider.
+		]]
+		local function miniButton(name: string, text: string, width: number, onClick: () -> ()): TextButton
+			local button = Instance.new("TextButton")
+			button.Name = name
+			button.AnchorPoint = Vector2.new(0, 0.5)
+			button.Size = UDim2.fromOffset(width, 22)
+			button.BackgroundColor3 = UI.Palette.Backdrop
+			button.BackgroundTransparency = 0.15
+			button.BorderSizePixel = 0
+			button.AutoButtonColor = false
+			button.Font = UI.Font.Heading
+			button.TextSize = 14
+			button.TextColor3 = UI.Palette.Text
+			button.Text = text
+			button.Parent = line
+			UI.Role(button, { Ink = "Text", Fill = "Backdrop" })
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 6)
+			corner.Parent = button
+
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = UI.Palette.GlassStroke
+			stroke.Thickness = 1
+			stroke.Transparency = 0.25
+			stroke.Parent = button
+			UI.Role(stroke, { Stroke = "GlassStroke" })
+
+			UI.Pressable(button, { PressScale = 0.92, HoverScale = 1.06 })
+			button.Activated:Connect(onClick)
+			return button
+		end
+
+		local function nudge(delta: number)
+			local live = ProfileController:Get()
+			local now = if live ~= nil then tonumber((live.Settings :: any)[settingName]) else nil
+			local value = math.clamp((now or level) + delta, 0, 100)
+			slider.Set(value)
+			apply(value, true)
+		end
+
+		local minus = miniButton("Down", "−", 24, function()
+			nudge(-VOLUME_STEP)
+		end)
+		minus.Position = UDim2.new(0.5, 12, 0.5, 0)
+
+		local plus = miniButton("Up", "+", 24, function()
+			nudge(VOLUME_STEP)
+		end)
+		plus.AnchorPoint = Vector2.new(1, 0.5)
+		plus.Position = UDim2.new(1, -38, 0.5, 0)
+
+		muteButton = miniButton("Mute", "🔊", 30, function()
+			local live = ProfileController:Get()
+			local now = if live ~= nil then tonumber((live.Settings :: any)[settingName]) else nil
+			local value = now or level
+
+			if value > 0 then
+				mutedFrom[settingName] = value
+				value = 0
+			else
+				-- Back to where they were, not to the default. Remembering it is the
+				-- whole point; the default is only the fallback for a rejoin, which has
+				-- nowhere to have remembered anything.
+				value = mutedFrom[settingName] or VOLUME_DEFAULTS[settingName] or 100
+			end
+
+			slider.Set(value)
+			apply(value, true)
+		end)
+		muteButton.AnchorPoint = Vector2.new(1, 0.5)
+		muteButton.Position = UDim2.new(1, 0, 0.5, 0)
+		muteButton.TextSize = 13
+		muteButton.Text = if level <= 0 then "🔇" else "🔊"
 	end
 
-	toggleRow("MusicEnabled", "Music", "Background soundtrack", settings.MusicEnabled)
-	toggleRow("SfxEnabled", "Sound effects", "Training, combat, and menu feedback", settings.SfxEnabled)
-
 	order += 1
-	local claim = row(parent, 58, order)
-	local label = UI.Label("Text", claim)
-	label.Size = UDim2.new(1, -132, 1, 0)
-	label.Text =
-		`<b>VIP daily protection</b>\n<font color="#8A93A8">Claim one hour of immortality every day</font>`
+	local appearance = row(parent, 58, order)
+	local appearanceLabel = UI.Label("Text", appearance)
+	appearanceLabel.Size = UDim2.new(1, -132, 1, 0)
+	appearanceLabel.TextSize = 14
+	appearanceLabel.Text = `<b>Appearance</b>\n<font color="#8A93A8">Skin, shorts, hair and face</font>`
 
-	button(claim, "CLAIM", UI.Palette.Token, function()
-		local _, message = Net.Function("ClaimVipDaily"):InvokeServer()
-		toast(message)
+	-- The creator needs the whole screen to show the body it is changing, so the menu
+	-- gets out of the way rather than hosting it as a page.
+	button(appearance, "EDIT", UI.Palette.Accent, function()
+		-- Open closes this menu itself, the same way the full map does. Closing it
+		-- here as well worked only because Toggle happens to be synchronous.
+		Loader.Get("CustomizerController"):Open(false)
 	end)
+
+	volumeRow("MasterVolume", "Master", "Everything the game plays", UI.Palette.Accent)
+	volumeRow("MusicVolume", "Music", "Soundtrack and world ambience", UI.Palette.Token)
+	volumeRow("SfxVolume", "Sound effects", "Training, combat, and menu feedback", UI.Palette.Power)
 
 	order += 1
 	local heading = UI.Label("ControlsHeading", parent)
@@ -1668,17 +2377,143 @@ function MenuController:_renderSettings(parent: Frame)
 	heading.TextColor3 = UI.Palette.Accent
 	heading.Text = "CONTROLS"
 
+	--[[
+		The bindings, read from the configs that define them.
+
+		This was four hand-written lines of prose, and every one of them had drifted:
+		it claimed F punches (F blocks), that Q flies (Q is the ground slam), and that
+		holding the mouse trains the selected muscle — a feature whose buttons are
+		destroyed the frame they are built. None of that was ever a typo. It is what
+		happens when a screen restates a config in its own words: the config moves and
+		the sentence does not.
+
+		So the sentences are gone. Combat rows come from AbilityConfig and movement
+		keys from MovementConfig, which means a rebound ability is right here with no
+		edit, and a wrong key on this page now requires the game itself to be wrong.
+	]]
 	order += 1
-	local note = row(parent, 112, order)
-	local noteText = UI.Label("Note", note)
-	noteText.Size = UDim2.fromScale(1, 1)
-	noteText.TextSize = 13
-	noteText.TextWrapped = true
-	noteText.TextColor3 = UI.Palette.TextMuted
-	noteText.Text = "Hold E at a machine to mount or dismount  ·  Space dismounts\n"
-		.. "Hold mouse to train the selected hotbar muscle  ·  F punches\n"
-		.. "Shift sprints  ·  Q flies  ·  Space climbs  ·  Ctrl descends\n"
-		.. "M opens the menu  ·  Tab toggles the player list"
+	local controls = row(parent, 0, order)
+
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.new(0.5, -6, 0, 26)
+	grid.CellPadding = UDim2.fromOffset(12, 6)
+	grid.FillDirectionMaxCells = 2
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = controls
+
+	local padding = controls:FindFirstChildOfClass("UIPadding")
+	if padding ~= nil then
+		padding.PaddingTop = UDim.new(0, 10)
+		padding.PaddingBottom = UDim.new(0, 10)
+	end
+
+	local capOrder = 0
+
+	--[[
+		One binding: the key drawn as a physical cap, then what it does.
+
+		The cap is sized to its text rather than fixed, because SHIFT and C both have to
+		look like the same kind of object while being four characters apart.
+	]]
+	local function keycap(key: string, action: string)
+		capOrder += 1
+
+		local line = Instance.new("Frame")
+		line.Name = action
+		line.BackgroundTransparency = 1
+		line.Size = UDim2.new(1, 0, 0, 26)
+		line.LayoutOrder = capOrder
+		line.Parent = controls
+
+		local cap = UI.Label("Key", line)
+		cap.AutomaticSize = Enum.AutomaticSize.X
+		cap.Size = UDim2.fromOffset(0, 22)
+		cap.Position = UDim2.fromOffset(0, 2)
+		cap.BackgroundColor3 = UI.Palette.Backdrop
+		cap.BackgroundTransparency = 0.15
+		cap.Font = UI.Font.Numeric
+		cap.TextSize = 12
+		cap.TextColor3 = UI.Palette.Text
+		cap.TextXAlignment = Enum.TextXAlignment.Center
+		cap.Text = key
+		UI.Role(cap, { Ink = "Text", Fill = "Backdrop" })
+
+		local capPadding = Instance.new("UIPadding")
+		capPadding.PaddingLeft = UDim.new(0, 8)
+		capPadding.PaddingRight = UDim.new(0, 8)
+		capPadding.Parent = cap
+
+		local capCorner = Instance.new("UICorner")
+		capCorner.CornerRadius = UDim.new(0, 5)
+		capCorner.Parent = cap
+
+		local capStroke = Instance.new("UIStroke")
+		capStroke.Color = UI.Palette.GlassStroke
+		capStroke.Thickness = 1
+		capStroke.Transparency = 0.25
+		capStroke.Parent = cap
+		UI.Role(capStroke, { Stroke = "GlassStroke" })
+
+		-- The label starts past the widest cap rather than past this one, so the
+		-- actions line up in a column instead of stepping in and out with key length.
+		local text = UI.Label("Action", line)
+		text.Position = UDim2.fromOffset(78, 0)
+		text.Size = UDim2.new(1, -78, 1, 0)
+		text.TextSize = 13
+		text.TextColor3 = UI.Palette.TextMuted
+		text.TextTruncate = Enum.TextTruncate.AtEnd
+		text.Text = action
+	end
+
+	local function group(title: string)
+		capOrder += 1
+		local heading = UI.Label(title, controls)
+		heading.Size = UDim2.new(1, 0, 0, 26)
+		heading.LayoutOrder = capOrder
+		heading.Font = UI.Font.Heading
+		heading.TextSize = 11
+		heading.TextColor3 = UI.Palette.Accent
+		heading.Text = string.upper(title)
+
+		-- A heading owns its whole row; the grid would otherwise put the first binding
+		-- of the group beside it.
+		capOrder += 1
+		local spacer = Instance.new("Frame")
+		spacer.Name = "Spacer"
+		spacer.BackgroundTransparency = 1
+		spacer.Size = UDim2.new(1, 0, 0, 26)
+		spacer.LayoutOrder = capOrder
+		spacer.Parent = controls
+	end
+
+	group("Combat")
+	for _, ability in AbilityConfig.Ordered() do
+		-- Punch carries no KeyCode on purpose: it is the left mouse button, and has
+		-- been since before the ability table existed.
+		local key = if ability.KeyCode ~= nil then keyCaption(ability.KeyCode) else "LMB"
+		local action = if ability.Kind == "Hold" then `{ability.DisplayName} (hold)` else ability.DisplayName
+		keycap(key, action)
+	end
+
+	group("Movement")
+	keycap(keyCaption(MovementConfig.SPRINT_KEY), "Sprint (toggle)")
+	keycap(keyCaption(MovementConfig.DASH_KEY), "Dash")
+	keycap("SPACE ×2", "Fly — needs Power")
+	keycap(keyCaption(MovementConfig.ASCEND_KEY), "Rise while flying")
+	keycap(keyCaption(MovementConfig.DESCEND_KEY), "Drop while flying")
+
+	group("General")
+	keycap("E", "Hold at a machine to train")
+	keycap("SPACE", "Leave the machine")
+	keycap("M", "Menu")
+	keycap("ESC", "Close")
+	keycap("TAB", "Player list")
+
+	-- Grown from the rows actually rendered. A hard-coded height was survivable while
+	-- this was a fixed block of prose; it is not once the list comes from a config that
+	-- can gain an entry.
+	controls.AutomaticSize = Enum.AutomaticSize.Y
+	controls.Size = UDim2.new(1, 0, 0, 0)
 end
 
 function MenuController:_refresh()
@@ -1690,7 +2525,7 @@ function MenuController:_refresh()
 		local selected = tabId == activeTab
 		tabButton.BackgroundColor3 = if selected then UI.Palette.Accent else UI.Palette.Backdrop
 		tabButton.BackgroundTransparency = if selected then 0 else 0.2
-		tabButton.TextColor3 = if selected then UI.Palette.Backdrop else UI.Palette.TextMuted
+		tabButton.TextColor3 = if selected then UI.Palette.OnAccent else UI.Palette.TextMuted
 		local stroke = tabButton:FindFirstChildOfClass("UIStroke")
 		if stroke ~= nil then
 			stroke.Transparency = if selected then 0.05 else 0.75
@@ -1701,27 +2536,64 @@ function MenuController:_refresh()
 	-- Info, Shop and Settings form the menu. Quests and Ranks are standalone HUD
 	-- destinations, so showing the menu strip above them falsely implies a hierarchy
 	-- they do not belong to and wastes a full row of usable space.
-	local hasMenuTabs = activeTab == "Info" or activeTab == "Shop" or activeTab == "Settings"
+	local hasMenuTabs = activeTab == "Info"
+		or activeTab == "Muscles"
+		or activeTab == "Shop"
+		or activeTab == "Settings"
 	tabStrip.Visible = hasMenuTabs
-	bodyScroll.Position = if hasMenuTabs then UDim2.fromOffset(0, 82) else UDim2.fromOffset(0, 28)
-	bodyScroll.Size = if hasMenuTabs then UDim2.new(1, 0, 1, -82) else UDim2.new(1, 0, 1, -28)
+	-- The standalone pages are full width, so they pass under the close button rather
+	-- than stopping short of it the way the tab strip does. They start below the header
+	-- band instead, or the first card's corner sits under the button.
+	local band = if hasMenuTabs then TABBED_BAND else HEADER_BAND
+	bodyScroll.Position = UDim2.fromOffset(0, band)
+	bodyScroll.Size = UDim2.new(1, 0, 1, -band)
 
 	local fixedPage = activeTab == "Info"
 	bodyScroll.ScrollingEnabled = not fixedPage
 	bodyScroll.ScrollBarThickness = if fixedPage then 0 else 4
 	bodyScroll.AutomaticCanvasSize = if fixedPage then Enum.AutomaticSize.None else Enum.AutomaticSize.Y
-	bodyScroll.CanvasPosition = Vector2.zero
 
+	-- A new page starts at the top; a redraw of the page already open does not.
+	--
+	-- Holding the canvas is what keeps the redraw invisible. Clearing the body while
+	-- AutomaticCanvasSize is on collapses the canvas to nothing for a frame, and Roblox
+	-- clamps CanvasPosition against it — so the page flicked to the top and back on
+	-- every redraw even once the position was being restored. Pinning the old height
+	-- across the rebuild means the position is never out of range to begin with.
+	local heldCanvas = false
+	if scrolledTab ~= activeTab then
+		bodyScroll.CanvasPosition = Vector2.zero
+		scrolledTab = activeTab
+	elseif not fixedPage then
+		bodyScroll.AutomaticCanvasSize = Enum.AutomaticSize.None
+		bodyScroll.CanvasSize = UDim2.fromOffset(0, bodyScroll.AbsoluteCanvasSize.Y)
+		heldCanvas = true
+	end
+
+	renderGeneration += 1
 	body:ClearAllChildren()
 	local layout = UI.VerticalList(body, 6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 
+	local generation = renderGeneration
 	for _, tab in tabs do
 		if tab.Id == activeTab then
 			titleLabel.Text = string.upper(tab.DisplayName)
 			tab.Render(body)
 			break
 		end
+	end
+
+	if heldCanvas then
+		-- Hand the canvas back to the layout once it has had a frame to measure the
+		-- rebuilt rows. The generation guard drops this if a newer render, or a tab
+		-- switch that is entitled to the top, has happened in the meantime.
+		task.spawn(function()
+			RunService.Heartbeat:Wait()
+			if renderGeneration == generation and isOpen then
+				bodyScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			end
+		end)
 	end
 end
 
@@ -1754,6 +2626,9 @@ function MenuController:Toggle(tabId: string?)
 		-- Closing invalidates any in-flight Train poll, so a panel nobody is looking
 		-- at stops asking the server questions.
 		trainPollToken += 1
+		-- Reopening a page is a new page, so it starts at the top even if it is the
+		-- same tab that was showing when the menu closed.
+		scrolledTab = nil
 	end
 
 	self:_publish()
@@ -1836,6 +2711,15 @@ end
 ]]
 function MenuController:_enterTab()
 	trainPollToken += 1
+
+	-- The shop re-renders on every profile push, and training pushes constantly, so
+	-- asking the server for the catalogue inside the render meant a round trip several
+	-- times a second — with the body already cleared, which is a blank shop for as long
+	-- as the trip takes. Prices still come from the Creator Dashboard rather than from
+	-- code; they are simply read once per visit instead of once per redraw.
+	if activeTab == "Shop" then
+		catalogueCache = nil
+	end
 end
 
 function MenuController:_build()
@@ -1867,19 +2751,16 @@ function MenuController:_build()
 	titleLabel.TextColor3 = UI.Palette.TextMuted
 	titleLabel.Text = "GYM NETWORK"
 
-	local close = Instance.new("TextButton")
+	-- No OnPress: nothing else on this page makes a sound, and one control that clicks
+	-- while its neighbours are silent reads as a bug rather than as polish.
+	local close = Icons.CloseButton(panel, {
+		Size = CLOSE_SIZE,
+		OnActivated = function()
+			self:Toggle()
+		end,
+	})
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position = UDim2.fromScale(1, 0)
-	close.Size = UDim2.fromOffset(28, 28)
-	close.BackgroundTransparency = 1
-	close.Font = UI.Font.Heading
-	close.TextSize = 20
-	close.TextColor3 = UI.Palette.TextMuted
-	close.Text = "✕"
-	close.Parent = panel
-	close.Activated:Connect(function()
-		self:Toggle()
-	end)
 
 	-- The user's three top-level menu pages live together here. Direct HUD routes such
 	-- as Quests hide this strip in _refresh, so they read as their own surfaces.
@@ -1897,11 +2778,12 @@ function MenuController:_build()
 	tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	tabLayout.Parent = tabStrip
 
-	for index, tabId in { "Info", "Shop", "Settings" } do
+	local menuTabIds = { "Info", "Muscles", "Shop", "Settings" }
+	for index, tabId in menuTabIds do
 		local tabButton = Instance.new("TextButton")
 		tabButton.Name = tabId
 		tabButton.LayoutOrder = index
-		tabButton.Size = UDim2.new(1 / 3, -6, 1, 0)
+		tabButton.Size = UDim2.new(1 / #menuTabIds, -6, 1, 0)
 		tabButton.BackgroundColor3 = UI.Palette.Backdrop
 		tabButton.BackgroundTransparency = 0.2
 		tabButton.BorderSizePixel = 0
@@ -1933,8 +2815,8 @@ function MenuController:_build()
 	scroll.Name = "Body"
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
-	scroll.Position = UDim2.fromOffset(0, 82)
-	scroll.Size = UDim2.new(1, 0, 1, -82)
+	scroll.Position = UDim2.fromOffset(0, TABBED_BAND)
+	scroll.Size = UDim2.new(1, 0, 1, -TABBED_BAND)
 	scroll.CanvasSize = UDim2.new()
 	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	scroll.ScrollBarThickness = 4
@@ -1956,10 +2838,33 @@ function MenuController:Start()
 		end
 	end)
 
+	-- The profile replicates once per Heartbeat in which anything marked it dirty, and
+	-- training marks it on every rep. Rebuilding a whole page that often is work the
+	-- player can see as flicker, so refreshes are coalesced: the first one schedules a
+	-- redraw, and everything that lands inside the window rides along with it.
+	local profileRefreshPending = false
 	ProfileController.Changed:Connect(function()
-		if isOpen and (activeTab == "Info" or activeTab == "Shop" or activeTab == "Settings") then
-			self:_refresh()
+		if
+			not isOpen
+			or profileRefreshPending
+			or not (
+				activeTab == "Info"
+				or activeTab == "Muscles"
+				or activeTab == "Titles"
+				or activeTab == "Shop"
+				or activeTab == "Settings"
+			)
+		then
+			return
 		end
+
+		profileRefreshPending = true
+		task.delay(PROFILE_REFRESH_INTERVAL, function()
+			profileRefreshPending = false
+			if isOpen then
+				self:_refresh()
+			end
+		end)
 	end)
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)

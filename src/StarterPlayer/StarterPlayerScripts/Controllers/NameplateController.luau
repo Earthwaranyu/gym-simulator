@@ -23,6 +23,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local UI = require(ReplicatedStorage.Modules.UI)
+local NumberFormat = require(ReplicatedStorage.Modules.NumberFormat)
 
 local NameplateController = {
 	Name = "NameplateController",
@@ -30,12 +31,12 @@ local NameplateController = {
 }
 
 -- How far above the head the plate floats.
-local HEADROOM = 2.6
+local HEADROOM = 3.35
 -- Past this the plate is not readable anyway, and drawing it is a BillboardGui the
 -- engine has to lay out every frame for someone the player cannot even make out.
 local MAX_DISTANCE = 150
-local PLATE_WIDTH = 140
-local PLATE_HEIGHT = 36
+local PLATE_WIDTH = 240
+local PLATE_HEIGHT = 82
 
 type Plate = {
 	gui: BillboardGui,
@@ -92,23 +93,56 @@ function NameplateController:_attach(player: Player, character: Model)
 	gui.ResetOnSpawn = false
 	gui.Parent = head
 
+	local title = UI.Label("Title", gui)
+	title.Size = UDim2.new(1, 0, 0, 20)
+	title.Font = UI.Font.Heading
+	title.TextSize = 14
+	title.TextXAlignment = Enum.TextXAlignment.Center
+	title.TextStrokeTransparency = 0.35
+
+	-- Off unless the title asks for it. A stroke rather than a second glowing label:
+	-- it survives being 14px tall at 150 studs, which is the whole point of a title
+	-- somebody paid for.
+	--
+	-- One pixel, not two. The text is 14px and a two-pixel halo in its own colour
+	-- closed the counters of the letters — a gold "VIP" read as a gold blob at any
+	-- distance worth reading it from. Thin and mostly transparent is a rim light;
+	-- thick is a smudge.
+	local titleGlow = Instance.new("UIStroke")
+	titleGlow.Thickness = 1
+	titleGlow.Transparency = 0.35
+	titleGlow.Enabled = false
+	titleGlow.Parent = title
+
 	local label = UI.Label("Name", gui)
-	label.Size = UDim2.new(1, 0, 0, 16)
+	label.Position = UDim2.fromOffset(0, 21)
+	label.Size = UDim2.new(1, 0, 0, 20)
 	label.Font = UI.Font.Heading
-	label.TextSize = 13
+	label.TextSize = 16
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextStrokeTransparency = 0.4
 	label.Text = player.DisplayName
 
 	local bar = UI.Bar("Health", UI.Palette.Vital, gui, UI.Palette.Health)
-	bar.Root.Position = UDim2.fromOffset(0, 18)
-	bar.Root.Size = UDim2.new(1, 0, 0, 12)
-	bar.Caption.TextSize = 10
+	bar.Root.Position = UDim2.fromOffset(0, 47)
+	bar.Root.Size = UDim2.new(1, 0, 0, 28)
+	bar.Caption.Font = UI.Font.Numeric
+	bar.Caption.TextSize = 14
 	bar.Caption.TextXAlignment = Enum.TextXAlignment.Center
 	bar.Caption.Position = UDim2.fromOffset(0, 0)
 	bar.Caption.Size = UDim2.fromScale(1, 1)
 
 	local function refresh()
+		local titleName = player:GetAttribute("TitleName")
+		local titleColor = player:GetAttribute("TitleColor")
+		title.Text = if type(titleName) == "string" then string.upper(titleName) else "NEWBIE"
+		title.TextColor3 = if typeof(titleColor) == "Color3" then titleColor else UI.Palette.TextMuted
+		local glowing = player:GetAttribute("TitleGlow") == true
+		titleGlow.Color = title.TextColor3
+		titleGlow.Enabled = glowing
+		-- The dark drop shadow every plate carries is what a coloured halo has to
+		-- fight; a glowing title drops it and lets its own colour do the separating.
+		title.TextStrokeTransparency = if glowing then 0.75 else 0.35
 		if humanoid.MaxHealth <= 0 then
 			bar.Set(0, "—")
 			return
@@ -117,7 +151,9 @@ function NameplateController:_attach(player: Player, character: Model)
 		-- so "half a bar" stops meaning a fixed amount of damage very early on.
 		bar.Set(
 			humanoid.Health / humanoid.MaxHealth,
-			`{math.floor(humanoid.Health)} / {math.floor(humanoid.MaxHealth)}`
+			`HP  {NumberFormat.Format(math.max(0, humanoid.Health))} / {NumberFormat.Format(
+				humanoid.MaxHealth
+			)}`
 		)
 	end
 	refresh()
@@ -130,15 +166,14 @@ function NameplateController:_attach(player: Player, character: Model)
 			-- Training Chest raises the ceiling mid-fight, and a bar that ignores that
 			-- shows someone at full health as wounded until they next take a hit.
 			humanoid:GetPropertyChangedSignal("MaxHealth"):Connect(refresh),
+			player:GetAttributeChangedSignal("TitleName"):Connect(refresh),
+			player:GetAttributeChangedSignal("TitleColor"):Connect(refresh),
+			player:GetAttributeChangedSignal("TitleGlow"):Connect(refresh),
 		},
 	}
 end
 
 local function watch(player: Player)
-	if player == Players.LocalPlayer then
-		return
-	end
-
 	player.CharacterAdded:Connect(function(character)
 		NameplateController:_attach(player, character)
 	end)

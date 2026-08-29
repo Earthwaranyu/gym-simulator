@@ -11,8 +11,8 @@ with no client remote to exploit.
 **Current roadmap: 11 / 18 items complete (#96–#113).** The checked foundation proves a
 large playable prototype; it does **not** mean the product is ready for a public launch.
 
-**Current public-launch blockers:** `DataService` still uses the Studio mock store, four
-product `AssetId`s are `0`, sound IDs are blank, and real persistence, Robux receipts,
+**Current public-launch blockers:** `DataService` still uses the Studio mock store, the
+four token-pack `AssetId`s are `0`, sound IDs are blank, and real persistence, Robux receipts,
 multiplayer balance, mobile controls, and load testing are incomplete. The current
 [`docs/PLAYTEST.md`](docs/PLAYTEST.md) also describes an older world and is reconciled in
 #96 before it is used as release evidence.
@@ -25,12 +25,12 @@ multiplayer balance, mobile controls, and load testing are incomplete. The curre
 |---|---|
 | Core stats | **5** — Arms, Chest, Back, Core, Legs |
 | PvP zoning | **Open PvP everywhere**, except safe spawn, shop, and quest board |
-| Death cost | **Time + broken combo only.** No stat, cash, or token loss |
+| Death cost | **Time + broken combo only.** No stat or token loss |
 | Progression sink | **Tokens → per-stat multiplier upgrades.** No rebirth system |
 | Token accrual | Passive per-tick, **only while alive, inside a gym zone, and somewhere you can be attacked**, plus quest rewards |
 | Training | **Hold E to mount.** You teleport onto the machine, lock into it, and reps tick on their own — no stamina, no clicking. Hold E again to get off |
 | Assets | **Everything original.** Part-built machines, animations generated from joint angles. No Toolbox models, no uploaded animation ids |
-| PvP opt-out | **Paid only** — immortal potions (19 R$ / 1h, 79 R$ / 1 day) and VIP (199 R$, 1h daily) |
+| PvP opt-out | **Paid only** — immortal potions (19 R$ / 1h, 199 R$ / 1 day) and VIP (699 R$, 1h daily) |
 | Reputation | Criminal → Neutral → Guardian → Hero, driven by who you kill |
 | Git | One commit per checklist item. No co-author trailer. |
 
@@ -61,7 +61,7 @@ system that consumes it:
 
 ## Phase 1 — Data Layer
 
-- [x] 8. `ProfileTemplate` schema: stats, tokens, per-stat multiplier levels, cash, owned equipment, quest progress, **reputation**, **immortality expiry**, kill/death record, settings, `SchemaVersion`.
+- [x] 8. `ProfileTemplate` schema: stats, tokens, per-stat multiplier levels, owned equipment, quest cycle progress, **reputation**, **immortality expiry**, kill/death record, settings, `SchemaVersion`.
 - [x] 9. `DataService` — session locking, release on leave, `BindToClose` flush.
 - [x] 10. Migration system: ordered list of version-bump functions, so the schema grows without breaking live saves.
 - [x] 11. Replication: server pushes an authoritative read-only profile view to the owning client; client never writes.
@@ -106,7 +106,7 @@ system that consumes it:
       the victim but leaves them mounted; only death dismounts them and resets the
       combo. The attacker must commit to a full kill, so the cost of interrupting is
       proportional to the effort of causing it.*
-- [x] 33. Death & respawn — respawn timer, rep-streak reset, in-flight token tick forfeited. **No stat, cash, or token loss on death.** *(ragdoll deferred to #56 VFX)*
+- [x] 33. Death & respawn — respawn timer, rep-streak reset, in-flight token tick forfeited. **No stat or token loss on death.** *(ragdoll deferred to #56 VFX)*
 - [x] 34. **Reputation system** — data-driven tiers (Criminal → Neutral → Guardian → Hero). Killing peaceful trainers pushes you toward Criminal; killing Criminals pushes you toward Hero. Tier table is config, not code.
 - [x] 35. **Immortality + barrier** — `CombatService` nullifies all damage while a potion is active, and the player wears a visible body barrier so attackers can see it before swinging.
 - [x] 36. Bounty / killstreak system with a revenge incentive so victims get a comeback path.
@@ -116,11 +116,11 @@ system that consumes it:
 
 ## Phase 6 — Economy & Monetisation
 
-- [x] 40. `CurrencyService` — cash from reps, kills, and bounties. Kept distinct from Tokens.
+- [x] 40. ~~`CurrencyService` — cash from reps, kills, and bounties.~~ **Removed.** Cash was deleted; the economy is Tokens (time, quests, bosses) and Fight Tokens (KOs, bounties, goblins).
 - [x] 41. Data-driven shop catalogue: gym-tier unlocks, supplements (timed multipliers), abilities.
 - [x] 42. `MarketplaceService` handler — gamepasses + dev products, **idempotent** receipt processing.
-- [x] 43. **Immortal potions** as dev products: 1 hour for 19 R$, 1 day for 79 R$. Expiry stored on the profile so it survives rejoin.
-- [x] 44. **VIP gamepass** at 199 R$ — grants one 1-hour immortal potion per day, with a daily-claim reset.
+- [x] 43. **Immortal potions** as dev products: 1 hour for 19 R$, 1 day for 199 R$ (live dashboard prices, read at runtime — see #159). Expiry stored on the profile so it survives rejoin.
+- [x] 44. **VIP gamepass** at 699 R$ — grants one 1-hour immortal potion per day, with a daily-claim reset.
 - [x] 45. Boost/multiplier sources all register into the Phase-2 modifier stack (#13) — 2x Stats, VIP, token boosts, and event buffs must not special-case.
 
 ## Phase 7 — UI
@@ -273,7 +273,7 @@ GTA V's art direction on top of it. And travel becomes a **button**, not a porta
       than from `Workspace`: with streaming on, a district 1,500 studs away is not
       replicated, so a client measuring for itself would draw only what happened to be
       loaded.
-- [x] 74. **Fast Travel gamepass.** 149 R$ to travel from wherever you are standing
+- [x] 74. **Fast Travel gamepass.** 299 R$ to travel from wherever you are standing
       instead of only from the plaza. One new file implementing `Types.Product`, no service
       edits — and its `Grant` deliberately does nothing: `TravelService` asks whether the
       player owns the pass at the moment they travel, so ownership is read live rather than
@@ -1046,7 +1046,7 @@ punches for a whole phase, so the game had two answers to one question.
       compact power/reputation roster stays top-right; and the main goal sits beneath
       it instead of overlapping it. Info has a player portrait and the five-stat
       multiplier ladder with confirmation. Shop groups the live server catalogue into
-      VIP/passes, immortal potions, token dumbbells, and cash supplements. Settings has
+      VIP/passes, immortal potions, token dumbbells, and Robux supplements. Settings has
       server-whitelisted, persisted Music/SFX toggles plus the VIP daily claim; disabled
       SFX now actually silences the shared effects path. Required-power machine signs
       also carry the warning badge and honest `+Stat/s` copy from the reference without
@@ -1070,7 +1070,7 @@ punches for a whole phase, so the game had two answers to one question.
       muscle owns a large round pictogram, current value, multiplier, gameplay effect,
       and a two-line upgrade control without pushing another muscle below the fold.
       Shop is rebuilt as responsive two-column card grids with separate saturated visual
-      families for VIP/passes, immortal potions, token dumbbells, and earned-cash
+      families for VIP/passes, immortal potions, token dumbbells, and Robux
       supplements. Each card has an original procedural glyph, short description, and
       full-width price state; the existing server catalogue still decides availability,
       ownership, pricing, and grants.
@@ -1372,6 +1372,278 @@ punches for a whole phase, so the game had two answers to one question.
       pure self-tests, generated-gym and balance validation, `git diff --check`, and a
       clean Rojo build.
 
+- [x] 127. **Sculpt a Gym-League-style final form and identify the muscle being trained.**
+      Full in-class growth now cross-fades the visible rectangular R15 body into 15
+      overlapping torso/waist/arm/hand/leg shells while preserving the original rig as
+      its invisible hitbox. A broad upper torso, narrower midsection, compact waist and
+      continuous ellipsoid limbs replace the old spherical body blobs and cut-off limb
+      cylinders. Over that mass sit deltoid caps, separate biceps/triceps, paired rounded-
+      band pecs, a ten-piece trap/rhomboid/lat/erector back, six abs with obliques, and
+      quad/hamstring/calf contours. The anterior shapes were corrected to Roblox
+      avatar-front −Z, fixing pecs, abs and quads previously hidden behind the body. Each group
+      still listens only to its own progress since the last physique change, so the
+      player builds back from lean without losing lifetime stats. Machine and manual
+      training publish the authoritative active stat; the local avatar receives a faint
+      white wash on the supporting body part and a stronger white fill on that stat's
+      sculpted contours. Manual release and machine stop clear it locally before the
+      network round trip. Live Studio verified lean at 0 shells/0 contours, isolated Arms
+      at 6 shells/8 contours with an untouched torso, and full growth at 15 shells/34
+      contours. Arms/Chest/Back/Core/Legs highlight 18/6/14/13/16 pieces respectively,
+      with zero remaining after stop. Selene has zero warnings, all pure self-tests and
+      world validation pass, and strict analysis reports only existing UI/FullMap issues.
+
+- [x] 128. **Combat gets a framework the abilities can be config in.** Abilities were
+      already open/closed on the server — a file in `CombatService/Abilities/` is
+      discovered at startup — but the client was not: `CombatController` hardcoded one
+      ability id, one cooldown mirror and one bind, so the second ability would have
+      needed a second copy of all three. `AbilityConfig` becomes the manifest both
+      realms read (id, key, cooldown, HUD glyph, colour), is deliberately free of the
+      Roblox API so `scripts/selftest.luau` can check it, and names E, C, Space and
+      LeftShift as reserved so no ability can silently fight the training prompt.
+      `CombatController` now binds every row in it and `HudController` draws one slot
+      per row with a cooldown sweep. Combat also gains three reusable primitives it had
+      no form of: `GetTargetsInRadius` (all targets, not the nearest, providers
+      included via an optional `FindAllInRadius`), `ApplyKnockback` (the game's first
+      impact physics, a short-lived `LinearVelocity`, refused for safe-zone and immortal
+      players and never dismounting a training victim), and a `RegisterDamageModifier`
+      registry so a defensive move can have the last word on damage without a branch
+      inside `ApplyDamage`. Dash moves from Q to C to free the key.
+
+- [x] 129. **A procedural VFX system, because the game had none.** Nothing in the
+      workspace had ever flashed, cracked or shaken — `EffectsController` was damage
+      numbers and silent sounds. `VfxConfig` declares effects as layered data (ring,
+      flash, shards, burst, shake, impact beat, scorch, trail) and `VfxController`
+      builds them at runtime from Roblox primitives under `CurrentCamera`, so nothing
+      replicates and a crater costs one client one frame. Everything is ours by the
+      project's asset rule: engine-bundled `rbxasset://` particle textures and
+      `Enum.Material.ForceField`, no upload. Effects are timed against the strike clip
+      that owns them, so retiming an animation moves its crater with it. The impact beat
+      is named for what it does rather than how — a true hit-stop cannot freeze a
+      procedural animation without desyncing it from server damage timing, so the camera
+      holds and the FOV punches instead. Studio verified the slam crater builds 22
+      shards, 2 rings, 2 bursts and a scorch; the first pass was retuned after a
+      screenshot showed dinner-plate slabs and dust thick enough to hide the fight.
+
+- [x] 130. **Ground Slam, Hard Punch and Block.** Q is a leap and a smash: one contact
+      two thirds through a 1.15s clip, damage falling off linearly to the rim, and
+      everybody inside launched. R is one telegraphed heavy — nearly half its clip is
+      wind-up, which is the entire reason Block has something to react to; the self-test
+      asserts it stays slower to land than a jab. F is a held guard owned by
+      `BlockService`: generous when outmatched by design (a defensive move that stops
+      working when you need it is not a move), draining on time and on damage absorbed
+      at a rate scaled to the victim's own health so it survives the same number of hits
+      at every point on the curve, and shattering into a three-second lockout if
+      emptied. The guard dome is deliberately not an effect but a state — the first
+      build made it one and shipped a barrier that flashed for 0.38s while the guard was
+      still up — and it is shrunk rather than faded away, because ForceField draws its
+      own shell and ignores `Transparency` entirely. Verified live in Studio: all three
+      fire from their keys, the bar sweeps, the meter drains red and breaks, and the
+      dome renders around the character.
+
+- [x] 131. **Flight gets an animation, and the body earns the right to tilt.** Flight
+      had none: FlightController puts the humanoid on PlatformStand and drives a
+      LinearVelocity, so Roblox's freefall clip kept playing and the avatar read as a
+      standing body sliding through the air. That is also why the controller held the
+      body rigidly upright — its own comment said a rig with no flight animation looks
+      like a falling body when pitched — so the pose is what removes the workaround
+      rather than layering on it. `FlightConfig` holds three silhouettes (upright
+      hover, leaning glide, near-horizontal superhero cruise with the leading fist
+      out), deliberately not a `PoseConfig` entry because a Pose cycles on a machine's
+      rep interval and flight blends on speed. `FlightPoseController` consumes them on
+      PreSimulation, modelled on `TrainingPoseController`, and clears every joint to
+      identity on landing or death. The controller now pitches from vertical velocity
+      and banks from how fast the heading is swinging, both clamped and eased.
+      Flight was also the one body state nobody else could see: `FlightAllowed` said
+      who *may* fly and nothing said who *is*, so a remote flier was unmarked. A
+      `FlightChanged` remote and a `FlightState` attribute close that, carrying coarse
+      bands rather than a per-frame float — the local flier blends from its own
+      velocity and never reads the attribute, so the coarseness costs the only person
+      who could notice it nothing. VFX: four contrails that ride the speed blend in
+      width, lifetime and heat, camera speed lines, a takeoff ring, a landing dust puff
+      pointedly lighter than a slam, a one-shot sonic boom with hysteresis, and
+      speed-scaled field of view folded into the existing camera hook. The flight
+      update runs on Heartbeat rather than RenderStepped, which a Studio session proved
+      matters — a backgrounded window throttles RenderStepped to zero. `StrikeConfig`'s
+      self-test had been written and never called from anywhere; it and FlightConfig's
+      now run at Studio boot, since both build poses from Vector3 and the CLI cannot
+      require them. Verified live: the cruise silhouette applies to the rig, hovering
+      eases back upright, landing releases every joint and every trail, and contrails
+      sit disabled at rest and near-maximum at speed.
+
+- [x] 132. **Walking and running stop being Roblox's.** Locomotion was the last
+      animation in the game that was not ours — the stock Animate script playing
+      Roblox's uploaded walk and run clips — and it is the animation players see most:
+      training is a pose at a machine, flying is occasional, fighting is bursts, and
+      running is every other second of the session. `GaitConfig` holds a heavy
+      gym-bruiser walk and sprint as `PoseConfig.Pose`-shaped cycles, so
+      `PosePlayback.AlphaAt` drives them unchanged. Almost nothing new was needed:
+      `JointMotion.Phase` already existed for limb opposition and its own comment cited
+      "a running stride", and `StairClimber` was already a walk cycle in all but name,
+      so its phase structure (hips half a cycle apart, knees lagging by a fifth, arms
+      opposite the same-side leg) is what these are built on. Ankles are included, which
+      `FlightConfig` omits — a flier's feet trail and nobody looks, a runner's feet are
+      what touch the ground.
+      Unlike flight, **no replication was needed at all**: `AssemblyLinearVelocity` and
+      `Humanoid.WalkSpeed` already replicate, so every client derives every other
+      character's gait from what it can already see. No remote, no attribute.
+      The one thing `GaitController` could not copy from `TrainingPoseController` is its
+      driver. That controller resets `startedAt` when the rep interval changes, which is
+      right for a machine and catastrophic here, because the interval changes every
+      frame as speed varies — it would restart the cycle sixty times a second and the
+      legs would stand still while the body slid. The phase is accumulated instead, and
+      accumulated from distance covered, so slowing down shortens the steps rather than
+      moon-walking. Lean and vertical bob live in the controller rather than the poses:
+      lean has to grow smoothly with speed instead of switching on with the sprint
+      silhouette, and the bob runs at twice the stride frequency because a body rises
+      once per step and a stride is two steps.
+      Priority 7 makes it the weakest of the four pose controllers — it writes first, so
+      training, strikes and flight all overwrite it — with explicit guards doing the
+      same job directly. VFX: footfall dust fired on the cycle's own footfall phases,
+      which is only possible because the cycle is ours, plus a sprint kick with
+      `FlightBoom`'s hysteresis and ground speed lines turned well down from flight's.
+      Verified live: hips in opposition, knees lagging, arms opposing legs, sprint
+      driving to −107° knees against a walk's −52°, measured root lean matching
+      `Formulas.RunLean` exactly, footfall and sprint effects spawning, and the gait
+      standing down for flight, training and strikes and releasing to Roblox's idle.
+
+- [x] 133. **The punch lands on somebody.** `Punch` was the only strike in the game with
+      no VFX at all, and the victim of one showed no sign of being hit — a number
+      appeared on their screen and their body did not move a joint. In a game whose hook
+      is interrupting somebody mid-training, the person being interrupted was the one
+      character in the fight not reacting.
+      The fix is architectural before it is cosmetic. Every effect until now hung off the
+      *actor* — a strike stamp, a guard, a flight state — but an attacker's swing is
+      stamped before the server knows whether it will connect, so anything driven off it
+      fires on a whiff. A Hard Punch thrown at empty air was already flashing a full
+      impact against nothing. `CombatService` now stamps the **victim** with `HurtAt` and
+      `HurtImpact` when damage actually lands, and impacts are driven from there;
+      `HeavyImpact` moved off the swing onto that path, and mobs are stamped too.
+      Escalation is an explicit weight rather than a function of damage, because for
+      evenly matched players a jab is about two per cent of a health bar and every
+      contact of a combo would have landed in the same band. `Punch` states 0.3 / 0.45 /
+      0.8 across its three contacts, a heavy states 1, and a slam states its own falloff.
+      `Formulas.ImpactTier` maps those to Light / Solid / Crushing, and the self-test
+      asserts the combo's mapping so a retune cannot silently flatten it.
+      `FlinchConfig` holds three victim poses, upper body only so a flinch never stops a
+      fleeing player's legs, blended in fast and out slow. `VfxConfig` gains a graded
+      `ImpactLight`/`Solid`/`Crushing` family and a new `Starburst` element — the manga
+      impact frame, a ring of camera-facing neon spikes, on the finisher only. Taking a
+      hit also pulses a screen vignette, deliberately a GUI frame rather than a
+      `Highlight`, because `StationHighlightController` already documents that Roblox
+      stops honouring Highlights past a few dozen and is using fourteen of them.
+      Whether a flinch interrupts your own swing turned out not to be expressible as a
+      controller priority: measured in Studio, a flinch stamped mid-swing won regardless.
+      So it is a stated rule — a crushing hit interrupts, a lighter one does not — which
+      is a better rule anyway, since "the flinch always loses" would have meant two
+      players fighting each other never visibly reacted at all.
+      `Punch` deliberately gains no knockback: contact range is 24 studs and the slowest
+      knockback is 40 studs a second, so shoving on the first contact would carry the
+      target out of reach of the other two and turn the combo into a one-hit move.
+      Verified live: punching air produces the swing and zero impact effects, the three
+      weights map to the three tiers with neck snaps of −6.9°/−16°/−30° and the starburst
+      only on the last, jabs and crosses lose to your own swing while a finisher
+      interrupts it, and a full combo peaks at 14 effect parts.
+
+- [x] 134. **One click, one punch.** The normal punch was one click that played a
+      0.9-second clip landing all three contacts by itself: the player pressed once and
+      watched. The three-hit combo the HUD advertised was something the game did to you
+      rather than something you did. Now each click is one swing, and clicking again
+      inside a 0.6-second window chains jab → cross → finisher before wrapping back to
+      the jab; stop, and the next click starts over.
+      `StrikeConfig` gains `PunchJab`, `PunchCross` and `PunchFinish` and the old
+      three-contact `Punch` strike is gone, so there is one definition of a jab rather
+      than two that can drift. The poses are unchanged — these are the same coils and
+      contacts the old combo walked through, regrouped one swing at a time, each now
+      returning to neutral because a swing has to be able to be the last one. The
+      finisher is longer and most of the extra length is recovery, so reaching the end of
+      a chain visibly costs something.
+      Damage is untouched in total. Each swing keeps its 25 / 30 / 45 per cent share, and
+      three clicks span roughly the same 0.9 seconds, so DPS and time-to-kill are exactly
+      where they were. The chain state lives inside `Punch.luau` in a **weak-keyed**
+      table: an ability has no `PlayerRemoving` hook, that belongs to `CombatService`, and
+      reaching in for one would put punch-specific knowledge into a system that
+      deliberately has none — while a plain table keyed by `Player` would leak an entry
+      per player for the life of the server.
+      `StrikeController` gained a blend. It used to clear every joint to identity and
+      start each clip from its own first pose, which was invisible while a strike only
+      ever began from a body at rest; chained swings interrupt each other mid-recovery,
+      and a click on the contact frame would have snapped a fully extended arm from 102
+      degrees to zero in one frame. Each swing now eases from wherever the joint actually
+      was — which improves every strike, not just the punch.
+      The cooldown is deliberately *shorter* than a swing's clip (0.3 against 0.34) so the
+      next click cuts the previous recovery. That broke the existing
+      `Cooldown >= Duration` self-test's coverage silently — it only checks ids that
+      match a strike, and no strike is called `Punch` any more — so the punch gets an
+      explicit chain-aware assertion instead, pinned from both directions and against the
+      remote's 8/sec rate limit.
+      Verified live against a goblin: one click throws one swing, four fast clicks give
+      jab, cross, finisher, jab, letting the window lapse resets to the jab, each swing
+      lands exactly one hit, the impact weights arrive 0.30/Light, 0.45/Solid,
+      0.80/Crushing, and a chained click reads 91° → 102° → 94° on the shoulder instead
+      of snapping to zero.
+
+- [x] 135. **The sprint was leaning backwards and windmilling.** #132 was authored blind —
+      Studio's screen capture has been unresponsive all session, so every angle was
+      reasoned from `PoseConfig`'s documented axes and verified only numerically. The
+      numbers were right; two of the conventions behind them were not.
+      **Root X is negative-forward.** That is not what the limb convention suggests, but
+      every pose already in the game follows it: FlightConfig's glide is −26 and its
+      cruise −62, and a strike's coils are positive while its contacts are negative,
+      because a coil loads the body back and a contact drives it forward. `Formulas.RunLean`
+      returned a *positive* value, so the character sprinted tipping backwards, further
+      back the faster it went. The sign now lives in the formula rather than in a caller's
+      memory, which is where it went wrong.
+      **Shoulder Z is arm width**, and the sprint was wider than the walk. PoseConfig's
+      lat pulldown uses 145 for arms straight out and `StairClimber`, the walk cycle this
+      gait was built from, uses 10; the sprint had 16-18 against the walk's 12-14, so it
+      held its arms further out than a stroll while swinging them through a 114 degree
+      arc. Walk drops to 9-10 and sprint tucks to 5-6, with the arc trimmed to 104.
+      The reason a blind mistake survived is that nothing tied the gait to the poses that
+      already had it right, so `GaitConfig.RunSelfTest` now requires `FlightConfig` and
+      asserts the two agree about which way forward is, plus that a sprint tucks its arms
+      closer than a walk. Those encode the relationships rather than the numbers, and the
+      first is the one check that would have failed on the shipped build — no amount of
+      numeric verification could surface it, because every value was internally consistent.
+      Verified live: walk leans -4.00 degrees with shoulder |Z| 9.99, sprint leans -16.82
+      with |Z| 6.33. Screen capture is still unresponsive, so this is confirmed consistent
+      with the working poses rather than confirmed to look right.
+
+- [x] 136. **The gait becomes anime.** Re-authored from "heavy gym-bruiser" to an anime
+      walk and run, in three parts.
+      **Timing first.** `StrikeConfig`'s header already says "the anime read comes from
+      the timing far more than the angles" — a cartoon motion holds at full extension and
+      crosses between poses in two frames — and the gait was running on a pure cosine, the
+      most symmetric and most *realistic* curve available. Anime poses on that curve still
+      read as realistic. A third `MotionStyle`, `Snapped`, runs the cosine through the
+      `smootherstep` helper already local to `PosePlayback`, so limbs dwell near their
+      extremes and transit fast. Deliberately not a literal hold, which would read as
+      dropped frames.
+      **Three silhouettes instead of two.** A light bouncy upright walk, a shonen sprint
+      with long strides and high knees, and a Naruto dash whose whole identity is the arms
+      — swept back, elbows locked, barely cycling. `GaitConfig` asserts the dash keeps its
+      shoulders negative at *both* ends of the cycle where the walk swings through zero,
+      which is the difference between arms that trail and arms that pump.
+      **The blend is now absolute, not per character.** It used to measure against each
+      character's own `WalkSpeed`, which meant everybody sat at 100% the moment they held
+      Shift — a fresh player jogging at 24 studs a second got the identical flat-out ninja
+      run as somebody with forty Legs doing 64. Measured against the global 64-stud
+      ceiling, speed means the same thing for everyone and **the dash is something Legs
+      earns**. The lean also went quadratic and deepened to 40 degrees so the deep end
+      arrives late, and the bob inverted — bouncy walk, gliding dash — which is the
+      reverse of a real gait and required renaming its constants, since MIN/MAX had become
+      lies.
+      **A third convention bug, fixed structurally.** `FlightConfig` pairs Root -26 with
+      Neck +20 and -62 with +46: the neck cancels the lean so the head stays level. The
+      sprint had Neck -6 against a -18 lean, so it stared at the floor. Rather than
+      hand-tune it again — hand-tuning is what produced all three of these bugs — the
+      controller now derives the neck counter-rotation from the same number it leans the
+      root by, and the self-test asserts no gait pose writes a head pitch at all.
+      Verified live: walk leans -4.0 with the shoulder swinging -30..+33; a fresh sprint
+      leans -5.0 with -58..+54 and -117 knees; top speed leans -37.1 with the shoulder at
+      -75..-56, both ends behind the body. The neck cancels the lean to within 0.05
+      degrees at every speed. Screen capture is still unresponsive, so this is verified
+      numerically and against the conventions rather than visually.
+
 ---
 
 # Roadmap — From Playable Prototype to Viral-Ready Live Game
@@ -1419,3 +1691,1194 @@ traffic exists:
 | Discovery | qPTR at or above benchmark with honest, meaningfully different creatives; judge each source by downstream D7, not clicks alone |
 | Monetization | 100% idempotent grants; no statistically meaningful D1/D7 or non-payer/PvP-victim regression after a store change |
 | Reliability | crash-free sessions ≥99.5%; OOM exits <0.1%; p95 join→interactive ≤10s; p50 ≥55 FPS on the chosen low-end mobile tier; healthy server heartbeat at capacity |
+
+- [x] 137. **Build artifacts stop being version-controlled.** `scripts/__pycache__` was
+      tracked, so every run of a build script produced a spurious diff, and `default.rbxl`
+      was sitting untracked in the root waiting to be committed by accident. Both are now
+      ignored and the `.pyc` is untracked.
+
+- [x] 138. **Your rank becomes a title people can read above your head.** `TitleService`
+      turns the ranks in `RankConfig` into a *selectable* label rather than an automatic
+      one: earning a rank unlocks its title, and the player picks which unlocked title to
+      wear. It replicates as three plain Player attributes (`TitleId`, `TitleName`,
+      `TitleColor`) so `NameplateController` and `TabBarController` render it without
+      either of them requiring the service, and NPCs get the same attributes so a
+      nameplate never has to ask whether it is looking at a player.
+
+- [x] 139. **You pick the weight on the bar, and it decides the set.** Training was one
+      fixed rate per machine; `WeightConfig` gives every district a bare-bar 0 kg state
+      and ten authored increases above it. The world multiplier still owns the exponential
+      curve — load is a smaller within-district bonus, so a heavier plate is never a way
+      to skip a zone. Each step has its own stat requirement, and mastering a muscle's
+      final load opens *that same muscle* in the next district, never a different one.
+
+- [x] 140. **Legs buy you a dash, not just a top speed.** The dash is real physics at 78
+      studs a second, which meant dashing through a crowd scattered it — a way to fling
+      people off machines without throwing a punch, which is exactly the interruption rule
+      #5 exists to prevent. `DashService` fixes it with a collision group rather than
+      anything in the mover: dashing parts move to `Dashing`, which collides with the
+      world and with nothing alive. It has to be server-side because collision groups
+      replicate from the server and the shove is simulated on both machines. The client
+      declares its own dash state, which is safe because the flag grants nothing except
+      the ability to *not* push people.
+
+- [x] 141. **Each district gets its own sky and light.** `LightingConfig` makes the grade
+      data. The look was a warm, saturated, high-noon grade that washed distance to white
+      and left asphalt reading as light grey; it is now GTA V — desaturated, cold shadows
+      against warm light, blacks that reach black, and haze with weight rather than milk.
+      `AtmosphereController` applies it per zone at runtime and is the authority, with the
+      `Lighting` block in `default.project.json` mirroring `Base` so the Studio edit view
+      and the first frame of a session are not a different game.
+
+- [x] 142. **Quests become one endless rotation instead of a daily log.** Upper body,
+      lower body, monsters, repeat forever — exactly one active at a time, with goals and
+      rewards growing 1.6x a loop (the kill step more slowly, since a kill costs travel and
+      a fight rather than time on a machine). This made the engine *smaller*: the daily
+      model needed a UTC-midnight reset, a completions table and a "once" marker, all of
+      which existed to answer "is this available again yet". A cycle never asks that — the
+      active step is a position, not a date. Every quest's listener stays wired including
+      the inactive ones, and `report` discards anything that is not the active quest, which
+      is the single place the one-at-a-time rule lives.
+
+- [x] 143. **Tokens live in MultiplierService, so CurrencyService goes.** A separate
+      service holding one balance that only one system spent was indirection with no
+      second caller. `BountyService` now credits through `MultiplierService` directly.
+
+- [x] 144. **The muscle you are working lights up while you train it.** A highlight driven
+      off `EquipmentConfig`'s muscle mapping, so a new machine gets the effect from its
+      config row and `TrainingMuscleHighlightController` never learns another exercise.
+
+- [x] 145. **The balance model catches up with the weights and the cycle.** The simulator
+      and its extracted inputs were still modelling a game with no selectable load and
+      three fixed daily quests, so every projection it produced was for a build that no
+      longer existed.
+
+- [x] 146. **The truth files describe the game that actually exists.** `PLAYTEST.md` was
+      the launch gate and could not be run as written: it asserted 26 server systems and 20
+      controllers (actually 32 and 37), one combat ability (actually three), four products
+      (actually eleven), and quest ids that had been deleted. A launch gate that fails on
+      its own stale facts teaches you to ignore it, which is worse than not having one.
+      `PRODUCT_TRUTH.md` and `ALPHA_PROTOCOL.md` carried the same claims.
+
+- [x] 147. **`./scripts/check.sh` passes again.** Step 1 of `PLAYTEST.md` is "all checks
+      pass", and it had not been true for a while: six `--!strict` errors and a shadowed
+      local survived in `UI`, `BodySkinConfig`, `BodySkinPainter`, `BodyLoftController` and
+      `FullMapController`. All six were annotation gaps rather than logic bugs — an
+      untyped `ROLE_ATTRIBUTES` and `validRegions`, `x ~= nil` against a non-nilable type,
+      an unannotated `bounds` parameter — but a gate that always fails is a gate nobody
+      reads, and it would have hidden a real error the day one appeared.
+
+- [x] 148. **Impacts get layers, variants and a mix that ducks for them.** The previous
+      pass filled thirteen ids and called it audio; one file per event is what makes a
+      game sound cheap. A `SoundSpec` now carries `Variants` (several ids, one picked per
+      play — reps and footsteps machine-gun otherwise, however much pitch jitter they
+      get), `Layers` (sub-specs played together: a slam is a concrete transient, a sub you
+      feel rather than hear, and the grit it throws up), `Group`, `Spatial` with rolloff,
+      and `Cooldown`.
+      **The mix is the part that does the real work.** `SoundBus` builds
+      Master → Music / Ambience / Sfx / Ui once, and hangs a `CompressorSoundEffect` on
+      Music and Ambience whose `SideChain` is the Sfx bus. Combat now pushes the music
+      down by itself — nothing scripts it, nothing knows a fight is happening, and no
+      sound had to be made louder to be heard over another. An `EqualizerSoundEffect` does
+      the same job in frequency, giving up the music's low-mids so impacts have somewhere
+      to sit. It is code rather than `default.project.json` because both the bus tree and
+      the sidechain are instance references, which a Rojo project file cannot express.
+      Also: `ContentProvider:PreloadAsync` on every id at startup, because the first punch
+      of a session was silent while the asset streamed. `ContentProvider` had never been
+      used in this codebase at all.
+
+- [x] 149. **Every button in the game clicks, not the six that opted in.** `UiClick` was
+      hand-wired onto six buttons across two controllers, so every other button in the
+      game was mute — being heard was opt-in and nobody opted in. `UI.Pressable` is the
+      one choke point every button already goes through, so the click belongs there.
+      `UI.luau` lives in ReplicatedStorage and must not depend on a client controller, so
+      it exposes `SetPressListener` and EffectsController fills it in; the six hand-wired
+      calls are gone, along with MenuBarController's now-unused EffectsController handle.
+
+- [x] 150. **The five sounds nothing was playing now play.** `Knockout`, `SlamWindup`,
+      `SlamImpact`, `Purchase` and `Footfall` were fully configured and had **zero call
+      sites** — pasting ids into them would have changed nothing.
+      `SlamWindup` is renamed `SlamCharge` to match the cue name in `StrikeConfig`, and
+      that rename is the mechanism rather than tidying: VfxController now plays the sound
+      whose name matches the cue it is already drawing, so audio and visuals can be
+      authored independently and still land on the same frame, and a future cue is audible
+      for free. Footfall rides beside its dust in `PlayFootfall`; Purchase fires on the two
+      buy paths in MenuController; Knockout comes off `humanoid.Died`.
+      **This is also what made combat audible from outside.** Those handlers were already
+      watching *every* character, because hit, guard and flight are attribute-driven and
+      attributes replicate — so passing an emitter to each call was enough to hear an
+      attacker behind you. The planned server broadcast turned out to be unnecessary: the
+      replication needed already existed, and reusing it costs no new remote, no bandwidth
+      and no trust surface. The Footfall cooldown is keyed per emitter for the same
+      reason — a global key would let the nearest runner swallow everybody else's steps.
+
+- [x] 151. **A soundtrack, and combat music that warns you.** `MusicEnabled` had been in
+      the profile, the settings menu and the save file for months, wired to nothing —
+      worse than a missing feature, because the player concludes the game is broken.
+      One exploration track, one combat track that takes over on any hit and hands back
+      six seconds after the last one, and a global ambience bed. Combat gets a whole track
+      rather than a layer because fights here start without warning: a player locked into
+      a machine cannot see who is behind them, and the music changing *is* the warning.
+      Both tracks are created once and left playing for the session; a switch moves their
+      volumes past each other and never starts or stops a Sound, so the combat track is
+      already in its own bar when it fades up and the theme does not restart on the way
+      back. The fade is a **Heartbeat clock, not TweenService** — a direct reading of the
+      warning in `EffectsController:_showTrainingGain`: a tween captures its start value at
+      `Play()` and a second tween on the same property cancels the first, which is exactly
+      what "fade A down, fade B up, get interrupted halfway" does. Stepping toward a target
+      each frame is interruptible by construction.
+
+- [x] 152. **Three volume sliders replace two toggles that half worked.** `MusicEnabled`
+      and `SfxEnabled` become `MasterVolume` / `MusicVolume` / `SfxVolume`, 0-100, driving
+      the SoundGroup volumes so the mix is tunable live without a republish. Migration v9
+      carries the old choices over — off becomes zero, on becomes the *authored* level
+      rather than 100, so a returning player hears the game as designed rather than louder
+      than everyone else — and explicitly clears the retired booleans, because Reconcile
+      only ever adds keys and a forgotten one rides along in every save forever.
+      `UI.Slider` is new and shared, shaped like `UI.Bar`. Its `OnChanged`/`OnCommitted`
+      split is the load-bearing part of the API: dragging fires every frame, `Net` rate
+      limits the settings remote to four calls, and `_refresh` would destroy the slider
+      under the finger still dragging it — so the drag writes straight to the mix and only
+      the release reaches the server.
+
+- [x] 153. **A cosmetic controller could blank the whole client, and did.** Pressing Play
+      gave a default blocky avatar, a default blue sky and no HUD — not a sound bug in
+      effect, but the entire client failing to start.
+      **The mistake.** `SoundBus` set `SoundGroup.SoundGroup` to nest the buses. That
+      property does not exist: the class has exactly one member, `Volume`, and groups nest
+      by *parenting*. `luau-lsp` reported it and it was silenced with a `:: any` cast —
+      overriding the type checker to make a build go green is what turned a compile error
+      into a runtime one. The cast is gone and nothing in that file needs `any`.
+      **Why it cost the whole game.** `Loader.Ignite` called `error()` on any failed
+      `Init`, which aborted ignition before the `Start` loop ran — so every controller was
+      initialised and *none* was started: no UI built, no lighting grade applied, no body
+      mesh. `Start` failures were already isolated with `warn`; `Init` now matches. A
+      broken system loses its own feature and nothing else. The tradeoff is accepted and
+      recorded in the file: a half-initialised system carries on, so a dependency it never
+      resolved can resurface later as a confusing nil instead of as one loud failure.
+      **A second bug found while auditing for the same class of error.**
+      `emitter:GetDebugId()` in the footfall cooldown is PluginSecurity and cannot be
+      called from a LocalScript; it had never executed only because MusicController
+      (priority 6) died before EffectsController (priority 5) reached `Start`. The
+      cooldown is now a weak-keyed table indexed by the emitter Instance, which is legal,
+      collects despawned characters, and builds no string on the most frequent sound in
+      the game.
+      **And one caught only by running it.** Rewriting `SoundBus.Get` lost its `or "Sfx"`
+      default, so every world sound routed to Master — where the sidechain compressors
+      have nothing to duck against, silently disabling the ducking for sixteen of the
+      twenty sounds. `check.sh` was green throughout all of this: the self-tests run
+      outside Roblox, where `SoundGroup` does not exist. The lesson is the process one —
+      a green static check is not evidence that the game starts, and this pass is verified
+      by `Ignited 38 systems / 0 failures` and a bus assertion over every configured sound.
+
+- [x] 154. **The combat audio stops being foley and starts being designed.** The sounds
+      were bad, and for a specific reason worth recording: they were chosen by reading
+      catalogue descriptions, because whoever writes this config cannot hear it. That
+      produced a ground slam that was **a recording of a table falling over**, a block
+      that was **a golf club hitting a pipe**, a block break that was **medieval
+      manacles**, and four legacy `rbxasset://sounds/` defaults — `victory.wav`,
+      `bass.wav`, `electronicpingshort.wav`, `switch.wav` — which every Roblox player
+      recognises instantly and which made the whole game read as unfinished.
+      **The real constraint, now named.** Roblox's free Pro Sound Effects catalogue is a
+      *foley* library: props, doors, vehicles, room tone. There is no explosion set, no
+      impact-design set, no UI set. Searching it harder was never going to produce a
+      better ground slam, because a better ground slam is not in it. What it does have is
+      good raw material — the "Fight – Hits / Meaty Thud" family is genuinely the right
+      recording for a punch, and the Steel Door family (big hollow slams with long
+      rattling decay) is the right one for everything heavy.
+      **So the jump came from processing, which is how expensive audio is made anyway.**
+      A `SoundSpec` now carries an `Effects` chain, and the game had been using none of
+      the nine DSP units Roblox exposes. Two do most of the work: `Distortion` adds the
+      harmonic bite that separates a hit from a thud, and `PitchShift` drops the body of a
+      sound *without* slowing it — `PlaybackSpeed` does both, which is why the heavy punch
+      used to be the sluggish one. Chains are restricted to the rare big moments and
+      `RunSelfTest` refuses them on Footfall, Rep, UiClick and BlockAbsorb rather than
+      trusting nobody adds one.
+      **A layering bug only running it could find.** Layers do not declare `Spatial`, so a
+      spatial impact was emitting its transient from the character and its sub flat from
+      the listener — pulling the two apart in the stereo field, which is exactly the
+      smearing the layering exists to prevent. Layers now inherit the parent's placement
+      unless they override it. Verified live: a Hard Punch emits three sounds from the
+      root at matching rolloff, and instance counts return to baseline afterwards.
+      **And the actual fix for the root cause.** `AuditionController` (F9, Studio-only,
+      gated like DevService) lists every sound with its layers and DSP, plays it exactly
+      as the game does, and plays each alternate from `SoundCandidates` dry so a recording
+      can be judged as itself rather than through a chain. The guessing loop failed twice;
+      this puts someone who can hear inside it.
+
+- [x] 155. **A corrupt schema version could lock a player out of their own save.**
+      `Migrations.Apply` read `tonumber(data.SchemaVersion) or 1` and looped straight off
+      it, so a stored version of `0`, a negative, a fraction like `3.5`, a string or a
+      boolean indexed a step that does not exist and **threw inside the join path** — at
+      `DataService.luau:105`, after the profile loaded but before it was registered. That
+      player could not get in, repeatedly, with their profile still sitting in the
+      datastore. The version is floored and clamped now, so anything below the first step
+      means "migrate from the beginning" — which is also the right answer for a profile
+      that predates versioning.
+      **Steps are isolated, and a failed one is deliberately not stamped.** That second
+      half is the one that matters: a profile marked current with only half its steps
+      applied is corrupt *permanently*, because every later join skips what it still
+      owes. Leaving it unstamped means the next join retries from where it stopped, so a
+      bad deploy costs sessions rather than saves. DataService now kicks rather than
+      letting a session run on half-migrated data and write the partial result back over
+      a good save.
+      **None of this was reachable in Studio**, which is the point: `USE_MOCK_IN_STUDIO`
+      means every save in this project's history died with its session, so the live path
+      had never once executed. Verified by feeding `Apply` the eight profile shapes a real
+      DataStore can return — six of them used to throw, and a rollback case stamped far in
+      the future is correctly left untouched.
+
+- [x] 156. **A bad volume in a save no longer takes the audio down.** The three volume
+      reads used raw arithmetic and comparison — `(settings.MasterVolume or 100) / 100`
+      and `... <= 0` — both of which *throw* on a non-number rather than falling back. A
+      corrupt or tampered profile would have broken audio init on exactly the saves least
+      able to afford another problem. `SoundBus.ReadVolume` centralises it because there
+      were three such sites and the fourth would have got it wrong.
+
+- [x] 157. **The playtest gate records what was actually verified, not what was assumed.**
+      Its client ignition count was stale again (37, actually 39 after MusicController and
+      AuditionController). Section 1 is now ticked — and only section 1 — with every box
+      read out of a live session rather than inferred: 32 server systems, 39 client, three
+      abilities, eleven AssetId-0 warnings, zero station warnings, zero non-DataStore
+      errors, 35 tagged zones, `check.sh` green and `validate_gym` at 35/35 against build
+      `319220b972df`. The evidence block says plainly what that run does *not* prove: a
+      machine can confirm the game boots correctly, and cannot confirm it is any good.
+
+- [x] 158. **The shop sells something real.** Seven of the eleven products carried
+      `AssetId = 0`, which is not a cosmetic gap: `PurchaseService` deliberately refuses to
+      register a zero-id product, so every Robux card in the shop rendered "COMING SOON"
+      and the whole Robux half of the economy was decorative. The three gamepasses (VIP,
+      Fast Travel, Auto Load), both immortal potions, Pre-Workout and Protein Shake now
+      carry their live ids from the Creator Dashboard. The four token packs stay at `0` on
+      purpose — they have not been created yet, and the unavailable path is what should
+      show until they are.
+      `ShopIcons.luau` carries the uploaded artwork for those products plus the two
+      currencies, and `Icons.Draw` consults it before falling back to the drawn glyph. That
+      fallback is the point: a key whose upload has not happened renders exactly what it
+      rendered before, so the artwork can land one id at a time without a broken frame in
+      between. The asset rule in `CLAUDE.md` gains the same carve-out the body mesh has —
+      our own images may be uploaded, the Toolbox still may not.
+
+- [x] 159. **The dashboard sets the price, not the code.** #158 wired the live `AssetId`s
+      and stopped there, which left every card quoting a number Roblox would not charge:
+      VIP was advertised at 199 R$ against a real 699, Fast Travel 149 against 299, the
+      1 day potion 79 against 199. Six of seven were wrong, and copying today's numbers
+      into the modules would only have moved the drift to the next dashboard edit.
+      `ProductInfo` caches `MarketplaceService:GetProductInfo` behind a 300s TTL, warmed
+      off the request path at startup because that call yields and is rate limited. It
+      never yields itself and never throws: a failed lookup falls back to the module's
+      `RobuxPrice`, which is now documented as a fallback rather than a price.
+      The same call carries `IconImageAssetId`, so the artwork attached to each product on
+      the dashboard *is* the shop's artwork — no second copy to keep in sync, and the
+      uploaded images shrink to the two currencies in `ShopIcons`. The token-priced
+      supplements borrow their Robux twin's picture, because a Pre-Workout bought with
+      tokens is the same tub; only Meal Prep, which has no product, keeps a drawn glyph.
+      Verified live: catalogue returns 19/19/29/199/299/699/699 with an icon each, the
+      four uncreated token packs return their fallback price and no icon, and a bogus
+      asset id degrades to the fallback instead of erroring the shop.
+
+- [x] 160. **Boosts are bought with Robux, not tokens.** The shop sold the same three
+      supplements twice: once for Robux and once for Tokens priced in *minutes of income*,
+      a rule that existed only so the two prices could not drift apart as physique classes
+      doubled token income. Selling a boost for the currency the game hands out for free
+      undercut the Robux half of the shop, so the token shelf is gone: `ShopConfig` and
+      `ShopService` are deleted, `PurchaseShopItem` and `GetShopPrices` are off the wire,
+      and Meal Prep — which never had a Robux twin — goes with them.
+      Pre-Workout and Protein Shake now describe their own effect (3x/180s, 2x/600s) in
+      their product files, since the config that held those numbers existed to keep two
+      sellers of one item in agreement and there is only one seller now. The supplements
+      shelf is recognised by an explicit id set rather than by "has a ShopConfig entry".
+      Tokens keep exactly one sink: the five per-stat doubling paths.
+
+- [x] 161. **A pass shows its price even to someone who owns it.** The card had one line of
+      text for both price and state, and `OWNED` won — so every gamepass looked free to
+      anybody who had bought it, the developer testing in Studio included, which is how
+      the missing price was found. The price moves to its own label in the card's top-right
+      and is drawn from the catalogue row regardless of what the button says; the button
+      is now just `BUY` / `OWNED` / `COMING SOON`.
+      Clicking START TRAINING also stopped firing `RankUp` — a metal hit with a 2.4 second
+      reverb tail — at the exact moment the music and ambience fade in behind the curtain.
+      Three loud things at once is what a player hears as one loud thing.
+
+- [x] 162. **The immortal potion says how long is left.** A player bought an hour or a day
+      of immunity and was told once, in a toast, at the moment of purchase; after a rejoin
+      the shield's remaining length was unknowable, which is precisely what you need before
+      deciding to stand in the open. A badge to the right of the summary panel shows
+      `IMMORTAL {duration}` while the potion runs and hides itself at zero.
+      No new remote: `ImmortalUntil` is an absolute epoch already riding every
+      `ProfileChanged` push, so the client ticks it locally on a one-second clock. It
+      formats with `NumberFormat.Duration`, the same function the purchase toast uses, so
+      the badge and the toast cannot disagree.
+
+- [x] 163. **The price rides the buy button.** #161 put it in the card's corner because
+      `OWNED` was occupying the button, which is the one place a price is actually read.
+      It goes back: the button says `BUY · R$ 699` whenever the product can be bought, and
+      the corner label survives only for the cards whose button is already spent on `OWNED`
+      or `COMING SOON`. A price is therefore always on the card and never on it twice — and
+      the buyable cards get their full name row back, so "Immortal Potion (1 Hour)" stops
+      truncating.
+      Recorded because it will be asked again: a gamepass reading **OWNED in Studio is
+      Roblox's answer, not a bug**. `UserOwnsGamePassAsync` returns true for all three
+      passes for the account whose id is this place's `game.CreatorId`, and false for an
+      unrelated user — a creator owns their own passes and cannot buy them. Every real
+      player sees the buy button.
+
+- [x] 164. **VIP is something other players can see.** The pass sold "2x every stat & vip
+      title" and the title half did not exist — every title in the game was one of the nine
+      power ranks, and VIP bought a multiplier and a daily potion that nobody else could
+      notice. VIP is now a **selectable** title: it sits in the same list, unlocked by
+      owning the pass instead of by Power, so an owner chooses between it and the rank they
+      trained for rather than having one taken away.
+      It lives in a second `specials` list rather than among the ranks, because `Get()`
+      walks the ranks to decide what a player *is* — a VIP entry at `MinPower = 0` would
+      have broken the ascending-order assertion and then handed the title to every player
+      at zero power, pass or no pass. `RankConfig.IsUnlocked` takes an ownership predicate
+      so the same rule serves both sides: the server asks MarketplaceService, the client
+      reads the `VipOwned` attribute the grant sets.
+      `TitleService` asks each title its own question and, importantly, still demotes: the
+      old check compared Power, which a VIP title's `MinPower = 0` would always pass, so a
+      refunded pass would have left the title on forever. The ownership call yields, so the
+      saved title is published first and corrected a moment later rather than leaving a
+      blank plate. In the selector, a locked VIP row says `GET VIP` and opens the Roblox
+      prompt — the shop is one press away and an inert LOCKED button would waste that.
+      The nameplate glow is a one-pixel stroke, not two: at 14px a two-pixel halo in the
+      text's own colour closed the counters of the letters and "VIP" read as a gold blob.
+
+- [x] 165. **Protection reads next to health, and the daily says when it returns.** The
+      immortality badge from #162 sat beside the power strip captioned `IMMORTAL 57:33` —
+      a word next to a potion bottle is the picture written out twice, and it was in the
+      corner that must not reflow when a badge appears. It moves above the health bar,
+      left edge and width shared with it, and shows the glyph and the bare time. Both
+      answer the same question, so a player checking one is already looking at the other.
+      The VIP daily claim button now counts down instead of inviting a press the server
+      would refuse. The wait is the rest of the current UTC day — the exact rule
+      `VipService.today()` implements — and not a rolling twenty-four hours, which would be
+      a longer promise than the pass makes. `VipLastClaimDay` already rides the profile
+      push, so the countdown costs no traffic. Its one-second loop exits on
+      `IsDescendantOf(game)` rather than a Parent check: the settings page is rebuilt on
+      every open, a destroyed row still reports its old parent, and without that guard each
+      visit would leave another loop writing to a button nobody can see.
+
+- [x] 166. **The immortality badge is a shield and a number.** What #165 actually put above
+      the health bar was a white block next to a timer: the Potion glyph was drawn in
+      `UI.Dark.Text`, near-white, at 24px, so the bottle's silhouette vanished into its own
+      colour. It is now the same 🛡 the player list already puts beside an immune name —
+      one symbol for one rule, wherever it appears, which is the only reason to mark it in
+      two places.
+      The `UI.Panel` went with it. A panel is a glass fill, a border and 10/12px of padding,
+      which is also why the badge's offsets looked wrong — everything inside was inset by
+      that padding. Two glyphs do not need a box drawn around them, and the health bar
+      directly below already gives the corner an edge to align to. Both labels carry a text
+      stroke instead, the trick the nameplate labels use for the same reason: pink on a
+      bright sky is unreadable without an outline.
+
+- [x] 167. **Token packs are sized in hours, not in tokens.** The worry was that multipliers
+      would make a pack's number meaningless. They do not, and writing down why is most of
+      this item: `AwardClassScaled` multiplies a pack by the buyer's physique class, so the
+      figure in the module is a **Natural-quoted** one and the pack is worth the same
+      stretch of progress at every stage. Two identities fall out of that, and they are
+      what a pack should actually be tuned against — a pack is `TOKENS / 4` minutes of
+      play, and because multiplier costs double at the same rate class income doubles, a
+      pack of X buys `log2(X / 100 + 1)` successive multiplier levels whether a Natural or
+      a Mythic buys it.
+      Measured against that, the old ladder topped out at 6.7 hours for 299 R$, which is
+      thin for a top tier. It is now Small/Medium/Large/Huge at 250 / 750 / 2,000 / 5,000
+      tokens — about 1, 3, 8 and 21 hours of play, roughly 1.8, 3.1, 4.4 and 5.7 doublings
+      — at 49 / 99 / 199 / 399 R$. Still not a route to the cap: one muscle costs 26.2M
+      tokens to max and all five cost 131M, and those numbers scale with nothing.
+      The modules are renamed to their sizes, because a file called `TokenPack400` that no
+      longer grants 400 is how names rot, and the cards say the hours rather than a raw
+      number a Mythic buyer would see multiplied by 512. All four keep `AssetId = 0`: they
+      still do not exist on the dashboard, and the startup warning count (four, not eight)
+      is what proves no orphaned module survived the rename.
+
+- [x] 168. **A pack card names the number it will actually pay.** #167 sized the packs in
+      hours and left the tokens invisible: the module carries a Natural-quoted figure,
+      `AwardClassScaled` multiplies it by the buyer's class, and nothing on the card ever
+      said what would land in the balance. A Mythic buying the Medium pack receives
+      384,000 tokens, and the only way to learn that was to read the source.
+      `Types.Product` gains an optional `TokenGrant`, the four packs declare it, and the
+      catalogue row quotes `TokenService:ClassScaled(player, grant)` — the scaling split
+      out of `AwardClassScaled` so the two now share it. That sharing is the point: a card
+      that promises one number while the grant computes another is exactly the failure this
+      arrangement rules out, the same reason a price and the charge for it are never
+      worked out twice.
+      Quoted server-side because the server owns the class; the client only formats it,
+      with the same `NumberFormat.Format` the HUD counter uses, so `384K` means the same
+      thing in both places.
+
+- [x] 169. **A pack's quoted payout follows the class the frame it changes.** #168 quoted
+      the figure server-side, which meant it was only as fresh as the last catalogue round
+      trip. The row now carries the Natural-quoted `TokenGrant` and the client scales it
+      through `MuscleClassConfig.ScaleTokens` — the same function `TokenService:ClassScaled`
+      now calls, so the quote and the grant still cannot disagree. The shop already
+      re-renders on every `ProfileChanged` push, so a physique transformation moves the
+      number with no RPC in between.
+      That re-render exposed a fault worth more than the feature: `GetProductCatalogue`
+      called `UserOwnsGamePassAsync` once per gamepass with no caching, and it runs on
+      every profile push — a token tick, a rep. A player who left the shop open while
+      training was firing three uncached web requests a tick at Roblox's rate limiter.
+      Ownership is now cached for 60 seconds per player per pass, cleared outright when a
+      purchase completes so a fresh buyer sees `OWNED` immediately, and dropped on
+      `PlayerRemoving` so the table does not grow with the session. A *failed* lookup is
+      deliberately not cached: holding a VIP out of their own pass for a minute because one
+      request timed out is worse than asking again.
+      Measured: a catalogue call after the TTL lapses costs 84ms, the one immediately after
+      it 50ms.
+
+- [x] 170. **The ground slam stops clattering.** The table was never actually removed. The
+      lead had been swapped to a steel door hit and the comment above the entry said so,
+      but `rbxassetid://9126090979` — which `SoundCandidates` describes in its own words as
+      "table falling on concrete (the old one)" — was still mixed in as a layer at half
+      volume. A table on concrete is a handful of small wooden knocks spread over two
+      seconds; under a steel hit that is not weight, it is noise with the wrong grain, and
+      it is what the slam still sounded like.
+      The layer is cut and the sub raised from 0.9 to 1 to carry what it was pretending to
+      add. The pitch, distortion and reverb are deliberately untouched: those are what
+      would make a slam sound *warbly*, not clattery, and changing four things at once when
+      only one of them can be heard makes the next report impossible to act on.
+      The lesson is the comment now carried in the file: **check the layer list.** A lead
+      swapped without pruning what is mixed under it leaves the old sound audible while the
+      entry looks correct, and a comment claiming otherwise is how it survived two passes.
+      No licensing change — all three remaining ids are the same ProSoundEffects recordings
+      already in use, and this only removes one.
+
+- [x] 171. **The token packs go on sale.** #167 sized them in hours and #168 taught the card
+      to quote what it will actually pay, but all four still carried `AssetId = 0`, which
+      `_loadProducts` reads as "does not exist yet": four startup warnings, `Available =
+      false`, a `COMING SOON` card that cannot be clicked, and a `PromptProduct` that
+      refuses. The dashboard products now exist, so the ids are pasted in — Small
+      3709886043, Medium 3709886078, Large 3709886119, Huge 3709886164 — and every one of
+      those gates opens on that one field.
+      No shop or receipt code changed, and that is the point: the buy button, the live
+      price label, the class-scaled `≈ N TOKENS` line and the `PurchaseId`-keyed idempotent
+      grant were all built to work the moment an id was real. A feature that needs edits in
+      five files to turn on was not finished when it was written.
+      Managed pricing is deliberately **off** on all four. With it on, Roblox may move the
+      price per region or per experiment, and a pack whose whole pitch is "this many hours
+      for this many Robux" cannot have the second half drift underneath the first. The
+      module's `RobuxPrice` stays at 49/99/199/399 as the pre-warm fallback only — the
+      figure on the card comes from `ProductInfo`, which reads the dashboard at runtime.
+      The header comments that said the id "must be set from the Creator Dashboard" are
+      rewritten rather than left, because a stale instruction to do something already done
+      is how the next reader concludes the file is broken.
+
+- [x] 172. **The supplements say what they are doing.** #169 gave the immortal potion a
+      badge because a shield of unknown length is the one thing you need to know before
+      standing in the open. The Protein Shake and Pre-Workout had the same hole and a
+      shorter fuse: a Pre-Workout burns in three minutes, and the only thing that ever
+      told you it was running was the toast at the moment of purchase.
+      They now sit in the same corner — 🥤 `x2` and ⚡ `x3`, the multiplier at TextSize 20
+      and the clock at 16, because what a player checks mid-set is *whether* they are
+      boosted; how long is the follow-up question, and sizing them the other way round
+      makes the badge read as a timer with a decoration rather than a buff with a timer.
+      Three pinned badges do not work — each hard-coding its own Y offset is fine for one,
+      but hiding the middle one leaves a hole — so the shield moved into a bottom-aligned
+      `UIListLayout` and the rows re-flow instead.
+      **They stack, and the badge now says so.** `GetMultiplier` has always been a product
+      over live modifiers, so both at once was already x6; nobody could see it. A `⚙ x6
+      TOTAL` row appears once more than one boost is live, and hides at one, where it would
+      only restate the row above it. Leaving players to multiply two chips in their head is
+      how a stacking bonus goes unbought.
+      **The bug found on the way is the bigger half.** Boosts lived only in the in-memory
+      `StatService` table, which is dropped on `PlayerRemoving` — buy a ten-minute shake,
+      disconnect at two, and you paid Robux for nothing. A visible countdown would have
+      made that worse, vanishing mid-count. `BoostUntil` is now an absolute epoch map on
+      the profile, exactly as `ImmortalUntil` already was, restored into the modifier stack
+      on `ProfileLoaded`; the profile is the durable record and the modifier table is a
+      cache. That is also what lets the badge tick with no remote of its own — it rides
+      the existing ProfileChanged push, which is the whole reason the immortality badge
+      was free to build.
+      Re-buying now **extends** rather than resets, matching `ImmortalityService:Grant`.
+      It used to overwrite, silently binning the nine minutes you had already paid for.
+      `GrantGlobal` returns false when the write fails so ProcessReceipt leaves the receipt
+      unconsumed and Roblox retries, rather than charging for a boost that never landed.
+      Permanent boosts stay off the profile on purpose: those are gamepasses, re-granted
+      each join from the ownership check, and persisting them would give a revoked pass a
+      second life.
+      The numbers moved to `BoostConfig` in ReplicatedStorage, because the HUD has to read
+      a multiplier and a glyph and a client cannot require a product module. A third
+      supplement is now a row in that table plus a product module — neither the HUD nor
+      BoostService names a boost, they both iterate it.
+      Row order is sorted by multiplier, not hash order. `for id in BoostConfig.Boosts`
+      put the rows in a different sequence from one session to the next, which is exactly
+      the kind of instability a player reads as a bug.
+
+- [x] 173. **The VIP daily claim moves to the card that sold the pass.** It was a row in
+      the Settings tab, which is not where anyone goes after buying VIP. It now sits beside
+      the VIP card's own button in the shop: `OWNED` and `CLAIM` share the action row,
+      split horizontally because the card is 108px and the description already runs to
+      y=70 — there is no second band to put a button in without resizing every cell in the
+      grid. `productCard` takes an optional `secondary`; nil renders exactly what the other
+      eleven products rendered before, which is the only acceptable blast radius for a
+      change to the one function every card goes through.
+      Only an **owner** sees it. Offering CLAIM to someone who does not own the pass is an
+      invitation to be refused. Which products carry a daily lives in a `DAILY_CLAIMS`
+      table rather than an `if product.Id == "Vip"` branch, so a second entitlement is a
+      row there and nothing else.
+      **The "18 hours" was not a bug.** The daily resets on the UTC calendar day —
+      `VipService.today()` is `os.date("!%Y-%m-%d")`, and the header has always called the
+      trade deliberate: claim at 23:59 and you can claim again at 00:01. Eighteen hours was
+      the honest time to the next UTC midnight. What was wrong was the wording: `READY IN
+      18:00:00` reads as a broken twenty-four hour timer because it never says what it is
+      counting toward. It now says `RESETS 18:00:00`. The rule is unchanged and the comment
+      explaining it moved with the code, which is what stops the question being re-asked.
+      **The bug found on the way is the one worth keeping.** `_renderShop` yields on
+      `GetProductCatalogue`, and `_refresh` clears the body and re-renders. A profile push
+      landing during that round trip cleared the body under a render that was still in
+      flight; the stale render resumed and appended its shelves to the new page, and the
+      shop came back with every shelf twice. Claiming is the reliable way to hit it — it
+      marks the profile dirty *and* refreshes — but any push at the wrong moment would
+      have done it, and this was latent long before the claim button existed.
+      Fixed with a `renderGeneration` counter bumped on every clear: a yielding page
+      captures it on entry and drops what it built if the number moved underneath it.
+      `_renderLeaderboard` yields the same way and gets the same guard. Verified in Studio
+      by claiming and counting sections — four, not eight.
+
+- [x] 174. **The settings page stops lying about the controls, and the sliders earn their
+      place.** Two jobs on one screen.
+      **The controls text was wrong in almost every clause.** It claimed `F punches` — F is
+      Block, and Punch is the left mouse button with no key at all (`AbilityConfig.luau:71`
+      says so on purpose). It claimed `Q flies` — Q is the ground slam, and flight is a
+      double-tapped Space gated on Power. It claimed holding the mouse trains the selected
+      hotbar muscle, a feature whose buttons are destroyed the frame they are built
+      (`HudController.luau:700-704`). It called Shift a sprint hold when it is a toggle, and
+      it never mentioned C, R, Escape or Tab.
+      None of that was a typo. It is what a screen does when it restates a config in its own
+      words: the config moves and the sentence does not. So the sentences are gone. Combat
+      rows are generated from `AbilityConfig.Ordered()` — `DisplayName` for the action,
+      `KeyCode` for the cap, `LMB` where the key is nil, `(hold)` where `Kind == "Hold"` —
+      and movement keys come from `MovementConfig`. A rebound ability is on this page with
+      no edit, and a wrong key here now requires the game itself to be wrong.
+      Presented as keycaps in a two-column grid, with `KEY_CAPTIONS` translating enum names
+      into what players call them: nobody is looking for a key called LeftShift. The row
+      grows with `AutomaticSize` rather than the old hard-coded 112px, because a list that
+      comes from a config can gain an entry.
+      **`1`-`5` are deliberately not listed.** They still call `_select`, but it only paints
+      `slotButtons`, which is cleared when the dock is destroyed — so the keys do nothing
+      visible. Documenting a dead key is worse than omitting it. The dead `_select` /
+      `_beginManualTraining` / `_trainPing` path is left standing for a separate change.
+      **The sliders got the polish.** They were already drag sliders; what they lacked was
+      any sign of being draggable. A bare filled bar reads as a progress meter — something
+      the game is telling you — rather than a control. So: a stroked knob riding the fill,
+      a three-stop gradient and a top-edge shine borrowed from the HUD stat chips, a track
+      stroke so the empty half still reads as part of the control, hover and press scaling
+      on the existing `PRESS_IN`/`PRESS_OUT` curves rather than a new easing, and a `%` on
+      the readout, which said `72` and could have meant anything. Knob travel is inset by
+      its own radius so it sits inside the trough at 0 and 100 instead of hanging off.
+      **Fixed a leak while in there.** `UserInputService.InputEnded` was connected once per
+      slider at construction and never disconnected, so every rebuild of the settings page
+      leaked a listener for the session. It is bound on the way down and dropped on the way
+      up, so no global listener exists at all while nobody is dragging.
+      **Wheel-to-nudge was built and then removed.** Every slider here lives on a scrolling
+      page, so the wheel both moved the value and scrolled the list under it — measured, one
+      notch of three went to the page. A control that quietly changes a player's audio while
+      they scroll past it is worse than one that only answers to a drag. The comment saying
+      so stays in the file, or it gets added again.
+      Verified in Studio by dragging: 70% to 30%, one server write on release (`UpdateSetting`
+      is rate limited to four), the value still 30% after leaving the tab and returning.
+
+- [x] 175. **The volume readout stops being a smudge.** Three things were fighting the
+      number on the slider, all introduced by the polish pass that was supposed to help it.
+      `UI.Font.Numeric` is GothamBold, so a 13px readout was set in the same weight as a
+      heading. On top of that it carried `TextStrokeTransparency = 0.4`, and at that size an
+      outline closes up the counters — the glyphs stop being a figure and become a shape.
+      The stroke was copied from the immortality badge, which needs one because it floats
+      over open sky; this number sits on an opaque fill that already separates it from the
+      page, so the outline was buying nothing and costing legibility.
+      Fixed with `UI.Font.Readout = Enum.Font.Gotham` and no stroke. `Numeric` is left alone:
+      29 call sites use it, and none of them asked for this. The new entry carries its own
+      comment saying why it is exempt from the one-face rule directly above it, because a
+      second face added silently under a comment claiming there is only one is how the next
+      reader concludes the rule is dead.
+      **Dropping the stroke exposed what it had been hiding.** The readout is right-aligned,
+      so a nearly-full bar slides its own fill underneath it, and dark ink on the dark teal
+      of the music fill is invisible — the outline had been papering over a contrast bug
+      while causing a legibility one. The colour now flips to on-accent exactly when the
+      fill reaches the text, measured against the text's own `TextBounds` rather than a
+      guessed ratio: "7%" and "100%" are covered at different points and one fixed threshold
+      gets one of them wrong.
+      Verified in Studio at both ends — dark ink at 70% over the empty track, cream at 100%
+      over the fill, flipping mid-drag — and the HUD counters confirmed still GothamBold.
+
+- [x] 176. **The fighter creator arrives before the world does.** On a fresh join the gym
+      was on screen for a second or two before "CREATE YOUR FIGHTER" appeared. Two causes,
+      only one of them removable.
+      The removable one was a literal `task.wait(1)` in `CustomizerController:Start`,
+      commented "let the body finish dressing itself", sitting on top of a
+      `ProfileController:WaitFor` that spun on `task.wait(0.1)` and so charged every caller
+      up to a tenth of a second *after* the data had already landed. The intent of the wait
+      was right and the implementation was a guess: a second is dead time on a fast machine
+      and not enough on a slow one, and neither has anything to do with a clock. It now
+      waits for what "dressed" actually means — the character exists, its root part exists,
+      and `AppearanceService.gate` has written the `Customizing` attribute — each with its
+      own timeout, falling through rather than hanging. `WaitFor` wakes on the `Changed`
+      signal it already had.
+      The unremovable one is the profile round trip: whether a player is new is only
+      knowable from `Appearance.Chosen`, which comes from a DataStore. That cannot be made
+      faster from the client. It can only be covered — and nothing covered it, because the
+      project had **no ReplicatedFirst at all**. Everything the game draws lives in
+      StarterPlayerScripts, which cannot run until the character is already loading.
+      So there is now one script in ReplicatedFirst whose whole job is to be on screen
+      before anything else is. It requires nothing: ReplicatedFirst runs before
+      ReplicatedStorage has necessarily replicated, so requiring the UI module would mean a
+      WaitForChild at the very front of the boot, reintroducing the delay it exists to
+      cover. Its two colours are copied from the palette by hand, and the header says so.
+      The lift is a player attribute for the same reason — nothing has to have loaded for an
+      attribute to work.
+      **It lifts itself after ten seconds no matter what.** This is the only rule in the file
+      that may not depend on anything else working. A wrong-looking join is recoverable; a
+      player stuck behind an opaque frame has no game.
+      **That fallback caught a real bug during testing.** The handoff originally waited on
+      `RenderStepped`, which does not fire while the client is not rendering — Studio lost
+      focus mid-test and the curtain lifted on the timeout with `BootReady` still unset,
+      because the thread was parked forever. A player who alt-tabs across the join would
+      have hit exactly that. It waits a Heartbeat step instead, which keeps running.
+      Verified both branches in Studio: new player opens the creator already framed, with
+      the curtain lifting onto a finished shot rather than a moving camera; returning player
+      (tested by temporarily defaulting `Chosen`) lifts straight into the world with the HUD
+      up and the creator closed. The ten-second fallback is proven by the run that hit it.
+
+- [x] 177. **The toast loses its box, and world news moves to chat.**
+      A toast was a `UI.Panel` — glass fill, corner, stroke, padding — plus a 3px accent
+      rail, all wrapped around one sentence that lives four seconds. The furniture was the
+      loudest thing on screen. It is now a bare `TextLabel` and nothing else.
+      Losing the panel meant losing the background the text was legible against: the old
+      colour was near-black ink, readable only because it sat on a light fill, and over the
+      world it would have vanished against dark terrain. So the line carries its own
+      contrast the way the immortality badge and the nameplates do — light text with an
+      outline — and that outline is the whole reason the panel could go.
+      The accent moved into the text. It only ever tinted the rail, and the rail is gone, so
+      the kill feed's three states (muted repeat, red outlaw, orange ordinary) now read as
+      coloured text. Every other caller passes no accent and is unchanged.
+      One trap in the rewrite: the fade ended on `fade.Completed:Wait()`, where `fade`
+      tweened the *panel's* background. With no panel that tween animates nothing, so the
+      removal now waits on the text tween — and the stroke fades with it, or the outline
+      hangs in the air after the glyphs have gone.
+      **Boss spawns were server-wide news wearing a personal notification's clothes.**
+      `MobService` looped every player firing `Notify`, so "Titan of the Square has risen"
+      sat next to "Knocked off the machine!" and expired in four seconds with no way to look
+      back at it. It now goes to chat in red, and the toast is gone. `BountyService`'s
+      streak announce used the identical loop-over-all-players idiom and moves with it, so
+      the split is now clean: **chat is what happened in the world, toasts are what happened
+      to you.**
+      Both go through `Announce.Broadcast`, a plain module rather than a Loader system
+      because it holds no state and needs no lifecycle — a service should not have to think
+      about ignite order to say something. It is one `FireAllClients`, not a broadcast
+      hand-written as N unicasts, which is what both sites were doing.
+      Posted to `RBXGeneral` from the client, not the server: `TextChannels` is populated at
+      runtime, and a player whose chat is unavailable should quietly miss the line rather
+      than make a boss spawn throw. The message is escaped before it goes inside the `<font>`
+      tag — mob names come from config, but the bounty line carries a *player's* display
+      name, and that is not a string this code gets to assume anything about.
+      Verified in Studio: toasts are `TextLabel`s with zero descendants, centred, stroked,
+      still fading and still capping at five; the announce arrives on RBXGeneral with the
+      red markup intact. **Not verified: that Roblox's chat window actually displays it** —
+      the window never appeared in the Studio session despite messages landing every 1.5s,
+      and CoreGui cannot be introspected from a script. Worth confirming in a real client.
+      Note for whoever does: the HUD's power strip and minimap occupy the top-left, which is
+      exactly where the chat window is aligned.
+
+- [x] 178. **The spawn pad was a duplicate nobody authored, and the volume rows became
+      clickable.**
+      The visible pad at spawn was not in this repository. `Workspace` held *two*
+      `SpawnLocation`s: the one `default.project.json` declares — 10x10, y=2.3,
+      `Transparency = 1`, `CanCollide = false` — and a second 12x12 at y=0.5, fully opaque
+      and collidable, living only in the `.rbxl`. That is why "make the spawn pad invisible"
+      had no obvious source to edit: Rojo does not manage the instance, so no change under
+      `src/` could ever have touched it. Two enabled spawn points also means Roblox chooses
+      between them, so the stray was not merely visible, it was likely where players landed.
+      It was deleted in Studio, which is where it lived. **Git cannot record that**, so this
+      entry is the only account of it: if a future reader finds one SpawnLocation and
+      wonders, the missing one was the 12x12 orphan and the survivor is the one the project
+      declares. Checked before deleting rather than after: a downward ray from spawn
+      ignoring both pads lands on `Environment_Mainland.DistrictGround_1_5` at y=1, solid
+      and collidable and level with the removed pad's top face, so nothing was holding the
+      player up except the ground that is still there. Confirmed in play — one SpawnLocation,
+      invisible, and the character's Y does not move over 2.5 seconds.
+      **The sliders got buttons**, because dragging a 200px track on a trackpad is a fiddly
+      gesture and mute in particular should be one click. Each row is now
+      `[-] [slider] [+] [speaker]`. Steps move 10 at a time and clamp to 0-100, which is the
+      range `SettingsService` clamps to anyway.
+      Mute returns to **the level before muting**, not to the default — remembered in a
+      module-scope table, and the scope is the whole trick: `_renderSettings` re-runs on
+      every profile push, so a table declared inside it would forget the level within a
+      second or two and unmute would silently jump to the default. A rejoin still loses it,
+      because a muted setting is just 0 on the profile with nowhere to record what it used
+      to be; unmute then falls back to the channel default, which is honest rather than a
+      guess.
+      The writes are debounced, for the same reason `UI.Slider` splits `OnChanged` from
+      `OnCommitted`: `UpdateSetting` is rate limited to four calls, and ten taps of `+`
+      would spend the budget and start failing. The mix follows every click; only the last
+      is sent. Verified by clicking `+` ten times in a row — the value clamped to 100, no
+      rejection toast appeared, and the level survived leaving the tab and returning, so the
+      one collapsed write did land.
+
+- [x] 179. **The goblins became thieves and the bosses became brutes.** A reskin, and almost
+      entirely a data edit, because MobRigConfig already describes a body as Bones, Joints
+      and Decor and MobService only interprets it. That was the payoff of writing the rig as
+      data: two new creatures needed no new code.
+      **The brute stopped being a zoomed goblin.** `BOSS` was literally `Bones = GOBLIN.Bones,
+      Joints = GOBLIN.Joints` with horns and pauldrons bolted on at 2.1x — which is a bigger
+      goblin however much you decorate it, because proportion is what a silhouette is read
+      by. It owns its own skeleton now: a very wide chest, a waist that does not follow it,
+      arms thicker than the thief's legs, and a head deliberately left at ordinary size.
+      That last one is the whole trick — everything is bigger at 2.1x, so muscle can only be
+      read in the ratio of shoulders to skull. The idea is borrowed from PhysiqueConfig
+      (girth on X and Z, leave Y alone); only the idea, because that system deforms an
+      EditableMesh and is capped at a handful of instances per client, so it could never
+      dress a field.
+      The thief is ordinary human proportions with the read carried by the hood and the
+      covered face: the goblin's 2.1-wide chest was most of why it looked like a creature.
+      One lit eye-slit rather than two glowing eyeballs — a pair of neon spheres is a
+      monster, a band of light under a hood is a person hiding their face.
+      **What could not change is the naming contract**, and it is why a reskin was safe at
+      all. Every joint keeps its stock R15 name, because GaitController, StrikeController
+      and FlinchController drive mobs through the same PosePlayback the player uses purely
+      because those names match. `Head` stays because MobNameplateController does
+      `WaitForChild("Head")` and renaming it would silently delete every health bar.
+      `RightLowerArm` stays because `VfxController.handOf` falls through to it, so the boss
+      wind-up VFX hangs there. Verified rather than assumed: all eleven joints animate on a
+      live thief, and the nameplate reads ALLEY THIEF above it.
+      Renaming was safe because mob ids are runtime-only — a model attribute and a travel
+      id — and never reach a profile. `goblin(...)` is `thief(...)`, ids are `{Zone}Thief`,
+      and the fourteen display names moved with them.
+      **The rename reached further than the mobs.** `extract_balance.py` and
+      `validate_gym.py` both regex for `goblin\\(` — they would have silently found zero mob
+      rows and validated nothing. Both moved, `_balance_inputs.luau` was regenerated, and
+      `simulate.luau` follows the renamed constants. The validator passes.
+      Map pins were redrawn: the boss glyph used to be the goblin's head plus horns because
+      they were the same creature at two sizes, and they are not any more — it is now a
+      small head on very wide shoulders, which is the only thing that reads as muscle at
+      twenty-eight pixels.
+      One correction after looking at it in game: the two pecs were 1.08 wide at 0.54 out,
+      which put their inner edges together and made a single flat plate across the chest —
+      a breastplate, not a chest. Narrower and further apart, they leave a 0.67-stud gap and
+      the sternum survives.
+
+- [x] 180. **The boss wears a real body.** The mobs were primitives and looked it. The game
+      already renders a genuinely muscular body — `BodyLoftBuilder`, one procedurally
+      lofted skinned mesh driven by bones that follow the stock R15 rig — and
+      `Build(progressByStat, detail, palette, scales)` turns out to be entirely
+      player-agnostic: four plain tables in, a MeshPart out. "Very muscular" is literally
+      every progress at 1.0.
+      So a boss now wears it. `BodyLoftController` drives players **plus** models carrying
+      a tag, and `MobService` tags bosses with the same `MuscleProgress` and `MuscleScales`
+      folders a character carries. That is the whole integration — no branch anywhere in
+      that controller learned what a mob is, because `dress`, `progressOf`, `paletteOf` and
+      `follow` all read a Model and a rig rather than a Player.
+      **Only bosses, and that is a budget decision rather than an oversight.** A Play client
+      allows seven or eight `EditableMesh` instances at once — a cap on instances, not
+      memory — and each dressed body costs one. Six thieves in a field would spend what the
+      players' own bodies need, and `CreateEditableMesh` returns nil rather than erroring,
+      so the loss would be silent. Players are refreshed before bosses for the same reason:
+      whatever is dressed last is what goes without, and a boss falling back to its own rig
+      is a worse-looking boss while a player falling back is the player's own body missing.
+      **Two things had to be fixed before the mesh would fit.** The rig had no
+      `LeftHand`/`RightHand`/`LeftFoot`/`RightFoot` — hands and feet were rigid decor — so
+      four of the loft's fifteen bones had nothing to follow. Promoting them to real bones
+      with wrist and ankle joints also bought animation that was never there: GaitConfig
+      drives ankles, and PosePlayback had been skipping that channel only because the rig
+      had none. Both rigs got it.
+      The second was scale, and it took two attempts. `BodyLoftConfig.BONES` is an absolute
+      bind pose in studs, and a boss rig is built at 2.1, so every bone was handed a large
+      constant translation and the body arrived in pieces — arms floating off the shoulders.
+      Scaling the rendered part was necessary but not sufficient: the fix is that the *Bone*
+      stays at the unscaled bind, because that is the pose the skin weights were baked
+      against, while `bindInverse` is measured against the **rig**, which rests at 2.1 times
+      those coordinates. Getting that one wrong is what folded the second attempt into a
+      lump. Measured after: every bone's rest offset is exactly 0.
+      The brute rig is therefore ordinary human proportions now rather than a 2.6-wide
+      chest. The muscle comes from the loft; the boxes are the skeleton and the fallback.
+      **The thief stays primitive by design** and got what primitives can have: Fabric and
+      Leather instead of SmoothPlastic — stock materials, so no asset question at all —
+      real hand and foot bones, and a coat hem so the legs emerge from cloth rather than
+      from a box. Verified in a field: 31 fabric parts, 7 leather, 15 joints, and no
+      EditableMesh instance at all.
+      Verified on the boss: dressed and active, 15 bones, every rest offset 0, body
+      11.99 x 8.11 x 5.64 against a player's 4.11 x 3.86 x 1.37, and while it walks 13 rig
+      joints animate — including the new ankles — with 14 loft bones following them.
+      CLAUDE.md's asset paragraph was describing the dead AI-mesh pipeline as if it shipped.
+      Corrected: there is no mesh asset in the game, the body is generated at runtime, and
+      the fourteen-piece cutter is disabled and unrevivable as written.
+
+- [x] 181. **The boss stands on the ground again.** I floated it in #180 by re-proportioning
+      the brute rig, and the cause was a mismatch between what holds a boss up and what a
+      player can see.
+      `buildMob` derives HipHeight by measuring the lowest point the rig reaches, which is
+      the right instinct — a hard-coded value is only ever correct for one set of legs. But
+      `reach` counts the ball caps on capsule limbs, and on a brute at scale 2.1 the shin
+      cap hangs 6.7 studs under the root. The generated body is not that tall: its geometry
+      stops 4.05 under the root, because the loft's legs do not reach down to the foot bone
+      its own skeleton names. Standing the rig on its lowest part therefore hung the visible
+      body two and a half studs in the air, and the rig is hidden once the body is on, so
+      all that was left on screen was a boss floating over nothing.
+      Measured rather than reasoned about, and the measuring is what found it. The first
+      guess — that the foot and the shin cap disagreed by about a third of a stud — was
+      right about the mechanism and an order of magnitude out on the size. The real numbers:
+      lowest rig part `RightLowerLegCap` 0.151 *below* the floor, foot 0.196 above it, and
+      the mesh 2.505 above it. Comparing against a player wearing the same mesh gave the
+      target: root 1.199 over the floor for a half-height of 1.93, which leaves the body's
+      lowest point 0.731 *under* the floor — feet planted, not perched.
+      So a dressed mob now takes its hip height from the body rather than the skeleton, from
+      one ratio that scales linearly with the rig. Undressed mobs keep the measured rig,
+      which is what the fallback wants: no mesh, so the skeleton is the thing standing on
+      the floor. Thieves are untouched.
+      After: hip height 4.609 -> 0.417, and the mesh bottom moved from 2.505 above the floor
+      to 1.414 below it against a target of 1.54 — the remaining tenth is the legs being
+      mid-stride when sampled. Animation did not regress: all 14 loft bones still follow the
+      rig.
+      **On Blender**: asked for, and declined for now on the evidence. It is not installed
+      here, the body already is a real rigged animated mesh generated at runtime, and the
+      import step is the one thing that cannot be scripted — `AssetService:CreateAssetAsync`
+      is unavailable, so a Blender body would need a human to import it before any of it
+      could be wired up. The route stays open; it is a replacement for a working system
+      rather than a repair to a broken one.
+
+- [x] 182. **Definition stops washing out as a body grows.** The boss read as fat-muscular
+      rather than ripped, and my first diagnosis — the flat 2.2 girth I hand it — was wrong.
+      Worth writing down as wrong: a maxed player gets the same 2.2 on both UpperTorso and
+      LowerTorso, and PhysiqueConfig already tapers hard (LowerTorso.X 0.17 against
+      UpperTorso.X 0.54, so at 2.2 the chest grows 65% and the waist 20%). The waist was
+      never the problem.
+      The real fault was an asymmetry in BodyLoftBuilder. The base radius scales with
+      girth. Lobes scale with girth, deliberately — the comment there says why: *"the sphere
+      grows with the body too, or muscles shrink relative to a widening torso and the
+      physique flattens out at high rank."* **Grooves did not.** `radius += push` added
+      Displacement in absolute studs, so at 2.2 the chest went from 1.14 to 1.88 while
+      PecCleft stayed a 0.18-stud nick. The exact flattening that comment warns about was
+      happening anyway, one layer down, and the cuts vanished precisely as the muscle
+      arrived. `blend = l.Blend * girth` compounded it: the fillets joining lobes widened
+      with size, so muscles fused more the bigger a body got.
+      Grooves now scale with girth for the same reason lobes do, and the fillet grows on a
+      square root — enough that a crease never hardens into a seam at size, not so much
+      that the separation dissolves. This is a fix for every large body, not just the boss:
+      a maxed player was losing definition the same way.
+      **Then a leanness axis**, because there was none. Definition was purely a function of
+      the same progress that drove size, so nothing could be big and cut independently —
+      a maxed body was a larger beginner. Leanness deepens the cuts and darkens the shadow
+      in them without touching a radius. 1 is a player and the default everywhere; the boss
+      runs 1.7, which is what lets it look like something no amount of training produces.
+      It is clamped rather than trusted, because it multiplies values that self-tests guard:
+      groove depth against the minimum surviving radius, stroke depth against pure black.
+      Both self-tests still pass.
+      The one place a mistake here would never surface is the skin cache, which is shared
+      across every body on the client — a boss painted with deeper shadows would otherwise
+      be handed to the next player sharing its skin tone. Leanness is part of the cache key,
+      quantised like progress already is.
+      Also dropped hands and feet from the boss's scale loop: it was setting every part to
+      2.2 including LeftHand and RightFoot, which a player never grows past 1, rounding off
+      the two parts that most need to stay crisp.
+      Verified: all nineteen self-tests pass, the boss still stands on the ground (mesh
+      bottom -1.418) and still animates (14 loft bones following), and a player has no
+      leanness attribute so their path is untouched. **Not verified: how it actually looks.**
+      Studio's screen capture hung repeatedly and the camera kept being reclaimed, so the
+      "is it ripped" question — the only one that matters here — is still open and wants
+      human eyes.
+
+- [x] 183. **A grown body cannot put its arms down.** The reference physique everyone pictures
+      when they say "gym simulator body" reads as huge partly because of the *stance*: the lat
+      fills the space the upper arm used to hang in, so the arms are held out whether the
+      character wants them there or not. Ours stood with its arms at its sides at every size,
+      which made a maxed player read as a normal person wearing muscle rather than as somebody
+      whose own mass is in the way.
+      Abduction is now derived, not chosen. `BodyLoftBuilder` already pushes the arm tubes
+      outward by `spreadStuds = (AxisScale("UpperTorso", scale).X - 1) * TORSO_HALF_WIDTH`,
+      which is 0.648 studs at the 2.2 cap. `StanceConfig.MAX_DEGREES = 33` is exactly
+      `asin(0.648 / 1.19)` over the bind pose's 1.19-stud shoulder-to-hand reach — the angle
+      at which the rig arm travels out by as much as the lat mass grew. Larger is a T-pose;
+      smaller sinks the upper arm into the chest. `RunSelfTest` asserts the two against each
+      other, so retuning `WEIGHTS.UpperTorso.X` now fails loudly instead of silently starting
+      to clip arms through a body. `ARM_REACH` is likewise checked against `BONES` rather
+      than trusted, and the curve is `growth^0.7` so the first sessions show something.
+      Two consumers, because the gait deliberately does nothing at rest. `GaitController`
+      composes the offset onto its own shoulders while moving; a new `StanceController` at
+      Priority 8 — the weakest slot — covers standing. The wrap goes **outside** the weight
+      lerp, and that was the whole trick: inside it, abduction faded toward identity along
+      with the gait's blend-out and the arms dipped every time a player stopped, which is the
+      one thing this exists to prevent.
+      No idle pose, deliberately. `GaitConfig.RunSelfTest` asserts every entry in `List` has
+      all thirteen joints, hip opposition at exactly 0.5 and a knee lagging its hip; a
+      standing pose satisfies none, so admitting one would have meant weakening four real
+      invariants. `PoseConfig` already overrides the stock idle per joint, so claiming two
+      shoulders locks the arms out while the idle's breathing and sway keep playing.
+      The three ownership checks moved out of `GaitController` into
+      `GaitConfig.BodyIsClaimed`, because it is no longer only the gait that asks. Two copies
+      of that list is two places to forget a fourth case, and the failure looks like a player
+      throwing a punch with one arm stuck in a lat spread.
+      Bosses need no branch anywhere: `BRUTE_SCALE == MAX_MUSCLE_SCALE`, so `growth` clamps
+      to 1 and a brute stands permanently spread through the same path a player grows into.
+      Thieves have no `MuscleScales` folder, resolve to zero degrees, and are released on the
+      first frame.
+      Verified: `check.sh` clean (the two remaining selene warnings are pre-existing in
+      `MenuController` and predate this branch). **Not verified: how it looks.** The angle is
+      derived from the mesh rather than eyeballed, which is the best a number can do, but
+      whether 33° reads as a lat spread or as a penguin wants human eyes.
+
+- [x] 184. **The muscles come apart into heads.** The physique everyone pictures when they
+      say "gym simulator body" is not bigger than ours was — it is *segmented*. Ours had one
+      lobe per group: one deltoid, one bicep, one pec, one lat per side. That reads as a
+      smooth big arm rather than a built one, and no amount of raising a radius fixes it,
+      because a bigger ball is still one ball. The taper was never the problem: at the 2.2
+      cap the chest already reaches 1.88 against a 0.77 waist, a 2.4:1 V.
+      The lever that was sitting unused was `StretchX/Y/Z`, which was 1 on all 26 lobes —
+      every muscle in the game was a sphere. A latissimus is a broad flat sheet, and
+      rendered as a ball it is a lump on an otherwise smooth back, which is exactly why the
+      wide V never appeared however far the amplitudes went up. Stretched tall in Y and
+      flattened in Z it becomes the sheet, and the flare is what pushes the arms out.
+      So: 26 lobes to 56 and 22 grooves to 51. Three deltoid heads instead of one, a bicep
+      peak plus brachialis, the tricep's horseshoe, a forearm split front and back, a pec as
+      an upper head over a squashed wide shelf, the lat as flare plus sweep, teres and
+      rhomboid on the back, three quad heads and two calf heads. Every new head got the
+      channel that separates it from its neighbour, because grooves are what make swells
+      read as separate muscles — the header of that file records that the first version had
+      26 muscles, no grooves, and produced a barrel.
+      Gated at the top of the curve. Each group's primary head keeps the early ramp it
+      always had, so a beginner grows the same recognisable body on the same curve; the
+      second and third heads start at `SPLIT_START = 0.58`. Maxing out is now a change in
+      kind rather than one more increment of size — the arms do not merely get bigger, they
+      come apart. `BodySkinConfig` gained the matching painted strokes at the same
+      threshold, because at the Mid LOD (14 sides) geometry stops resolving a narrow channel
+      and the texture has to carry it; a head and its line must arrive together or the split
+      reads as a scratch on a smooth muscle.
+      The self-test caught four buried lobes on the first run — Brachialis, TricepLateral,
+      Teres and Rhomboid all sat inside the surface and would have cost a build while
+      changing nothing visible. That check is the reason this took one iteration instead of
+      a screenshot hunt. Added two it was missing: every stretch axis must be positive
+      (RayExit *divides* by them, so a zero is a nan that propagates through SmoothMax and
+      makes an entire limb vanish with no error anywhere), and mirrored lobes must be
+      stretched identically.
+      Doubling the tables made the builder's per-vertex work stop being negligible, so the
+      groove loop now hoists a per-tube list before the ring loop instead of walking all 51
+      grooves per vertex and testing the tube inside — the same shape the lobe loop one
+      block above already used. The lobe loop already pruned by tube, so it needed nothing.
+      Verified: all nineteen self-tests pass, `check.sh` clean except the two selene warnings
+      in `MenuController` that predate this branch. **Not verified: how it looks.** That is
+      the only question that matters here and it needs `PhysiquePreview.show()` in Studio
+      Edit mode and human eyes — front row and back row, checking that stage 0 still reads
+      as a normal person and stage 1 reads as segmented rather than merely lumpy.
+
+- [x] 185. **Looked at it, and found the real problem is older than this branch.** #184 shipped
+      unverified by eye, so I built the preview in Studio Edit and took the shots.
+      What the change did do: the maxed body is visibly wider (mesh X from 4.11 at stage 0 to
+      5.78 at stage 1) and the arms now read as separated pieces — delt heads and the bicep
+      split are legible on the silhouette where before the arm was one smooth mass. All ten
+      preview bodies build, 46–65ms each at the Near LOD.
+      What it did not fix: the torso reads as a muddy dark smear rather than a cut chest, and
+      an A/B against HEAD~2 shows **the pre-change body has exactly the same smear**. This is
+      not a regression from #184 — it is the state the body was already in, and it is now the
+      dominant visual problem, ahead of segmentation. The likely cause is resolution, not
+      authoring: `BodySkinConfig.RESOLUTION` is 512 for the entire body, and the torso's
+      atlas column is u 0..0.5, so roughly 256 pixels carry the front *and* back of a chest
+      that is 5.8 studs wide at full growth. Every stroke on it is magnified and filtered
+      into a blur. Not changed here, because doubling a texture every client holds is a
+      memory call that wants making deliberately rather than as a side effect of a shape pass.
+      Two mistakes of mine caught in the process, both now fixed: the new strokes were
+      authored at the same depths as the deepest existing rows and then stacked on top of
+      them in the same place, which put a near-black band across the upper chest — depths
+      dropped to 0.20–0.32. And the first control build was invalid: `BodySkinPainter` caches
+      textures in a module upvalue keyed by palette and stage, so building a second variant
+      inside one cloned Modules folder silently reuses the first one's image. Every variant
+      after that got its own clone.
+      Also noted, unfixed and pre-existing: a stair-stepped notch in the surface at the
+      armpit, visible on both the old and the new body, where the arm tube's rings blend from
+      UpperTorso weight to UpperArm weight.
+      Verified: `check.sh` clean but for the two `MenuController` selene warnings that predate
+      this branch; nineteen self-tests pass; Studio preview cleaned up afterwards and the
+      real `ReplicatedStorage.Modules` tree left untouched (every build ran from a clone).
+
+- [x] 186. **The cuts were narrower than the mesh could hold, and the plate was an end cap.**
+      #185 said the body read as a muddy smear and blamed texture resolution. That was half
+      of it. Rated against the reference the shipped body scores about 25%, and three things
+      were wrong, none of them "the numbers want more tuning".
+      **A groove is a Gaussian, and the mesh has to have a vertex inside it.** At thirty
+      sides a facet was 0.209 rad. The depth a cut actually reaches is
+      `exp(-(spacing/2/sigma)^2)`, so surviving with half its authored depth needs
+      `sigma >= 0.6 * spacing` — a floor of 0.126, and fourteen grooves sat under it while
+      every other one landed shallow. That is why deepening them by hand never helped: the
+      amplitude was never the thing being sampled. `SPREAD_FLOOR_FACTOR` derives the floor
+      from whatever the finest tier is set to, and `RunSelfTest` holds every groove to it on
+      both axes, so the two can no longer drift apart.
+      **The shoulder plate was never the deltoid.** Every tube is closed with a triangle fan
+      whose normals are locked to its own axis, so a limb's root ring is a flat horizontal
+      disc — fine inside the torso, and it was not inside: at full growth the arm's cap
+      reached x = 1.9 while the torso had necked to 1.5, hanging in open air. The
+      `spread * limbShare` term made it worse rather than better; a weight climbing from 0.30
+      at the cap to 1.0 down the arm is a *gradient of translation*, which fans the rings from
+      a 2.75:1 silhouette to 4.55:1 — the same shelf it was added to remove. The limb tubes
+      now start well inside the body and the spread is uniform, which preserves the authored
+      slope at every size. The hip had the same bug and the same upward-facing ledge. The
+      burial is now asserted at both ends of the growth curve, and the check was confirmed
+      non-vacuous by putting the old ring back and watching it fail.
+      **The user asked for 96 sides. The engine refuses it.** An EditableMesh is capped at
+      20,000 triangles and enforces it by *refusal* — "Triangle count above limit", the build
+      returns nil, and the player silently keeps the stock rig with nothing logged as an
+      error. 96/3 is 36,288 and 64/3 is 24,192; both were rejected in Studio. The budget had
+      to be spent rather than raised, and it went on angle over length — nearly every line
+      that defines this physique runs vertically — so 64 sides at 2 subdivisions (18,304)
+      over 48 at 3 (18,144). `MAX_TRIANGLES` and `TriangleCount` now price every tier in the
+      self-test, because a config change is always one ring away from crossing it.
+      Also: texture to 1024 with the atlas rebalanced (torso 0.5 → 0.4, legs 0.10 → 0.15
+      each), because the columns are what decide pixels and at 512 an arm owned 76 of them
+      for its whole circumference and a leg 51. The stroke falloff had no solid core — a
+      smoothstep across the entire half-width is feather all the way to the centre line, so
+      every crease was a gradient with no line in it. And the cream body: `AppearanceConfig
+      .Find` fell back to the palette's first row, which is Porcelain, while every new player
+      is given Tan; `paletteOf` now refuses to bake a palette until BodyColors has actually
+      replicated, rather than guessing cream and caching it globally.
+      The stroke-width test hardcoded 512 and the torso's share, so it spoke for one region
+      out of five and would have gone on passing after the resolution moved. The per-region
+      version needs both modules and neither may require the other, so it lives in
+      `scripts/selftest.luau` as a cross-module suite alongside the appearance defaults.
+      Verified: twenty self-test suites pass, `check.sh` clean but for the two `MenuController`
+      selene warnings that predate this branch, build measured at 54–59 ms per body at the new
+      settings (unchanged from before, so no yielding was needed), and the silhouette now
+      rises monotonically from 0.73 at the neck to 2.90 at the shoulder and stays flat down
+      the arm instead of spiking and falling back. **Not verified: how it looks.** Studio's
+      screen capture hung on every attempt this round after working earlier in the session.
+
+- [x] 187. **Three reported bugs, and two of my three hypotheses were wrong.**
+      **The skin tone was never wrong — the customiser was lying about it.** I chased this
+      through the whole pipeline and it was correct at every step: the swatch sends an id, the
+      server paints BodyColors, `paletteOf` reads the rig, and the texture's flat-skin pixel
+      comes back *bit-exact* against the chosen RGB (verified by reading the live body's own
+      EditableImage back and histogramming it). The rebuild lag is 0.12s. What was wrong is
+      `CustomizerStageController`, which grades the creator stage to **Saturation = -0.45** for
+      mood. ColorCorrection does not touch a ScreenGui, so the swatch buttons showed true
+      colour while the body beside them was desaturated by nearly half: Umber (129,84,52)
+      previewed as a pale peach. The player then walked out into a world graded at only -0.12
+      and got a third colour again. Brightness and contrast stay; saturation is now 0, because
+      this is the one screen whose entire job is choosing a colour.
+      Two hypotheses I had to abandon on the way, both killed by measurement rather than
+      argument. `MeshPart.Color` was never assigned, so it sits at default grey — I "fixed"
+      that and it changed nothing, because painting every face of a body pure red rendered it
+      red while its part was Tan: **a vertex colour replaces `BasePart.Color`**, so part colour
+      is inert on this mesh. That resolves the open question `BodySkinPainter`'s header had
+      been carrying ("not something this project can check right now"), and the header now
+      states it. And the body looked paler than a Tan cube purely because a cube is flat and a
+      body is convex — against a Tan *sphere* it matched.
+      **The boss's sink was mine to a degree, and older than me for the rest.** `HipHeight`
+      came from a hand-measured `LOFT_ROOT_HEIGHT = 1.199` that nothing tied to the geometry.
+      My first fix used the mesh's half-height (1.930) and was still wrong: the mesh is
+      *skinned*, so the bounding box is not where it renders — every vertex is placed by its
+      bone, and the ankle bone is 2.86 under the root. Measured on a live boss, the rig's foot
+      was **2.31 studs under the floor**. Both the loft and the rig exist at once and end at
+      different heights, so `MobService` now stands a boss on whichever reaches lower — the
+      loft's derived drop or the rig's measured lowest part. Lowest rig part went from -2.31
+      to -0.15 below ground; `HipHeight` 0.418 → 4.609.
+      **The love handle had a precise cause.** The ring authored as "the waist" at y = -0.60
+      was **55% UpperTorso**, so the chest's x1.648 growth reached down and widened it by
+      x1.448 while the hips below grew on x1.293 — at full size it sat 0.074 *proud* of the
+      ring beneath it, which is what a love handle is, and training Chest or Back made it
+      worse. Rebalanced to the waist's own bone, and given a new `Cinch` field: how far a ring
+      pulls in as the body grows, 0 everywhere else. Not a negative `PhysiqueConfig` weight,
+      which was the obvious move and wrong twice over — those weights also scale the real R15
+      parts and hitboxes, and PhysiqueConfig's self-test requires every part to actually grow.
+      The waist now *shrinks* (0.640 → 0.618) and chest:waist goes 1.90 → **3.04**, with the
+      minimum back where it was authored. Core's payoff moved from girth to definition, and a
+      new `ObliqueGap` cuts the flank — nothing in the file grooved below y ~= -0.39, so the
+      oblique swelled out of an ungrooved band with no edge, which is why it read as fat. The
+      "surface survives its own grooves" test now measures the cinched radius, or a narrowed
+      ring would quietly get a bigger cut budget than it has.
+      Bosses inherit all of the waist work with no boss-specific code.
+      Verified by eye this session — screen capture came back when Studio regained focus.
+      Twenty self-test suites pass; `check.sh` clean but for the two `MenuController` selene
+      warnings that predate this branch.
+
+- [x] 188. **The creases were being divided by the bulges.** The body had the reference's muscles
+      — 56 lobes, 52 grooves, a 3.04 chest-to-waist V — and still read as a smooth mass with
+      faint smudges. Measuring the shading end to end found the reason, and it was not that the
+      numbers were a bit gentle.
+      `ReliefTint` takes `depth = -relief / reach`, and the builder set `reach` to a running
+      `max(abs(relief))` over the whole tube. On a maxed torso that is **1.001 studs**, set by a
+      lat peaking a full stud *proud* of the tube — while the deepest cut on the same body
+      reaches −0.26. Every groove was divided by four times its own range. The deepest crease on
+      an entire player torso rendered **4.7% darker than flat skin, on one vertex**, and the
+      median groove vertex 0.02% darker. Deepening a groove only grew its own divisor, which is
+      why several passes of doing exactly that changed nothing on screen. A cut is now measured
+      against the deepest cut on its own tube.
+      `GROOVE_SHADE` 0.18 → 0.42 on top of that. Deepest crease goes 0.901 → **0.580** for a
+      player and **0.400** for a boss — which finally makes the `min(..., 0.6)` clamp inside
+      `ReliefTint` live code rather than unreachable, since `MAX_LEANNESS` is 2 and 0.18 × 2
+      could never reach it. Verified by reading the vertex colours the builder actually wrote,
+      not by trusting the config value: darkest 0.580 at leanness 1, 0.400 at 1.7.
+      **The normals could not see a narrow groove either.** `positions[next] - positions[prev]`
+      is a smoothing kernel exactly one facet wide, so at the floor of a one-vertex crease both
+      walls sit level, the terms cancel, and the normal points straight off the body — the cut
+      renders flat however deep it is. Most grooves here are 0.9–1.4 vertices across at Hero
+      detail. Where a vertex is now a local extremum in relief, the tangent is taken *one-sided*
+      toward the steeper wall instead of spanning both; flat surface fails the test and keeps the
+      smooth central difference, so nothing that already looked right moved.
+      Shape, unevenly, because uniform inflation is what produced the smooth barrel two passes
+      ago. The torso was the weak half: pecs stood proud 24–29% of local radius and lats 19–22%,
+      against a deltoid at 76%. Pecs → 50–60%, lats → 47–50%, abs → 40%. And the lats had the
+      softest rim on the body — `Blend` 0.20/0.22 is an effective fillet of 0.25–0.27 studs at
+      full growth against 0.167 studs of arc per vertex, so the edge dissolved over 1.5
+      vertices; down to 0.14/0.15, and the glute with them. Left alone: abs and delts, whose
+      fillets were already inside a single vertex, and the small accents (teres, trap, forearm
+      extensor) that are meant to be accents.
+      Added the self-test whose absence let a tint of 0.9998 ship and survive three passes: a
+      groove at full depth must darken past 0.7. The five existing `ReliefTint` assertions all
+      passed throughout — they only ever checked that flat skin is untouched and that a groove is
+      neither absent nor black, and 0.9998 is comfortably both.
+      Verified: twenty self-test suites pass; `check.sh` clean but for the two `MenuController`
+      selene warnings that predate this branch; mesh build unchanged at 50 ms (the 236 ms in the
+      first reading was the one-off 1024 texture fill for a fresh stage — cold is 80 ms).
+      **Verified by eye after all** — a capture that had been left for dead came back once
+      Studio regained focus. The pecs now read as two shelves with a cleft and a hard under-line,
+      the abs as bands rather than scratches, and the lat V is legible on the back. That is the
+      thing every previous pass failed at.
+      One more found by looking, which no numeric probe would ever have raised: the body was
+      `SmoothPlastic` and took a hard specular highlight, so a surface made entirely of convex
+      muscle read as *wet* — long glossy sweeps down the pecs and a patent-leather shine on the
+      shorts, against a reference that is flat matte. The stock R15 head is `Plastic`, so the
+      body was also finishing differently from the face on top of it. Now `Plastic`, and the
+      wet look is gone.
+      Still short of the reference, and honestly: the shoulder still reads as a wide flat shelf
+      from a high angle, and the crease shading is streaky rather than crisp — 4.7% of
+      face-corners carry it, which is sparse. Call it half way there, up from about a quarter.
+
+- [x] 189. **The lat was eating the waist, and I had been measuring the wrong thing.** The player
+      said the waist kept growing. They were right, it was my regression from #188, and the way I
+      missed it matters more than the fix.
+      Last pass I measured the waist and reported it shrinking: rings 0.640 → 0.618. That was
+      true — of the *rings*. Measuring the **finished surface** instead, base ring plus every
+      lobe's ray-union plus grooves, the waist went 0.656 → **1.568 at full growth, +139%**,
+      against a chest growing +102%. The waist was growing faster than the chest and the body
+      came out **1.43 chest-to-waist**: a barrel with shoulders, while every number in the config
+      looked right and my own measurement said it was fine.
+      The cause was `{side}Lat`. A latissimus is wide at the armpit and comes to a point at the
+      waist; an ellipsoid is exactly as wide at its bottom as its middle. That lobe sat at
+      y = +0.28 with a vertical semi-axis of 1.28 studs — spanning y = -1.00 to +1.56, the entire
+      torso — and on its own pushed the waist from 0.673 to 1.588. `LatSweep` added another +83%.
+      So inflating the lats in #188, radius 0.54 → 0.74, inflated the waist harder than anything
+      else on the body. Splitting the blame: **98% of the waist's growth was the lat, 2% was
+      LowerTorso scaling.**
+      Fixed by giving the lat the same treatment every other muscle here already has: three heads
+      with falling radius — `LatUpper` at the armpit carrying the flare, `LatMid` at the ribs,
+      `LatLower` small and the only one near the waist — with StretchY down from 1.7 to ~0.9,
+      because the stack carries the taper now instead of one stretched shape. Waist at y = -0.60
+      now goes 0.640 → **0.607, which is a 5% *shrink***, hips stay flat, chest is unchanged, and
+      the ratio is **3.72 : 1**.
+      That 2% is why `PhysiqueConfig` was left alone, which was worth checking before assuming:
+      `WEIGHTS.LowerTorso` sizes the real R15 part and that part's `Size` *is* the player hitbox;
+      `PhysiqueConfig.RunSelfTest` requires `max(X, Z) > 0.16667` and we sit at 0.17, exactly on
+      the floor; and `BodyLoftConfig.RunSelfTest` hardcodes that same 0.17 as a literal in the
+      limb-cap burial check, so changing one without the other would leave a test validating a
+      body that no longer exists. All of that to fix 2% of the problem.
+      Core's payoff went where the player asked — the abs. Ab lobes up to radius 0.46 and the
+      cuts between them deeper (`LineaAlba` 0.22, `AbGap` 0.19, `Serratus` 0.13). Safe to raise
+      because they sit at angle ±0.20, dead front: they lift the belly toward the viewer rather
+      than pushing past the silhouette, and the waist measurement does not move when they grow.
+      No stat mapping changed. Every player-facing string already frames Core as abs.
+      **The real fix is the new self-test**, which measures the finished silhouette rather than
+      the ring table — the same maths the builder runs, all of it already pure in this module —
+      and asserts that the waist is still the narrowest part of the torso at full growth and that
+      the chest clears it by 2.4:1. Confirmed non-vacuous by putting the old lat back: it reports
+      "the narrowest point of the torso is at y=-1.20, which is not where the waist is", which is
+      precisely the migration that happened. A ring table is not a body, and until now nothing in
+      this file had ever checked the body.
+      Verified: twenty self-test suites pass; `check.sh` clean but for the two `MenuController`
+      selene warnings that predate this branch. **Not verified by eye:** Studio's capture timed
+      out again this round. Still open and unrelated: the torso does not narrow toward the neck —
+      it holds ~2.0 half-width from the chest all the way up, which is the flat shoulder shelf.

@@ -16,10 +16,10 @@ local ONE_DAY = 24 * 60 * 60
 local Product: Types.Product = {
 	Id = "ImmortalPotion1Day",
 	Kind = "DevProduct",
-	AssetId = 0,
+	AssetId = 3709768699,
 	DisplayName = "Immortal Potion (1 Day)",
 	Description = "A full day of immunity. Expiry is saved, so it survives rejoining.",
-	RobuxPrice = 79,
+	RobuxPrice = 199,
 
 	Grant = function(player: Player): boolean
 		return Loader.Get("ImmortalityService"):Grant(player, ONE_DAY)

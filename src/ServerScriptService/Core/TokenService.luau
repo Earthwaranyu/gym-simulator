@@ -30,6 +30,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Signal = require(ReplicatedStorage.Packages.Signal)
 local Loader = require(ReplicatedStorage.Modules.Loader)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local MuscleClassConfig = require(ReplicatedStorage.Modules.MuscleClassConfig)
+local MobConfig = require(ReplicatedStorage.Modules.MobConfig)
 
 local GYM_ZONE_TAG = "GymZone"
 
@@ -135,6 +137,39 @@ function TokenService:AwardTokens(player: Player, amount: number): boolean
 end
 
 --[[
+	Awards an amount stated at Natural, scaled to what the player's class is worth.
+
+	Income doubles with every physique class, so a flat grant decays: four hundred tokens
+	is well over an hour of play to a Natural and about forty seconds to a Mythic. A pack
+	sold as "400 tokens" would quietly become worthless to exactly the players most likely
+	to buy one.
+
+	The number on a pack is therefore its Natural value, and this converts it, so what a
+	pack is really selling is a fixed stretch of progress at any point in the game.
+
+	The token shop priced its items by the same rule and for the same reason. It is gone
+	— boosts are Robux-only and tokens buy the per-stat multipliers — so this is now the
+	only place the class multiplier is used to hold a number's meaning steady.
+]]
+function TokenService:AwardClassScaled(player: Player, baseAmount: number): boolean
+	return self:AwardTokens(player, self:ClassScaled(player, baseAmount))
+end
+
+--[[
+	What a Natural-quoted amount is worth to this player, without paying it.
+
+	Split out of AwardClassScaled so the shop can quote the figure the grant will
+	actually credit. A card that promises one number while the grant computes another
+	is the failure this exists to prevent — the same reason a price and the charge for
+	it are never worked out twice.
+]]
+function TokenService:ClassScaled(player: Player, baseAmount: number): number
+	local data = DataService:GetData(player)
+	local level = if data ~= nil then data.MuscleClassLevel else 0
+	return MuscleClassConfig.ScaleTokens(level, baseAmount)
+end
+
+--[[
 	Spends tokens if the player can afford it. Returns false without touching the
 	balance when they cannot, so callers never need to pre-check.
 ]]
@@ -151,13 +186,37 @@ function TokenService:TrySpendTokens(player: Player, amount: number): boolean
 end
 
 function TokenService:Start()
+	-- Boss kills are the one combat source of training Tokens. Everything else pays
+	-- Tokens for time; this pays for a trip and a fight, which is why the lump is large
+	-- enough to be worth planning around and why only bosses grant it.
+	Loader.Get("MobService").MobKilled:Connect(function(killer: Player, mob)
+		if mob.Kind ~= "Boss" then
+			return
+		end
+		-- Same class scaling and same tier cap the thieves use, through the same
+		-- function, so the two currencies cannot drift apart.
+		local data = DataService:GetData(killer)
+		local classLevel = if data ~= nil then data.MuscleClassLevel else 0
+		local reward = (mob.TokenReward or 0) * MobConfig.RewardMultiplier(mob, classLevel)
+		if reward > 0 then
+			self:AwardTokens(killer, reward)
+		end
+	end)
+
 	task.spawn(function()
 		while true do
 			task.wait(Formulas.TOKEN_TICK_SECONDS)
 
 			for _, player in Players:GetPlayers() do
 				if self:IsAccruing(player) then
-					self:AwardTokens(player, Formulas.TokensPerTick())
+					-- The physique class multiplies the tick. Everything else in this
+					-- economy doubles per step, and a flat income against doubling costs
+					-- would make each multiplier tier take twice as long as the last with
+					-- nothing a player could do about it. Prestige is that something.
+					local data = DataService:GetData(player)
+					local level = if data ~= nil then data.MuscleClassLevel else 0
+					local class = MuscleClassConfig.Get(level)
+					self:AwardTokens(player, Formulas.TokensPerTick() * class.TokenMultiplier)
 				end
 			end
 		end

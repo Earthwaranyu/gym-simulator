@@ -14,9 +14,15 @@
 	implementing Types.Ability — there is no registry list here to extend and no
 	`if abilityId == "Punch"` anywhere.
 
-	Damage always passes through PowerGapFalloff. That is load-bearing, not cosmetic:
-	raw damage at trillion-scale stats exceeds a fresh player's entire health pool, so
-	skipping falloff would let a maxed player one-shot beginners.
+	A punch deals exactly the attacker's Arms, to anybody. There used to be a
+	power-gap falloff in front of it that scaled a strong player's hit down against a
+	weak victim; it was removed deliberately, because it meant the damage you saw bore
+	no relation to the stat you had trained — a trillion-power player hit a beginner
+	for about fifteen. What protects a new player now is the safe zone they spawn in
+	and the immortality potions, not a number quietly divided behind their back.
+
+	The consequence is that a maxed player one-shots a fresh one. That is the intended
+	shape of open PvP here.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -28,6 +34,7 @@ local Loader = require(ReplicatedStorage.Modules.Loader)
 local Net = require(ReplicatedStorage.Modules.Net)
 local Types = require(ReplicatedStorage.Modules.Types)
 local Formulas = require(ReplicatedStorage.Modules.Formulas)
+local FlinchConfig = require(ReplicatedStorage.Modules.FlinchConfig)
 
 local SAFE_ZONE_TAG = "SafeZone"
 -- Killing the same victim again inside this window still works — griefing is the
@@ -38,6 +45,15 @@ local REPEAT_KILL_WINDOW = 120
 local VITALS_REFRESH_SECONDS = 1
 -- Generosity on the client's claimed range, to absorb latency.
 local RANGE_TOLERANCE = 1.35
+-- What a hit reads as when the ability does not say. Middling on purpose: an ability
+-- that has not been taught about impact weights should feel like a solid hit rather than
+-- like a graze or like a finisher.
+local DEFAULT_IMPACT = 0.5
+
+-- How long a knockback constraint pushes for. Short: this is an impulse, not a shove.
+-- Long enough to clear the ground and let the ragdoll-free Humanoid arc; short enough
+-- that a player is back in control before they have time to be annoyed about it.
+local KNOCKBACK_SECONDS = 0.16
 
 local CombatService = {
 	Name = "CombatService",
@@ -53,6 +69,7 @@ local sprinting: { [Player]: boolean } = {}
 local DataService: any = nil
 local StatService: any = nil
 local FlightService: any = nil
+local TrainingService: any = nil
 
 -- (victim, attacker, damage, isKill)
 CombatService.DamageDealt = Signal.new()
@@ -60,11 +77,67 @@ CombatService.DamageDealt = Signal.new()
 -- knocked this victim out inside REPEAT_KILL_WINDOW. Listeners that hand out rewards
 -- must skip those; the kill itself still counts and still annoys the victim.
 CombatService.PlayerKilled = Signal.new()
+-- (model, killer) — a non-player combatant died. Deliberately a separate signal from
+-- PlayerKilled, which seven services consume with a `(Player, Player, boolean)` shape;
+-- firing that one with a mob as the victim would break every one of them at once.
+CombatService.EntityKilled = Signal.new()
+
+--[[
+	Non-player things a player can hit.
+
+	CombatService knows how a punch travels, what a safe zone means and how Back and
+	Core resolve a hit. It deliberately does not know what a thief is. A system that
+	owns some other kind of combatant registers a provider here and gets targeting and
+	damage routing for free, exactly as a new file in Abilities/ gets an ability.
+
+	`FindNearest` is only ever consulted after the player sweep comes up empty, so
+	registering a provider can never make an ability stop aiming at a player.
+]]
+export type TargetProvider = {
+	Id: string,
+	Owns: (model: Model) -> boolean,
+	FindNearest: (origin: Vector3, range: number, forPlayer: Player) -> (Model?, BasePart?),
+	-- Optional: every owned entity inside a radius, for area attacks. Optional rather
+	-- than required so registering a provider stays a small commitment and no existing
+	-- provider had to change when Ground Slam arrived; GetTargetsInRadius falls back to
+	-- FindNearest, which means a provider without this contributes its closest entity
+	-- to a blast instead of all of them.
+	FindAllInRadius: ((
+		origin: Vector3,
+		radius: number,
+		forPlayer: Player
+	) -> { { Model: Model, Root: BasePart } })?,
+	-- Returns (damageDealt, wasKilled). The provider owns the entity's health rules.
+	ApplyDamage: (attacker: Player, model: Model, damage: number) -> (number, boolean),
+}
+
+local targetProviders: { TargetProvider } = {}
+
+--[[
+	A last say over how much damage actually lands on a victim.
+
+	Registered rather than branched for the usual reason: CombatService owns the rules
+	that come from stats — safe zones, immortality, Back, Core — and deliberately does
+	not own the rules that come from what a player is *doing* at that instant. Block is
+	the first of those, and it holds a meter, a break state and a cooldown that have no
+	business living in here.
+
+	A modifier receives the damage that survived ResolveDamage and returns what should
+	survive it. It must be pure and prompt: it runs inside the damage path, so yielding
+	in one would stall every hit in the server.
+]]
+export type DamageModifier = {
+	Id: string,
+	Apply: (victim: Player, attacker: Player?, damage: number) -> number,
+}
+
+local damageModifiers: { DamageModifier } = {}
 
 function CombatService:Init()
 	DataService = Loader.Get("DataService")
 	StatService = Loader.Get("StatService")
 	FlightService = Loader.Get("FlightService")
+	TrainingService = Loader.Get("TrainingService")
 
 	self:_loadAbilities()
 end
@@ -179,27 +252,424 @@ local function getLivingParts(player: Player): (Model?, Humanoid?, BasePart?)
 	return character, humanoid, root
 end
 
+-- Server-side fallback for forgiving melee. The client normally supplies its nearest
+-- candidate, but streaming, a character spawning during the click, or a modified
+-- camera controller can leave that nil. Distance is the only targeting rule here;
+-- ApplyDamage still owns safe zones, immortality and every combat permission.
+local function nearestLivingTarget(
+	attacker: Player,
+	origin: Vector3,
+	range: number
+): (Player?, Model?, BasePart?)
+	local bestPlayer: Player? = nil
+	local bestCharacter: Model? = nil
+	local bestRoot: BasePart? = nil
+	local bestDistance = range
+
+	for _, candidate in Players:GetPlayers() do
+		if candidate == attacker then
+			continue
+		end
+		local character, _, root = getLivingParts(candidate)
+		if character == nil or root == nil then
+			continue
+		end
+		local distance = (origin - root.Position).Magnitude
+		if distance <= bestDistance then
+			bestDistance = distance
+			bestPlayer = candidate
+			bestCharacter = character
+			bestRoot = root
+		end
+	end
+
+	return bestPlayer, bestCharacter, bestRoot
+end
+
+--[[
+	The same sweep over registered non-player providers. Kept separate from the player
+	sweep and always called after it, so a mob standing closer than an enemy player
+	never steals the swing: in a PvP game the person is the target that matters.
+]]
+local function nearestEntityTarget(attacker: Player, origin: Vector3, range: number): (Model?, BasePart?)
+	local bestModel: Model? = nil
+	local bestRoot: BasePart? = nil
+	local bestDistance = range
+
+	for _, provider in targetProviders do
+		local model, root = provider.FindNearest(origin, bestDistance, attacker)
+		if model ~= nil and root ~= nil then
+			local distance = (origin - root.Position).Magnitude
+			if distance <= bestDistance then
+				bestDistance = distance
+				bestModel = model
+				bestRoot = root
+			end
+		end
+	end
+
+	return bestModel, bestRoot
+end
+
 --[[
 	Applies damage from one player to another, with every PvP rule in one place:
-	safe zones, immortality, power-gap falloff, Back's resistance and Core's
-	retaliation.
+	safe zones, immortality, Back's ratio-based block and Core's ratio-based
+	reflection.
 
-	`isRetaliation` marks a hit that Core sent back at an attacker. It exists for
-	one reason: to stop retaliation triggering retaliation, which would bounce a
-	single punch between two players until one of them died. Retaliation otherwise
-	goes through this same function deliberately — safe zones, immortality and the
-	power-gap falloff all have to apply to it, and routing it here is how they do
-	that without being written twice.
+	`isRetaliation` marks true return damage sent by Core. It cannot trigger Core again
+	or pass through Back, so a displayed reflection amount is exact and a single punch
+	cannot bounce forever. It still passes through this function so safe zones,
+	immortality, kill credit and Fight Token rewards remain server-authoritative.
 
 	Returns the damage actually dealt, which is zero for any blocked hit.
 ]]
+--[[
+	Registers a source of non-player targets. Call from a system's Start.
+]]
+function CombatService:RegisterTargetProvider(provider: TargetProvider)
+	for _, existing in targetProviders do
+		if existing.Id == provider.Id then
+			warn(`[CombatService] Target provider "{provider.Id}" is already registered`)
+			return
+		end
+	end
+	table.insert(targetProviders, provider)
+end
+
+--[[
+	Registers a damage modifier. Call from a system's Start, same as a target provider.
+]]
+function CombatService:RegisterDamageModifier(modifier: DamageModifier)
+	for _, existing in damageModifiers do
+		if existing.Id == modifier.Id then
+			warn(`[CombatService] Damage modifier "{modifier.Id}" is already registered`)
+			return
+		end
+	end
+	table.insert(damageModifiers, modifier)
+end
+
+--[[
+	Everything an attacker could hit inside a radius — players first, then whatever the
+	registered providers own.
+
+	The single-target sweeps above return the nearest and stop; an area attack needs all
+	of them, so this is the same walk with the "keep the best" replaced by "keep them
+	all". Deliberately not written in terms of nearestLivingTarget: calling that in a
+	loop and excluding what it already returned is quadratic and, worse, gets the
+	exclusion wrong the moment two entities share a position.
+
+	Liveness and distance are the only rules applied here. Safe zones, immortality and
+	the stat-based defenses stay where they have always been, in ApplyDamage, so an
+	area attack cannot accidentally acquire a weaker rule set than a punch.
+]]
+function CombatService:GetTargetsInRadius(
+	attacker: Player,
+	origin: Vector3,
+	radius: number
+): { Types.CombatTarget }
+	local found: { Types.CombatTarget } = {}
+	if not Formulas.IsFinite(radius) or radius <= 0 then
+		return found
+	end
+
+	for _, candidate in Players:GetPlayers() do
+		if candidate == attacker then
+			continue
+		end
+		local character, _, root = getLivingParts(candidate)
+		if character == nil or root == nil then
+			continue
+		end
+		if (origin - root.Position).Magnitude > radius then
+			continue
+		end
+		table.insert(found, {
+			Kind = "Player" :: "Player",
+			Player = candidate,
+			Model = character,
+			Root = root,
+		})
+	end
+
+	for _, provider in targetProviders do
+		local findAll = provider.FindAllInRadius
+		if findAll ~= nil then
+			for _, entity in findAll(origin, radius, attacker) do
+				table.insert(found, {
+					Kind = "Entity" :: "Entity",
+					Player = nil,
+					Model = entity.Model,
+					Root = entity.Root,
+				})
+			end
+		else
+			local model, root = provider.FindNearest(origin, radius, attacker)
+			if model ~= nil and root ~= nil then
+				table.insert(found, {
+					Kind = "Entity" :: "Entity",
+					Player = nil,
+					Model = model,
+					Root = root,
+				})
+			end
+		end
+	end
+
+	return found
+end
+
+--[[
+	Launches a target. The game's only impact physics.
+
+	Driven with a short-lived LinearVelocity, the same mechanism FlightService and the
+	client dash already use, rather than with a legacy BodyVelocity or a direct
+	AssemblyLinearVelocity write: the constraint expires on its own timer, so a launch
+	that is interrupted by a respawn, a death or a disconnect cleans itself up instead
+	of leaving a player permanently sliding.
+
+	Refuses to move anyone the rest of combat refuses to touch — a safe-zone or immortal
+	player is not shoved around, because a knockback that ignored the barrier would be a
+	way to push somebody out of it.
+
+	Deliberately does NOT dismount a training player. Only death dismounts, which is the
+	rule the whole PvP loop is built on: an attacker has to commit to a kill to break a
+	set, and a slam that scattered a room full of people off their machines would undo
+	that in one button.
+]]
+function CombatService:ApplyKnockback(target: Types.CombatTarget?, direction: Vector3, speed: number)
+	if target == nil or not Formulas.IsFinite(speed) or speed <= 0 then
+		return
+	end
+
+	local victim = target.Player
+	if victim ~= nil then
+		if self:IsInSafeZone(victim) or self:IsImmortal(victim) then
+			return
+		end
+	end
+
+	local root = target.Root
+	if root.Parent == nil or root.Anchored then
+		return
+	end
+
+	-- A launch with no horizontal component is somebody standing exactly on the
+	-- epicentre. Straight up is the honest answer, and normalising a zero vector is not.
+	local flat = Vector3.new(direction.X, 0, direction.Z)
+	local horizontal = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.zero
+	local launch = (horizontal * (1 - Formulas.KNOCKBACK_LIFT) + Vector3.yAxis * Formulas.KNOCKBACK_LIFT).Unit
+		* speed
+
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "KnockbackAttachment"
+	attachment.Parent = root
+
+	local velocity = Instance.new("LinearVelocity")
+	velocity.Name = "Knockback"
+	velocity.Attachment0 = attachment
+	velocity.RelativeTo = Enum.ActuatorRelativeTo.World
+	velocity.MaxForce = math.huge
+	velocity.VectorVelocity = launch
+	velocity.Parent = root
+
+	task.delay(KNOCKBACK_SECONDS, function()
+		velocity:Destroy()
+		attachment:Destroy()
+	end)
+end
+
+--[[
+	Damage from a player to whatever they actually hit.
+
+	Abilities call this rather than ApplyDamage, so an ability never has to learn what
+	kinds of combatant exist. Player targets fall straight through to ApplyDamage with
+	its full PvP rule set intact; everything else is routed to the provider that owns it.
+]]
+--[[
+	Marks a victim as having just been hit, and how hard.
+
+	Stamped on the victim rather than sent to anybody, for the same reason a strike is
+	stamped on the attacker: everybody in the room needs it and nobody needs it
+	privately. Clients read it to play the flinch and the impact effect.
+
+	On the victim rather than the attacker is the important half. An attacker's swing
+	plays whether or not it connects — Punch stamps StrikeAt before it has any idea
+	whether there is a target — so an impact effect driven off the swing fires when
+	somebody punches empty air. A hit is something that happens to a body, so the body
+	that it happened to is what carries it.
+
+	A timestamp rather than a flag, so three contacts of a combo are three events.
+]]
+function CombatService:_markHit(model: Model, impact: number)
+	if not Formulas.IsFinite(impact) then
+		return
+	end
+	model:SetAttribute(FlinchConfig.HURT_IMPACT_ATTRIBUTE, math.clamp(impact, 0, 1))
+	model:SetAttribute(FlinchConfig.HURT_AT_ATTRIBUTE, workspace:GetServerTimeNow())
+end
+
+function CombatService:ApplyDamageToTarget(
+	attacker: Player,
+	target: Types.CombatTarget?,
+	rawDamage: number,
+	-- How hard this particular contact should read, 0 to 1. Stated by the ability
+	-- because damage cannot say it: a jab is around two per cent of an evenly matched
+	-- player's health, so weighting by damage would put every contact of a combo in the
+	-- same band and there would be no escalation to see. See Formulas.ImpactTier.
+	--
+	-- Optional, and defaulted, so every call site written before this existed still
+	-- compiles and still produces a reasonable hit.
+	impact: number?
+): number
+	if target == nil then
+		return 0
+	end
+
+	local weight = impact or DEFAULT_IMPACT
+
+	if target.Kind == "Player" then
+		local victim = target.Player
+		if victim == nil then
+			return 0
+		end
+		local dealt = self:ApplyDamage(attacker, victim, rawDamage)
+		local character = victim.Character
+		-- Only a hit that actually landed. A fully blocked or fully reflected hit is a
+		-- successful defence, and a victim who flinched at one would be reporting damage
+		-- they did not take.
+		if dealt > 0 and character ~= nil then
+			self:_markHit(character, weight)
+		end
+		return dealt
+	end
+
+	if not Formulas.IsFinite(rawDamage) or rawDamage <= 0 then
+		return 0
+	end
+
+	-- A player swinging from inside a safe zone hits nothing, mobs included. Otherwise
+	-- the barrier would be a free turret position.
+	if self:IsInSafeZone(attacker) then
+		return 0
+	end
+
+	for _, provider in targetProviders do
+		if provider.Owns(target.Model) then
+			local damage, killed = provider.ApplyDamage(attacker, target.Model, rawDamage)
+			if damage > 0 then
+				-- Mobs flinch too. It costs one attribute write and the alternative is a
+				-- mob that stands perfectly still while being beaten.
+				self:_markHit(target.Model, weight)
+				Net.Event("CombatFeedback"):FireClient(attacker, {
+					Kind = "Hit",
+					Damage = damage,
+					Blocked = 0,
+					Reflected = 0,
+					IsReflection = false,
+					Victim = target.Model.Name,
+				})
+			end
+			if killed then
+				CombatService.EntityKilled:Fire(target.Model, attacker)
+			end
+			return damage
+		end
+	end
+
+	return 0
+end
+
+--[[
+	Damage to a player from something that is not a player — a mob, and later anything
+	else the world can do to you.
+
+	It reuses every defensive rule that matters (safe zones, immortality, Back's block
+	and the flight grounding) but must never touch kill bookkeeping: there is no killer
+	Player to credit, and PlayerKilled's seven listeners all assume there is. Deaths are
+	counted here directly so being killed by a mob is not invisible to the profile.
+
+	`attackStat` is the Arms-equivalent of whatever swung — MobConfig's per-tier
+	AttackStat. Back's bands are a ratio of defence to attack, so without a real number
+	here there is nothing to block against: this used to pass zero, the ratio floored the
+	attacker at one, and the result was that every player above ten Core took no damage
+	from any monster, ever.
+
+	Formulas.ResolveEnvironmentDamage owns the two rules that differ from a player hit:
+	Core is not consulted, and Back can never block the whole thing. Both exist so that
+	out-levelling a tier makes it trivial rather than inert — an arena that cannot touch
+	you at all reads as a broken game, and while it was true it hid two genuine bugs,
+	because zero damage looks identical however it was arrived at.
+]]
+function CombatService:ApplyEnvironmentDamage(
+	sourceName: string,
+	victim: Player,
+	rawDamage: number,
+	attackStat: number
+): number
+	if not Formulas.IsFinite(rawDamage) or rawDamage <= 0 then
+		return 0
+	end
+
+	local _, humanoid, _ = getLivingParts(victim)
+	if humanoid == nil then
+		return 0
+	end
+
+	if self:IsInSafeZone(victim) or self:IsImmortal(victim) then
+		return 0
+	end
+
+	local breakdown =
+		Formulas.ResolveEnvironmentDamage(rawDamage, StatService:GetStat(victim, "Back"), attackStat)
+	local damage = breakdown.Damage
+	-- The same last word the player-versus-player path gives a modifier. A guard that
+	-- stopped a punch but not a mob would be a rule the player has no way to learn.
+	local blockedDamage = breakdown.Blocked
+	for _, modifier in damageModifiers do
+		local reduced = modifier.Apply(victim, nil, damage)
+		if Formulas.IsFinite(reduced) and reduced < damage then
+			local absorbed = damage - math.max(reduced, 0)
+			blockedDamage += absorbed
+			damage -= absorbed
+		end
+	end
+	if damage <= 0 then
+		return 0
+	end
+
+	humanoid:TakeDamage(damage)
+	local isKill = humanoid.Health <= 0
+	FlightService:Ground(victim)
+
+	Net.Event("CombatFeedback"):FireClient(victim, {
+		Kind = "Hurt",
+		Damage = damage,
+		Blocked = blockedDamage,
+		Reflected = 0,
+		IsReflection = false,
+		Attacker = sourceName,
+	})
+
+	if isKill then
+		local data = DataService:GetData(victim)
+		if data ~= nil then
+			data.Deaths += 1
+			DataService:MarkDirty(victim)
+		end
+		Net.Event("Notify"):FireClient(victim, `{sourceName} knocked you out.`)
+	end
+
+	return damage
+end
+
 function CombatService:ApplyDamage(
 	attacker: Player,
 	victim: Player,
 	rawDamage: number,
 	isRetaliation: boolean?
 ): number
-	if attacker == victim or rawDamage <= 0 then
+	if attacker == victim or not Formulas.IsFinite(rawDamage) or rawDamage <= 0 then
 		return 0
 	end
 
@@ -220,18 +690,47 @@ function CombatService:ApplyDamage(
 		return 0
 	end
 
-	local falloff =
-		Formulas.PowerGapFalloff(StatService:GetTotalPower(attacker), StatService:GetTotalPower(victim))
+	local attackerArms = StatService:GetStat(attacker, "Arms")
+	local breakdown = if isRetaliation
+		then {
+			Damage = rawDamage,
+			Blocked = 0,
+			Reflected = 0,
+			BlockRate = 0,
+			ReflectionRate = 0,
+		}
+		else Formulas.ResolveDamage(
+			rawDamage,
+			StatService:GetStat(victim, "Back"),
+			StatService:GetStat(victim, "Core"),
+			attackerArms
+		)
+	local damage = breakdown.Damage
+	local blockedDamage = breakdown.Blocked
+	local reflectedDamage = breakdown.Reflected
 
-	-- What Back is for. Contested against the attacker's Arms, so two players who
-	-- trained evenly cancel out and this changes nothing about a fair fight — it
-	-- only answers somebody who out-levelled you on Arms alone.
-	local resistance =
-		Formulas.DamageResistance(StatService:GetStat(victim, "Back"), StatService:GetStat(attacker, "Arms"))
+	-- What the victim is doing gets the last word, after what the victim has trained.
+	-- Skipped for retaliation for the same reason Back and Core are: a Core counter is
+	-- already the defense resolving, and letting a guard also eat the counter would
+	-- reduce the attacker's punishment for hitting somebody they cannot hurt.
+	--
+	-- Anything a modifier removes is reported as Blocked rather than as a fourth
+	-- number, so the existing feedback payload, the damage-number tint and the HUD all
+	-- keep working unchanged: from the player's side a stopped hit is a stopped hit.
+	if not isRetaliation then
+		for _, modifier in damageModifiers do
+			local reduced = modifier.Apply(victim, attacker, damage)
+			if Formulas.IsFinite(reduced) and reduced < damage then
+				local absorbed = damage - math.max(reduced, 0)
+				blockedDamage += absorbed
+				damage -= absorbed
+			end
+		end
+	end
 
-	local damage = rawDamage * falloff * (1 - resistance)
-
-	humanoid:TakeDamage(damage)
+	if damage > 0 then
+		humanoid:TakeDamage(damage)
+	end
 	local isKill = humanoid.Health <= 0
 
 	-- Training players stay on their machine when hit — damage accumulates but they
@@ -239,33 +738,42 @@ function CombatService:ApplyDamage(
 	-- TrainingService's humanoid.Died listener). This makes the attacker commit to
 	-- a full kill rather than cheaply disrupting every set they walk past.
 
-	-- Grounded so a flying player cannot simply escape.
-	FlightService:Ground(victim)
+	-- Only actual damage grounds a flying player. A full block or full reflection is a
+	-- successful defense, not a hidden movement debuff.
+	if damage > 0 then
+		FlightService:Ground(victim)
+	end
 
-	Net.Event("CombatFeedback"):FireClient(attacker, { Kind = "Hit", Damage = damage, Victim = victim.Name })
-	Net.Event("CombatFeedback")
-		:FireClient(victim, { Kind = "Hurt", Damage = damage, Attacker = attacker.Name })
+	Net.Event("CombatFeedback"):FireClient(attacker, {
+		Kind = "Hit",
+		Damage = damage,
+		Blocked = blockedDamage,
+		Reflected = reflectedDamage,
+		IsReflection = isRetaliation == true,
+		Victim = victim.Name,
+	})
+	Net.Event("CombatFeedback"):FireClient(victim, {
+		Kind = "Hurt",
+		Damage = damage,
+		Blocked = blockedDamage,
+		Reflected = reflectedDamage,
+		IsReflection = isRetaliation == true,
+		Attacker = attacker.Name,
+	})
 
-	CombatService.DamageDealt:Fire(victim, attacker, damage, isKill)
+	if damage > 0 then
+		CombatService.DamageDealt:Fire(victim, attacker, damage, isKill)
+	end
 
 	if isKill then
 		self:_recordKill(attacker, victim)
 	end
 
-	-- What Core is for. Skipped on the blow that kills — a dead player does not
-	-- hit back — and skipped when this hit was itself retaliation, or two players
-	-- with Core would trade a single punch until one of them fell over.
-	--
-	-- Sent back through this same function so it inherits every rule above: it
-	-- cannot land in a safe zone, it cannot touch an immortal attacker, and the
-	-- falloff protects a beginner who punched somebody enormous. It can kill, and
-	-- because the arguments are the other way round, _recordKill credits the kill
-	-- to the player who was being attacked.
-	if not isKill and not isRetaliation then
-		local retaliation = Formulas.Retaliation(StatService:GetStat(victim, "Core"), damage)
-		if retaliation > 0 then
-			self:ApplyDamage(victim, attacker, retaliation, true)
-		end
+	-- Reflection is calculated before Back and returned even when the remaining hit
+	-- also kills the defender. That allows the dramatic SPTS-style trade where a glass
+	-- cannon kills a Core specialist and falls to the reflected blow at the same time.
+	if not isRetaliation and reflectedDamage > 0 then
+		self:ApplyDamage(victim, attacker, reflectedDamage, true)
 	end
 
 	return damage
@@ -364,13 +872,58 @@ function CombatService:Activate(
 		targetCharacter, _, targetRoot = getLivingParts(target)
 	end
 
-	if ability.RequiresTarget then
-		if target == nil or targetRoot == nil then
-			return false, "No target.", true
-		end
+	-- Range is checked whenever a target was named, not only when the ability demands
+	-- one. An ability that can swing at nothing still must not reach across the map
+	-- because its caller passed somebody far away, and leaving that to each ability
+	-- would put a security check in the one place it is easy to forget.
+	if target ~= nil and targetRoot ~= nil then
 		if (attackerRoot.Position - targetRoot.Position).Magnitude > ability.Range * RANGE_TOLERANCE then
-			return false, "Too far away.", true
+			targetRoot = nil
 		end
+	end
+
+	-- A target that is dead, gone, or out of reach is no target. For an ability that
+	-- requires one this is a rejection; for one that does not, it is simply a miss,
+	-- and the ability is run with nothing to hit.
+	if targetRoot == nil then
+		target = nil
+		targetCharacter = nil
+	end
+
+	local combatTarget: Types.CombatTarget? = nil
+
+	if target == nil and ability.AutoTarget == true then
+		target, targetCharacter, targetRoot =
+			nearestLivingTarget(attacker, attackerRoot.Position, ability.Range * RANGE_TOLERANCE)
+
+		-- Only look for a mob once no player is in reach. The client never names a mob
+		-- — it still sends a Player or nil — so this is the entire path by which a
+		-- non-player target is ever selected, and it costs the client nothing.
+		if target == nil then
+			local entityModel, entityRoot =
+				nearestEntityTarget(attacker, attackerRoot.Position, ability.Range * RANGE_TOLERANCE)
+			if entityModel ~= nil and entityRoot ~= nil then
+				combatTarget = {
+					Kind = "Entity",
+					Player = nil,
+					Model = entityModel,
+					Root = entityRoot,
+				}
+			end
+		end
+	end
+
+	if target ~= nil and targetCharacter ~= nil and targetRoot ~= nil then
+		combatTarget = {
+			Kind = "Player",
+			Player = target,
+			Model = targetCharacter,
+			Root = targetRoot,
+		}
+	end
+
+	if ability.RequiresTarget and combatTarget == nil then
+		return false, "No target.", true
 	end
 
 	local context: Types.AbilityContext = {
@@ -380,6 +933,7 @@ function CombatService:Activate(
 		Target = target,
 		TargetCharacter = targetCharacter,
 		TargetRoot = targetRoot,
+		CombatTarget = combatTarget,
 	}
 
 	if ability.Validate ~= nil then
@@ -404,9 +958,24 @@ function CombatService:GetBaseDamage(player: Player): number
 end
 
 --[[
+	One of a player's five stats.
+
+	A passthrough to StatService, and the reason it exists is dependency direction. An
+	ability is a file dropped into a folder; it should describe a move using what
+	CombatService hands it, not go looking through the service Loader for a second
+	system. GetBaseDamage already covers the common case of "how hard does this player
+	hit"; abilities that resolve a radius from Legs or a launch from the victim's Back
+	need the raw numbers, and this keeps that from becoming a second import in every
+	ability file.
+]]
+function CombatService:GetStat(player: Player, statId: string): number
+	return StatService:GetStat(player, statId)
+end
+
+--[[
 	Pushes stat-derived health and walkspeed onto a living character. Growing Chest
 	preserves missing health rather than health percentage: +1 Chest is therefore
-	exactly +1 current and max health, whether the player is full or injured.
+	exactly +10 current and max health, whether the player is full or injured.
 ]]
 function CombatService:_applyVitals(player: Player)
 	local _, humanoid, _ = getLivingParts(player)
@@ -424,7 +993,12 @@ function CombatService:_applyVitals(player: Player)
 	local legs = StatService:GetStat(player, "Legs")
 	local character = player.Character
 	local training = character ~= nil and character:GetAttribute("TrainingPose") ~= nil
-	local walkSpeed = if training
+	-- AppearanceService sets Customizing while the first-join creator is open. It is
+	-- checked here rather than written as a WalkSpeed from that file, because the
+	-- reconciliation pass below reasserts this number from the Legs stat and would
+	-- undo any speed written anywhere else.
+	local customizing = character ~= nil and character:GetAttribute("Customizing") == true
+	local walkSpeed = if training or customizing
 		then 0
 		else if sprinting[player] == true then Formulas.SprintSpeed(legs) else Formulas.WalkSpeed(legs)
 	if math.abs(humanoid.WalkSpeed - walkSpeed) > 0.01 then
@@ -433,6 +1007,13 @@ function CombatService:_applyVitals(player: Player)
 end
 
 function CombatService:Start()
+	-- A sprint is a persistent toggle. Training temporarily forces WalkSpeed to zero,
+	-- but leaving a machine must reveal the same toggle state immediately; restoring
+	-- the numeric pre-mount speed made the player click Run twice after every set.
+	TrainingService.TrainingChanged:Connect(function(player: Player)
+		self:_applyVitals(player)
+	end)
+
 	Net.BindEvent("SprintChanged", 8, function(player: Player, wantsSprint: any)
 		if type(wantsSprint) ~= "boolean" then
 			return
@@ -457,9 +1038,15 @@ function CombatService:Start()
 	end)
 
 	Players.PlayerAdded:Connect(function(player: Player)
-		player.CharacterAdded:Connect(function()
+		player.CharacterAdded:Connect(function(character: Model)
 			cooldowns[player] = {}
 			sprinting[player] = false
+			-- Leaving the appearance creator has to give the player their speed back
+			-- now, not on the next reconciliation pass — a second of paralysis after
+			-- pressing Apply reads as a broken button.
+			character:GetAttributeChangedSignal("Customizing"):Connect(function()
+				self:_applyVitals(player)
+			end)
 			-- Wait a beat for the Humanoid to finish setting itself up.
 			task.defer(function()
 				self:_applyVitals(player)

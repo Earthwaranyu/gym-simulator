@@ -22,7 +22,7 @@
 3. **Client-Server Boundary**: Client handles UI/inputs. Server handles stat math, the automatic training loop, and DataStores.
 4. **Muscle Deformation**: Avatar scaling relies on `NumberValue` instances inside the player's character model to drive server-sided MeshPart scaling.
 5. **Player can pvp**: Players can kill other players while they are training to annoy them. Training starts by holding **E** at a machine, which teleports the player onto it, locks them there, and plays the exercise animation while reps tick automatically (no stamina, no clicking). Holding **E** again, or pressing **Space**, gets them off. Because they are locked in place they cannot dodge — but a hit only deals damage; **only dying dismounts them** and resets the combo, so an attacker has to commit to a full kill to break a set.
-6. **Player can avoid pvp**: Players can avoid pvp by buying immortal potion for 1 hour costing 19 robux per potion. We can have 1 day potion for 79 robux also. Players can buy VIP gamepass costing 199 robux which give you 1 hour immortal potion per day. Player who drink immortal potion will have a barrier between body.
+6. **Player can avoid pvp**: Players can avoid pvp by buying immortal potion for 1 hour costing 19 robux per potion. We can have 1 day potion for 199 robux also. Players can buy VIP gamepass costing 699 robux which give you 1 hour immortal potion per day. Player who drink immortal potion will have a barrier between body. Prices live on the Creator Dashboard and the game reads them at runtime — never hardcode one.
 7. **Player can have reputation**: Criminal, guardian, Hero, etc.
 8. **In the tab bar**: it shows that player overall power, and reputation.
 
@@ -37,6 +37,10 @@
 No Toolbox models, no imported meshes, no uploaded animations. Machines are built from
 Roblox primitives and training animations are generated from joint angles in
 `PoseConfig.luau`, so nothing in the game is someone else's copyrighted work.
+
+Shop artwork in `ShopIcons.luau` is uploaded, on the same terms as the body mesh: those
+images were made for this project. An image from the Toolbox or an outside artist still
+is not. Interface glyphs without uploaded art stay drawn in `Icons.luau`.
 
 
 ## Git

@@ -19,25 +19,30 @@
 local Types = require(script.Parent.Types)
 
 -- Bump alongside a new entry in Core/_Migrations.luau.
-local SCHEMA_VERSION = 2
+local SCHEMA_VERSION = 9
 
 local ProfileTemplate: Types.ProfileData = {
 	SchemaVersion = SCHEMA_VERSION,
 
 	Stats = {},
 	MultiplierLevels = {},
+	MuscleClassLevel = 0,
+	PhysiqueStatBaselines = {},
 
 	Tokens = 0,
-	Cash = 0,
+	FightTokens = 0,
 
 	OwnedEquipment = {},
 	QuestProgress = {},
-	QuestCompletions = {},
+	QuestCycleIndex = 0,
+	QuestCycleLoop = 0,
 	PurchaseHistory = {},
 
 	Reputation = 0,
 
 	ImmortalUntil = 0,
+	-- Reconcile fills missing top-level keys, so this needs no migration.
+	BoostUntil = {},
 	VipLastClaimDay = "",
 
 	Kills = 0,
@@ -48,9 +53,26 @@ local ProfileTemplate: Types.ProfileData = {
 
 	TotalPlaytime = 0,
 
+	SelectedWeights = {},
+	AutoLoadEnabled = false,
+	SelectedTitleId = "Newbie",
+
+	-- Palette and style *ids*, never colours: ProfileStore refuses userdata, and an id
+	-- lets a later palette retune reach players who already chose that entry.
+	-- Chosen gates the forced first-join customizer; see Core/_Migrations.luau for why
+	-- returning players are not sent back through it.
+	Appearance = {
+		SkinId = "Tan",
+		PantId = "Charcoal",
+		HairId = "Buzz",
+		FaceId = "Neutral",
+		Chosen = false,
+	},
+
 	Settings = {
-		MusicEnabled = true,
-		SfxEnabled = true,
+		MasterVolume = 100,
+		MusicVolume = 70,
+		SfxVolume = 100,
 	},
 }
 

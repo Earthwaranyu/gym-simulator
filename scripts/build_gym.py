@@ -147,10 +147,6 @@ CHROME = [0.78, 0.80, 0.84]
 RUBBER = [0.07, 0.07, 0.08]
 PAD_RED = [0.45, 0.11, 0.12]
 PAD_BLUE = [0.09, 0.22, 0.40]
-FLOOR_DARK = [0.16, 0.17, 0.21]
-FLOOR_IRON = [0.11, 0.13, 0.17]
-WALL = [0.24, 0.25, 0.30]
-WALL_IRON = [0.16, 0.18, 0.24]
 ACCENT_STARTER = [0.49, 0.83, 0.61]
 ACCENT_IRON = [0.26, 0.65, 0.96]
 WOOD = [0.35, 0.24, 0.16]
@@ -160,7 +156,7 @@ def part(name, size, frame, color, material="Metal", class_name="Part", **props)
     properties = {
         "Anchored": True,
         "CFrame": serialise_cf(frame),
-        "Size": [round(v, 4) for v in size],
+        "Size": [round(v, 3) for v in size],
         "Color": color,
         "Material": material,
         "TopSurface": "Smooth",
@@ -176,15 +172,238 @@ def cylinder(name, length, diameter, frame, color, material="Metal", **props):
                 Shape="Cylinder", **props)
 
 
+def wedge(name, size, frame, color, material="Metal", **props):
+    """A ramp. Roblox slopes a WedgePart down along +Z from the top of its -Z face,
+    so a roof pitch is a wedge rotated to face the eave it falls toward."""
+    return part(name, size, frame, color, material, class_name="WedgePart", **props)
+
+
 def marker(name, size, frame):
     """An invisible, non-colliding reference part — anchors and exits."""
     return part(name, size, frame, [1, 1, 1], "SmoothPlastic",
                 Transparency=1, CanCollide=False, CastShadow=False)
 
 
+# --------------------------------------------------------------------------
+# Detail helpers. A machine built from bare boxes reads as a blockout no matter
+# how many boxes it has, so these exist to add the specific cues that separate
+# real equipment from a placeholder: round steel instead of square, rolled pad
+# edges instead of a flat slab, visible hardware at the joints, feet under the
+# frame. They are shared rather than per-machine because 35 builders hand-rolling
+# their own bolt heads is how a room stops looking designed.
+# --------------------------------------------------------------------------
+
+
+def _unit(v):
+    """A vector scaled to length 1, and the length it had."""
+    length = math.sqrt(sum(c * c for c in v))
+    if length < 1e-6:
+        raise ValueError("zero-length vector has no direction")
+    return tuple(c / length for c in v), length
+
+
+def _perpendicular(direction):
+    """Any unit vector at right angles to `direction`.
+
+    Round geometry is symmetric about its own axis, so which perpendicular this
+    picks never shows. Seeding off X unless the run is nearly parallel to X keeps
+    the cross product well away from zero.
+    """
+    seed = (1.0, 0.0, 0.0) if abs(direction[0]) < 0.9 else (0.0, 0.0, 1.0)
+    axis, _ = _unit(cross(seed, direction))
+    return axis
+
+
+def tube(name, start, end, diameter, color, material="Metal", **props):
+    """Round stock running between two points.
+
+    The single strongest "this is real equipment" cue available without meshes.
+    Gym frames are welded tube; drawn as boxes they read as scaffolding. Because
+    a cylinder's axis is its local X, the run direction becomes the right vector
+    and the length becomes the X size.
+    """
+    span = tuple(e - s for s, e in zip(start, end))
+    direction, length = _unit(span)
+    middle = tuple((s + e) / 2 for s, e in zip(start, end))
+    return part(name, [length, diameter, diameter],
+                axes(middle, direction, _perpendicular(direction)),
+                color, material, Shape="Cylinder", **props)
+
+
+def hardware(name, frame, diameter=0.18, depth=0.09, color=CHROME):
+    """A bolt head or tube end cap.
+
+    One part, and the cheapest detail in the file: an unbroken steel surface
+    reads as a untextured box, and the eye finds the same surface convincing the
+    moment something interrupts it at the joints.
+    """
+    return cylinder(name, depth, diameter, frame, color, "Metal",
+                    Reflectance=0.3, CanCollide=False)
+
+
+def foot_pad(name, frame, size=(0.9, 0.22, 0.9)):
+    """A rubber foot under a frame leg.
+
+    Machines authored flush to the floor look like they were dropped through it.
+    A foot gives the frame somewhere to end.
+    """
+    return part(name, list(size), frame, RUBBER, "Rubber")
+
+
+def padded_slab(name, size, frame, color, caps=False):
+    """Upholstery with a rolled edge instead of a flat slab.
+
+    Every pad in the gym is currently one rectangular box, which is the detail
+    most responsible for the equipment looking cheap: real vinyl is wrapped over
+    foam and turns a radius at every edge. The core is inset and the radius is
+    drawn as round stock down each long side, so the silhouette curves.
+
+    Rolls run along whichever of X/Z is longer, which is the pad's length for
+    every pad in the file. `caps` adds the short-end rolls too — worth it on a
+    bench pad the player lies on, wasted on a small roller pad.
+    """
+    sx, sy, sz = size
+    roll = min(sy, min(sx, sz) * 0.5)
+    out = []
+
+    if sz >= sx:
+        core_x, core_z = sx - roll, sz - (roll if caps else 0.0)
+        out.append(part(name, [core_x, sy, core_z], frame, color, "Fabric"))
+        for side in (-1, 1):
+            out.append(cylinder(
+                f"{name}Roll", core_z, roll,
+                mul(frame, mul(cf(side * core_x / 2, 0, 0), rot_y(90))),
+                color, "Fabric"))
+        if caps:
+            for side in (-1, 1):
+                out.append(cylinder(
+                    f"{name}Cap", core_x, roll,
+                    mul(frame, cf(0, 0, side * core_z / 2)), color, "Fabric"))
+    else:
+        core_x, core_z = sx - (roll if caps else 0.0), sz - roll
+        out.append(part(name, [core_x, sy, core_z], frame, color, "Fabric"))
+        for side in (-1, 1):
+            out.append(cylinder(
+                f"{name}Roll", core_x, roll,
+                mul(frame, cf(0, 0, side * core_z / 2)), color, "Fabric"))
+        if caps:
+            for side in (-1, 1):
+                out.append(cylinder(
+                    f"{name}Cap", core_z, roll,
+                    mul(frame, mul(cf(side * core_x / 2, 0, 0), rot_y(90))),
+                    color, "Fabric"))
+    return out
+
+
+def pulley(name, centre, diameter, accent, axis_length=0.5, mount=None):
+    """A cable wheel in its housing, on the bracket that carries it.
+
+    Selectorised machines currently route their cable past nothing at all, so the
+    line changes direction in mid-air. A wheel at the corner is what makes the
+    routing legible — the cable turns because something turns it.
+
+    The wheel's axle runs along X, so the wheel itself lies in the machine's
+    YZ plane, which is the plane every cable in the gym runs in.
+
+    `mount` is where the bracket is bolted; without one the wheel hangs in the
+    air, which is the exact problem it was added to solve. The cheeks are kept
+    well under the wheel diameter so the rim the cable actually rides on still
+    shows between them.
+    """
+    cheek = diameter * 0.62
+    out = [
+        cylinder(f"{name}Wheel", 0.22, diameter,
+                 mul(cf(*centre), rot_z(90)), CHROME, "Metal", Reflectance=0.3),
+        cylinder(f"{name}Axle", axis_length + 0.24, 0.16,
+                 cf(*centre), STEEL_LIGHT, "Metal"),
+    ]
+    for side in (-1, 1):
+        out.append(part(f"{name}Cheek", [0.12, cheek, cheek],
+                        cf(centre[0] + side * axis_length / 2, centre[1], centre[2]),
+                        accent, "Metal"))
+    if mount is not None:
+        out.append(tube(f"{name}Bracket", mount, centre, 0.3, STEEL_LIGHT))
+        out.append(hardware(f"{name}BracketBolt",
+                            mul(cf(*mount), rot_z(90)), 0.34))
+    return out
+
+
+def console(name, frame, accent, size=(2.6, 1.5, 0.18)):
+    """A machine readout: bezel, screen, and the light it throws.
+
+    A Neon slab on its own is a glowing rectangle; the bezel is what makes it a
+    screen. The light is deliberately short-range and shadowless — 35 of these
+    across the gym is affordable only because none of them cast.
+    """
+    sx, sy, sz = size
+    screen = part(f"{name}Screen", [sx * 0.82, sy * 0.72, sz * 0.6],
+                  mul(frame, cf(0, 0, sz * 0.4)), accent, "Neon",
+                  CanCollide=False)
+    screen["children"] = [{
+        "name": "Glow", "className": "PointLight",
+        "properties": {
+            "Brightness": 1.4, "Range": 9, "Shadows": False,
+            "Color": [round(c, 4) for c in accent],
+        },
+    }]
+    return [
+        part(f"{name}Bezel", [sx, sy, sz], frame, STEEL, "Metal"),
+        screen,
+    ]
+
+
+def stack_shroud(name, top_centre, width, height, depth, accent):
+    """The housing around a weight stack.
+
+    `add_load_visuals` grows the plates themselves; this is the cabinet they sit
+    in. Bare slabs stacked in the open are the clearest tell that a machine was
+    blocked out and never finished, and the shroud is also what the selector
+    label has to sit on.
+    """
+    cx, cy, cz = top_centre
+    return [
+        part(f"{name}Shroud", [0.14, height, depth],
+             cf(cx - width / 2, cy - height / 2, cz), STEEL, "Metal"),
+        part(f"{name}Shroud", [0.14, height, depth],
+             cf(cx + width / 2, cy - height / 2, cz), STEEL, "Metal"),
+        part(f"{name}Cap", [width + 0.3, 0.5, depth + 0.2],
+             cf(cx, cy + 0.25, cz), STEEL_LIGHT, "DiamondPlate"),
+        part(f"{name}Label", [width * 0.5, 0.34, 0.1],
+             cf(cx, cy - 0.55, cz + depth / 2), accent, "Neon",
+             CanCollide=False),
+    ]
+
+
+# Every machine lays a floor_mat under itself, and the mat is 0.12 thick. Builders
+# pass FLOOR_TOP to anchor_standing because that is the height they think of as "the
+# ground", so without this the avatar stands at FLOOR_TOP and its soles finish 0.12
+# studs inside the mat it is standing on. Measured on eight standing machines: every
+# one sank between 0.08 and 0.12.
+MAT_THICKNESS = 0.12
+
+
 def anchor_standing(frame):
     """A training spot where the player stands upright, facing the CFrame's look."""
-    return marker("TrainAnchor", [2, 2, 1], mul(frame, cf(0, ROOT_HEIGHT, 0)))
+    return marker("TrainAnchor", [2, 2, 1],
+                  mul(frame, cf(0, ROOT_HEIGHT + MAT_THICKNESS, 0)))
+
+
+# A lying anchor's up vector runs along the body from hips to head, so both of
+# these put the head toward -Z; the right vector is what rolls the body over.
+# Face-up and face-down differ by that one sign, which is exactly why they are
+# named here rather than written out at each machine — three prone exercises were
+# being performed on their backs because the supine line had been copied to them.
+LYING_HEAD = (0, 0, -1)
+
+
+def anchor_supine(pos):
+    """Lying face-up — a bench press, a skull crusher."""
+    return marker("TrainAnchor", [2, 2, 1], axes(pos, (-1, 0, 0), LYING_HEAD))
+
+
+def anchor_prone(pos):
+    """Lying face-down — a push-up, a plank, a lying leg curl."""
+    return marker("TrainAnchor", [2, 2, 1], axes(pos, (1, 0, 0), LYING_HEAD))
 
 
 # --------------------------------------------------------------------------
@@ -192,11 +411,277 @@ def anchor_standing(frame):
 # front (the side a player approaches from) facing +Z.
 # --------------------------------------------------------------------------
 
+# Equipment whose resistance is visibly carried on a bar/dumbbell, versus a pin-
+# selected stack. Bodyweight and cardio stations still use the load selector as game
+# resistance, but do not grow implausible steel plates out of the floor.
+FREE_WEIGHT_EQUIPMENT = {
+    "BenchPress", "InclinePress", "Dumbbells", "BarbellCurl", "HammerCurl",
+    "PreacherCurl", "SkullCrusher", "Deadlift", "TBarRow", "SquatRack",
+    "DeclinePress",
+}
+SELECTORISED_EQUIPMENT = {
+    "PecDeck", "CableCrossover", "TricepsPushdown", "SeatedRow", "LatPulldown",
+    "CableCrunch", "WoodChop", "LegPress", "LegExtension",
+    "HamstringCurl", "CalfRaise",
+}
+
+# IWF competition-disc denominations and colours. A gameplay load is the added
+# resistance, so each 10 kg step is split symmetrically across both sleeves: the first
+# step is one 5 kg white disc per side, while 100 kg is two 25 kg red discs
+# per side. Configurations are ordered heaviest-to-lightest, as real bars are loaded.
+OLYMPIC_DISC_STYLE = {
+    25: ([0.72, 0.08, 0.10], 0.22, 1.90),
+    20: ([0.10, 0.34, 0.73], 0.20, 1.85),
+    15: ([0.91, 0.72, 0.10], 0.17, 1.75),
+    10: ([0.10, 0.46, 0.20], 0.14, 1.60),
+    5: ([0.84, 0.84, 0.80], 0.10, 1.32),
+    2.5: ([0.72, 0.08, 0.10], 0.08, 1.05),
+}
+OLYMPIC_LOAD_STATES = (
+    (5,), (10,), (15,), (20,), (25,),
+    (25, 5), (25, 10), (25, 15), (25, 20), (25, 25),
+)
+
+
+def _cf_from_properties(properties):
+    raw = properties["CFrame"]
+    return (
+        (raw[0], raw[1], raw[2]),
+        (tuple(raw[3:6]), tuple(raw[6:9]), tuple(raw[9:12])),
+    )
+
+
+def _load_visual(node, kind, index, count):
+    node.setdefault("attributes", {}).update({
+        "LoadVisualKind": kind,
+        "LoadVisualIndex": index,
+        "LoadVisualCount": count,
+    })
+    return node
+
+
+def olympic_load_visuals(base_frame, handle_length, scale=1.0):
+    """All 10-100 kg symmetric Olympic loading states for one held implement."""
+    visuals = []
+    count = len(OLYMPIC_LOAD_STATES)
+    inner = handle_length * 0.30
+    for index, configuration in enumerate(OLYMPIC_LOAD_STATES, start=1):
+        for side in (-1, 1):
+            cursor = 0.0
+            for plate_number, denomination in enumerate(configuration, start=1):
+                color, authored_thickness, authored_diameter = OLYMPIC_DISC_STYLE[denomination]
+                thickness = authored_thickness * scale
+                diameter = authored_diameter * scale
+                offset = side * (inner + cursor + thickness / 2)
+                visual = cylinder(
+                    f"Olympic{index:02d}_{denomination:g}kg_{plate_number}",
+                    thickness, diameter, mul(base_frame, cf(offset, 0, 0)),
+                    color, "SmoothPlastic", CanCollide=False, CanTouch=False,
+                    CanQuery=False, Transparency=1,
+                )
+                visual.setdefault("attributes", {})["PlateKg"] = denomination
+                visuals.append(_load_visual(visual, "FreePlate", index, count))
+                cursor += thickness + 0.018 * scale
+    return visuals
+
+
+def body_load_visuals(base_frame, axis="x", scale=1.0):
+    """All ten body-carried load states, preserving every individual disc.
+
+    These are complete states just like ``olympic_load_visuals``. Unlike a bar there
+    is only one central stack, but a 100% load is still visibly two 25 kg red discs,
+    not one red cylinder whose extra thickness hides that a second plate exists.
+    ``axis`` names the local direction in which the stack grows.
+    """
+    visuals = []
+    count = len(OLYMPIC_LOAD_STATES)
+    for index, configuration in enumerate(OLYMPIC_LOAD_STATES, start=1):
+        total = sum(OLYMPIC_DISC_STYLE[value][1] * scale for value in configuration)
+        cursor = -total / 2
+        for plate_number, denomination in enumerate(configuration, start=1):
+            color, authored_thickness, authored_diameter = OLYMPIC_DISC_STYLE[denomination]
+            thickness = authored_thickness * scale
+            diameter = authored_diameter * scale
+            centre = cursor + thickness / 2
+            offset = {
+                "x": cf(centre, 0, 0),
+                "y": cf(0, centre, 0),
+                "z": cf(0, 0, centre),
+            }[axis]
+            visual = cylinder(
+                f"OlympicBody{index:02d}_{denomination:g}kg_{plate_number}",
+                thickness, diameter, mul(base_frame, offset),
+                color, "SmoothPlastic", CanCollide=False, CanTouch=False,
+                CanQuery=False, Transparency=1,
+            )
+            visual.setdefault("attributes", {})["PlateKg"] = denomination
+            visuals.append(_load_visual(visual, "BodyPlate", index, count))
+            cursor += thickness
+    return visuals
+
+
+def add_load_visuals(equipment_id, children):
+    """Adds client-driven plate geometry before the machine is placed in the world.
+
+    Each visual carries only an index. Runtime reads the server's replicated load
+    ratio and reveals the matching number of discs/stack slices. The exact kg stays
+    on the UI because late-game fantasy loads cannot be represented by literal 25 kg
+    discs without making a bar hundreds of studs wide.
+    """
+    if equipment_id in FREE_WEIGHT_EQUIPMENT:
+        def visit_held(node):
+            if node.get("name") in ("HeldRight", "HeldLeft"):
+                cylinders = [
+                    child for child in node.get("children", [])
+                    if child.get("className") in ("Part", "MeshPart")
+                    and child.get("properties", {}).get("Shape") == "Cylinder"
+                ]
+                # Authored rubber heads are replaced by identifiable competition discs.
+                for child in cylinders:
+                    if child.get("name") in ("Head", "DumbbellHead", "Weight"):
+                        child.get("properties", {})["Transparency"] = 1
+
+                has_visual = any(
+                    "LoadVisualKind" in child.get("attributes", {})
+                    for child in node.get("children", [])
+                )
+                if not has_visual and cylinders:
+                    grip = max(cylinders, key=lambda item: item["properties"]["Size"][0])
+                    node["children"].extend(olympic_load_visuals(
+                        _cf_from_properties(grip["properties"]),
+                        grip["properties"]["Size"][0], 0.62,
+                    ))
+
+            if node.get("name") == "HeldBoth":
+                candidates = [
+                    child for child in node.get("children", [])
+                    if child.get("className") == "Part"
+                    and child.get("properties", {}).get("Shape") == "Cylinder"
+                ]
+                if candidates:
+                    bar = max(candidates, key=lambda item: item["properties"]["Size"][0])
+                    bar_size = bar["properties"]["Size"]
+                    bar_frame = _cf_from_properties(bar["properties"])
+
+                    # Authored plates become the invisible base; the five calibrated
+                    # discs below are what respond to the selected load.
+                    for child in node.get("children", []):
+                        if "Plate" in child.get("name", ""):
+                            child.get("properties", {})["Transparency"] = 1
+
+                    node["children"].extend(olympic_load_visuals(
+                        bar_frame, bar_size[0], 1.0,
+                    ))
+
+            for child in list(node.get("children", [])):
+                visit_held(child)
+
+        for child in children:
+            visit_held(child)
+
+    if equipment_id in SELECTORISED_EQUIPMENT:
+        def add_stack_plates(nodes):
+            additions = []
+            for node in list(nodes):
+                properties = node.get("properties", {})
+                if node.get("name") in ("WeightStack", "WeightTower", "Tower") and "CFrame" in properties:
+                    width, height, depth = properties["Size"]
+                    tower_frame = _cf_from_properties(properties)
+                    count = 10
+                    gap = height / count
+                    thickness = max(0.12, gap * 0.62)
+                    # Real slabs sitting in the tower, not decals stuck on its front.
+                    # These used to be 0.10 deep and pasted onto the outside face at
+                    # depth/2 + 0.035, which reads as a sticker the moment it moves.
+                    plate_depth = max(0.35, depth * 0.72)
+                    for index in range(1, count + 1):
+                        # Index 1 is the bottom of the stack, and the client lifts the
+                        # top `selected` plates -- a pin goes in at the chosen plate and
+                        # everything above it comes up. See TrainingPoseController.
+                        y = -height / 2 + gap * (index - 0.5)
+                        plate_frame = mul(tower_frame, cf(0, y, 0))
+                        plate = part(
+                            f"StackPlate{index:02d}",
+                            [max(0.3, width * 0.86), thickness, plate_depth],
+                            plate_frame, [0.07, 0.075, 0.085], "Metal",
+                            CanCollide=False, CanTouch=False, CanQuery=False,
+                            CastShadow=False,
+                        )
+                        additions.append(_load_visual(
+                            plate, "StackPlate", index, count
+                        ))
+                    # The pin, and the guide rods the lifted block rides on. Without
+                    # them a stack is a column of slabs that inexplicably splits in two.
+                    for side in (-1, 1):
+                        additions.append(part(
+                            "StackGuideRod", [0.16, height * 0.98, 0.16],
+                            mul(tower_frame, cf(side * width * 0.3, 0, 0)),
+                            CHROME, "Metal", Reflectance=0.3,
+                            CanCollide=False, CanTouch=False, CanQuery=False,
+                            CastShadow=False,
+                        ))
+                    additions.append(_load_visual(part(
+                        "StackPin", [width * 0.5, 0.22, 0.22],
+                        mul(tower_frame, cf(0, 0, plate_depth / 2 + 0.12)),
+                        [0.85, 0.62, 0.15], "Metal",
+                        CanCollide=False, CanTouch=False, CanQuery=False,
+                        CastShadow=False,
+                    ), "StackPin", 1, count))
+                add_stack_plates(node.get("children", []))
+            nodes.extend(additions)
+
+        add_stack_plates(children)
+
+
+def machine_palette(equipment_id, row):
+    """The upholstery and accent one machine is built in.
+
+    Every machine on a court used to be handed its district's single pad colour, so
+    five machines standing together were the same machine in different shapes. The
+    accent still is the district's -- that is the thing carrying the identity of the
+    room, and the palette comment above is right that a colour per part reads as a
+    prototype -- but the upholstery now shifts a little per machine, which is what a
+    real gym looks like as pads get replaced one at a time.
+
+    Derived from the id rather than randomised, so a machine is the same colour in
+    every build and the output stays byte-for-byte deterministic.
+    """
+    digest = 0
+    for character in equipment_id:
+        digest = (digest * 31 + ord(character)) % 9973
+
+    # +/-12% per channel, on three different digits of the same digest so the
+    # channels do not move together and merely brighten the pad.
+    pad = []
+    for index, channel in enumerate(row["pad"]):
+        step = (digest // (7 ** index)) % 5 - 2
+        pad.append(min(1.0, max(0.0, channel * (1 + step * 0.06))))
+    return pad, row["accent"]
+
+
+def machine_light(accent):
+    """One short-range, shadowless light per machine.
+
+    Machines contributed nothing to the room's own lighting: every lamp in the gym
+    was in the structure, so equipment sat in whatever fell on it. Thirty-five of
+    these is affordable exactly because none of them casts a shadow -- the same
+    count with shadows on would not be.
+    """
+    fixture = marker("MachineLight", [0.4, 0.4, 0.4], cf(0, FLOOR_TOP + 6.5, 0))
+    fixture["children"] = [{
+        "name": "Glow", "className": "PointLight",
+        "properties": {
+            "Brightness": 0.85, "Range": 17, "Shadows": False,
+            "Color": [round(c, 4) for c in accent],
+        },
+    }]
+    return fixture
+
 
 def machine(name, equipment_id, origin, children, travel_id=None,
             access_kind=None, floor_index=None, exercise_family=None,
             environment_id=None, requires_flight=False, location_name=None,
-            location_tagline=None):
+            location_tagline=None, accent=None):
     # Atomic streaming: a machine arrives whole or not at all. Under the default
     # mode Roblox streams a model's parts in one at a time, and a bench press
     # missing its rack — or worse, missing the TrainAnchor the server pivots you
@@ -218,6 +703,19 @@ def machine(name, equipment_id, origin, children, travel_id=None,
         attributes["LocationName"] = location_name
     if location_tagline is not None:
         attributes["LocationTagline"] = location_tagline
+    add_load_visuals(equipment_id, children)
+
+    # Only if the machine does not already light itself. A console carries its own
+    # glow, and hanging the generic fixture over it as well would put two lights on
+    # one machine for no visible gain.
+    def emits(node):
+        if node.get("className") in ("PointLight", "SpotLight", "SurfaceLight"):
+            return True
+        return any(emits(child) for child in node.get("children", []))
+
+    children = list(children)
+    if not any(emits(child) for child in children):
+        children.append(machine_light(accent or ACCENT_IRON))
     return {
         "name": name,
         "className": "Model",
@@ -230,6 +728,61 @@ def machine(name, equipment_id, origin, children, travel_id=None,
 def group(name, children, class_name="Model"):
     """A container with no geometry of its own — a training spot, or a held prop."""
     return {"name": name, "className": class_name, "children": children}
+
+
+def level_bar(children):
+    """A HeldBoth barbell that stays horizontal while it is carried.
+
+    A loaded olympic bar does not roll. The carry code otherwise takes the bar's
+    axis straight from the two hand positions, so any asymmetry between them —
+    the idle animation underneath the pose, the blend on the way in — shows up as
+    the bar tilting through the rep. This tag tells it to flatten that axis.
+    """
+    held = group("HeldBoth", children)
+    held["attributes"] = {"GripStyle": "LevelBar"}
+    return held
+
+
+def waist_chain_load(x, y, z):
+    """Dip belt, short chain, and scalable hanging plates for pull movements."""
+    pieces = [
+        part("BeltFront", [2.5, 0.45, 0.28], cf(x, y + 1.55, z - 0.5),
+             RUBBER, "Fabric", CanCollide=False, CanTouch=False, CanQuery=False),
+        part("BeltBack", [2.5, 0.45, 0.28], cf(x, y + 1.55, z + 0.5),
+             RUBBER, "Fabric", CanCollide=False, CanTouch=False, CanQuery=False),
+        part("Buckle", [0.5, 0.55, 0.18], cf(x, y + 1.55, z - 0.68),
+             CHROME, "Metal", CanCollide=False, CanTouch=False, CanQuery=False),
+    ]
+    for index in range(6):
+        link_y = y + 1.12 - index * 0.42
+        pieces.append(part(
+            f"ChainLink{index + 1:02d}",
+            [0.13 if index % 2 == 0 else 0.52, 0.34, 0.52 if index % 2 == 0 else 0.13],
+            cf(x, link_y, z - 0.35), CHROME, "Metal",
+            CanCollide=False, CanTouch=False, CanQuery=False,
+        ))
+    # The disc cylinder is rotated so its own X axis points front-to-back. Stack
+    # along local X to keep multiple plates together on the hanging chain.
+    pieces.extend(body_load_visuals(
+        mul(cf(x, y - 1.45, z - 0.35), rot_y(90)), axis="x",
+    ))
+    return group("HeldWaist", pieces)
+
+
+def hand_plate_load(x, y, z):
+    """A compact plate held against the chest during loaded trunk work."""
+    pieces = body_load_visuals(cf(x, y, z), axis="x")
+    held = group("HeldBoth", pieces)
+    held["attributes"] = {"GripStyle": "ChestPlate"}
+    return held
+
+
+def back_plate_load(x, y, z):
+    """Flat plates that ride securely on the upper back for push-ups and planks."""
+    # After rot_y(90), local X is front-to-back through the torso. Keep every disc
+    # in that local stack instead of merging it into one thick visual.
+    pieces = body_load_visuals(mul(cf(x, y, z), rot_y(90)), axis="x")
+    return group("HeldBack", pieces)
 
 
 def place(origin, child):
@@ -287,10 +840,10 @@ def bench_press(pad_color, accent):
     for z in (-2.6, 3.0):
         out.append(part("FrameLeg", [2.6, 1.3, 0.45],
                         cf(0, FLOOR_TOP + 0.65, z), STEEL, "DiamondPlate"))
-    out.append(part("Base", [2.7, 0.55, 6.6],
-                    cf(0, FLOOR_TOP + 1.58, 0.2), pad_color, "Fabric"))
-    out.append(part("HeadPad", [2.7, 0.35, 1.6],
-                    cf(0, FLOOR_TOP + 1.75, -2.9), pad_color, "Fabric"))
+    out.extend(padded_slab("Base", [2.7, 0.55, 6.6],
+                    cf(0, FLOOR_TOP + 1.58, 0.2), pad_color, caps=True))
+    out.extend(padded_slab("HeadPad", [2.7, 0.35, 1.6],
+                    cf(0, FLOOR_TOP + 1.75, -2.9), pad_color))
 
     # The barbell is a held prop rather than scenery: while a set runs it leaves the
     # hooks and tracks the lifter's hands, so a press moves the weight instead of
@@ -305,9 +858,8 @@ def bench_press(pad_color, accent):
 
     out.append(group("Spot", [
         # Lying on the back: head toward the rack (-Z), face toward the ceiling.
-        marker("TrainAnchor", [2, 2, 1],
-               axes((0, FLOOR_TOP + 2.85, 0.1), (-1, 0, 0), (0, 0, -1))),
-        group("HeldBoth", bar),
+        anchor_supine((0, FLOOR_TOP + 2.85, 0.1)),
+        level_bar(bar),
     ]))
     out.append(marker("TrainExit", [2, 2, 1],
                       mul(cf(3.6, FLOOR_TOP + ROOT_HEIGHT, 1.5), rot_y(-90))))
@@ -346,11 +898,19 @@ def dumbbell_rack(pad_color, accent):
                     cf(0, FLOOR_TOP + top_y, top_z), STEEL, "DiamondPlate"))
 
     def dumbbell(name, x, y, z):
-        pieces = [cylinder("Handle", 1.5, 0.3, cf(x, y, z), CHROME, "Metal",
-                           Reflectance=0.25, CanCollide=False)]
+        pieces = [
+            cylinder("IronHandle", 3.3, 0.26, cf(x, y, z), CHROME, "Metal",
+                     Reflectance=0.3, CanCollide=False),
+        ]
         for side in (-1, 1):
-            pieces.append(cylinder("Head", 0.75, 1.56, cf(x + side * 0.95, y, z),
-                                   RUBBER, "Pebble", CanCollide=False))
+            pieces.append(cylinder(
+                "Collar", 0.12, 0.48, cf(x + side * 0.58, y, z),
+                CHROME, "Metal", Reflectance=0.25, CanCollide=False,
+            ))
+
+        # Each selector step owns a complete symmetric IWF-style configuration.
+        # Runtime swaps configurations rather than accumulating fantasy discs.
+        pieces.extend(olympic_load_visuals(cf(x, y, z), 3.3, 0.62))
         return group(name, pieces)
 
     # Three curl spots facing the rack (a CFrame's look is its -Z, so an
@@ -388,12 +948,21 @@ def pull_up_rig(pad_color, accent):
     for side in (-1, 1):
         out.append(cylinder("Grip", 1.3, 0.5, cf(side * 1.9, FLOOR_TOP + 8.35, 0),
                             accent, "Pebble"))
+        out.append(part(
+            "BeltStorageHook", [0.35, 0.35, 1.8],
+            cf(side * 1.9, FLOOR_TOP + 3.45, 1.15), CHROME, "Metal",
+            CanCollide=False, CanTouch=False, CanQuery=False,
+        ))
         # Hanging: feet well clear of the floor, facing out into the room. Height is
         # set so the hands meet the bar with the arms overhead and the chin clears it
         # at the top of the pull — the arms cannot stretch to find the bar on their
-        # own, so the body has to hang at the right distance below it.
-        out.append(marker("TrainAnchor", [2, 2, 1],
-                          mul(cf(side * 1.9, FLOOR_TOP + 6.2, 0), rot_y(180))))
+        # own, so the body has to hang at the right distance below it. The number is
+        # measured: at 6.2 the closest the hands came all rep was 0.64 studs short.
+        out.append(group("Spot", [
+            marker("TrainAnchor", [2, 2, 1],
+                   mul(cf(side * 1.9, FLOOR_TOP + 6.85, -0.71), rot_y(180))),
+            waist_chain_load(side * 1.9, FLOOR_TOP + 3.0, 1.6),
+        ]))
     out.append(marker("TrainExit", [2, 2, 1],
                       cf(0, FLOOR_TOP + ROOT_HEIGHT, 3.4)))
     return out
@@ -412,7 +981,7 @@ def sit_up_bench(pad_color, accent):
                     cf(0, FLOOR_TOP + 1.4, 3.2), STEEL, "DiamondPlate"))
 
     pad = mul(cf(0, FLOOR_TOP + 2.0, 0), rot_x(-slope))
-    out.append(part("Base", [2.6, 0.5, 7.2], pad, pad_color, "Fabric"))
+    out.extend(padded_slab("Base", [2.6, 0.5, 7.2], pad, pad_color, caps=True))
 
     # Rollers the lifter hooks their ankles under, at the low end.
     for offset in (-0.55, 0.55):
@@ -424,42 +993,51 @@ def sit_up_bench(pad_color, accent):
 
     # Reclined along the pad: rot_x(90) tips the body from standing onto its
     # back, so the head runs up the slope and the face points away from the pad.
-    out.append(marker("TrainAnchor", [2, 2, 1],
-                      mul(pad, mul(cf(0, 1.35, 0.3), rot_x(90)))))
+    out.append(group("Spot", [
+        marker("TrainAnchor", [2, 2, 1],
+               mul(pad, mul(cf(0, 1.35, 0.3), rot_x(90)))),
+        hand_plate_load(0, FLOOR_TOP + 1.25, -3.8),
+    ]))
     out.append(marker("TrainExit", [2, 2, 1],
                       mul(cf(3.2, FLOOR_TOP + ROOT_HEIGHT, 0), rot_y(-90))))
     return out
 
 
-def treadmill(pad_color, accent):
-    """Belt, side rails and a console. The player runs facing the readout."""
-    out = [floor_mat(8, 12)]
+def goblet_squat(pad_color, accent):
+    """A starter squat platform with a plate carried at the chest."""
+    out = [floor_mat(9, 10)]
 
-    out.append(part("Deck", [4.2, 0.7, 8.4],
-                    mul(cf(0, FLOOR_TOP + 0.75, 0), rot_x(-4)), STEEL, "DiamondPlate"))
-    out.append(part("Base", [3.4, 0.22, 7.6],
-                    mul(cf(0, FLOOR_TOP + 1.16, 0), rot_x(-4)), RUBBER, "Pebble"))
+    out.append(part("Base", [6.8, 0.45, 6.8],
+                    cf(0, FLOOR_TOP + 0.23, 0), STEEL, "DiamondPlate"))
+    out.append(part("LiftingMat", [5.8, 0.12, 5.8],
+                    cf(0, FLOOR_TOP + 0.52, 0), pad_color, "Rubber"))
+    # Toe guides give the pose a believable shoulder-width stance without blocking
+    # the player. They also make the station readable from the promenade.
     for side in (-1, 1):
-        out.append(part("Rail", [0.45, 0.45, 6.2],
-                        cf(side * 2.15, FLOOR_TOP + 2.6, -0.4), CHROME, "Metal",
-                        Reflectance=0.2))
-        out.append(part("RailPost", [0.4, 1.9, 0.4],
-                        cf(side * 2.15, FLOOR_TOP + 1.75, 2.2), STEEL, "Metal"))
+        out.append(part("FootGuide", [1.05, 0.08, 2.4],
+                        mul(cf(side * 1.15, FLOOR_TOP + 0.61, 0.25), rot_y(side * 8)),
+                        accent, "Neon", CanCollide=False))
 
-    # Console at the far end, so a runner faces -Z into the room's mirror wall.
-    out.append(part("ConsolePost", [3.6, 3.4, 0.4],
-                    cf(0, FLOOR_TOP + 2.5, -4.0), STEEL, "Metal"))
-    out.append(part("Console", [3.4, 1.9, 0.5],
-                    mul(cf(0, FLOOR_TOP + 4.3, -3.9), rot_x(18)), STEEL_LIGHT, "Metal"))
-    out.append(part("Readout", [2.6, 1.2, 0.12],
-                    mul(cf(0, FLOOR_TOP + 4.36, -3.65), rot_x(18)), accent, "Neon"))
-    out.append(cylinder("Handlebar", 3.9, 0.34, cf(0, FLOOR_TOP + 3.5, -3.3),
+    # A compact storage peg explains where the selected plate comes from. The ten
+    # BodyPlate slices move onto the avatar's hands when training starts.
+    out.append(part("PlateStand", [0.45, 2.4, 0.45],
+                    cf(-3.3, FLOOR_TOP + 1.2, -2.8), STEEL, "Metal"))
+    out.append(part("StandFoot", [2.1, 0.35, 1.4],
+                    cf(-3.3, FLOOR_TOP + 0.18, -2.8), STEEL, "DiamondPlate"))
+    out.append(cylinder("StoragePeg", 1.35, 0.3,
+                        mul(cf(-3.3, FLOOR_TOP + 1.55, -2.45), rot_x(90)),
                         CHROME, "Metal", Reflectance=0.25))
+    for index, radius in enumerate((2.05, 1.82, 1.60), start=1):
+        out.append(cylinder(f"StoredPlate{index}", 0.22, radius,
+                            mul(cf(-3.3, FLOOR_TOP + 1.55, -2.1 + index * 0.2), rot_x(90)),
+                            [0.12, 0.13, 0.16], "Metal"))
 
-    # Standing on the belt, facing the console.
-    out.append(anchor_standing(cf(0, FLOOR_TOP + 1.3, -0.2)))
+    out.append(group("Spot", [
+        anchor_standing(cf(0, FLOOR_TOP + 0.55, 0.25)),
+        hand_plate_load(-3.3, FLOOR_TOP + 1.55, -1.3),
+    ]))
     out.append(marker("TrainExit", [2, 2, 1],
-                      cf(0, FLOOR_TOP + ROOT_HEIGHT, 5.2)))
+                      cf(0, FLOOR_TOP + ROOT_HEIGHT, 4.8)))
     return out
 
 
@@ -469,21 +1047,27 @@ def incline_press(pad_color, accent):
     bench = mul(cf(0, FLOOR_TOP + 2.15, 0.5), rot_x(-32))
     out.extend([
         part("BenchSpine", [0.6, 0.5, 8.0], bench, STEEL, "DiamondPlate"),
-        part("Base", [3.2, 0.65, 5.2], bench, pad_color, "Fabric"),
-        part("SeatPad", [3.2, 0.65, 2.4],
-             mul(cf(0, FLOOR_TOP + 1.45, 3.0), rot_x(8)), pad_color, "Fabric"),
+        *padded_slab("Base", [3.2, 0.65, 5.2], bench, pad_color, caps=True),
+        *padded_slab("SeatPad", [3.2, 0.65, 2.4],
+             mul(cf(0, FLOOR_TOP + 1.45, 3.0), rot_x(8)), pad_color, caps=True),
         part("RearFoot", [4.4, 1.8, 0.55], cf(0, FLOOR_TOP + 0.9, -2.6), STEEL, "Metal"),
         part("FrontFoot", [4.4, 0.55, 1.8], cf(0, FLOOR_TOP + 0.28, 3.0), STEEL, "Metal"),
         part("AngleBrace", [0.55, 3.5, 0.55], cf(0, FLOOR_TOP + 1.75, -1.8), accent, "Metal"),
     ])
 
+    # Standing on the floor either side of the bench, which is where a pair of
+    # dumbbells lives between sets. They were authored at bench height and half a
+    # stud clear of the frame, so they hovered beside the seat.
+    # Head radius 0.75 sitting on the 0.12 mat.
+    rest_y = FLOOR_TOP + 0.87
+
     def dumbbell(name, x):
-        pieces = [cylinder("Handle", 1.5, 0.3, cf(x, FLOOR_TOP + 2.1, 1.0),
+        pieces = [cylinder("Handle", 1.5, 0.3, cf(x, rest_y, 1.0),
                            CHROME, "Metal", CanCollide=False, CanTouch=False,
                            CanQuery=False)]
         for side in (-1, 1):
             pieces.append(cylinder("Head", 0.72, 1.5,
-                                   cf(x + side * 0.92, FLOOR_TOP + 2.1, 1.0),
+                                   cf(x + side * 0.92, rest_y, 1.0),
                                    RUBBER, "Pebble", CanCollide=False,
                                    CanTouch=False, CanQuery=False))
         return group(name, pieces)
@@ -491,8 +1075,8 @@ def incline_press(pad_color, accent):
     out.append(group("Spot", [
         marker("TrainAnchor", [2, 2, 1],
                mul(bench, mul(cf(0, 1.25, 0.2), rot_x(90)))),
-        dumbbell("HeldRight", -2.0),
-        dumbbell("HeldLeft", 2.0),
+        dumbbell("HeldRight", -2.7),
+        dumbbell("HeldLeft", 2.7),
     ]))
     out.append(marker("TrainExit", [2, 2, 1],
                       mul(cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 1.5), rot_y(-90))))
@@ -505,19 +1089,26 @@ def pec_deck(pad_color, accent):
     out.extend([
         part("Base", [8.0, 0.55, 8.5], cf(0, FLOOR_TOP + 0.28, -0.2), STEEL, "DiamondPlate"),
         part("SeatPost", [1.2, 2.2, 1.2], cf(0, FLOOR_TOP + 1.1, 1.8), STEEL, "Metal"),
-        part("Seat", [4.0, 0.6, 4.0], cf(0, FLOOR_TOP + 2.35, 1.8), pad_color, "Fabric"),
-        part("BackPad", [4.4, 6.0, 0.7], cf(0, FLOOR_TOP + 5.2, 3.4), pad_color, "Fabric"),
+        *padded_slab("Seat", [4.0, 0.6, 4.0], cf(0, FLOOR_TOP + 2.35, 1.8), pad_color, caps=True),
+        *padded_slab("BackPad", [4.4, 6.0, 0.7], cf(0, FLOOR_TOP + 5.2, 3.4), pad_color),
         part("TopBeam", [11.0, 0.7, 0.8], cf(0, FLOOR_TOP + 9.0, 1.2), STEEL, "Metal"),
     ])
     for side in (-1, 1):
         out.extend([
             part("WeightTower", [2.0, 8.5, 2.4],
                  cf(side * 4.6, FLOOR_TOP + 4.25, 1.2), STEEL_LIGHT, "Metal"),
+            *stack_shroud("Tower", (side * 4.6, FLOOR_TOP + 8.5, 1.2),
+                          2.3, 8.5, 2.4, accent),
+            # Hung from the top beam and angled inward so the lower end arrives
+            # exactly where the hand grips it. The old sign swung the arm the other
+            # way, so its free end travelled outward and finished two studs wide of
+            # the grip it was supposed to be carrying.
             part("FlyArm", [0.55, 5.2, 0.55],
-                 mul(cf(side * 3.7, FLOOR_TOP + 6.4, 0.2), rot_z(side * 35)),
+                 mul(cf(side * 4.09, FLOOR_TOP + 7.13, -0.2), rot_z(-side * 35)),
                  accent, "Metal"),
         ])
 
+    # Where each arm's lower end lands: 2.6 out, 2.13 below the arm's centre.
     def grip(name, x):
         return group(name, [cylinder(
             "Grip", 1.4, 0.48, cf(x, FLOOR_TOP + 5.0, -0.2),
@@ -570,10 +1161,27 @@ def triceps_pushdown(pad_color, accent):
         part("StackStripe", [4.0, 0.45, 2.7], cf(0, FLOOR_TOP + 6.8, -3.4), accent, "Neon"),
         part("PulleyPost", [0.8, 10.5, 0.8], cf(0, FLOOR_TOP + 5.25, -2.0), STEEL, "Metal"),
         part("PulleyArm", [0.8, 0.8, 4.0], cf(0, FLOOR_TOP + 10.1, -0.4), STEEL, "Metal"),
-        cylinder("Pulley", 0.8, 1.7, cf(0, FLOOR_TOP + 9.4, 1.2), CHROME, "Metal"),
         part("Cable", [0.12, 5.0, 0.12], cf(0, FLOOR_TOP + 7.0, 1.2), RUBBER,
              "SmoothPlastic", CanCollide=False, CanTouch=False, CanQuery=False),
     ])
+
+    # The wheel the cable turns over, now in a housing bolted to the arm above it
+    # rather than a bare cylinder floating at the end of the boom.
+    out.extend(pulley("Pulley", (0, FLOOR_TOP + 9.4, 1.2), 1.7, accent,
+                      axis_length=0.8, mount=(0, FLOOR_TOP + 10.1, 1.2)))
+    out.extend(stack_shroud("Stack", (0, FLOOR_TOP + 8.0, -3.4), 4.1, 8.0, 2.5, accent))
+
+    # Diagonal braces: a ten-stud mast on a five-stud base needs to look held up.
+    for side in (-1, 1):
+        out.append(tube("Brace", (side * 1.9, FLOOR_TOP + 0.65, -2.6),
+                        (side * 0.3, FLOOR_TOP + 4.2, -2.1), 0.3, STEEL_LIGHT))
+        out.append(hardware("MastBolt",
+                            mul(cf(side * 0.42, FLOOR_TOP + 1.2, -2.0), rot_z(90))))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, -4.6)))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, -1.4)))
+    out.append(tube("ArmStay", (0, FLOOR_TOP + 8.6, -1.9),
+                    (0, FLOOR_TOP + 9.9, -0.2), 0.28, STEEL_LIGHT))
+
     bar = [cylinder("PushBar", 4.0, 0.38, cf(0, FLOOR_TOP + 4.6, 1.2),
                     CHROME, "Metal", CanCollide=False, CanTouch=False,
                     CanQuery=False)]
@@ -583,22 +1191,27 @@ def triceps_pushdown(pad_color, accent):
     ]))
     out.append(marker("TrainExit", [2, 2, 1], cf(3.8, FLOOR_TOP + ROOT_HEIGHT, 2.5)))
     return out
-
-
 def seated_row(pad_color, accent):
     """Low cable row with a seat, foot plates, stack and close-grip handle."""
     out = [floor_mat(10, 13)]
     out.extend([
         part("Base", [4.5, 0.55, 10.0], cf(0, FLOOR_TOP + 0.28, 0), STEEL, "DiamondPlate"),
-        part("Seat", [4.2, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 2.7), pad_color, "Fabric"),
+        *padded_slab("Seat", [4.2, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 2.7), pad_color, caps=True),
         part("SeatPost", [1.0, 1.8, 1.0], cf(0, FLOOR_TOP + 0.9, 2.7), STEEL, "Metal"),
         part("WeightTower", [4.0, 7.5, 2.4], cf(0, FLOOR_TOP + 3.75, -4.4), STEEL_LIGHT, "Metal"),
+        *stack_shroud("Tower", (0, FLOOR_TOP + 7.5, -4.4), 4.3, 7.5, 2.4, accent),
         part("TowerStripe", [4.2, 0.45, 2.6], cf(0, FLOOR_TOP + 6.3, -4.4), accent, "Neon"),
     ])
     for side in (-1, 1):
         out.append(part("FootPlate", [3.0, 0.4, 3.4],
                         mul(cf(side * 2.1, FLOOR_TOP + 1.2, -0.7), rot_z(side * 28)),
                         STEEL, "DiamondPlate"))
+    # A low outlet on the front of the stack, and the cable running forward from it
+    # to the handle. A row's cable is near horizontal, which is the one case where
+    # its absence is most obvious: the handle sat in mid-air over the foot plates.
+    out.append(cylinder("Outlet", 0.8, 1.4, cf(0, FLOOR_TOP + 3.5, -3.2),
+                        CHROME, "Metal"))
+    out.append(_cable((0, FLOOR_TOP + 3.5, -3.2), (0, FLOOR_TOP + 3.5, -1.6)))
     handle = [cylinder("RowHandle", 3.2, 0.4, cf(0, FLOOR_TOP + 3.5, -1.6),
                        CHROME, "Metal", CanCollide=False, CanTouch=False,
                        CanQuery=False)]
@@ -615,7 +1228,7 @@ def lat_pulldown(pad_color, accent):
     out = [floor_mat(12, 12)]
     out.extend([
         part("Base", [10.0, 0.6, 9.0], cf(0, FLOOR_TOP + 0.3, -0.2), STEEL, "DiamondPlate"),
-        part("Seat", [4.0, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 1.8), pad_color, "Fabric"),
+        *padded_slab("Seat", [4.0, 0.65, 4.0], cf(0, FLOOR_TOP + 2.1, 1.8), pad_color, caps=True),
         part("SeatPost", [1.0, 1.8, 1.0], cf(0, FLOOR_TOP + 0.9, 1.8), STEEL, "Metal"),
         cylinder("ThighRoller", 5.0, 1.0, cf(0, FLOOR_TOP + 3.5, 0.2), RUBBER, "Pebble"),
         part("TopCrossbar", [10.5, 0.8, 0.8], cf(0, FLOOR_TOP + 11.0, -1.5), STEEL, "Metal"),
@@ -623,7 +1236,14 @@ def lat_pulldown(pad_color, accent):
     for side in (-1, 1):
         out.append(part("WeightTower", [2.1, 10.5, 2.3],
                         cf(side * 4.4, FLOOR_TOP + 5.25, -1.5), STEEL_LIGHT, "Metal"))
-    bar = [cylinder("LatBar", 8.0, 0.38, cf(0, FLOOR_TOP + 9.5, 0),
+        out.extend(stack_shroud("Tower", (side * 4.4, FLOOR_TOP + 10.5, -1.5),
+                                2.4, 10.5, 2.3, accent))
+    # The bar hangs off the crossbar on a cable. Without one it floats under the
+    # frame attached to nothing, and at 8.0 long its ends were buried inside the two
+    # weight towers, whose inner faces are 3.35 out.
+    bar_y = FLOOR_TOP + 9.5
+    out.append(_cable((0, FLOOR_TOP + 11.0, -1.5), (0, bar_y, 0)))
+    bar = [cylinder("LatBar", 6.4, 0.38, cf(0, bar_y, 0),
                     CHROME, "Metal", CanCollide=False, CanTouch=False,
                     CanQuery=False)]
     out.append(group("Spot", [
@@ -640,18 +1260,21 @@ def knee_raise(pad_color, accent):
     out.extend([
         part("Base", [8.0, 0.65, 6.0], cf(0, FLOOR_TOP + 0.33, -1.0), STEEL, "DiamondPlate"),
         part("BackFrame", [6.0, 9.0, 0.8], cf(0, FLOOR_TOP + 5.0, -3.0), STEEL, "Metal"),
-        part("BackPad", [4.4, 5.5, 0.65], cf(0, FLOOR_TOP + 6.0, -2.45), pad_color, "Fabric"),
+        *padded_slab("BackPad", [4.4, 5.5, 0.65], cf(0, FLOOR_TOP + 6.0, -2.45), pad_color),
         part("TopStripe", [6.2, 0.5, 1.0], cf(0, FLOOR_TOP + 9.7, -2.7), accent, "Neon"),
     ])
     for side in (-1, 1):
         out.extend([
-            part("ArmRest", [2.0, 0.65, 4.5],
-                 cf(side * 2.7, FLOOR_TOP + 6.0, -0.2), pad_color, "Fabric"),
+            *padded_slab("ArmRest", [2.0, 0.65, 4.5],
+                 cf(side * 2.7, FLOOR_TOP + 6.0, -0.2), pad_color),
             cylinder("Handle", 2.3, 0.42,
                      mul(cf(side * 2.7, FLOOR_TOP + 6.35, 1.2), rot_y(90)),
                      CHROME, "Metal"),
         ])
-    out.append(marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 5.4, -0.5)))
+    out.append(group("Spot", [
+        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 5.4, -0.5)),
+        waist_chain_load(0, FLOOR_TOP + 2.2, 2.4),
+    ]))
     out.append(marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 4.2)))
     return out
 
@@ -660,18 +1283,87 @@ def torso_twist(pad_color, accent):
     """Seated torso-rotation station with a medicine ball held in both hands."""
     out = [floor_mat(10, 10)]
     out.extend([
-        cylinder("Base", 0.7, 7.0, mul(cf(0, FLOOR_TOP + 0.35, 0), rot_z(90)),
+        # A pedestal with some height to it. The base was a 7-wide disc only 0.7
+        # thick, and the machine's own mat covered its bottom 0.12 -- so barely half a
+        # stud of the whole structure stood above the floor and the rig read as
+        # something sunk into the pad rather than bolted onto it. Narrower and much
+        # taller: the same footprint idea, but visible.
+        # 0.7 thick, not thicker: the seated feet rest on the FootBrace at 2.01 and
+        # this disc sits directly under them, so anything taller tops out inside them --
+        # measured 0.78 studs of foot inside a 1.1-thick base. The height this machine
+        # was missing comes from the column, the back rest and the raised gauge, none of
+        # which are anywhere near the feet.
+        cylinder("Base", 0.7, 5.0, mul(cf(0, FLOOR_TOP + 0.35, 0), rot_z(90)),
                  STEEL, "DiamondPlate"),
-        part("SeatPost", [1.0, 1.8, 1.0], cf(0, FLOOR_TOP + 0.9, 0), STEEL, "Metal"),
-        part("Seat", [4.4, 0.65, 4.2], cf(0, FLOOR_TOP + 2.2, 0), pad_color, "Fabric"),
-        part("FootBrace", [7.0, 0.5, 2.5], cf(0, FLOOR_TOP + 0.8, 2.3), STEEL, "Metal"),
-        part("ArcGauge", [8.0, 0.35, 0.8], cf(0, FLOOR_TOP + 0.25, -3.0), accent, "Neon"),
+        # Narrow enough that the seated feet clear it. At 1.0 square the post's corner
+        # caught the inside edge of each foot by 0.14 studs once the anchor came down to
+        # the seated convention; the feet sit at x +/-0.86, so 0.7 gets out of the way.
+        part("SeatPost", [0.9, 1.8, 0.9], cf(0, FLOOR_TOP + 0.9, 0), STEEL, "Metal"),
+        # A back rest, so the seat reads as a rotation machine and not a stool. Behind
+        # the sitter (they face -Z), clear of the seat top at 2.525.
     ])
-    ball = [part("MedicineBall", [2.2, 2.2, 2.2], cf(0, FLOOR_TOP + 4.5, -1.2),
+    out.extend(padded_slab("BackRest", [4.4, 3.4, 0.7],
+                           cf(0, FLOOR_TOP + 3.9, 2.1), pad_color))
+    out.extend([
+        part("BackPost", [0.8, 2.6, 0.8], cf(0, FLOOR_TOP + 2.4, 2.1), STEEL, "Metal"),
+        # Set back behind the knees, same reason as the preacher bench: a 4.2-deep pad
+        # centred on the sitter runs forward through the dangling legs and hides them.
+    ])
+    out.extend(padded_slab("Seat", [4.4, 0.65, 2.4],
+                           cf(0, FLOOR_TOP + 2.2, 1.1), pad_color, caps=True))
+    out.extend([
+        # In front, where the feet actually land. The brace used to sit at z +2.3 --
+        # behind the lifter, who faces -Z -- so it braced nothing.
+        part("FootBrace", [7.0, 0.5, 2.4], cf(0, FLOOR_TOP + 0.55, -1.1), STEEL, "Metal"),
+        # Lifted out of the mat. At 0.25 its underside sat at 1.075 against a mat top
+        # of 1.12, so the gauge was partly buried in the floor it stands on. Also no
+        # longer emissive, like the rest of the district trim.
+        part("ArcGauge", [8.0, 0.5, 0.8], cf(0, FLOOR_TOP + 1.5, -3.0),
+             accent, "SmoothPlastic"),
+        part("ArcGaugePost", [0.6, 1.4, 0.6], cf(-3.4, FLOOR_TOP + 0.7, -3.0),
+             STEEL, "Metal"),
+        part("ArcGaugePost", [0.6, 1.4, 0.6], cf(3.4, FLOOR_TOP + 0.7, -3.0),
+             STEEL, "Metal"),
+    ])
+    # A rotation machine that visibly rotates: a bearing collar at the top of the
+    # post the seat turns on, kept under the 0.86 the seated feet sit at, and
+    # graduations along the arc gauge so the sweep reads as measured.
+    out.append(cylinder("BearingCollar", 0.32, 1.5,
+                        mul(cf(0, FLOOR_TOP + 1.72, 0), rot_x(90)), CHROME, "Metal",
+                        Reflectance=0.3))
+    for side in (-1, 1):
+        out.append(tube("GaugePost", (side * 3.4, FLOOR_TOP + 0.12, -3.0),
+                        (side * 3.4, FLOOR_TOP + 1.4, -3.0), 0.5, STEEL))
+        out.append(tube("BackBrace", (side * 1.6, FLOOR_TOP + 2.5, 2.45),
+                        (side * 0.3, FLOOR_TOP + 1.5, 2.1), 0.28, STEEL_LIGHT))
+        out.append(hardware("SeatBolt",
+                            mul(cf(side * 0.5, FLOOR_TOP + 1.9, 0), rot_z(90))))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, 0),
+                            (1.1, 0.22, 1.1)))
+    for tick in (-3.2, -1.6, 0.0, 1.6, 3.2):
+        out.append(part("GaugeTick", [0.16, 0.62, 0.9],
+                        cf(tick, FLOOR_TOP + 1.6, -3.0), STEEL_LIGHT,
+                        "SmoothPlastic", CanCollide=False))
+
+    # On the mat in front of the machine — radius 1.1 on the 0.12 mat. It used to
+    # be parked at chest height over the seat, floating just above the pad the
+    # player sits on.
+    ball = [part("MedicineBall", [2.2, 2.2, 2.2], cf(0, FLOOR_TOP + 1.22, -3.2),
                  accent, "Rubber", Shape="Ball", CanCollide=False,
                  CanTouch=False, CanQuery=False)]
     out.append(group("Spot", [
-        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.2, 0)),
+        # Seat tops at FLOOR_TOP + 2.525, and every other seated rig puts the root
+        # 0.775 above its seat -- PecDeck, SeatedRow, LatPulldown and LegExtension all
+        # measure between 0.75 and 0.78. This one was at 1.825, more than a stud higher
+        # than the convention, and raising it is what broke it: the pose folds the legs
+        # straight down (hip 70 / knee -82), so from a root that high the feet finish at
+        # 3.06 -- wedged between the top of the SeatPost at 3.02 and the underside of
+        # the Seat at 3.095, which is the "stuck in the ground" that was reported.
+        #
+        # Measured on the rig, the feet hang 2.29 below the root in this pose. Putting
+        # the root on the standard 0.775 lands them at 2.01, right on the FootBrace,
+        # and satisfies both constraints at once.
+        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.30, 0)),
         group("HeldBoth", ball),
     ]))
     out.append(marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.0)))
@@ -691,18 +1383,31 @@ def squat_rack(pad_color, accent):
         part("Base", [10.0, 0.45, 9.0], cf(0, FLOOR_TOP + 0.23, 0), STEEL, "DiamondPlate"),
         part("TopBeam", [9.6, 0.75, 0.75], cf(0, FLOOR_TOP + 9.7, -3.8), accent, "Metal"),
     ])
-    bar = [cylinder("Bar", 9.4, 0.34, cf(0, FLOOR_TOP + 6.3, 0),
+    # J-hooks. The cage had four posts at z = +/-3.8 and nothing at all at z = 0,
+    # so the loaded bar hung in the middle of the cage touching none of it. Each
+    # hook cantilevers forward off a back post to meet the bar where it rests.
+    bar_y = FLOOR_TOP + 6.3
+    for side in (-1, 1):
+        out.append(part("HookArm", [0.4, 0.4, 3.4],
+                        cf(side * 4.4, bar_y - 0.5, -1.9), STEEL, "Metal"))
+        out.append(part("RackHook", [0.42, 1.1, 0.42],
+                        cf(side * 4.4, bar_y - 0.1, -0.3), accent, "Metal"))
+    bar = [cylinder("Bar", 9.4, 0.34, cf(0, bar_y, 0),
                     CHROME, "Metal", CanCollide=False, CanTouch=False,
                     CanQuery=False)]
+    # Inboard of the J-hooks at 4.4, so the plates load the sleeve rather than
+    # clipping through the hook the bar is resting in.
     for side in (-1, 1):
-        for offset in (3.4, 4.0):
+        for offset in (2.9, 3.5):
             bar.append(cylinder("Plate", 0.55, 2.0,
-                                cf(side * offset, FLOOR_TOP + 6.3, 0),
+                                cf(side * offset, bar_y, 0),
                                 RUBBER, "Pebble", CanCollide=False,
                                 CanTouch=False, CanQuery=False))
     out.append(group("Spot", [
-        anchor_standing(cf(0, FLOOR_TOP, 0.4)),
-        group("HeldBoth", bar),
+        # On the base plate. Standing at floor level put the feet 0.46 studs inside
+        # the plate the rack is built on.
+        anchor_standing(cf(0, FLOOR_TOP + 0.46, 0.4)),
+        level_bar(bar),
     ]))
     out.append(marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 6.1)))
     return out
@@ -714,13 +1419,16 @@ def leg_press(pad_color, accent):
     seat_frame = mul(cf(0, FLOOR_TOP + 2.1, 2.4), rot_x(28))
     out.extend([
         part("Base", [7.0, 0.6, 11.0], cf(0, FLOOR_TOP + 0.3, 0), STEEL, "DiamondPlate"),
-        part("Seat", [5.0, 0.7, 4.0], seat_frame, pad_color, "Fabric"),
-        part("BackPad", [5.0, 0.7, 6.0],
-             mul(cf(0, FLOOR_TOP + 3.8, 4.1), rot_x(58)), pad_color, "Fabric"),
+        *padded_slab("Seat", [5.0, 0.7, 4.0], seat_frame, pad_color, caps=True),
+        *padded_slab("BackPad", [5.0, 0.7, 6.0],
+             mul(cf(0, FLOOR_TOP + 3.8, 4.1), rot_x(58)), pad_color),
         part("FootPlate", [7.5, 0.65, 7.5],
              mul(cf(0, FLOOR_TOP + 5.0, -3.7), rot_x(-38)), STEEL_LIGHT, "DiamondPlate"),
         part("SledStripe", [7.7, 0.4, 1.0],
              mul(cf(0, FLOOR_TOP + 5.4, -3.2), rot_x(-38)), accent, "Neon"),
+        part("WeightStack", [2.2, 7.0, 2.4],
+             cf(-4.7, FLOOR_TOP + 3.5, 2.2), STEEL_LIGHT, "Metal"),
+        *stack_shroud("Stack", (-4.7, FLOOR_TOP + 7.0, 2.2), 2.5, 7.0, 2.4, accent),
     ])
     for side in (-1, 1):
         out.append(part("Rail", [0.55, 0.55, 10.0],
@@ -733,12 +1441,82 @@ def leg_press(pad_color, accent):
     return out
 
 
-def _held_bar(name, length, y, z, accent, diameter=0.38):
-    """A collision-free two-hand prop whose long axis is local X."""
-    return group(name, [cylinder(
-        "Grip", length, diameter, cf(0, y, z), accent, "Metal",
+def _held_bar(name, length, y, z, accent, diameter=0.38, x=0.0,
+              grip_style=None):
+    """A collision-free two-hand prop whose long axis is local X.
+
+    The x offset exists because a prop has to be authored where the machine
+    actually keeps it, and on a two-sided machine that is not the centreline: a
+    crossover grip belongs at the end of its own cable, a rope handle at the end of
+    its own rope.
+    """
+    held = group(name, [cylinder(
+        "Grip", length, diameter, cf(x, y, z), accent, "Metal",
         CanCollide=False, CanTouch=False, CanQuery=False,
     )])
+    if grip_style is not None:
+        held["attributes"] = {"GripStyle": grip_style}
+    return held
+
+
+def _cable(start, end, thickness=0.12, name="Cable"):
+    """A taut cable drawn between two points.
+
+    A selectorised machine's handle is held up by a cable, and without one drawn
+    the handle simply hangs in the air with nothing above it — which is what a
+    player reads as a broken machine. The part's local Y is laid along the run, so
+    its Size height is the distance between the two ends.
+    """
+    span = tuple(e - s for s, e in zip(start, end))
+    length = math.sqrt(sum(v * v for v in span))
+    if length < 1e-4:
+        raise ValueError(f"{name}: cable needs two distinct ends")
+    up = tuple(v / length for v in span)
+
+    # Any vector not parallel to the run gives a usable right axis; a cable is
+    # round, so which one it is never shows.
+    seed = (1.0, 0.0, 0.0) if abs(up[0]) < 0.9 else (0.0, 0.0, 1.0)
+    right = cross(seed, up)
+    scale = math.sqrt(sum(v * v for v in right))
+    right = tuple(v / scale for v in right)
+
+    middle = tuple((s + e) / 2 for s, e in zip(start, end))
+    return part(name, [thickness, length, thickness], axes(middle, right, up),
+                RUBBER, "SmoothPlastic",
+                CanCollide=False, CanTouch=False, CanQuery=False)
+
+
+def cable_run(points, thickness=0.12, name="Cable", sag=0.0, segments=1):
+    """A cable routed through a list of points, optionally hanging between them.
+
+    `_cable` draws one taut straight run, which is right for a handle held up
+    directly above its stack. It is wrong for the long routed lines on a
+    crossover or a pulldown, where the cable leaves the stack, turns over a
+    wheel, and only then reaches the handle: drawn as a single straight part it
+    cuts through the frame instead of following the machine.
+
+    Sag is drawn rather than simulated — a parabola sampled at `segments` points,
+    zero at both ends and deepest in the middle. A cable under load is very
+    nearly taut, so the default is no sag at all; it is worth spending segments
+    on only where slack actually shows, such as the loose end of a rope handle.
+    """
+    out = []
+    for index in range(len(points) - 1):
+        start, end = points[index], points[index + 1]
+        if segments <= 1 or sag <= 0.0:
+            out.append(_cable(start, end, thickness, name))
+            continue
+        previous = start
+        for step in range(1, segments + 1):
+            alpha = step / segments
+            point = tuple(s + (e - s) * alpha for s, e in zip(start, end))
+            # 4*a*(1-a) peaks at 1.0 mid-span and vanishes at both ends, which is
+            # what keeps every segment meeting its neighbours exactly.
+            drop = sag * 4.0 * alpha * (1.0 - alpha)
+            point = (point[0], point[1] - drop, point[2])
+            out.append(_cable(previous, point, thickness, name))
+            previous = point
+    return out
 
 
 def push_up_deck(pad_color, accent):
@@ -750,13 +1528,39 @@ def push_up_deck(pad_color, accent):
         cylinder("RightHandle", 2.2, 0.45, cf(-2.0, FLOOR_TOP + 1.25, -2.2), CHROME),
         cylinder("LeftHandle", 2.2, 0.45, cf(2.0, FLOOR_TOP + 1.25, -2.2), CHROME),
         part("WeightMarker", [5.0, 0.2, 0.7], cf(0, FLOOR_TOP + 1.0, 2.8), accent, "Neon"),
-        marker("TrainAnchor", [2, 2, 1],
-               axes((0, FLOOR_TOP + 2.25, 0.5), (-1, 0, 0), (0, 0, -1))),
+    ])
+
+    # The handles were parallel bars resting on nothing: their undersides sit at
+    # 1.025 and the deck tops out at 0.95. Uprights at each end close that gap and
+    # turn them into push-up bars rather than floating pipes.
+    for side in (-1, 1):
+        for end in (-1, 1):
+            out.append(tube("HandleLeg", (side * 2.0 + end * 0.95, FLOOR_TOP + 0.95, -2.2),
+                            (side * 2.0 + end * 0.95, FLOOR_TOP + 1.25, -2.2),
+                            0.34, CHROME, Reflectance=0.3))
+        out.append(cylinder("HandleCap", 0.14, 0.5,
+                            cf(side * 2.0, FLOOR_TOP + 1.25, -3.3), accent, "Metal"))
+        out.append(cylinder("HandleCap", 0.14, 0.5,
+                            cf(side * 2.0, FLOOR_TOP + 1.25, -1.1), accent, "Metal"))
+
+    # Deck edging, so the rubber reads as a bonded surface and not a loose sheet.
+    for side in (-1, 1):
+        out.append(cylinder("DeckEdge", 9.0, 0.36,
+                            mul(cf(side * 3.75, FLOOR_TOP + 0.9, 0), rot_y(90)),
+                            STEEL_LIGHT, "Metal"))
+        out.append(foot_pad("Foot", cf(side * 3.7, FLOOR_TOP + 0.11, -4.4)))
+        out.append(foot_pad("Foot", cf(side * 3.7, FLOOR_TOP + 0.11, 4.4)))
+        out.append(hardware("DeckBolt", mul(cf(side * 3.2, FLOOR_TOP + 0.96, 3.9), rot_x(90))))
+        out.append(hardware("DeckBolt", mul(cf(side * 3.2, FLOOR_TOP + 0.96, -3.9), rot_x(90))))
+
+    out.extend([
+        group("Spot", [
+            anchor_prone((0, FLOOR_TOP + 2.5, 0.5)),
+            back_plate_load(0, FLOOR_TOP + 1.25, 3.4),
+        ]),
         marker("TrainExit", [2, 2, 1], cf(5.0, FLOOR_TOP + ROOT_HEIGHT, 1.5)),
     ])
     return out
-
-
 def cable_crossover(pad_color, accent):
     """Twin cable towers with independent hand grips."""
     out = [floor_mat(14, 12)]
@@ -764,18 +1568,24 @@ def cable_crossover(pad_color, accent):
         out.extend([
             part("Tower", [2.4, 10.5, 3.0], cf(side * 5.2, FLOOR_TOP + 5.25, -1.5),
                  STEEL_LIGHT, "Metal"),
+            *stack_shroud("Tower", (side * 5.2, FLOOR_TOP + 10.5, -1.5),
+                          2.7, 10.5, 3.0, accent),
             part("PulleyArm", [4.2, 0.65, 0.65], cf(side * 3.7, FLOOR_TOP + 9.8, -1.5),
                  STEEL, "Metal"),
             part("Cable", [0.1, 6.0, 0.1], cf(side * 2.0, FLOOR_TOP + 6.7, -1.5),
                  RUBBER, "SmoothPlastic", CanCollide=False),
         ])
+    # Grip rest positions, at the two cable ends. They used to be authored on the
+    # centreline and offset in z instead, which put both grips in the middle of the
+    # machine with the cables ending two studs away on either side of them.
+    grip_y = FLOOR_TOP + 3.9
     out.extend([
         part("Base", [12.8, 0.55, 5.0], cf(0, FLOOR_TOP + 0.28, -1.5), STEEL, "DiamondPlate"),
         part("CrossBeam", [12.0, 0.65, 0.65], cf(0, FLOOR_TOP + 10.3, -1.5), accent, "Metal"),
         group("Spot", [
             anchor_standing(cf(0, FLOOR_TOP, 2.0)),
-            _held_bar("HeldRight", 1.2, FLOOR_TOP + 5.0, -0.5, CHROME),
-            _held_bar("HeldLeft", 1.2, FLOOR_TOP + 5.0, -2.4, CHROME),
+            _held_bar("HeldRight", 1.2, grip_y, -1.5, CHROME, x=-2.0),
+            _held_bar("HeldLeft", 1.2, grip_y, -1.5, CHROME, x=2.0),
         ]),
         marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 5.2)),
     ])
@@ -795,7 +1605,10 @@ def chest_dip(pad_color, accent):
         out.append(cylinder("DipBar", 6.0, 0.48,
                             mul(cf(side * 1.8, FLOOR_TOP + 5.2, 0), rot_y(90)), CHROME))
     out.extend([
-        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 5.1, -0.2)),
+        group("Spot", [
+            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 5.1, -0.2)),
+            waist_chain_load(0, FLOOR_TOP + 2.2, 2.5),
+        ]),
         marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 4.2)),
     ])
     return out
@@ -806,14 +1619,25 @@ def decline_press(pad_color, accent):
     out = [floor_mat(11, 13)]
     pad = mul(cf(0, FLOOR_TOP + 2.1, 0), rot_x(18))
     out.extend([
-        part("Base", [3.2, 0.6, 8.2], pad, pad_color, "Fabric"),
+        *padded_slab("Base", [3.2, 0.6, 8.2], pad, pad_color, caps=True),
         part("Frame", [0.7, 1.0, 9.0], cf(0, FLOOR_TOP + 0.7, 0), STEEL, "DiamondPlate"),
         cylinder("AnkleRoller", 4.0, 1.1, cf(0, FLOOR_TOP + 3.7, 3.6), RUBBER, "Pebble"),
         part("Rack", [8.5, 6.0, 0.7], cf(0, FLOOR_TOP + 3.0, -4.1), STEEL, "Metal"),
         part("RackStripe", [8.7, 0.4, 0.9], cf(0, FLOOR_TOP + 5.8, -4.1), accent, "Neon"),
+    ])
+    # Hook arms cantilevered forward off the rack wall, the same way bench_press
+    # does it: the bar has to rest where the hands press it, and the rack stands
+    # 3.1 studs behind that, so without the arms the bar floated over the lifter.
+    bar_y = FLOOR_TOP + 4.7
+    for side in (-1, 1):
+        out.append(part("HookArm", [0.3, 0.3, 2.8],
+                        cf(side * 1.9, bar_y - 0.45, -2.6), STEEL, "Metal"))
+        out.append(part("RackHook", [0.32, 0.9, 0.32],
+                        cf(side * 1.9, bar_y - 0.05, -1.3), accent, "Metal"))
+    out.extend([
         group("Spot", [
             marker("TrainAnchor", [2, 2, 1], mul(pad, mul(cf(0, 1.35, 0), rot_x(90)))),
-            _held_bar("HeldBoth", 7.5, FLOOR_TOP + 4.7, -1.0, CHROME),
+            _held_bar("HeldBoth", 7.5, bar_y, -1.0, CHROME, grip_style="LevelBar"),
         ]),
         marker("TrainExit", [2, 2, 1], cf(4.5, FLOOR_TOP + ROOT_HEIGHT, 2.0)),
     ])
@@ -827,10 +1651,18 @@ def hammer_curl(pad_color, accent):
         part("Base", [8.5, 0.65, 4.2], cf(0, FLOOR_TOP + 0.33, -2.2), STEEL, "DiamondPlate"),
         part("Rack", [8.0, 4.5, 1.0], cf(0, FLOOR_TOP + 2.3, -3.2), STEEL_LIGHT, "Metal"),
         part("Stripe", [8.2, 0.4, 1.2], cf(0, FLOOR_TOP + 4.3, -3.2), accent, "Neon"),
+        # A shelf to actually put the dumbbells on. The rack was a flat wall, and
+        # the pair floated in front of it with a stud and a half of air underneath.
+        part("Shelf", [8.0, 0.3, 1.8], cf(0, FLOOR_TOP + 2.6, -2.6),
+             STEEL, "DiamondPlate"),
         group("Spot", [
             anchor_standing(cf(0, FLOOR_TOP, 1.0)),
-            _held_bar("HeldRight", 1.6, FLOOR_TOP + 2.8, -2.4, CHROME, 0.65),
-            _held_bar("HeldLeft", 1.6, FLOOR_TOP + 2.8, -1.0, CHROME, 0.65),
+            # Neutral grip: the dumbbell shaft runs front-to-back through the fist,
+            # not left-to-right like a supinated curl.
+            _held_bar("HeldRight", 1.6, FLOOR_TOP + 3.08, -2.6, CHROME, 0.65,
+                      x=-1.2, grip_style="Neutral"),
+            _held_bar("HeldLeft", 1.6, FLOOR_TOP + 3.08, -2.6, CHROME, 0.65,
+                      x=1.2, grip_style="Neutral"),
         ]),
         marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
@@ -843,13 +1675,20 @@ def preacher_curl(pad_color, accent):
     pad = mul(cf(0, FLOOR_TOP + 4.2, -0.5), rot_x(-48))
     out.extend([
         part("Base", [7.0, 0.6, 8.5], cf(0, FLOOR_TOP + 0.3, 0), STEEL, "DiamondPlate"),
-        part("Seat", [4.0, 0.65, 3.5], cf(0, FLOOR_TOP + 2.2, 2.7), pad_color, "Fabric"),
-        part("PreacherPad", [5.6, 0.8, 4.6], pad, pad_color, "Fabric"),
+        # Shallow, set back behind the knee line, and low enough to sit on. A 3.5-deep
+        # pad reached forward under the legs and, being 4 wide, hid them from any side
+        # view; at 2.2 high it also sat a seated lifter's feet 0.9 studs off the floor.
+        # Seat top lands at 2.78 so the pelvis rests on it with the soles on the mat.
+        *padded_slab("Seat", [4.0, 0.65, 2.2], cf(0, FLOOR_TOP + 1.455, 3.4), pad_color, caps=True),
+        *padded_slab("PreacherPad", [5.6, 0.8, 4.6], pad, pad_color),
         part("PadPost", [0.8, 4.0, 0.8], cf(0, FLOOR_TOP + 2.0, -0.4), STEEL, "Metal"),
         part("Cradle", [6.0, 0.4, 1.0], cf(0, FLOOR_TOP + 2.1, -3.1), accent, "Metal"),
         group("Spot", [
-            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.2, 2.7)),
-            _held_bar("HeldBoth", 5.5, FLOOR_TOP + 2.6, -2.5, CHROME),
+            # Sized from the seated fold: the soles hang 2.43 below the root, so this
+            # puts them on the 1.12 mat and the pelvis on the 2.78 seat at the same
+            # time. The old 4.3 left the lifter hovering a full stud above the pad.
+            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 2.55, 2.55)),
+            _held_bar("HeldBoth", 5.5, FLOOR_TOP + 2.6, -2.5, CHROME, grip_style="LevelBar"),
         ]),
         marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.8)),
     ])
@@ -860,14 +1699,23 @@ def skull_crusher(pad_color, accent):
     """Flat triceps bench with a short EZ bar above the forehead."""
     out = [floor_mat(10, 12)]
     out.extend([
-        part("Base", [3.3, 0.65, 8.0], cf(0, FLOOR_TOP + 1.7, 0), pad_color, "Fabric"),
+        *padded_slab("Base", [3.3, 0.65, 8.0], cf(0, FLOOR_TOP + 1.7, 0), pad_color, caps=True),
         part("BenchFrame", [0.7, 1.2, 9.0], cf(0, FLOOR_TOP + 0.7, 0), STEEL, "DiamondPlate"),
         part("BarStand", [7.0, 4.8, 0.6], cf(0, FLOOR_TOP + 2.4, -4.0), STEEL, "Metal"),
         part("WarningStripe", [7.2, 0.4, 0.8], cf(0, FLOOR_TOP + 4.6, -4.0), accent, "Neon"),
+    ])
+    # Same cantilever as bench_press and decline_press: the EZ bar is racked over
+    # the forehead, 2.8 studs clear of the stand behind it.
+    bar_y = FLOOR_TOP + 4.2
+    for side in (-1, 1):
+        out.append(part("HookArm", [0.3, 0.3, 2.6],
+                        cf(side * 1.6, bar_y - 0.45, -2.6), STEEL, "Metal"))
+        out.append(part("RackHook", [0.32, 0.9, 0.32],
+                        cf(side * 1.6, bar_y - 0.05, -1.4), accent, "Metal"))
+    out.extend([
         group("Spot", [
-            marker("TrainAnchor", [2, 2, 1],
-                   axes((0, FLOOR_TOP + 2.9, 0), (-1, 0, 0), (0, 0, -1))),
-            _held_bar("HeldBoth", 5.8, FLOOR_TOP + 4.2, -1.2, CHROME),
+            anchor_supine((0, FLOOR_TOP + 2.9, 0)),
+            _held_bar("HeldBoth", 5.8, bar_y, -1.2, CHROME, grip_style="LevelBar"),
         ]),
         marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 1.5)),
     ])
@@ -878,20 +1726,62 @@ def battle_ropes(pad_color, accent):
     """Two long ropes anchored to a weighted floor post."""
     out = [floor_mat(14, 14)]
     out.extend([
-        cylinder("Base", 0.8, 4.5, mul(cf(0, FLOOR_TOP + 0.4, -5.0), rot_z(90)),
-                 STEEL, "DiamondPlate"),
-        part("AnchorPost", [1.2, 3.5, 1.2], cf(0, FLOOR_TOP + 1.75, -5.0), STEEL, "Metal"),
-        part("RopeRight", [0.35, 0.35, 8.5], mul(cf(-1.0, FLOOR_TOP + 0.8, -0.7), rot_x(-4)),
-             accent, "Fabric", CanCollide=False),
-        part("RopeLeft", [0.35, 0.35, 8.5], mul(cf(1.0, FLOOR_TOP + 0.8, -0.7), rot_x(4)),
-             accent, "Fabric", CanCollide=False),
+        # A wall anchor with real mass, not a lone post. What stood here before was a
+        # 1.2-square post and a 0.8-thick disc, and with the ropes only 0.3 thick and
+        # half a stud off the mat there was nothing on this pad taller than a kerb --
+        # the whole station read as markings painted on the floor rather than as
+        # equipment somebody had put there.
+        part("Base", [7.0, 0.8, 3.0], cf(0, FLOOR_TOP + 0.4, -5.0),
+             STEEL, "DiamondPlate"),
+        part("AnchorFrame", [6.0, 5.5, 1.0], cf(0, FLOOR_TOP + 3.55, -5.4),
+             STEEL, "Metal"),
+        part("AnchorCap", [7.0, 0.9, 2.0], cf(0, FLOOR_TOP + 6.6, -5.0),
+             accent, "Metal"),
+        cylinder("AnchorRoller", 6.4, 0.9, cf(0, FLOOR_TOP + 4.9, -4.6),
+                 CHROME, "Metal", Reflectance=0.25),
+        part("AnchorLeg", [1.0, 2.6, 3.4], cf(-3.0, FLOOR_TOP + 1.3, -4.6),
+             STEEL, "Metal"),
+        part("AnchorLeg", [1.0, 2.6, 3.4], cf(3.0, FLOOR_TOP + 1.3, -4.6),
+             STEEL, "Metal"),
         group("Spot", [
             anchor_standing(cf(0, FLOOR_TOP, 4.0)),
-            _held_bar("HeldRight", 1.2, FLOOR_TOP + 3.5, 1.3, accent),
-            _held_bar("HeldLeft", 1.2, FLOOR_TOP + 3.5, 2.7, accent),
+            # Down at the loose end of each rope, one handle per rope. They used to
+            # sit on the centreline at chest height, so a station nobody was using
+            # showed two handles hanging in mid-air with the ropes lying a stud to
+            # either side of them and never reaching.
+            _held_bar("HeldRight", 1.2, FLOOR_TOP + 0.8, 3.3, accent, x=-1.0),
+            _held_bar("HeldLeft", 1.2, FLOOR_TOP + 0.8, 3.3, accent, x=1.0),
         ]),
         marker("TrainExit", [2, 2, 1], cf(5.5, FLOOR_TOP + ROOT_HEIGHT, 4.0)),
     ])
+    # Short articulated segments are reshaped client-side between the fixed post
+    # and each moving hand. Two rigid 8.5-stud bars could never make a rope wave and
+    # visually pinned the player to the floor.
+    segment_count = 12
+    for side_name, x in (("Right", -1.0), ("Left", 1.0)):
+        start_z, end_z = -4.5, 3.3
+        for index in range(1, segment_count + 1):
+            t0 = (index - 1) / segment_count
+            t1 = index / segment_count
+            z0 = start_z + (end_z - start_z) * t0
+            z1 = start_z + (end_z - start_z) * t1
+            # Slung from the roller at 5.9 down to the handles at 1.8, sagging in the
+            # middle. The old line ran flat at 0.72 with a 0.22 bump, i.e. along the
+            # floor, which is why the ropes were invisible from standing height.
+            y0 = FLOOR_TOP + 4.9 - 4.1 * t0 - math.sin(t0 * math.pi) * 0.85
+            y1 = FLOOR_TOP + 4.9 - 4.1 * t1 - math.sin(t1 * math.pi) * 0.85
+            segment = _cable(
+                (x, y0, z0), (x, y1, z1), 0.55,
+                f"BattleRope{side_name}{index:02d}",
+            )
+            segment["properties"]["Color"] = accent
+            segment["properties"]["Material"] = "Fabric"
+            segment["attributes"] = {
+                "BattleRopeSide": side_name,
+                "BattleRopeIndex": index,
+                "BattleRopeCount": segment_count,
+            }
+            out.append(segment)
     return out
 
 
@@ -904,7 +1794,10 @@ def deadlift_platform(pad_color, accent):
         part("BackStop", [12.0, 1.0, 1.0], cf(0, FLOOR_TOP + 1.2, -4.5), accent, "Metal"),
         group("Spot", [
             anchor_standing(cf(0, FLOOR_TOP + 0.8, 1.1)),
-            _held_bar("HeldBoth", 10.5, FLOOR_TOP + 1.8, -0.6, CHROME, 0.5),
+            # Down on the oak, which is where a deadlift starts and where the bar
+            # is between sets. It was parked 0.55 clear of the platform.
+            _held_bar("HeldBoth", 10.5, FLOOR_TOP + 1.25, -0.6, CHROME, 0.5,
+                      grip_style="LevelBar"),
         ]),
         marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 5.5)),
     ])
@@ -918,12 +1811,14 @@ def t_bar_row(pad_color, accent):
     out.extend([
         part("Base", [7.5, 0.65, 11.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
         part("TBarRail", [0.7, 0.7, 10.0], rail, CHROME, "Metal"),
-        part("ChestPad", [4.0, 0.8, 3.5], mul(cf(0, FLOOR_TOP + 4.0, 2.2), rot_x(-35)),
-             pad_color, "Fabric"),
+        *padded_slab("ChestPad", [4.0, 0.8, 3.5], mul(cf(0, FLOOR_TOP + 4.0, 2.2), rot_x(-35)),
+             pad_color),
         part("PlateStop", [5.5, 2.0, 1.0], cf(0, FLOOR_TOP + 1.4, -4.6), accent, "Metal"),
         group("Spot", [
-            marker("TrainAnchor", [2, 2, 1], mul(cf(0, FLOOR_TOP + 3.4, 2.5), rot_x(25))),
-            _held_bar("HeldBoth", 3.0, FLOOR_TOP + 2.2, -0.5, CHROME),
+            # PoseConfig already hinges the root 31 degrees. Tilting the anchor too
+            # doubled that lean and pushed the avatar through the chest pad/rail.
+            anchor_standing(cf(0, FLOOR_TOP + 0.65, 3.35)),
+            _held_bar("HeldBoth", 3.0, FLOOR_TOP + 2.2, -0.5, CHROME, grip_style="LevelBar"),
         ]),
         marker("TrainExit", [2, 2, 1], cf(4.5, FLOOR_TOP + ROOT_HEIGHT, 3.0)),
     ])
@@ -936,16 +1831,42 @@ def back_extension_bench(pad_color, accent):
     slope = mul(cf(0, FLOOR_TOP + 3.5, 0), rot_x(-45))
     out.extend([
         part("Base", [7.0, 0.6, 10.0], cf(0, FLOOR_TOP + 0.3, 0), STEEL, "DiamondPlate"),
-        part("HipPad", [5.0, 1.0, 3.0], slope, pad_color, "Fabric"),
         part("Frame", [1.0, 5.5, 1.0], cf(0, FLOOR_TOP + 2.75, 0), STEEL, "Metal"),
         cylinder("AnkleRoller", 5.0, 1.1, cf(0, FLOOR_TOP + 1.5, 4.0), RUBBER, "Pebble"),
         part("AngleMarker", [5.5, 0.35, 0.8], cf(0, FLOOR_TOP + 5.4, -1.5), accent, "Neon"),
-        marker("TrainAnchor", [2, 2, 1], mul(slope, mul(cf(0, 1.1, 0), rot_x(90)))),
+    ])
+    # The hip pad is the one surface bearing the lifter's weight, on the measured
+    # 45-degree slope the anchor is derived from — same frame, rolled edge.
+    out.extend(padded_slab("HipPad", [5.0, 1.0, 3.0], slope, pad_color, caps=True))
+
+    for side in (-1, 1):
+        # A second roller: ankles go between two pads on a Roman chair, and the
+        # lower one is what actually stops the lifter sliding out.
+        out.append(cylinder("RollerCap", 0.18, 1.15,
+                            cf(side * 2.5, FLOOR_TOP + 1.5, 4.0), accent, "Metal"))
+        out.append(tube("RollerPost", (side * 1.5, FLOOR_TOP + 0.6, 4.0),
+                        (side * 1.5, FLOOR_TOP + 1.5, 4.0), 0.34, STEEL_LIGHT))
+        out.append(tube("FootPlate", (side * 1.4, FLOOR_TOP + 0.9, 4.9),
+                        (side * 1.4, FLOOR_TOP + 1.9, 5.1), 0.5, STEEL))
+        out.append(tube("MastBrace", (side * 1.6, FLOOR_TOP + 0.6, 0.9),
+                        (side * 0.35, FLOOR_TOP + 4.2, 0.2), 0.3, STEEL_LIGHT))
+        out.append(hardware("PadBolt",
+                            mul(cf(side * 0.55, FLOOR_TOP + 4.6, -0.6), rot_z(90))))
+        out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, -4.4)))
+        out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, 4.4)))
+    # Height collar: a Roman chair adjusts, and the pin is what says so.
+    out.append(cylinder("HeightCollar", 0.55, 1.35,
+                        mul(cf(0, FLOOR_TOP + 1.6, 0), rot_x(90)), STEEL_LIGHT, "Metal"))
+    out.append(hardware("HeightPin", cf(0.75, FLOOR_TOP + 1.6, 0), 0.3, 0.5, accent))
+
+    out.extend([
+        group("Spot", [
+            marker("TrainAnchor", [2, 2, 1], mul(slope, mul(cf(0, 1.1, 0), rot_x(90)))),
+            hand_plate_load(0, FLOOR_TOP + 1.3, -3.8),
+        ]),
         marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
-
 def rope_climb(pad_color, accent):
     """Tall rope gantry; the avatar climbs in place under a crash mat."""
     out = [floor_mat(10, 10)]
@@ -954,9 +1875,17 @@ def rope_climb(pad_color, accent):
         part("LeftPost", [1.0, 14.0, 1.0], cf(-3.8, FLOOR_TOP + 7.0, 0), STEEL, "Metal"),
         part("RightPost", [1.0, 14.0, 1.0], cf(3.8, FLOOR_TOP + 7.0, 0), STEEL, "Metal"),
         part("TopBeam", [8.5, 1.0, 1.0], cf(0, FLOOR_TOP + 13.6, 0), accent, "Metal"),
-        cylinder("ClimbRope", 12.0, 0.55, mul(cf(0, FLOOR_TOP + 7.0, 0), rot_z(90)),
+        # Hung 1.0 stud behind the anchor rather than straight through it. The
+        # arms reach overhead in the sagittal plane, because the shoulder cannot
+        # abduct far enough past 150 to bring a hand onto the body's own centreline
+        # — so the rope goes where the hands are, which is also how a rope is
+        # actually climbed.
+        cylinder("ClimbRope", 12.0, 0.55, mul(cf(0, FLOOR_TOP + 7.0, -1.0), rot_z(90)),
                  RUBBER, "Fabric", CanCollide=False),
-        marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 7.0, 0)),
+        group("Spot", [
+            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 7.0, 0)),
+            waist_chain_load(0, FLOOR_TOP + 2.2, 2.6),
+        ]),
         marker("TrainExit", [2, 2, 1], cf(0, FLOOR_TOP + ROOT_HEIGHT, 4.5)),
     ])
     return out
@@ -969,14 +1898,37 @@ def plank_deck(pad_color, accent):
         part("Base", [8.0, 0.65, 11.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
         part("Mat", [6.8, 0.25, 9.8], cf(0, FLOOR_TOP + 0.8, 0), pad_color, "Rubber"),
         part("ElbowTargets", [5.0, 0.15, 1.5], cf(0, FLOOR_TOP + 1.0, -3.0), accent, "Neon"),
-        part("TimerArch", [8.0, 4.5, 0.6], cf(0, FLOOR_TOP + 2.3, -5.0), STEEL, "Metal"),
-        marker("TrainAnchor", [2, 2, 1],
-               axes((0, FLOOR_TOP + 2.15, 0.5), (-1, 0, 0), (0, 0, -1))),
+    ])
+
+    # An arch, not a signboard. It was one 4.5-tall slab standing on the mat with
+    # no legs; a plank timer is a gantry you look up into from the floor.
+    out.append(part("TimerBeam", [8.0, 0.8, 0.6], cf(0, FLOOR_TOP + 4.15, -5.0),
+                    STEEL, "Metal"))
+    out.extend(console("Timer", cf(0, FLOOR_TOP + 3.1, -4.68), accent,
+                       size=(3.4, 1.6, 0.3)))
+    for side in (-1, 1):
+        out.append(tube("TimerLeg", (side * 3.6, FLOOR_TOP + 0.65, -5.0),
+                        (side * 3.6, FLOOR_TOP + 4.15, -5.0), 0.55, STEEL))
+        out.append(hardware("TimerBolt",
+                            mul(cf(side * 3.6, FLOOR_TOP + 0.95, -4.7), rot_x(90)), 0.34))
+        # Deck edging and feet, matching the other floor-level stations.
+        out.append(cylinder("MatEdge", 9.8, 0.34,
+                            mul(cf(side * 3.4, FLOOR_TOP + 0.88, 0), rot_y(90)),
+                            STEEL_LIGHT, "Metal"))
+        out.append(foot_pad("Foot", cf(side * 3.4, FLOOR_TOP + 0.11, -4.9)))
+        out.append(foot_pad("Foot", cf(side * 3.4, FLOOR_TOP + 0.11, 4.9)))
+        out.append(part("LaneStripe", [0.25, 0.14, 9.4],
+                        cf(side * 2.6, FLOOR_TOP + 0.95, 0), STEEL_LIGHT,
+                        "SmoothPlastic", CanCollide=False))
+
+    out.extend([
+        group("Spot", [
+            anchor_prone((0, FLOOR_TOP + 2.15, 0.5)),
+            back_plate_load(0, FLOOR_TOP + 1.25, 3.6),
+        ]),
         marker("TrainExit", [2, 2, 1], cf(4.5, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
-
 def cable_crunch(pad_color, accent):
     """High pulley with a kneeling pad and rope attachment."""
     out = [floor_mat(10, 11)]
@@ -984,38 +1936,88 @@ def cable_crunch(pad_color, accent):
         part("Base", [5.0, 0.7, 5.0], cf(0, FLOOR_TOP + 0.35, -3.0), STEEL, "DiamondPlate"),
         part("Tower", [4.0, 10.0, 2.8], cf(0, FLOOR_TOP + 5.0, -3.6), STEEL_LIGHT, "Metal"),
         part("Pulley", [1.0, 1.0, 4.0], cf(0, FLOOR_TOP + 9.5, -1.7), accent, "Metal"),
-        part("KneePad", [5.0, 0.5, 4.0], cf(0, FLOOR_TOP + 0.6, 2.4), pad_color, "Fabric"),
+        # The rope hangs off the pulley. Without this the attachment floats over the
+        # kneeling pad with the tower three studs behind it.
+        _cable((0, FLOOR_TOP + 9.3, -1.7), (0, FLOOR_TOP + 6.4, 0.2), 0.16),
+    ])
+    out.extend(padded_slab("KneePad", [5.0, 0.5, 4.0],
+                           cf(0, FLOOR_TOP + 0.6, 2.4), pad_color, caps=True))
+    out.extend(pulley("Head", (0, FLOOR_TOP + 9.3, -0.4), 1.5, accent,
+                      axis_length=0.7, mount=(0, FLOOR_TOP + 9.5, -1.4)))
+    out.extend(stack_shroud("Tower", (0, FLOOR_TOP + 10.0, -3.6), 4.3, 10.0, 2.8, accent))
+
+    for side in (-1, 1):
+        out.append(tube("TowerBrace", (side * 2.0, FLOOR_TOP + 0.7, -2.0),
+                        (side * 0.5, FLOOR_TOP + 4.4, -2.4), 0.3, STEEL))
+        out.append(hardware("TowerBolt",
+                            mul(cf(side * 2.05, FLOOR_TOP + 1.4, -3.6), rot_z(90))))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, -4.6)))
+        out.append(foot_pad("Foot", cf(side * 2.0, FLOOR_TOP + 0.11, -1.4)))
+        # A rail either side of the kneeling pad, to line the lifter up under the rope.
+        out.append(tube("KneeRail", (side * 2.6, FLOOR_TOP + 0.85, 0.6),
+                        (side * 2.6, FLOOR_TOP + 0.85, 4.2), 0.3, STEEL_LIGHT))
+
+    out.extend([
         group("Spot", [
-            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 2.2, 2.2)),
-            _held_bar("HeldBoth", 2.5, FLOOR_TOP + 6.4, 0.2, RUBBER, 0.55),
+            # Kneeling height: the shins rest on the KneePad rather than the body
+            # standing with its feet through the floor, which is what a pose with no
+            # knee bend at a kneeling machine was doing.
+            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.35, 2.2)),
+            _held_bar("HeldBoth", 2.5, FLOOR_TOP + 6.4, 0.2, RUBBER, 0.55, grip_style="LevelBar"),
         ]),
         marker("TrainExit", [2, 2, 1], cf(4.0, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
-
 def ab_wheel_runway(pad_color, accent):
     """Kneeling rollout lane with a carried ab wheel."""
     out = [floor_mat(9, 14)]
+    # Rolling on the runway rather than half sunk through it: the runway tops out
+    # at 0.925 and the wheel's radius is 1.1, so its axle belongs at 2.025.
+    wheel_y = FLOOR_TOP + 2.025
     wheel = [
-        cylinder("Wheel", 0.8, 2.2, mul(cf(0, FLOOR_TOP + 1.5, -1.8), rot_y(90)),
+        cylinder("Wheel", 0.8, 2.2, mul(cf(0, wheel_y, -1.8), rot_y(90)),
                  RUBBER, "Rubber", CanCollide=False, CanTouch=False, CanQuery=False),
-        cylinder("Handle", 4.2, 0.35, cf(0, FLOOR_TOP + 1.5, -1.8), CHROME, "Metal",
+        cylinder("Handle", 4.2, 0.35, cf(0, wheel_y, -1.8), CHROME, "Metal",
                  CanCollide=False, CanTouch=False, CanQuery=False),
     ]
     out.extend([
         part("Base", [7.0, 0.65, 12.0], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
         part("Runway", [5.5, 0.25, 10.8], cf(0, FLOOR_TOP + 0.8, 0), pad_color, "Rubber"),
         part("Finish", [5.7, 0.2, 0.7], cf(0, FLOOR_TOP + 1.0, -4.5), accent, "Neon"),
+    ])
+
+    # A lane, not a strip of paint: side rails to roll between, distance ticks to
+    # roll toward, and a padded kneeling block at the near end to start from.
+    for side in (-1, 1):
+        out.append(tube("LaneRail", (side * 3.0, FLOOR_TOP + 1.05, -5.4),
+                        (side * 3.0, FLOOR_TOP + 1.05, 5.4), 0.4, STEEL_LIGHT))
+        for end in (-5.4, 5.4):
+            out.append(tube("RailPost", (side * 3.0, FLOOR_TOP + 0.65, end),
+                            (side * 3.0, FLOOR_TOP + 1.05, end), 0.42, STEEL))
+        out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, -5.4)))
+        out.append(foot_pad("Foot", cf(side * 2.9, FLOOR_TOP + 0.11, 5.4)))
+        for end in (-5.4, 5.4):
+            out.append(hardware("RailCap",
+                                mul(cf(side * 3.0, FLOOR_TOP + 1.05, end), rot_x(90)), 0.46))
+    for index, z in enumerate((-3.0, -1.5, 0.0, 1.5)):
+        out.append(part("DistanceTick", [4.6 - index * 0.3, 0.14, 0.22],
+                        cf(0, FLOOR_TOP + 0.95, z), STEEL_LIGHT, "SmoothPlastic",
+                        CanCollide=False))
+    out.extend(padded_slab("StartBlock", [4.6, 0.45, 2.2],
+                           cf(0, FLOOR_TOP + 1.05, 4.2), pad_color))
+
+    out.extend([
         group("Spot", [
-            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 2.2, 2.0)),
+            # Measured, not guessed: at FLOOR_TOP + 2.2 the kneeling shins finished
+            # 1.53 studs under the runway they are supposed to be kneeling on.
+            # Bracketed from there: the shins move stud for stud with this number,
+            # 3.33 sinking them 0.39 in and 3.53 leaving 0.19.
+            marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.72, 2.0)),
             group("HeldBoth", wheel),
         ]),
         marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
-
 def wood_chop_station(pad_color, accent):
     """Single cable tower with high-to-low diagonal handle path."""
     out = [floor_mat(11, 11)]
@@ -1024,45 +2026,133 @@ def wood_chop_station(pad_color, accent):
         part("Tower", [3.0, 10.0, 3.0], cf(-3.0, FLOOR_TOP + 5.0, -3.0), STEEL_LIGHT, "Metal"),
         part("DiagonalGuide", [0.5, 9.0, 0.5],
              mul(cf(-1.0, FLOOR_TOP + 5.4, -1.0), rot_z(-25)), accent, "Neon"),
+        # A pulley head on the tower, and the cable that actually holds the handle
+        # up. The diagonal guide is a painted path marker, not structure, so before
+        # this the handle hung on nothing.
+        _cable((-3.0, FLOOR_TOP + 9.6, -1.6), (0, FLOOR_TOP + 7.2, -0.8)),
+    ])
+    out.extend(pulley("Head", (-3.0, FLOOR_TOP + 9.6, -1.6), 1.6, accent,
+                      axis_length=0.9, mount=(-3.0, FLOOR_TOP + 9.6, -2.6)))
+    out.extend(stack_shroud("Tower", (-3.0, FLOOR_TOP + 10.0, -3.0), 3.3, 10.0, 3.0, accent))
+
+    # The mast is carried on braces now, and the painted guide runs between real
+    # posts instead of hanging in the air at one end.
+    for side in (-1, 1):
+        out.append(tube("TowerBrace", (-3.0 + side * 1.9, FLOOR_TOP + 0.7, -1.5),
+                        (-3.0 + side * 0.6, FLOOR_TOP + 4.4, -2.0), 0.3, STEEL))
+        out.append(hardware("TowerBolt",
+                            mul(cf(-3.0 + side * 1.55, FLOOR_TOP + 1.5, -3.0), rot_z(90))))
+        out.append(foot_pad("Foot", cf(-3.0 + side * 1.9, FLOOR_TOP + 0.11, -4.1)))
+        out.append(foot_pad("Foot", cf(-3.0 + side * 1.9, FLOOR_TOP + 0.11, -0.9)))
+    out.append(tube("GuidePost", (0.9, FLOOR_TOP + 0.12, -0.1),
+                    (0.9, FLOOR_TOP + 3.4, -0.1), 0.36, STEEL))
+    out.append(tube("GuideTop", (-2.6, FLOOR_TOP + 9.3, -0.6),
+                    (0.6, FLOOR_TOP + 7.6, -0.2), 0.3, STEEL_LIGHT))
+    out.append(part("StancePad", [4.4, 0.16, 4.4], cf(1.5, FLOOR_TOP + 0.14, 1.8),
+                    RUBBER, "Pebble", CanCollide=False))
+
+    out.extend([
         group("Spot", [
             anchor_standing(cf(1.5, FLOOR_TOP, 1.8)),
-            _held_bar("HeldBoth", 2.2, FLOOR_TOP + 7.2, -0.8, CHROME),
+            _held_bar("HeldBoth", 2.2, FLOOR_TOP + 7.2, -0.8, CHROME, grip_style="LevelBar"),
         ]),
         marker("TrainExit", [2, 2, 1], cf(4.8, FLOOR_TOP + ROOT_HEIGHT, 2.8)),
     ])
     return out
-
-
 def leg_extension(pad_color, accent):
     """Seated quad extension with a front ankle roller."""
     out = [floor_mat(10, 11)]
     out.extend([
         part("Base", [7.5, 0.65, 8.5], cf(0, FLOOR_TOP + 0.33, 0), STEEL, "DiamondPlate"),
-        part("Seat", [4.5, 0.7, 4.0], cf(0, FLOOR_TOP + 2.4, 1.8), pad_color, "Fabric"),
-        part("BackPad", [4.5, 5.5, 0.7], cf(0, FLOOR_TOP + 5.1, 3.4), pad_color, "Fabric"),
         cylinder("AnkleRoller", 5.5, 1.2, cf(0, FLOOR_TOP + 1.6, -2.2), RUBBER, "Pebble"),
         part("Pivot", [1.0, 4.0, 1.0], cf(0, FLOOR_TOP + 2.0, -0.5), accent, "Metal"),
+        part("WeightStack", [2.2, 6.0, 2.4],
+             cf(-3.3, FLOOR_TOP + 3.0, -2.8), STEEL_LIGHT, "Metal"),
+    ])
+
+    # The seat and back are what the lifter is actually touching, so they are the
+    # two surfaces worth spending a rolled edge on.
+    out.extend(padded_slab("Seat", [4.5, 0.7, 4.0],
+                           cf(0, FLOOR_TOP + 2.4, 1.8), pad_color, caps=True))
+    out.extend(padded_slab("BackPad", [4.5, 5.5, 0.7],
+                           cf(0, FLOOR_TOP + 5.1, 3.4), pad_color))
+
+    # Tubular frame. The seat used to float over its base with nothing carrying it.
+    for side in (-1, 1):
+        out.append(tube("SeatPost", (side * 1.8, FLOOR_TOP + 0.65, 1.8),
+                        (side * 1.8, FLOOR_TOP + 2.1, 1.8), 0.34, STEEL_LIGHT))
+        out.append(tube("BackPost", (side * 2.0, FLOOR_TOP + 0.65, 3.8),
+                        (side * 2.0, FLOOR_TOP + 7.4, 3.8), 0.38, STEEL))
+        out.append(tube("RollerArm", (side * 0.45, FLOOR_TOP + 3.6, -0.5),
+                        (side * 0.45, FLOOR_TOP + 1.6, -2.2), 0.3, STEEL_LIGHT))
+        out.append(hardware("PivotBolt",
+                            mul(cf(side * 0.5, FLOOR_TOP + 3.6, -0.5), rot_z(90)), 0.4))
+        out.append(cylinder("RollerCap", 0.2, 1.25,
+                            cf(side * 2.75, FLOOR_TOP + 1.6, -2.2), accent, "Metal"))
+    out.append(tube("BackBrace", (-2.0, FLOOR_TOP + 7.4, 3.8),
+                    (2.0, FLOOR_TOP + 7.4, 3.8), 0.34, STEEL))
+
+    # The stack now pulls on something: over the wheel, down to the lifting arm.
+    out.extend(pulley("Lift", (-3.3, FLOOR_TOP + 7.0, -2.8), 1.1, accent,
+                      mount=(-3.3, FLOOR_TOP + 6.3, -2.8)))
+    out.extend(cable_run([(-3.3, FLOOR_TOP + 6.05, -2.8),
+                          (-3.3, FLOOR_TOP + 7.0, -2.8),
+                          (-0.5, FLOOR_TOP + 3.7, -0.5)]))
+    out.extend(stack_shroud("Stack", (-3.3, FLOOR_TOP + 6.0, -2.8), 2.5, 6.0, 2.4, accent))
+
+    for fx in (-3.4, 3.4):
+        for fz in (-3.9, 3.9):
+            out.append(foot_pad("Foot", cf(fx, FLOOR_TOP + 0.11, fz)))
+
+    out.extend([
         marker("TrainAnchor", [2, 2, 1], cf(0, FLOOR_TOP + 3.5, 1.8)),
         marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.6)),
     ])
     return out
 
-
 def hamstring_curl(pad_color, accent):
     """Prone leg-curl bench with heel roller and selector stack."""
     out = [floor_mat(10, 13)]
     out.extend([
-        part("Base", [4.8, 0.7, 10.0], cf(0, FLOOR_TOP + 1.7, 0), pad_color, "Fabric"),
         part("Frame", [1.0, 1.5, 11.0], cf(0, FLOOR_TOP + 0.8, 0), STEEL, "DiamondPlate"),
         part("WeightStack", [3.5, 6.0, 2.5], cf(0, FLOOR_TOP + 3.0, -5.0), STEEL_LIGHT, "Metal"),
         cylinder("HeelRoller", 6.0, 1.25, cf(0, FLOOR_TOP + 2.8, 4.2), RUBBER, "Pebble"),
         part("StackStripe", [3.7, 0.4, 2.7], cf(0, FLOOR_TOP + 5.5, -5.0), accent, "Neon"),
-        marker("TrainAnchor", [2, 2, 1],
-               axes((0, FLOOR_TOP + 2.9, 0), (-1, 0, 0), (0, 0, -1))),
+    ])
+
+    # The bench the lifter lies face-down on: the anchor sits at 2.9, so the pad
+    # surface it rests against must stay exactly where it was.
+    out.extend(padded_slab("Base", [4.8, 0.7, 10.0],
+                           cf(0, FLOOR_TOP + 1.7, 0), pad_color, caps=True))
+
+    for side in (-1, 1):
+        out.append(tube("Leg", (side * 0.0, FLOOR_TOP + 0.06, side * 4.6),
+                        (side * 0.0, FLOOR_TOP + 1.4, side * 4.6), 0.5, STEEL))
+        out.append(tube("RollerArm", (side * 0.4, FLOOR_TOP + 1.5, 3.0),
+                        (side * 0.4, FLOOR_TOP + 2.8, 4.2), 0.3, STEEL_LIGHT))
+        out.append(cylinder("RollerCap", 0.2, 1.3,
+                            cf(side * 3.0, FLOOR_TOP + 2.8, 4.2), accent, "Metal"))
+        out.append(tube("ChestRail", (side * 1.9, FLOOR_TOP + 2.1, 2.6),
+                        (side * 1.9, FLOOR_TOP + 2.1, 4.0), 0.28, CHROME))
+        out.append(hardware("FrameBolt",
+                            mul(cf(side * 0.55, FLOOR_TOP + 1.5, 2.4), rot_z(90))))
+
+    out.extend(pulley("Lift", (0, FLOOR_TOP + 6.6, -5.0), 1.0, accent,
+                      mount=(0, FLOOR_TOP + 6.0, -5.0)))
+    out.extend(cable_run([(0, FLOOR_TOP + 6.05, -5.0),
+                          (0, FLOOR_TOP + 6.6, -5.0),
+                          (0, FLOOR_TOP + 2.1, -1.0),
+                          (0.4, FLOOR_TOP + 2.6, 3.0)]))
+    out.extend(stack_shroud("Stack", (0, FLOOR_TOP + 6.0, -5.0), 3.8, 6.0, 2.5, accent))
+
+    for fz in (-5.2, 5.2):
+        out.append(foot_pad("Foot", cf(0, FLOOR_TOP + 0.11, fz), (1.6, 0.22, 1.0)))
+
+    out.extend([
+        anchor_prone((0, FLOOR_TOP + 2.9, 0)),
         marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 2.5)),
     ])
     return out
-
 
 def calf_raise(pad_color, accent):
     """Standing calf block with shoulder pads and safety rails."""
@@ -1071,25 +2161,107 @@ def calf_raise(pad_color, accent):
         part("Base", [8.0, 0.7, 7.5], cf(0, FLOOR_TOP + 0.35, 0), STEEL, "DiamondPlate"),
         part("ToeBlock", [6.0, 0.8, 2.5], cf(0, FLOOR_TOP + 1.1, 1.5), pad_color, "Rubber"),
         part("Frame", [7.5, 9.0, 0.8], cf(0, FLOOR_TOP + 4.5, -3.0), STEEL, "Metal"),
-        part("ShoulderPads", [5.5, 0.8, 2.0], cf(0, FLOOR_TOP + 6.2, -0.2), pad_color, "Fabric"),
+        # A yoke, not a bar. One 5.5-wide pad across the middle at head height put the
+        # avatar's head 0.61 studs inside it at the top of the raise -- measured. A real
+        # calf-raise yoke is two pads that sit on the shoulders either side of the neck,
+        # which is also the shape that leaves the head somewhere to be.
         part("TopStripe", [7.7, 0.4, 1.0], cf(0, FLOOR_TOP + 8.7, -3.0), accent, "Neon"),
+        part("WeightStack", [2.2, 6.5, 2.4],
+             cf(-3.0, FLOOR_TOP + 3.25, -2.2), STEEL_LIGHT, "Metal"),
+    ])
+
+    for side in (-1, 1):
+        out.extend(padded_slab("ShoulderPads", [2.0, 0.8, 2.0],
+                               cf(side * 1.9, FLOOR_TOP + 4.9, -0.2), pad_color))
+        # The yoke the pads hang from, and the rails the lifter steadies against.
+        out.append(tube("YokeArm", (side * 1.9, FLOOR_TOP + 4.9, -0.2),
+                        (side * 1.9, FLOOR_TOP + 4.9, -2.6), 0.34, STEEL_LIGHT))
+        out.append(tube("YokePost", (side * 1.9, FLOOR_TOP + 4.55, -2.6),
+                        (side * 1.9, FLOOR_TOP + 7.6, -2.6), 0.36, STEEL_LIGHT))
+        out.append(tube("GuideRail", (side * 3.4, FLOOR_TOP + 0.7, -2.6),
+                        (side * 3.4, FLOOR_TOP + 8.4, -2.6), 0.4, CHROME,
+                        Reflectance=0.3))
+        out.append(tube("HandRail", (side * 2.6, FLOOR_TOP + 5.4, 0.6),
+                        (side * 3.4, FLOOR_TOP + 5.4, -1.4), 0.3, CHROME,
+                        Reflectance=0.3))
+        out.append(hardware("YokeBolt",
+                            mul(cf(side * 1.9, FLOOR_TOP + 4.9, -2.78), rot_x(90))))
+        out.append(foot_pad("Foot", cf(side * 3.5, FLOOR_TOP + 0.11, -3.2)))
+        out.append(foot_pad("Foot", cf(side * 3.5, FLOOR_TOP + 0.11, 3.2)))
+
+    # Toe block edge: the one part of this machine the player's feet overhang.
+    out.append(cylinder("ToeEdge", 6.0, 0.5,
+                        mul(cf(0, FLOOR_TOP + 1.25, 2.75), rot_y(90)),
+                        accent, "Rubber"))
+    out.extend(pulley("Lift", (-3.0, FLOOR_TOP + 7.2, -2.2), 1.0, accent,
+                      mount=(-3.0, FLOOR_TOP + 6.6, -2.2)))
+    out.extend(cable_run([(-3.0, FLOOR_TOP + 6.55, -2.2),
+                          (-3.0, FLOOR_TOP + 7.2, -2.2),
+                          (-1.9, FLOOR_TOP + 7.6, -2.6)]))
+    out.extend(stack_shroud("Stack", (-3.0, FLOOR_TOP + 6.5, -2.2), 2.5, 6.5, 2.4, accent))
+
+    out.extend([
         anchor_standing(cf(0, FLOOR_TOP + 0.8, 0.3)),
         marker("TrainExit", [2, 2, 1], cf(4.3, FLOOR_TOP + ROOT_HEIGHT, 2.8)),
     ])
     return out
-
 
 def stair_climber(pad_color, accent):
     """Compact rotating stair machine with hand rails and console."""
     out = [floor_mat(10, 12)]
     out.extend([
         part("Base", [7.0, 0.7, 10.0], cf(0, FLOOR_TOP + 0.35, 0), STEEL, "DiamondPlate"),
-        part("StepLow", [5.5, 0.8, 2.2], cf(0, FLOOR_TOP + 1.2, 3.0), pad_color, "Rubber"),
-        part("StepMid", [5.5, 1.5, 2.2], cf(0, FLOOR_TOP + 1.8, 0.8), pad_color, "Rubber"),
-        part("StepHigh", [5.5, 2.2, 2.2], cf(0, FLOOR_TOP + 2.5, -1.4), pad_color, "Rubber"),
-        part("Console", [5.0, 4.0, 1.0], cf(0, FLOOR_TOP + 6.0, -4.0), STEEL_LIGHT, "Metal"),
-        part("Readout", [4.2, 1.8, 0.2], cf(0, FLOOR_TOP + 6.6, -3.4), accent, "Neon"),
+        # Pedals, not a staircase. Three solid blocks up to 2.2 tall stood exactly where
+        # the climbing stride swings its shins through -- measured 0.75 studs of shin
+        # inside StepHigh -- because a static staircase has no way to get out of the way
+        # of a leg. A stair machine has two thin pedals that rise and fall, and thin is
+        # the part that matters here: the feet land at 2.21 and 2.95 above the mat in
+        # this pose, so the pedals go there and the shins pass over nothing.
+        part("PedalLow", [5.5, 0.35, 2.6], cf(0, FLOOR_TOP + 2.21, 1.2), pad_color, "Rubber"),
+        part("PedalHigh", [5.5, 0.35, 2.6], cf(0, FLOOR_TOP + 2.95, -1.4), pad_color, "Rubber"),
+        part("PedalArmLow", [0.4, 0.4, 4.0], cf(-2.4, FLOOR_TOP + 2.0, 0.4), STEEL, "Metal"),
+        part("PedalArmHigh", [0.4, 0.4, 4.0], cf(2.4, FLOOR_TOP + 2.74, -0.2), STEEL, "Metal"),
         cylinder("Handlebar", 6.0, 0.45, cf(0, FLOOR_TOP + 5.0, -2.8), CHROME),
+    ])
+
+    # A console with a bezel and a screen that throws light, in place of the flat
+    # Neon slab that used to stand in for one.
+    out.append(part("Console", [5.0, 4.0, 1.0], cf(0, FLOOR_TOP + 6.0, -4.0),
+                    STEEL_LIGHT, "Metal"))
+    out.extend(console("Readout", mul(cf(0, FLOOR_TOP + 6.6, -3.45), rot_x(-8)),
+                       accent, size=(4.2, 1.8, 0.25)))
+
+    # The mast the console and rails are carried on, and the drive housing the
+    # pedal arms disappear into at the back.
+    for side in (-1, 1):
+        out.append(tube("Mast", (side * 2.2, FLOOR_TOP + 0.7, -3.6),
+                        (side * 2.2, FLOOR_TOP + 6.2, -3.6), 0.45, STEEL))
+        out.append(tube("SideRail", (side * 2.6, FLOOR_TOP + 5.0, -2.8),
+                        (side * 2.6, FLOOR_TOP + 5.0, 1.2), 0.4, CHROME,
+                        Reflectance=0.3))
+        out.append(tube("RailDrop", (side * 2.6, FLOOR_TOP + 5.0, 1.2),
+                        (side * 2.6, FLOOR_TOP + 3.4, 2.0), 0.36, CHROME,
+                        Reflectance=0.3))
+        out.append(cylinder("PedalPivot", 0.6, 0.7,
+                            cf(side * 2.4, FLOOR_TOP + 2.4, -2.2), accent, "Metal"))
+        out.append(hardware("MastBolt",
+                            mul(cf(side * 2.2, FLOOR_TOP + 0.95, -3.35), rot_x(90)), 0.36))
+        out.append(foot_pad("Foot", cf(side * 3.0, FLOOR_TOP + 0.11, -4.4)))
+        out.append(foot_pad("Foot", cf(side * 3.0, FLOOR_TOP + 0.11, 4.4)))
+
+    out.append(part("DriveHousing", [6.4, 2.4, 2.2],
+                    cf(0, FLOOR_TOP + 1.9, -3.6), STEEL, "DiamondPlate"))
+    out.append(part("DriveVent", [5.2, 0.25, 0.14],
+                    cf(0, FLOOR_TOP + 2.5, -2.48), accent, "Neon", CanCollide=False))
+    for side in (-1, 1):
+        out.append(cylinder("PedalTread", 0.12, 0.4,
+                            mul(cf(side * 1.6, FLOOR_TOP + 2.4, 1.2), rot_z(90)),
+                            RUBBER, "Rubber", CanCollide=False))
+        out.append(cylinder("PedalTread", 0.12, 0.4,
+                            mul(cf(side * 1.6, FLOOR_TOP + 3.14, -1.4), rot_z(90)),
+                            RUBBER, "Rubber", CanCollide=False))
+
+    out.extend([
         anchor_standing(cf(0, FLOOR_TOP + 2.1, 0.0)),
         marker("TrainExit", [2, 2, 1], cf(4.2, FLOOR_TOP + ROOT_HEIGHT, 3.0)),
     ])
@@ -1125,7 +2297,7 @@ BUILDERS = {
     "CableCrunch": cable_crunch,
     "AbWheel": ab_wheel_runway,
     "WoodChop": wood_chop_station,
-    "Treadmill": treadmill,
+    "GobletSquat": goblet_squat,
     "SquatRack": squat_rack,
     "LegPress": leg_press,
     "LegExtension": leg_extension,
@@ -1133,8 +2305,6 @@ BUILDERS = {
     "CalfRaise": calf_raise,
     "StairClimber": stair_climber,
 }
-
-
 
 
 # --------------------------------------------------------------------------
@@ -1295,33 +2465,7 @@ DISTRICTS = [
     },
 ]
 
-# The city island everything starts on. Big enough to hold a street grid, the
-# first two gyms and a plaza with room to stand around in.
-DOWNTOWN_HALF = 330
-# The connected-city starter campus fills its central block. All five x1 training
-# venues sit on this pavement, while a smaller square barrier protects the actual
-# spawn point in the middle. Keeping the machines outside that barrier preserves
-# the game's core risk: somebody can still knock a trainee off a starter machine.
-PLAZA_RADIUS = 90
 SAFE_ZONE_HALF = 34
-# Bearing of the causeway out to the Docks. Due east so it runs straight off
-# the end of the east avenue — a bridge you have to go looking for is not a
-# bridge anyone walks.
-CAUSEWAY_BEARING = 90
-
-
-def district_origin(row):
-    """Where a district sits, as a CFrame.
-
-    Districts face back toward Downtown by default, so a player arriving on the
-    spawn pad is looking into the gym. A `facing` key overrides that for the two
-    that stand on Downtown's own street grid.
-    """
-    angle = math.radians(row["bearing"])
-    x = math.sin(angle) * row["radius"]
-    z = math.cos(angle) * row["radius"]
-    facing = row.get("facing", row["bearing"] + 180)
-    return mul(cf(x, row["altitude"], z), rot_y(facing))
 
 
 def disc(name, thickness, diameter, y, color, material, **props):
@@ -1331,661 +2475,284 @@ def disc(name, thickness, diameter, y, color, material, **props):
                     mul(cf(0, y, 0), rot_z(90)), color, material, **props)
 
 
-def underside(row, rng, round_shape):
-    """Tapering rock beneath a deck.
-
-    Islands float. Seen from below — which is most of the time once flight
-    unlocks — a bare slab reads as a placeholder, so each island gets a stack
-    of shrinking, jittered rock beneath it. Non-colliding and shadowless: it is
-    scenery, and a flier who clips it should pass through rather than snag.
-    """
-    out = []
-    half = row["half"]
-    y = FLOOR_TOP - 4
-    width = half * 2
-
-    for index in range(6):
-        width *= 0.79
-        depth = 7 + index * 4
-        y -= depth * 0.5
-        shade = [c * (1.0 - index * 0.1) for c in row["rock"]]
-        if round_shape:
-            out.append(disc("Rock", depth, width, y, shade, row["rock_material"],
-                            CanCollide=False, CastShadow=False))
-        else:
-            out.append(part("Rock", [width, depth, width],
-                            mul(cf(0, y, 0), rot_y(rng.uniform(-16, 16))),
-                            shade, row["rock_material"],
-                            CanCollide=False, CastShadow=False))
-        y -= depth * 0.5
-
-    # A spike at the bottom so the taper ends in a point rather than a stub.
-    out.append(part("RockTip", [width * 0.55, 34, width * 0.55],
-                    mul(cf(0, y - 14, 0), rot_y(rng.uniform(-20, 20))),
-                    [c * 0.4 for c in row["rock"]], row["rock_material"],
-                    CanCollide=False, CastShadow=False))
-    return out
-
-
-def spawn_pad(row):
-    """The pad travel drops arrivals onto, on the Downtown-facing edge.
-
-    A flat box, not a disc. TravelService lands a player at the pad's CFrame
-    raised by half its height, so the pad's orientation becomes the player's:
-    a disc is a cylinder turned on its end, and arriving on one would lay you
-    on your side. Unrotated in local space, its LookVector points at the middle
-    of the island, so you arrive facing the gym rather than the drop.
-    """
-    size = row.get("pad_size", 30)
-    at = row.get("pad_at", row["half"] * 0.74)
-    pad = part("SpawnPad", [size, 1, size], cf(0, FLOOR_TOP + 0.5, at),
-               row["accent"], "Neon")
-    return tagged(pad, tags=["ZoneSpawn"], attributes={"ZoneId": row["zone"]})
-
-
 def beacon(row, x, z, height):
     """A lit pylon. Islands are far apart and mostly seen against sky, so each
     one needs something that carries its colour at distance."""
     out = []
     out.append(part("Pylon", [4.5, height, 4.5],
                     cf(x, FLOOR_TOP + height / 2, z), STEEL, "DiamondPlate"))
-    light = part("Beacon", [6, 3, 6], cf(x, FLOOR_TOP + height + 1.5, z),
-                 row["accent"], "Neon", CanCollide=False)
-    light["children"] = [{
-        "name": "Glow",
-        "className": "PointLight",
-        "properties": {"Brightness": 3, "Range": 70, "Color": row["accent"]},
-    }]
-    out.append(light)
+    # A painted cap, not a lamp. These stand either side of the approach to a gym
+    # now, and a brightness-3 point light with a 70-stud range at head height washed
+    # out the entrance it was supposed to mark. The colour still identifies the
+    # district; the glow was part of the "random lightning" look.
+    out.append(part("Beacon", [6, 3, 6], cf(x, FLOOR_TOP + height + 1.5, z),
+                    row["accent"], "SmoothPlastic", CanCollide=False))
     return out
+
+
+def volume(zone_id, name, size, frame):
+    """One invisible box token accrual and machine tiering test against.
+
+    Must be a genuine volume the standing HumanoidRootPart ends up inside — see
+    the warning in ZoneConfig. Tall enough to cover a district's whole playable
+    height.
+    """
+    return tagged({
+        "name": name,
+        "className": "Part",
+        "properties": {
+            "Anchored": True,
+            "Locked": True,
+            "CanCollide": False,
+            "Transparency": 1,
+            "CastShadow": False,
+            "Size": [round(v, 3) for v in size],
+            "CFrame": serialise_cf(frame),
+            "Material": "SmoothPlastic",
+        },
+    }, tags=["GymZone"], attributes={"ZoneId": zone_id})
 
 
 # --------------------------------------------------------------------------
-# Island silhouettes. Each returns local-space children; the caller places
-# them. A new silhouette is a function plus a SHAPES entry.
+# Machine layouts. Where stat-specific training venues stand in a district, as
+# CFrames in its local space. Random layouts are seeded by zone id: authored
+# variety survives a rebuild instead of becoming a moving target in source control.
 # --------------------------------------------------------------------------
 
-
-def island_slab(row, rng):
-    """A rectangular deck with a kerb — quays, rooftops, stations."""
-    half = row["half"]
-    size = half * 2
-    out = [part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2, 0),
-                row["ground"], row["ground_material"])]
-    out.append(part("DeckTrim", [size + 5, 1.4, size + 5], cf(0, FLOOR_TOP - 4.5, 0),
-                    [c * 0.5 for c in row["accent"]], "Metal"))
-
-    # A kerb runs ALONG the edge it sits on, so the long axis is the one the
-    # offset is *not* on. #67's platform() had these two swapped, which put a
-    # full-width bar at x = half and left it sticking a whole island's width out
-    # into the void — invisible from inside, obvious from the air.
-    for sx, sz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        out.append(part("Kerb",
-                        [4 if sx != 0 else size + 4, 2.6, 4 if sz != 0 else size + 4],
-                        cf(sx * (half + 2), FLOOR_TOP + 1.3, sz * (half + 2)),
-                        [c * 0.6 for c in row["accent"]], "Metal"))
-
-    for sx in (-1, 1):
-        for sz in (-1, 1):
-            out.extend(beacon(row, sx * (half - 6), sz * (half - 6), 26))
-
-    out.extend(underside(row, rng, False))
-    return out
-
-
-def island_round(row, rng):
-    """A disc island with a stone rim — beaches and peaks."""
-    half = row["half"]
-    out = [disc("Deck", 4, half * 2, FLOOR_TOP - 2,
-           row["ground"], row["ground_material"])]
-    out.append(disc("DeckTrim", 1.6, half * 2 + 8, FLOOR_TOP - 4.6,
-                    [c * 0.5 for c in row["accent"]], "Metal"))
-
-    # A ring of boulders instead of a kerb: on a natural island a machined edge
-    # is the thing that gives it away.
-    for index in range(14):
-        angle = 360.0 * index / 14 + rng.uniform(-6, 6)
-        size = rng.uniform(7, 13)
-        out.append(part("Boulder", [size, size * 0.8, size],
-                        mul(mul(rot_y(angle), cf(0, FLOOR_TOP + size * 0.2, half - 3)),
-                            rot_y(rng.uniform(0, 90))),
-                        [c * rng.uniform(0.8, 1.1) for c in row["rock"]],
-                        row["rock_material"]))
-
-    for angle in (35, 145, 215, 325):
-        spot = mul(rot_y(angle), cf(0, 0, half - 20))
-        out.extend(beacon(row, spot[0][0], spot[0][2], 24))
-
-    out.extend(underside(row, rng, True))
-    return out
-
-
-def island_mesa(row, rng):
-    """A flat top on stepped stone shoulders — quarries and plateaus."""
-    half = row["half"]
-    size = half * 2
-    out = [part("Deck", [size, 4, size], cf(0, FLOOR_TOP - 2, 0),
-                row["ground"], row["ground_material"])]
-
-    # Shoulders step outward and down, so the top plate overhangs slightly.
-    for index in range(3):
-        width = size + 10 + index * 16
-        out.append(part("Shoulder", [width, 9, width],
-                        mul(cf(0, FLOOR_TOP - 6 - index * 9, 0),
-                            rot_y(rng.uniform(-8, 8))),
-                        [c * (0.95 - index * 0.12) for c in row["rock"]],
-                        row["rock_material"]))
-
-    # Cut walls at the back edge, the quarry face.
-    for index in range(4):
-        out.append(part("Face", [rng.uniform(24, 44), rng.uniform(14, 30), 12],
-                        cf(rng.uniform(-half * 0.7, half * 0.7), FLOOR_TOP + 8,
-                           -half + rng.uniform(2, 10)),
-                        [c * rng.uniform(0.85, 1.05) for c in row["rock"]],
-                        row["rock_material"]))
-
-    for sx in (-1, 1):
-        out.extend(beacon(row, sx * (half - 8), half - 8, 22))
-
-    out.extend(underside(row, rng, False))
-    return out
-
-
-def island_crag(row, rng):
-    """A deck ringed by jagged spurs — storm peaks and volcanic rock."""
-    half = row["half"]
-    out = [disc("Deck", 4, half * 2, FLOOR_TOP - 2,
-           row["ground"], row["ground_material"])]
-
-    for index in range(9):
-        angle = 360.0 * index / 9 + rng.uniform(-10, 10)
-        height = rng.uniform(26, 62)
-        width = rng.uniform(14, 26)
-        spur = mul(rot_y(angle), cf(0, FLOOR_TOP + height / 2 - 4, half - rng.uniform(4, 16)))
-        out.append(part("Spur", [width, height, width],
-                        mul(mul(spur, rot_y(rng.uniform(0, 90))),
-                            rot_x(rng.uniform(-9, 9))),
-                        [c * rng.uniform(0.8, 1.15) for c in row["rock"]],
-                        row["rock_material"]))
-
-    for angle in (0, 180):
-        spot = mul(rot_y(angle), cf(0, 0, half - 26))
-        out.extend(beacon(row, spot[0][0], spot[0][2], 28))
-
-    out.extend(underside(row, rng, True))
-    return out
-
-
-def island_lot(row, _rng):
-    """No island at all — a district that stands on Downtown's ground.
-
-    Garage Gym and Iron Hall are city blocks, not islands, so they get a floor
-    slab and a kerb and nothing underneath. #69 puts buildings on top of them.
-    """
-    half = row["half"]
-    size = half * 2
-    out = [part("Lot", [size, 1.2, size], cf(0, FLOOR_TOP - 0.6, 0),
-                row["ground"], row["ground_material"])]
-    out.append(part("LotTrim", [size + 4, 0.5, size + 4], cf(0, FLOOR_TOP - 1.4, 0),
-                    [c * 0.5 for c in row["accent"]], "Metal"))
-
-    for sx in (-1, 1):
-        out.extend(beacon(row, sx * (half - 6), half - 6, 18))
-
-    return out
-
-
-def island_plaza(row, _rng):
-    """No ground of its own — Downtown already paved this.
-
-    Garage Gym rings the spawn plaza, so all it needs is an apron marking where
-    the gym is and posts to give the ring an edge. Anything more would be a
-    second floor laid on top of the first.
-    """
-    spots = machine_spots(row)
-    radius = max(math.hypot(spot[0][0], spot[0][2]) for spot in spots)
-    # Poured concrete, lighter than the asphalt around it. The machines are steel
-    # and rubber; on a dark pad they disappear into it from any distance.
-    out = [disc("Apron", 0.3, (radius + 24) * 2, FLOOR_TOP + 0.15,
-                [0.46, 0.46, 0.47], "Concrete", CanCollide=False)]
-    out.append(disc("ApronEdge", 0.35, (radius + 26) * 2, FLOOR_TOP + 0.1,
-                    [c * 0.5 for c in row["accent"]], "Neon", CanCollide=False))
-
-    # A painted bay under each machine — the cheapest thing that turns a slab into
-    # a floor somebody planned. The bay reads the actual generated spot so the
-    # deliberately uneven layout cannot drift away from its floor markings.
-    for spot in spots:
-        out.append(part("Bay", [26, 0.2, 26],
-                        ((spot[0][0], FLOOR_TOP + 0.3, spot[0][2]), spot[1]),
-                        [0.30, 0.30, 0.32], "Concrete", CanCollide=False))
-        out.append(part("BayLine", [26, 0.25, 1.2],
-                        ((spot[0][0], FLOOR_TOP + 0.35, spot[0][2]), spot[1]),
-                        [c * 0.7 for c in row["accent"]], "Neon", CanCollide=False))
-
-    # Posts between the machines rather than behind them, so they read as the
-    # gym's corners instead of as clutter.
-    # Five uneven edge posts preserve the open-gym silhouette without visually
-    # snapping the venues back onto a perfect ring.
-    rng = random.Random(f"{row['zone']}:posts")
-    for index in range(MACHINE_COUNT):
-        angle = 360.0 * index / MACHINE_COUNT + rng.uniform(-22, 22)
-        spot = mul(rot_y(angle), cf(0, 0, radius + rng.uniform(13, 18)))
-        out.append(part("GymPost", [3, 15, 3],
-                        cf(spot[0][0], FLOOR_TOP + 7.5, spot[0][2]),
-                        [0.17, 0.17, 0.19], "Metal"))
-        out.append(part("GymPostLamp", [4.4, 1.6, 4.4],
-                        cf(spot[0][0], FLOOR_TOP + 15.8, spot[0][2]),
-                        row["accent"], "Neon", CanCollide=False))
-    return out
-
-
-SHAPES = {
-    "plaza": island_plaza,
-    "slab": island_slab,
-    "round": island_round,
-    "mesa": island_mesa,
-    "crag": island_crag,
-    "lot": island_lot,
+FAMILY_ORDER = ["Chest", "Arms", "Back", "Core", "Legs"]
+STAT_VARIANTS = {
+    "Chest": ("BenchPress", "InclinePress", "PecDeck", "PushUps",
+              "CableCrossover", "ChestDip", "DeclinePress"),
+    "Arms": ("Dumbbells", "BarbellCurl", "TricepsPushdown", "HammerCurl",
+             "PreacherCurl", "SkullCrusher", "BattleRopes"),
+    "Back": ("PullUpBar", "SeatedRow", "LatPulldown", "Deadlift",
+             "TBarRow", "BackExtension", "RopeClimb"),
+    "Core": ("SitUpBench", "KneeRaise", "TorsoTwist", "Plank",
+             "CableCrunch", "AbWheel", "WoodChop"),
+    "Legs": ("GobletSquat", "SquatRack", "LegPress", "LegExtension",
+             "HamstringCurl", "CalfRaise", "StairClimber"),
+}
+EQUIPMENT_FAMILY = {
+    equipment_id: family
+    for family, variants in STAT_VARIANTS.items()
+    for equipment_id in variants
 }
 
 
-# --------------------------------------------------------------------------
-# Props. What makes a district a docks rather than a grey rectangle.
+# The colour that says which muscle a machine trains, before its label streams in.
 #
-# Every set is one function returning local-space children, registered in
-# PROPS and named by a district row. Adding a theme is a function and a key;
-# no district code changes, and no other theme is touched.
+# It used to be architecture: an Arms cage, a Chest bay, a Back tower, a Core court,
+# a Legs lane, each up to eighteen studs tall around the machine. Outdoors on a bare
+# island that read as a landmark. Indoors, in a lit hall, it read as a pile of dark
+# slabs — the canopy shaded the very machine you were walking to, and the pad beneath
+# it was the same near-black as the floor, so the training area you were meant to
+# stand on was invisible and the thing standing over it was all you could see.
 #
-# All of them keep clear of the machines: `ring` districts leave the middle
-# free and props go to the rim, `rows` districts fill the middle so props stay
-# outside RIM. The generator checks this rather than trusting it.
-# --------------------------------------------------------------------------
+# So the venue is now a floor pad and nothing else: a pale rubber mat, ringed in the
+# muscle's colour. It contrasts against the floor, it names the muscle at a glance
+# from any angle, and it does not stand between you and the machine.
+FAMILY_COLORS = {
+    "Chest": [1.00, 0.65, 0.15],
+    "Arms": [0.94, 0.33, 0.31],
+    "Back": [0.40, 0.73, 0.42],
+    "Core": [0.26, 0.65, 0.96],
+    "Legs": [0.67, 0.28, 0.74],
+}
+STAT_COLORS = {
+    equipment_id: FAMILY_COLORS[family]
+    for equipment_id, family in EQUIPMENT_FAMILY.items()
+}
+STAT_COLORS.update(FAMILY_COLORS)
 
-# Fraction of an island's half-size that props must stay beyond, on a district
-# whose machines are laid out in rows across the middle.
-RIM = 0.76
+# The mat surface itself, light enough to read against a dark gym floor.
+VENUE_PAD_COLOR = [0.58, 0.58, 0.60]
+
+# How far the mat stands proud of the floor it is laid on. Every machine builder
+# places its geometry against FLOOR_TOP, so a machine dropped straight onto a bay
+# origin sinks by exactly this much: its own rubber mat vanishes inside the pad and
+# the bottom of every leg, base ring and post goes with it. Machines are raised by it
+# at placement time rather than each of the 35 builders being taught about the pad.
+VENUE_PAD_RISE = 0.22
 
 
-# Every district's spawn pad sits on local +Z. Props ringing the rim skip this
-# arc around it, which stops travel dropping arrivals inside a shipping
-# container and leaves them a clear walk onto the island.
-SPAWN_ARC = 28
+def training_venue(equipment_id, district_accent):
+    """The floor a machine stands on, in its muscle's colour. Two parts, no walls.
 
-
-def rim_spots(count, radius, rng, jitter=0.0):
-    """Evenly spaced points on a circle, each yawed to face the middle.
-
-    The half-step offset means an even count never puts a prop exactly on the
-    spawn pad's bearing, and anything that still lands in the arc is dropped —
-    so a set occasionally returns one fewer point than asked for.
+    The border is a slightly larger plate underneath rather than four separate
+    strips: one part instead of four, and nothing to misalign at the corners.
     """
-    out = []
-    for index in range(count):
-        angle = 360.0 * index / count + 180.0 / count + rng.uniform(-jitter, jitter)
-        if abs((angle + 180) % 360 - 180) < SPAWN_ARC:
-            continue
-        spot = mul(rot_y(angle), cf(0, 0, radius))
-        out.append((spot[0][0], spot[0][2], angle + 180))
-    return out
-
-
-def props_docks(row, rng):
-    """Stacked containers, a gantry crane and bollards. An industrial quay."""
-    half = row["half"]
-    out = []
-    colours = [[0.62, 0.24, 0.18], [0.20, 0.36, 0.50], [0.55, 0.48, 0.16],
-               [0.24, 0.42, 0.28], [0.45, 0.45, 0.47]]
-
-    # Right out at the quay edge: a container is 26 studs deep radially, and a
-    # `rows` layout puts machines within 0.6 of the half-size.
-    for x, z, yaw in rim_spots(9, half * 0.9, rng, 6):
-        stack = rng.randint(1, 3)
-        for level in range(stack):
-            frame = mul(mul(cf(x, FLOOR_TOP + 6.5 + level * 12.4, z), rot_y(yaw)),
-                        rot_y(rng.uniform(-4, 4)))
-            out.append(part("Container", [12, 12, 26], frame,
-                            rng.choice(colours), "CorrodedMetal"))
-            out.append(part("ContainerRib", [12.4, 12.4, 1.0],
-                            mul(frame, cf(0, 0, 8)), [0.14, 0.14, 0.15], "Metal",
-                            CanCollide=False))
-
-    # A gantry straddling one edge: legs, beam, trolley.
-    gx, gz = 0, -half * RIM
-    for side in (-1, 1):
-        out.append(part("CraneLeg", [4, 62, 4], cf(gx + side * 26, FLOOR_TOP + 31, gz),
-                        [0.55, 0.36, 0.14], "CorrodedMetal"))
-    out.append(part("CraneBeam", [64, 5, 5], cf(gx, FLOOR_TOP + 64, gz),
-                    [0.55, 0.36, 0.14], "CorrodedMetal"))
-    out.append(part("CraneTrolley", [9, 6, 8], cf(gx + 14, FLOOR_TOP + 58, gz),
-                    [0.20, 0.21, 0.24], "Metal"))
-    out.append(part("CraneCable", [0.6, 22, 0.6], cf(gx + 14, FLOOR_TOP + 44, gz),
-                    [0.10, 0.10, 0.11], "Metal", CanCollide=False))
-    out.append(part("CraneHook", [4, 3, 4], cf(gx + 14, FLOOR_TOP + 32, gz),
-                    [0.30, 0.30, 0.32], "Metal", CanCollide=False))
-
-    for x, z, _ in rim_spots(16, half * 0.94, rng):
-        out.append(cylinder("Bollard", 3.4, 3.0,
-                            mul(cf(x, FLOOR_TOP + 1.7, z), rot_z(90)),
-                            [0.16, 0.17, 0.19], "Metal"))
-    return out
-
-
-def props_beach(row, rng):
-    """Boardwalk, lifeguard tower, palms and a volleyball net. Muscle Beach."""
-    half = row["half"]
-    out = []
-
-    for x, z, yaw in rim_spots(11, half * 0.88, rng, 8):
-        out.extend(palm(x, z, rng))
-
-    # The tower, on the far side from the spawn pad.
-    tx, tz = -half * 0.62, -half * 0.52
-    for sx in (-1, 1):
-        for sz in (-1, 1):
-            out.append(part("TowerLeg", [1.4, 18, 1.4],
-                            cf(tx + sx * 4, FLOOR_TOP + 9, tz + sz * 4),
-                            [0.52, 0.38, 0.24], "Wood"))
-    out.append(part("TowerDeck", [12, 1.2, 12], cf(tx, FLOOR_TOP + 18.6, tz),
-                    [0.60, 0.45, 0.28], "WoodPlanks"))
-    out.append(part("TowerHut", [10, 7, 8], cf(tx, FLOOR_TOP + 22.7, tz - 1),
-                    [0.86, 0.82, 0.72], "WoodPlanks"))
-    out.append(part("TowerRoof", [13, 0.8, 11], cf(tx, FLOOR_TOP + 26.5, tz - 1),
-                    row["accent"], "Fabric", CanCollide=False))
-
-    # Volleyball net across one side, and loungers along the rim.
-    nx, nz = -half * 0.5, half * 0.62
-    for side in (-1, 1):
-        out.append(part("NetPost", [0.8, 14, 0.8],
-                        cf(nx + side * 13, FLOOR_TOP + 7, nz), [0.50, 0.36, 0.22], "Wood"))
-    out.append(part("Net", [26, 5, 0.2], cf(nx, FLOOR_TOP + 11, nz),
-                    [0.90, 0.88, 0.80], "Fabric", CanCollide=False, Transparency=0.35))
-
-    for x, z, yaw in rim_spots(6, half * 0.72, rng, 10):
-        frame = mul(cf(x, 0, z), rot_y(yaw))
-        out.append(part("Lounger", [4, 0.4, 9],
-                        mul(frame, mul(cf(0, FLOOR_TOP + 1.6, 0), rot_x(-14))),
-                        [0.88, 0.86, 0.78], "Fabric"))
-        for side in (-1, 1):
-            out.append(part("LoungerLeg", [0.4, 1.4, 0.4],
-                            mul(frame, cf(side * 1.6, FLOOR_TOP + 0.7, 0)),
-                            [0.30, 0.30, 0.32], "Metal"))
-    return out
-
-
-def props_quarry(row, rng):
-    """Cut faces, a conveyor, rusted rigs and floodlights. A working pit."""
-    half = row["half"]
-    out = []
-
-    for x, z, yaw in rim_spots(12, half * RIM * 1.1, rng, 9):
-        size = rng.uniform(10, 22)
-        out.append(part("Boulder", [size, size * 0.8, size],
-                        mul(mul(cf(x, FLOOR_TOP + size * 0.3, z), rot_y(yaw)),
-                            rot_z(rng.uniform(-10, 10))),
-                        [c * rng.uniform(0.85, 1.15) for c in row["rock"]],
-                        row["rock_material"]))
-
-    # Conveyor climbing out of the pit.
-    cx, cz = half * 0.62, -half * 0.66
-    belt = mul(mul(cf(cx, FLOOR_TOP + 14, cz), rot_y(34)), rot_x(-22))
-    out.append(part("Conveyor", [7, 1.2, 54], belt, [0.24, 0.20, 0.16], "CorrodedMetal"))
-    out.append(part("ConveyorRail", [8, 3, 54], mul(belt, cf(0, 1.6, 0)),
-                    [0.42, 0.28, 0.14], "CorrodedMetal", CanCollide=False,
-                    Transparency=0.5))
-    for offset in (-20, 0, 20):
-        out.append(part("ConveyorLeg", [1.6, 22, 1.6],
-                        mul(mul(cf(cx, FLOOR_TOP, cz), rot_y(34)),
-                            cf(0, 11, offset)), [0.42, 0.28, 0.14], "CorrodedMetal"))
-
-    for x, z, yaw in rim_spots(4, half * 0.9, rng):
-        out.append(part("FloodPole", [1.6, 30, 1.6], cf(x, FLOOR_TOP + 15, z),
-                        [0.30, 0.24, 0.16], "CorrodedMetal"))
-        head = part("Flood", [5, 3.4, 2], mul(mul(cf(x, FLOOR_TOP + 30, z), rot_y(yaw)),
-                                              rot_x(24)),
-                    [1.0, 0.94, 0.72], "Neon", CanCollide=False)
-        head["children"] = [{
-            "name": "Glow", "className": "SpotLight",
-            "properties": {"Brightness": 4, "Range": 60, "Angle": 70},
-        }]
-        out.append(head)
-
-    # Well inside the machine ring, which sits at 0.54 of the half-size: at 0.5
-    # these stacks were standing in the middle of the equipment.
-    for x, z, _ in rim_spots(5, half * 0.28, rng, 20):
-        for level in range(rng.randint(2, 4)):
-            out.append(cylinder("Tyre", 2.2, 7.5,
-                                mul(cf(x, FLOOR_TOP + 1.2 + level * 2.3, z), rot_z(90)),
-                                [0.07, 0.07, 0.08], "Rubber"))
-    return out
-
-
-def props_rooftop(row, rng):
-    """Helipad, plant rooms, aircon and dishes. The top of a tower nobody built."""
-    half = row["half"]
+    family = EQUIPMENT_FAMILY[equipment_id]
+    color = FAMILY_COLORS[family]
     out = [
-        disc("Helipad", 0.3, 46, FLOOR_TOP + 1.15, [0.10, 0.11, 0.13], "Asphalt",
-             CanCollide=False),
-        disc("HelipadRing", 0.35, 38, FLOOR_TOP + 1.3, [0.92, 0.92, 0.88], "Neon",
-             CanCollide=False),
-        disc("HelipadCentre", 0.4, 30, FLOOR_TOP + 1.35, [0.10, 0.11, 0.13], "Asphalt",
-             CanCollide=False),
+        part("VenueEdge", [30, 0.16, 30], cf(0, FLOOR_TOP + 0.08, 0),
+             color, "SmoothPlastic", CanCollide=False),
+        # Tops out at exactly FLOOR_TOP + VENUE_PAD_RISE, which is the height every
+        # machine is raised onto. Changing this means changing that constant.
+        part("VenuePad", [26.5, 0.22, 26.5], cf(0, FLOOR_TOP + 0.11, 0),
+             VENUE_PAD_COLOR, "Pebble", CanCollide=False),
     ]
-    # The helipad sits in the middle, which on a rows district is where the
-    # machines are — so it goes to one corner instead.
-    for node in out:
-        node["properties"]["CFrame"] = serialise_cf(
-            cf(-half * 0.62, FLOOR_TOP + 1.15, -half * 0.62))
 
-    for x, z, yaw in rim_spots(7, half * RIM * 1.12, rng, 10):
-        w, d, h = rng.uniform(10, 18), rng.uniform(8, 14), rng.uniform(6, 13)
-        frame = mul(cf(x, FLOOR_TOP + h / 2, z), rot_y(yaw))
-        out.append(part("PlantRoom", [w, h, d], frame, [0.30, 0.32, 0.36], "Concrete"))
-        out.append(part("Vent", [w * 0.6, 1.2, d * 0.6],
-                        mul(frame, cf(0, h / 2 + 0.6, 0)), [0.42, 0.44, 0.48], "Metal"))
+    if family == "Legs":
+        # The one exception, because a running machine reads as one: two painted lane
+        # lines running past the mat. Flat markings, not structure.
+        for x in (-5, 5):
+            out.append(part("LaneLine", [0.35, 0.12, 42], cf(x, FLOOR_TOP + 0.30, 5),
+                            color, "SmoothPlastic", CanCollide=False, CastShadow=False))
 
-    for x, z, yaw in rim_spots(5, half * 0.88, rng, 14):
-        out.append(part("DishMast", [1.2, 9, 1.2], cf(x, FLOOR_TOP + 4.5, z),
-                        [0.28, 0.30, 0.34], "Metal"))
-        out.append(part("Dish", [8, 8, 1.2],
-                        mul(mul(cf(x, FLOOR_TOP + 10, z), rot_y(yaw)), rot_x(38)),
-                        [0.80, 0.80, 0.78], "Metal", CanCollide=False))
-
-    for sx in (-1, 1):
-        out.append(cylinder("WaterTank", 14, 16,
-                            mul(cf(sx * half * 0.8, FLOOR_TOP + 12, half * 0.34), rot_z(90)),
-                            [0.44, 0.40, 0.34], "Metal"))
     return out
 
 
-def props_peak(row, rng):
-    """Snow, cable pylons and weather masts. Somewhere the wind is a problem."""
-    half = row["half"]
-    out = []
+# --------------------------------------------------------------------------
+# Downtown: the city island at the origin.
+#
+# A grid, not a scatter. Two roads each way at +/-GRID, with the plaza sitting
+# in the block they enclose, and four avenues running from there out to the
+# island edge. The twelve rectangles that grid leaves behind are the city's
+# plots: ten get buildings, and two are handed to Garage Gym and Iron Hall —
+# which is the whole reason those districts are `lot` shaped and stand here
+# rather than on islands of their own.
+# --------------------------------------------------------------------------
 
-    for x, z, yaw in rim_spots(10, half * 0.86, rng, 12):
-        size = rng.uniform(12, 24)
-        out.append(part("Snowdrift", [size, size * 0.35, size * 0.8],
-                        mul(cf(x, FLOOR_TOP + size * 0.14, z), rot_y(yaw)),
-                        [0.90, 0.92, 0.96], "Snow", CanCollide=False))
-
-    # Pylons with a cable strung between them, right across the island.
-    pylons = rim_spots(4, half * 0.78, rng)
-    for x, z, _ in pylons:
-        out.append(part("PylonMast", [3, 46, 3], cf(x, FLOOR_TOP + 23, z),
-                        [0.34, 0.36, 0.42], "Metal"))
-        for level in (16, 30, 42):
-            out.append(part("PylonArm", [18, 1.4, 1.4], cf(x, FLOOR_TOP + level, z),
-                            [0.34, 0.36, 0.42], "Metal", CanCollide=False))
-    for index in range(len(pylons)):
-        ax, az, _ = pylons[index]
-        bx, bz, _ = pylons[(index + 1) % len(pylons)]
-        length = math.hypot(bx - ax, bz - az)
-        yaw = math.degrees(math.atan2(bx - ax, bz - az))
-        out.append(part("Cable", [0.5, 0.5, length],
-                        mul(cf((ax + bx) / 2, FLOOR_TOP + 41, (az + bz) / 2), rot_y(yaw)),
-                        [0.09, 0.09, 0.10], "Metal", CanCollide=False))
-
-    for x, z, yaw in rim_spots(3, half * 0.94, rng, 20):
-        out.append(part("MastPole", [0.9, 24, 0.9], cf(x, FLOOR_TOP + 12, z),
-                        [0.70, 0.72, 0.78], "Metal"))
-        out.append(part("Anemometer", [5, 0.4, 0.4],
-                        mul(cf(x, FLOOR_TOP + 24, z), rot_y(yaw)),
-                        row["accent"], "Neon", CanCollide=False))
-    return out
+ROAD = [0.12, 0.12, 0.13]
+ROAD_LINE = [0.76, 0.70, 0.36]
+SIDEWALK = [0.40, 0.40, 0.41]
 
 
-def props_void(row, rng):
-    """Monoliths and light strips. Nothing grows here, so nothing does."""
-    half = row["half"]
-    out = []
+# Four skins rather than one, picked per building. A city where every wall is
+# the same colour reads as a texture, not as a place people built over time.
+def _skin(wall, material, glass=(0.17, 0.24, 0.29)):
+    """One building skin, with its trim derived rather than chosen.
 
-    for x, z, yaw in rim_spots(8, half * RIM * 1.14, rng, 8):
-        height = rng.uniform(30, 70)
-        out.append(part("Monolith", [8, height, 8],
-                        mul(mul(cf(x, FLOOR_TOP + height / 2, z), rot_y(yaw)),
-                            rot_z(rng.uniform(-5, 5))),
-                        [0.05, 0.04, 0.08], "Slate"))
-        out.append(part("MonolithVein", [1.2, height * 0.8, 1.2],
-                        cf(x, FLOOR_TOP + height / 2, z + 4.2),
-                        row["accent"], "Neon", CanCollide=False))
-
-    for index in range(6):
-        angle = 60.0 * index
-        length = half * 1.5
-        out.append(part("LightStrip", [1.6, 0.2, length],
-                        mul(rot_y(angle), cf(0, FLOOR_TOP + 0.15, 0)),
-                        row["accent"], "Neon", CanCollide=False, CastShadow=False))
-
-    for x, z, _ in rim_spots(5, half * 0.92, rng, 16):
-        out.append(part("Shard", [3, rng.uniform(10, 20), 3],
-                        mul(cf(x, FLOOR_TOP + 14, z), rot_z(rng.uniform(-24, 24))),
-                        row["accent"], "Neon", CanCollide=False))
-    return out
+    Trim is always the wall darkened by the same factor, so the twelve skins read
+    as siblings out of one palette instead of twelve independent colour choices.
+    That is the difference between a city and a colour chart: the eye reads the
+    *relationships* between surfaces, and keeping them constant is what lets the
+    hues range widely without the result looking random.
+    """
+    return {
+        "wall": list(wall),
+        "trim": [round(c * 0.63, 4) for c in wall],
+        "glass": list(glass),
+        "material": material,
+    }
 
 
-def props_solar(row, rng):
-    """Magma channels and obsidian. Lit from below, which nothing else here is."""
-    half = row["half"]
-    out = []
+# Twelve skins in three eras. Era is what stops a glass curtain wall appearing in
+# brick: an archetype prefers the eras that suit it, so the palette carries some
+# of the architectural story rather than only the colour.
+BUILDING_SKINS_OLD = [
+    _skin((0.37, 0.24, 0.20), "Brick"),
+    _skin((0.45, 0.29, 0.23), "Brick"),
+    _skin((0.56, 0.53, 0.47), "Sandstone"),
+    _skin((0.48, 0.44, 0.34), "WoodPlanks"),
+]
 
-    for index in range(5):
-        angle = 72.0 * index + 20
-        channel = mul(rot_y(angle), cf(0, FLOOR_TOP + 0.1, half * 0.45))
-        out.append(part("Magma", [7, 0.4, half * 0.9], channel,
-                       [1.0, 0.42, 0.10], "Neon", CanCollide=False, CastShadow=False))
-        glow = part("Ember", [5, 0.3, 8],
-                    mul(channel, cf(0, 0.3, rng.uniform(-20, 20))),
-                    [1.0, 0.76, 0.30], "Neon", CanCollide=False)
-        glow["children"] = [{
-            "name": "Glow", "className": "PointLight",
-            "properties": {"Brightness": 2.5, "Range": 40, "Color": [1.0, 0.45, 0.12]},
-        }]
-        out.append(glow)
+BUILDING_SKINS_MID = [
+    _skin((0.45, 0.41, 0.36), "Concrete"),
+    _skin((0.34, 0.34, 0.32), "Concrete"),
+    _skin((0.52, 0.50, 0.46), "Granite"),
+    _skin((0.60, 0.58, 0.55), "Marble"),
+]
 
-    for x, z, yaw in rim_spots(10, half * RIM * 1.1, rng, 10):
-        height = rng.uniform(14, 34)
-        out.append(part("Obsidian", [rng.uniform(6, 12), height, rng.uniform(6, 12)],
-                        mul(mul(cf(x, FLOOR_TOP + height / 2, z), rot_y(yaw)),
-                            rot_x(rng.uniform(-12, 12))),
-                        [0.06, 0.04, 0.05], "Slate"))
+BUILDING_SKINS_NEW = [
+    _skin((0.21, 0.23, 0.27), "Metal", (0.20, 0.31, 0.37)),
+    _skin((0.28, 0.32, 0.36), "Metal", (0.22, 0.34, 0.40)),
+    _skin((0.16, 0.18, 0.22), "Slate", (0.18, 0.28, 0.34)),
+    _skin((0.33, 0.36, 0.40), "Pebble", (0.21, 0.30, 0.36)),
+]
 
-    for x, z, _ in rim_spots(6, half * 0.92, rng):
-        out.append(cylinder("Brazier", 5, 6,
-                            mul(cf(x, FLOOR_TOP + 2.5, z), rot_z(90)),
-                            [0.20, 0.13, 0.10], "Basalt"))
-        out.append(part("Flame", [4, 4, 4], cf(x, FLOOR_TOP + 6, z),
-                        [1.0, 0.55, 0.16], "Neon", CanCollide=False))
-    return out
+BUILDING_SKINS = BUILDING_SKINS_OLD + BUILDING_SKINS_MID + BUILDING_SKINS_NEW
 
-
-def props_nebula(row, rng):
-    """Trusses, solar panels and antennae. A station, not an island."""
-    half = row["half"]
-    out = []
-
-    for x, z, yaw in rim_spots(8, half * RIM * 1.12, rng, 6):
-        frame = mul(cf(x, 0, z), rot_y(yaw))
-        out.append(part("TrussPost", [2.2, 26, 2.2], mul(frame, cf(0, FLOOR_TOP + 13, 0)),
-                        [0.42, 0.44, 0.52], "Metal"))
-        out.append(part("PanelArm", [1.2, 1.2, 14], mul(frame, cf(0, FLOOR_TOP + 24, 6)),
-                        [0.42, 0.44, 0.52], "Metal", CanCollide=False))
-        out.append(part("SolarPanel", [22, 0.5, 13],
-                        mul(mul(frame, cf(0, FLOOR_TOP + 26, 12)), rot_x(26)),
-                        [0.10, 0.12, 0.30], "Glass", Reflectance=0.4, CanCollide=False))
-        out.append(part("PanelEdge", [22.6, 0.9, 1.0],
-                        mul(mul(frame, cf(0, FLOOR_TOP + 25.4, 17.6)), rot_x(26)),
-                        row["accent"], "Neon", CanCollide=False))
-
-    for x, z, yaw in rim_spots(5, half * 0.92, rng, 14):
-        out.append(part("Antenna", [0.8, 30, 0.8], cf(x, FLOOR_TOP + 15, z),
-                        [0.50, 0.52, 0.58], "Metal"))
-        for level in (12, 20, 26):
-            out.append(part("AntennaRing", [4, 0.4, 4], cf(x, FLOOR_TOP + level, z),
-                            row["accent"], "Neon", CanCollide=False))
-    return out
-
-
-def props_celestial(row, rng):
-    """Columns, arches and a reflecting pool. The end of the map should feel
-    like an arrival, not another platform."""
-    half = row["half"]
-    out = [disc("Pool", 0.5, half * 0.5, FLOOR_TOP + 0.9,
-                [0.55, 0.80, 0.92], "Glass", CanCollide=False,
-                Transparency=0.35, Reflectance=0.5)]
-
-    for x, z, yaw in rim_spots(12, half * RIM * 1.12, rng):
-        out.append(cylinder("Column", 42, 8,
-                            mul(cf(x, FLOOR_TOP + 21, z), rot_z(90)),
-                            [0.90, 0.88, 0.82], "Marble"))
-        out.append(part("Capital", [11, 3, 11], cf(x, FLOOR_TOP + 43.5, z),
-                        [0.94, 0.92, 0.86], "Marble", CanCollide=False))
-        out.append(part("ColumnBase", [11, 2.4, 11], cf(x, FLOOR_TOP + 1.2, z),
-                        [0.94, 0.92, 0.86], "Marble"))
-
-    # Inside the machine ring, not on it: a `ring` layout leaves the middle free
-    # and the pool only takes the innermost quarter of it.
-    for x, z, _ in rim_spots(8, half * 0.36, rng):
-        out.append(cylinder("Brazier", 4, 5,
-                            mul(cf(x, FLOOR_TOP + 2, z), rot_z(90)),
-                            [0.82, 0.76, 0.60], "Marble"))
-        flame = part("Flame", [3.4, 3.4, 3.4], cf(x, FLOOR_TOP + 5, z),
-                     row["accent"], "Neon", CanCollide=False)
-        flame["children"] = [{
-            "name": "Glow", "className": "PointLight",
-            "properties": {"Brightness": 2, "Range": 34, "Color": row["accent"]},
-        }]
-        out.append(flame)
-    return out
-
-
-PROPS = {
-    "docks": props_docks,
-    "beach": props_beach,
-    "quarry": props_quarry,
-    "rooftop": props_rooftop,
-    "peak": props_peak,
-    "void": props_void,
-    "solar": props_solar,
-    "nebula": props_nebula,
-    "celestial": props_celestial,
+# Which eras suit which archetype. Weighted rather than exclusive, so a brick
+# tower is unusual rather than impossible.
+ARCHETYPE_ERAS = {
+    "setback": (BUILDING_SKINS_MID, BUILDING_SKINS_NEW),
+    "slab": (BUILDING_SKINS_MID, BUILDING_SKINS_NEW),
+    "curtain": (BUILDING_SKINS_NEW,),
+    "drum": (BUILDING_SKINS_MID, BUILDING_SKINS_NEW),
+    "shophouse": (BUILDING_SKINS_OLD,),
+    "shed": (BUILDING_SKINS_NEW, BUILDING_SKINS_MID),
+    "deco": (BUILDING_SKINS_MID, BUILDING_SKINS_OLD),
+    "perimeter": (BUILDING_SKINS_OLD, BUILDING_SKINS_MID),
+    "brutalist": (BUILDING_SKINS_MID,),
+    "residential": (BUILDING_SKINS_MID, BUILDING_SKINS_OLD),
+    "arcade": (BUILDING_SKINS_OLD, BUILDING_SKINS_MID),
 }
 
 
-# --- Ground clutter -------------------------------------------------------
+def street_light(x, z, facing):
+    """Pole, arm and head. Three parts, and they are what makes a road at dusk
+    read as a road rather than as a grey stripe."""
+    arm = mul(cf(x, FLOOR_TOP + 15.5, z), rot_y(facing))
+    return [
+        part("LightPole", [1.1, 16, 1.1], cf(x, FLOOR_TOP + 8, z), [0.17, 0.17, 0.19], "Metal"),
+        part("LightArm", [0.8, 0.8, 7], mul(arm, cf(0, 0, 3.5)), [0.17, 0.17, 0.19], "Metal"),
+        part("LightHead", [2.2, 0.7, 3.4], mul(arm, cf(0, -0.6, 6.6)),
+             [1.0, 0.90, 0.68], "Neon", CanCollide=False),
+    ]
+
+
+def city_tree(x, z, rng):
+    """A compact street/park tree made from original primitive geometry."""
+    height = rng.uniform(18, 27)
+    out = [cylinder(
+        "TreeTrunk", height, 2.0,
+        mul(cf(x, FLOOR_TOP + height / 2, z), rot_z(90)),
+        [0.27, 0.20, 0.14], "Wood", CanCollide=False,
+    )]
+    for ox, oy, oz, scale in ((0, 0, 0, 1), (-4, -1, 1, 0.72), (4, -2, -1, 0.68)):
+        out.append(part(
+            "TreeCanopy", [13 * scale, 10 * scale, 13 * scale],
+            cf(x + ox, FLOOR_TOP + height + oy, z + oz),
+            [0.12, rng.uniform(0.30, 0.39), 0.16], "Grass", Shape="Ball",
+            CanCollide=False, CanTouch=False, CanQuery=False,
+        ))
+    return out
+
+
+def coastal_public_realm():
+    """Beach, boardwalk and seawall: the continuous public edge of the city."""
+    out = []
+    surface_columns = max(1, math.ceil(CITY_MAINLAND_SIZE[0] / 1800))
+    city_min_x = CITY_MAINLAND_CENTER[0] - CITY_MAINLAND_SIZE[0] / 2
+    city_max_x = CITY_MAINLAND_CENTER[0] + CITY_MAINLAND_SIZE[0] / 2
+    # Visible sand stops before the seawall; the underlying mainland remains the
+    # collision surface, so the thin finish can never trap a player at its edge.
+    out.extend(place(cf(CITY_MAINLAND_CENTER[0], 0, 178), node)
+               for node in tiled_surface(
+                   "BeachSand", CITY_MAINLAND_SIZE[0], 344, 0.08,
+                   FLOOR_TOP, [0.66, 0.57, 0.40], "Sand",
+                   columns=surface_columns, rows=1, map_kind="Park", CanCollide=False,
+               ))
+    out.extend(place(cf(CITY_MAINLAND_CENTER[0], 0, 24), node)
+               for node in tiled_surface(
+                   "Boardwalk", CITY_MAINLAND_SIZE[0], 42, 0.12,
+                   FLOOR_TOP + 0.02, [0.34, 0.25, 0.17], "WoodPlanks",
+                   columns=surface_columns, rows=1, map_kind="Plaza", CanCollide=False,
+               ))
+    out.extend(city_road("CoastalBoulevard", CITY_MAINLAND_SIZE[0], 64,
+                         CITY_MAINLAND_CENTER[0], -86))
+    # No sea-facing rail. A 120-stud near-black bar repeated the length of the coast
+    # read as a barrier cutting the promenade off from the beach rather than as trim,
+    # and it sat directly across the benches.
+    for x in range(int(city_min_x + 150), int(city_max_x - 140), 190):
+        out.extend(street_light(x, -50, 180))
+    return out
+
+
+# --------------------------------------------------------------------------
+# City props.
 #
-# PROPS above builds one landmark kit per island: a crane, a lifeguard tower, a
-# row of containers. Those are the things you navigate by, and there are about a
-# dozen of them on a ring near the coast. They are not enough to fill an island,
-# and once the islands grew 2.5x they read as an empty plate with a decorated rim.
+# Small, cheap, repeated pieces. One function per kind, registered in CITY_PROPS,
+# so a new piece of scenery is a new function and a new dict key rather than an
+# edit to whatever scatters them.
 #
-# Clutter is the other half: small, cheap, repeated pieces scattered across the
-# whole surface so the ground between two gyms is somewhere rather than nothing.
-# One function per kind, registered in CLUTTER, and a per-theme recipe in
-# CLUTTER_KITS naming which kinds an island uses and how often — so a new piece of
-# scenery is a new function and a new dict key, never an edit to the scatter pass.
-#
-# Every function returns nodes in island-local space around the origin. The caller
-# places, filters and strips collision from them; none of that belongs here.
+# Every function returns nodes in local space around the origin; the caller places
+# them and decides what they collide with. These were written for an island world
+# that no longer exists and were never placed anywhere -- they are moved here,
+# ahead of that dead builder being deleted, because the shapes are sound and the
+# city needs exactly this kit.
+# --------------------------------------------------------------------------
 
 
 def clutter_rock(rng, accent, ground):
@@ -2054,7 +2821,10 @@ def clutter_sign(rng, accent, ground):
     return [
         cylinder("SignPost", height, 0.7, cf(0, FLOOR_TOP + height / 2, 0),
                  [0.17, 0.18, 0.20], "Metal"),
-        part("SignBoard", [rng.uniform(5, 8), rng.uniform(2.4, 3.6), 0.4],
+        # Not "SignBoard": gym_hall's own signage owns that name, and collision here
+        # is decided by name, so a scenery part that shares one with a structural
+        # part cannot be told apart from it.
+        part("SignPanel", [rng.uniform(5, 8), rng.uniform(2.4, 3.6), 0.4],
              mul(rot_y(rng.uniform(0, 360)), cf(0, FLOOR_TOP + height, 0)),
              accent, "SmoothPlastic"),
     ]
@@ -2091,7 +2861,21 @@ def clutter_debris(rng, accent, ground):
     return out
 
 
-CLUTTER = {
+# Scenery that keeps its collision because its shape is cover: waist-to-chest,
+# compact footprint, sitting flat on the ground with nothing overhanging. These are
+# the only non-structural parts in the world you can hide behind, and a punch is
+# range 12, so a 4-stud crate is enough to break a line.
+#
+# Names, not kinds, because _decorate walks parts: clutter_shrub returns a stem and
+# a canopy and neither is cover, while clutter_crate returns one to three stacked
+# Crate parts and all of them are. Anything not named here is stripped exactly as
+# before, which is every landmark prop in PROPS and every thin or overhanging piece.
+# The mixed-use city authors cover deliberately as architecture.  Random clutter is
+# decorative and non-colliding; in particular, Rock/Boulder props are intentionally
+# absent so machines no longer look as though a stone was dropped beside every mat.
+SOLID_CITY_PROPS = frozenset()
+
+CITY_PROPS = {
     "rock": clutter_rock,
     "shrub": clutter_shrub,
     "grass": clutter_grass,
@@ -2103,336 +2887,6 @@ CLUTTER = {
     "palm": clutter_palm,
     "debris": clutter_debris,
 }
-
-# Which kinds each themed island uses, and how heavily. The None entry is the
-# fallback for a district whose row names no prop kit — which is how Iron/OldTown
-# ends up with scenery despite having no landmark set of its own.
-CLUTTER_KITS = {
-    "docks": (("crate", 4), ("barrel", 4), ("debris", 2), ("lamp", 2), ("sign", 1)),
-    "beach": (("palm", 4), ("rock", 2), ("shrub", 3), ("grass", 5)),
-    "quarry": (("rock", 6), ("debris", 4), ("pillar", 2), ("crate", 1)),
-    "rooftop": (("crate", 2), ("lamp", 4), ("sign", 3), ("pillar", 2), ("debris", 1)),
-    "peak": (("rock", 5), ("pillar", 3), ("debris", 3), ("shrub", 1)),
-    "void": (("pillar", 5), ("rock", 3), ("lamp", 2), ("debris", 2)),
-    "solar": (("pillar", 3), ("barrel", 3), ("debris", 3), ("lamp", 2), ("rock", 2)),
-    "nebula": (("lamp", 5), ("sign", 4), ("crate", 2), ("pillar", 2)),
-    "celestial": (("pillar", 5), ("lamp", 3), ("shrub", 2), ("grass", 2)),
-    None: (("rock", 3), ("shrub", 3), ("grass", 4), ("debris", 2), ("crate", 2)),
-}
-
-# Scatter points per island, not parts — a point expands to between one and six
-# parts depending on the kind it draws.
-CLUTTER_PER_ISLAND = 120
-# Hard ceiling per island, asserted at build time. The validator's global budget is
-# 7,000 BaseParts; ten islands at this cap plus the existing world stays near 68%
-# of it, which leaves room for later content instead of spending the lot on grass.
-CLUTTER_PART_BUDGET = 300
-
-
-def volume(zone_id, name, size, frame):
-    """One invisible box token accrual and machine tiering test against.
-
-    Must be a genuine volume the standing HumanoidRootPart ends up inside — see
-    the warning in ZoneConfig. Tall enough to cover a district's whole playable
-    height.
-    """
-    return tagged({
-        "name": name,
-        "className": "Part",
-        "properties": {
-            "Anchored": True,
-            "Locked": True,
-            "CanCollide": False,
-            "Transparency": 1,
-            "CastShadow": False,
-            "Size": [round(v, 4) for v in size],
-            "CFrame": serialise_cf(frame),
-            "Material": "SmoothPlastic",
-        },
-    }, tags=["GymZone"], attributes={"ZoneId": zone_id})
-
-
-def zone_volume(row):
-    """The volume token accrual and machine tiering both test against.
-
-    One box per district, sized to cover its machines. It may overlap the spawn
-    plaza's safe zone — Garage Gym's does, because it is built around it — and
-    that is fine now: TokenService refuses to pay inside a safe zone regardless
-    of which gym zone also covers it.
-    """
-    half = row["half"]
-    return [volume(row["zone"], f"{row['zone']}Volume",
-                   [half * 2 + 8, 120, half * 2 + 8], cf(0, 55, 0))]
-
-
-
-# --------------------------------------------------------------------------
-# Machine layouts. Where stat-specific training venues stand in a district, as
-# CFrames in its local space. Random layouts are seeded by zone id: authored
-# variety survives a rebuild instead of becoming a moving target in source control.
-# --------------------------------------------------------------------------
-
-FAMILY_ORDER = ["Chest", "Arms", "Back", "Core", "Legs"]
-STAT_VARIANTS = {
-    "Chest": ("BenchPress", "InclinePress", "PecDeck", "PushUps",
-              "CableCrossover", "ChestDip", "DeclinePress"),
-    "Arms": ("Dumbbells", "BarbellCurl", "TricepsPushdown", "HammerCurl",
-             "PreacherCurl", "SkullCrusher", "BattleRopes"),
-    "Back": ("PullUpBar", "SeatedRow", "LatPulldown", "Deadlift",
-             "TBarRow", "BackExtension", "RopeClimb"),
-    "Core": ("SitUpBench", "KneeRaise", "TorsoTwist", "Plank",
-             "CableCrunch", "AbWheel", "WoodChop"),
-    "Legs": ("Treadmill", "SquatRack", "LegPress", "LegExtension",
-             "HamstringCurl", "CalfRaise", "StairClimber"),
-}
-MACHINE_ORDER = [STAT_VARIANTS[family][0] for family in FAMILY_ORDER]
-EQUIPMENT_FAMILY = {
-    equipment_id: family
-    for family, variants in STAT_VARIANTS.items()
-    for equipment_id in variants
-}
-MACHINE_COUNT = len(MACHINE_ORDER)
-
-
-def ring_angle(index, count):
-    """Where a ring layout puts its Nth item. Anything decorating a ring — a
-    painted bay, a post between two of them — has to ask this rather than
-    restate it, or it ends up describing a different ring."""
-    return 360.0 * index / count + 180.0 / count
-
-
-def layout_ring(row, count):
-    """Evenly around a circle, every machine facing the middle. Reads as a
-    deliberate arrangement on a round island, where a grid reads as a car park."""
-    out = []
-    radius = row.get("ring_radius", row["half"] * 0.54)
-    for index in range(count):
-        spot = mul(rot_y(ring_angle(index, count)), cf(0, 0, radius))
-        out.append(mul(spot, rot_y(180)))
-    return out
-
-
-def layout_rows(row, count):
-    """Two alternating rows facing each other across an aisle — a gym floor."""
-    out = []
-    span = row["half"] * 0.6
-    for index in range(count):
-        x = -span + (2 * span) * (index / max(1, count - 1))
-        near = index % 2 == 0
-        out.append(mul(cf(x, 0, span * (0.55 if near else -0.55)),
-                       rot_y(180 if near else 0)))
-    return out
-
-
-def layout_scatter(row, count):
-    """A reproducible, irregular spread with one venue in each loose sector.
-
-    Sectoring prevents all five random points landing on one side of an island;
-    jittered angle and radius keep it from reading as another machine ring. The
-    spawn district uses a tighter outer band so its venues clear the safe plaza.
-    """
-    rng = random.Random(f"{row['zone']}:training-spots")
-    minimum = row.get("scatter_min", row["half"] * 0.22)
-    maximum = row.get("scatter_max", row["half"] * 0.58)
-    phase = rng.uniform(0, 360)
-    out = []
-
-    for index in range(count):
-        position = None
-        angle = 0.0
-        # Venue pads are 30 studs wide. Keep their centres at least 38 studs
-        # apart so rotated corners and the longer Legs lane do not merge into a
-        # neighbouring stat area. With five angular sectors this converges in a
-        # handful of attempts, but a bounded loop keeps bad row data harmless.
-        for _attempt in range(64):
-            angle = phase + 360.0 * index / count + rng.uniform(-18, 18)
-            radius = rng.uniform(minimum, maximum)
-            candidate = mul(rot_y(angle), cf(0, 0, radius))
-            if all(math.hypot(candidate[0][0] - prior[0][0],
-                              candidate[0][2] - prior[0][2]) >= 38
-                   for prior in out):
-                position = candidate
-                break
-        if position is None:
-            angle = phase + 360.0 * index / count
-            position = mul(rot_y(angle), cf(0, 0, maximum))
-        # Face the machine toward the district interior, leaving its architecture
-        # behind it and the approach side open.
-        out.append(mul(position, rot_y(angle + 180)))
-
-    return out
-
-
-LAYOUTS = {
-    "ring": layout_ring,
-    "rows": layout_rows,
-    "scatter": layout_scatter,
-}
-
-
-def machine_spots(row):
-    """The single source of truth for machine and venue positions."""
-    return LAYOUTS[row["layout"]](row, len(MACHINE_ORDER))
-
-
-# Architecture makes the stat legible before the machine label streams in.
-# These are gameplay venues, not decorative copies of the machine itself: an
-# Arms cage, Chest bay, Back tower, Core court and Legs lane have different
-# silhouettes and use the stat colour as a restrained wayfinding stripe.
-FAMILY_COLORS = {
-    "Chest": [1.00, 0.65, 0.15],
-    "Arms": [0.94, 0.33, 0.31],
-    "Back": [0.40, 0.73, 0.42],
-    "Core": [0.26, 0.65, 0.96],
-    "Legs": [0.67, 0.28, 0.74],
-}
-STAT_COLORS = {
-    equipment_id: FAMILY_COLORS[family]
-    for equipment_id, family in EQUIPMENT_FAMILY.items()
-}
-STAT_COLORS.update(FAMILY_COLORS)
-
-
-def training_venue(equipment_id, district_accent):
-    """Original part-built architecture wrapped around one training machine."""
-    family = EQUIPMENT_FAMILY[equipment_id]
-    color = FAMILY_COLORS[family]
-    dark = [0.12, 0.13, 0.15]
-    concrete = [0.31, 0.31, 0.32]
-    out = [
-        part("VenuePad", [30, 0.22, 30], cf(0, FLOOR_TOP + 0.11, 0),
-             concrete, "Concrete", CanCollide=False),
-        part("StatStripe", [30, 0.12, 1.1], cf(0, FLOOR_TOP + 0.26, 13.6),
-             color, "Neon", CanCollide=False, CastShadow=False),
-    ]
-
-    if family == "Chest":
-        # A heavy open-front press bay: concrete sides, lit lintel, no front wall.
-        out.extend([
-            part("ChestWall", [30, 12, 1.2], cf(0, FLOOR_TOP + 6, -14), dark, "Concrete"),
-            part("ChestWing", [1.2, 9, 13], cf(-14.4, FLOOR_TOP + 4.5, -7.5), dark, "Concrete"),
-            part("ChestWing", [1.2, 9, 13], cf(14.4, FLOOR_TOP + 4.5, -7.5), dark, "Concrete"),
-            part("ChestLintel", [28, 1.0, 1.5], cf(0, FLOOR_TOP + 11.5, -13.4), color, "Neon"),
-        ])
-    elif family == "Arms":
-        # A steel street cage; open sides keep the three curl spots reachable.
-        for x in (-14, 14):
-            for z in (-13, 13):
-                out.append(part("ArmsPost", [1.0, 14, 1.0], cf(x, FLOOR_TOP + 7, z), dark, "Metal"))
-        out.extend([
-            part("ArmsCanopy", [30, 0.8, 30], cf(0, FLOOR_TOP + 14.2, 0), dark, "Metal"),
-            part("ArmsBeam", [30, 0.7, 0.8], cf(0, FLOOR_TOP + 12.6, 13.4), color, "Neon"),
-        ])
-    elif family == "Back":
-        # A tall back-training tower visible over nearby props.
-        out.extend([
-            part("BackTower", [24, 18, 1.2], cf(0, FLOOR_TOP + 9, -14), dark, "Metal"),
-            part("BackCutout", [18, 11, 0.3], cf(0, FLOOR_TOP + 7.5, -13.3),
-                 [0.22, 0.24, 0.28], "DiamondPlate"),
-            part("BackTop", [26, 1.2, 2.0], cf(0, FLOOR_TOP + 18.3, -14), color, "Neon"),
-        ])
-    elif family == "Core":
-        # A low court keeps sightlines open while marking a dedicated Core area.
-        for x, z, sx, sz in ((0, -14, 30, 1), (-14, 0, 1, 28), (14, 0, 1, 28)):
-            out.append(part("CoreWall", [sx, 3.2, sz], cf(x, FLOOR_TOP + 1.6, z), dark, "Concrete"))
-        for x in (-12, 12):
-            out.append(part("CoreBeacon", [1.0, 8, 1.0], cf(x, FLOOR_TOP + 4, -13), color, "Neon"))
-    else:
-        # The treadmill sits on a long marked running lane with a finish gantry.
-        out.extend([
-            part("LegsLane", [12, 0.18, 42], cf(0, FLOOR_TOP + 0.22, 5),
-                 [0.16, 0.17, 0.19], "Asphalt", CanCollide=False),
-            part("LaneLine", [0.35, 0.12, 42], cf(-5, FLOOR_TOP + 0.36, 5), color, "Neon", CanCollide=False),
-            part("LaneLine", [0.35, 0.12, 42], cf(5, FLOOR_TOP + 0.36, 5), color, "Neon", CanCollide=False),
-            part("LegsGantry", [16, 1.0, 1.0], cf(0, FLOOR_TOP + 11, -14), color, "Neon"),
-            part("LegsPost", [1.0, 11, 1.0], cf(-7.5, FLOOR_TOP + 5.5, -14), dark, "Metal"),
-            part("LegsPost", [1.0, 11, 1.0], cf(7.5, FLOOR_TOP + 5.5, -14), dark, "Metal"),
-        ])
-
-    # One small district-colour marker ties the venue back to its progression zone.
-    out.append(part("DistrictMarker", [2.2, 5.5, 2.2], cf(12.5, FLOOR_TOP + 2.75, 12.5),
-                    district_accent, "Neon", CanCollide=False))
-    return out
-
-
-# --------------------------------------------------------------------------
-# Downtown: the city island at the origin.
-#
-# A grid, not a scatter. Two roads each way at +/-GRID, with the plaza sitting
-# in the block they enclose, and four avenues running from there out to the
-# island edge. The twelve rectangles that grid leaves behind are the city's
-# plots: ten get buildings, and two are handed to Garage Gym and Iron Hall —
-# which is the whole reason those districts are `lot` shaped and stand here
-# rather than on islands of their own.
-# --------------------------------------------------------------------------
-
-ROAD = [0.12, 0.12, 0.13]
-ROAD_LINE = [0.76, 0.70, 0.36]
-SIDEWALK = [0.40, 0.40, 0.41]
-KERB = [0.53, 0.53, 0.54]
-
-# Pushed out from 140 so the central block can hold the plaza AND the starter
-# gym ringing it, with room to walk between them.
-GRID = 170
-ROAD_WIDTH = 36
-# Plots run from the grid roads out to here; past it is promenade and railing.
-PLOT_EDGE = 320
-
-# Four skins rather than one, picked per building. A city where every wall is
-# the same colour reads as a texture, not as a place people built over time.
-BUILDING_SKINS = [
-    {"wall": [0.45, 0.41, 0.36], "trim": [0.29, 0.26, 0.23],
-     "glass": [0.15, 0.21, 0.26], "material": "Concrete"},
-    {"wall": [0.37, 0.24, 0.20], "trim": [0.24, 0.15, 0.12],
-     "glass": [0.14, 0.18, 0.23], "material": "Brick"},
-    {"wall": [0.56, 0.53, 0.47], "trim": [0.36, 0.34, 0.30],
-     "glass": [0.18, 0.25, 0.30], "material": "Sandstone"},
-    {"wall": [0.21, 0.23, 0.27], "trim": [0.14, 0.15, 0.18],
-     "glass": [0.20, 0.31, 0.37], "material": "Metal"},
-]
-
-
-def city_plots():
-    """The twelve rectangles the street grid leaves behind, as (x, z, sx, sz).
-
-    Three per quadrant: one flanking each avenue, one on the corner. The two
-    corner plots the gym districts occupy are excluded by the caller.
-    """
-    out = []
-    near, far = ROAD_WIDTH / 2 + 2, GRID - ROAD_WIDTH / 2
-    inner, outer = GRID + ROAD_WIDTH / 2, PLOT_EDGE
-    for sx in (-1, 1):
-        for sz in (-1, 1):
-            out.append((sx * (near + far) / 2, sz * (inner + outer) / 2,
-                        far - near, outer - inner))
-            out.append((sx * (inner + outer) / 2, sz * (near + far) / 2,
-                        outer - inner, far - near))
-            out.append((sx * (inner + outer) / 2, sz * (inner + outer) / 2,
-                        outer - inner, outer - inner))
-    return out
-
-
-def street(length, width, frame, dash_axis):
-    """Asphalt laid flush with the ground, with a dashed centre line."""
-    out = [part("Road", [width, 0.5, length], frame, ROAD, "Asphalt",
-                CanCollide=False)]
-    for offset in range(-int(length // 2) + 20, int(length // 2) - 18, 44):
-        out.append(part("Line", [1.2, 0.1, 14] if dash_axis else [14, 0.1, 1.2],
-                        mul(frame, cf(0, 0.3, offset)), ROAD_LINE, "SmoothPlastic",
-                        CanCollide=False, CastShadow=False))
-    return out
-
-
-def street_light(x, z, facing):
-    """Pole, arm and head. Three parts, and they are what makes a road at dusk
-    read as a road rather than as a grey stripe."""
-    arm = mul(cf(x, FLOOR_TOP + 15.5, z), rot_y(facing))
-    return [
-        part("LightPole", [1.1, 16, 1.1], cf(x, FLOOR_TOP + 8, z), [0.17, 0.17, 0.19], "Metal"),
-        part("LightArm", [0.8, 0.8, 7], mul(arm, cf(0, 0, 3.5)), [0.17, 0.17, 0.19], "Metal"),
-        part("LightHead", [2.2, 0.7, 3.4], mul(arm, cf(0, -0.6, 6.6)),
-             [1.0, 0.90, 0.68], "Neon", CanCollide=False),
-    ]
 
 
 def parked_car(x, z, facing, rng):
@@ -2467,73 +2921,6 @@ def palm(x, z, rng):
     return out
 
 
-def building(x, z, sx, sz, height, skin, rng):
-    """A tower: storefront band, shaft, glazing on each face, and a parapet.
-
-    Deliberately few parts. At the distance you actually see these from, a
-    window strip per face carries a building far better than a floor-by-floor
-    grid would, and this map has ten plots of them to pay for.
-    """
-    out = [
-        part("Storefront", [sx, 9, sz], cf(x, FLOOR_TOP + 4.5, z),
-             skin["trim"], skin["material"]),
-        part("Shaft", [sx - 2, height, sz - 2], cf(x, FLOOR_TOP + 9 + height / 2, z),
-             skin["wall"], skin["material"]),
-        part("Parapet", [sx + 1, 3, sz + 1], cf(x, FLOOR_TOP + 10.5 + height, z),
-             skin["trim"], skin["material"]),
-    ]
-
-    lit = rng.random() < 0.4
-    for side, (ox, oz, w, d) in enumerate((
-        (0, sz / 2 - 1, sx - 10, 0.6),
-        (0, -sz / 2 + 1, sx - 10, 0.6),
-        (sx / 2 - 1, 0, 0.6, sz - 10),
-        (-sx / 2 + 1, 0, 0.6, sz - 10),
-    )):
-        if w <= 0 or d <= 0:
-            continue
-        out.append(part("Glazing", [w, height - 6, d],
-                        cf(x + ox, FLOOR_TOP + 9 + height / 2, z + oz),
-                        skin["glass"], "Neon" if lit else "Glass",
-                        Transparency=0 if lit else 0.35, CanCollide=False))
-
-    # Lit shopfront across the street-facing side, at head height.
-    if sx >= sz:
-        shop_size, shop_at = [sx - 12, 5, 0.4], cf(x, FLOOR_TOP + 4.5, z + sz / 2 - 0.2)
-    else:
-        shop_size, shop_at = [0.4, 5, sz - 12], cf(x + sx / 2 - 0.2, FLOOR_TOP + 4.5, z)
-    out.append(part("ShopGlass", shop_size, shop_at, [0.85, 0.72, 0.38], "Neon",
-                    CanCollide=False))
-    return out
-
-
-def city_plot(x, z, sx, sz, rng):
-    """A sidewalk, its kerb, and two or three buildings standing on it."""
-    out = [
-        part("Sidewalk", [sx, 1.0, sz], cf(x, FLOOR_TOP + 0.5, z), SIDEWALK, "Concrete"),
-        # Non-colliding: a kerb is a painted edge, not a wall. Left solid it is 160
-        # ankle-height ledges across the city for a running player to catch on.
-        part("Kerb", [sx + 3, 0.7, sz + 3], cf(x, FLOOR_TOP + 0.35, z), KERB, "Concrete",
-             CanCollide=False),
-    ]
-
-    # Split the long axis into two or three footprints with a gap between, so a
-    # plot reads as several buildings rather than one extruded rectangle.
-    along_x = sx >= sz
-    span = sx if along_x else sz
-    count = 2 if span < 150 else 3
-    cell = span / count
-    for index in range(count):
-        offset = -span / 2 + cell * (index + 0.5)
-        w = cell - 12 if along_x else sx - 16
-        d = sz - 16 if along_x else cell - 12
-        out.extend(building(
-            x + (offset if along_x else 0), z + (0 if along_x else offset),
-            w, d, rng.uniform(26, 104), rng.choice(BUILDING_SKINS), rng,
-        ))
-    return out
-
-
 # --------------------------------------------------------------------------
 # What stands in the plaza.
 #
@@ -2562,25 +2949,60 @@ def facing_centre(x, z):
     return math.degrees(math.atan2(x, z)) + 180
 
 
-def npc(name, npc_id, x, z, accent):
+# The quest giver's ring. A flat disc on the floor, in the colour of the marker the
+# HUD uses for objectives, so "this is the person with the quests" is legible from
+# across the concourse without a nameplate being readable yet.
+QUEST_RING_COLOR = [1.0, 0.80, 0.22]
+COACH_GI = [0.93, 0.93, 0.90]
+COACH_TROUSERS = [0.13, 0.13, 0.15]
+COACH_HAIR = [0.88, 0.88, 0.86]
+
+
+def npc(name, npc_id, x, z, accent, style="tracksuit", ring_color=None):
     """A part-built figure. R6 proportions, no rig and no animation — it stands
-    there and holds a ProximityPrompt, which is all a quest giver has to do."""
+    there and holds a ProximityPrompt, which is all a quest giver has to do.
+
+    Two styles, because the two roles have to be told apart at a glance: the
+    shopkeeper is a tracksuit-and-cap staffer, and the coach is the one in the pale
+    gi who hands out the objectives. Both are the same seven parts in different
+    colours -- a second silhouette would be a second thing to keep in sync.
+    """
+    torso = COACH_GI if style == "coach" else TRACKSUIT
+    legs = COACH_TROUSERS if style == "coach" else TRACKSUIT
     frame = mul(cf(x, 0, z), rot_y(facing_centre(x, z)))
     body = [
-        part("LeftLeg", [1.0, 2.8, 1.0], cf(-0.6, PLAZA_TOP + 1.4, 0), TRACKSUIT, "Fabric"),
-        part("RightLeg", [1.0, 2.8, 1.0], cf(0.6, PLAZA_TOP + 1.4, 0), TRACKSUIT, "Fabric"),
+        part("LeftLeg", [1.0, 2.8, 1.0], cf(-0.6, PLAZA_TOP + 1.4, 0), legs, "Fabric"),
+        part("RightLeg", [1.0, 2.8, 1.0], cf(0.6, PLAZA_TOP + 1.4, 0), legs, "Fabric"),
         # Named Base to match the station contract, so anything looking for an
         # object's anchor part finds the same name everywhere in the world.
-        part("Base", [2.3, 2.8, 1.3], cf(0, PLAZA_TOP + 4.2, 0), TRACKSUIT, "Fabric"),
+        part("Base", [2.3, 2.8, 1.3], cf(0, PLAZA_TOP + 4.2, 0), torso, "Fabric"),
         part("Stripe", [2.4, 0.5, 1.35], cf(0, PLAZA_TOP + 4.6, 0), accent, "Neon",
              CanCollide=False),
-        part("LeftArm", [0.9, 2.6, 0.9], cf(-1.6, PLAZA_TOP + 4.2, 0), TRACKSUIT, "Fabric"),
-        part("RightArm", [0.9, 2.6, 0.9], cf(1.6, PLAZA_TOP + 4.2, 0), TRACKSUIT, "Fabric"),
+        part("LeftArm", [0.9, 2.6, 0.9], cf(-1.6, PLAZA_TOP + 4.2, 0), torso, "Fabric"),
+        part("RightArm", [0.9, 2.6, 0.9], cf(1.6, PLAZA_TOP + 4.2, 0), torso, "Fabric"),
         part("Head", [1.5, 1.5, 1.5], cf(0, PLAZA_TOP + 6.4, 0), SKIN, "SmoothPlastic"),
-        part("Cap", [1.7, 0.6, 1.7], cf(0, PLAZA_TOP + 7.3, 0), accent, "Fabric"),
-        part("CapPeak", [1.6, 0.25, 0.9], cf(0, PLAZA_TOP + 7.1, 1.1), accent, "Fabric",
-             CanCollide=False),
     ]
+
+    if style == "coach":
+        body.append(part("Hair", [1.7, 0.7, 1.7], cf(0, PLAZA_TOP + 7.35, 0),
+                         COACH_HAIR, "Fabric", CanCollide=False))
+    else:
+        body.extend([
+            part("Cap", [1.7, 0.6, 1.7], cf(0, PLAZA_TOP + 7.3, 0), accent, "Fabric"),
+            part("CapPeak", [1.6, 0.25, 0.9], cf(0, PLAZA_TOP + 7.1, 1.1), accent, "Fabric",
+                 CanCollide=False),
+        ])
+
+    if ring_color is not None:
+        # Sits a hair above the floor so it never z-fights the campus slab, and is
+        # non-collidable so it is a marking rather than a kerb to trip on.
+        # rot_z(90) stands the cylinder's local-X axis up, which is what turns it from
+        # a log lying on the floor into a disc painted on it.
+        body.append(cylinder("QuestRing", 0.08, 11,
+                             mul(cf(0, PLAZA_TOP + 0.06, 0), rot_z(90)),
+                             ring_color, "Neon",
+                             CanCollide=False, CastShadow=False))
+
     return tagged({
         "name": name,
         "className": "Model",
@@ -2628,8 +3050,14 @@ def bench(x, z):
 
 
 def plaza_furniture():
-    """The quest giver, the standings, and something to sit on."""
-    out = [npc("Coach", "Coach", 0, -17, ACCENT_STARTER)]
+    """The standings, and something to sit on.
+
+    The coach used to stand here, which meant the only quest giver in the game was at
+    spawn: once a player travelled out to a multiplier tier, picking up the next
+    objective meant a round trip home. campus_shell now puts one on every campus,
+    including this one, so plaza_furniture no longer places its own.
+    """
+    out = []
 
     # Two monuments, because LeaderboardService defines two boards. A third
     # board would be a third entry here and nothing else.
@@ -2641,254 +3069,120 @@ def plaza_furniture():
     return out
 
 
-def downtown():
-    out = []
-    rng = random.Random("Downtown")
-    size = DOWNTOWN_HALF * 2
-    row = {
-        "half": DOWNTOWN_HALF,
-        "rock": [0.15, 0.15, 0.17],
-        "rock_material": "Rock",
-    }
-
-    out.append(part("Ground", [size, 4, size], cf(0, FLOOR_TOP - 2, 0),
-                    [0.21, 0.21, 0.22], "Asphalt"))
-    out.append(part("GroundTrim", [size + 8, 2, size + 8], cf(0, FLOOR_TOP - 5, 0),
-                    [0.26, 0.27, 0.30], "Concrete"))
-
-    # The grid: two roads each way across the island, then four avenues from
-    # the plaza block out to the edge.
-    # `street` lays its road along the frame's local Z, so the ones that run
-    # east-west are the rotated pair, not the ones sitting at x = +/-GRID.
-    for sign in (-1, 1):
-        out.extend(street(size, ROAD_WIDTH,
-                          mul(cf(0, FLOOR_TOP - 0.25, sign * GRID), rot_y(90)), False))
-        out.extend(street(size, ROAD_WIDTH, cf(sign * GRID, FLOOR_TOP - 0.25, 0), False))
-
-        inner = GRID - ROAD_WIDTH / 2
-        avenue = DOWNTOWN_HALF - inner
-        mid = sign * (inner + avenue / 2)
-        out.extend(street(avenue, ROAD_WIDTH, cf(0, FLOOR_TOP - 0.25, mid), True))
-        out.extend(street(avenue, ROAD_WIDTH,
-                          mul(cf(mid, FLOOR_TOP - 0.25, 0), rot_y(90)), True))
-
-    # Plots. The two the gym districts stand on are left bare here; their own
-    # `lot` geometry covers them.
-    gym_plots = {(round(district_origin(r)[0][0]), round(district_origin(r)[0][2]))
-                 for r in DISTRICTS if r["shape"] == "lot"}
-    for x, z, sx, sz in city_plots():
-        if (round(x), round(z)) in gym_plots:
-            continue
-        out.extend(city_plot(x, z, sx, sz, rng))
-
-    # Street furniture along both sides of the grid roads.
-    for sign in (-1, 1):
-        for along in range(-DOWNTOWN_HALF + 60, DOWNTOWN_HALF - 40, 74):
-            out.extend(street_light(along, sign * (GRID - ROAD_WIDTH / 2 - 3), 90 * sign))
-            out.extend(street_light(sign * (GRID - ROAD_WIDTH / 2 - 3), along, 90 - 90 * sign))
-        for along in range(-DOWNTOWN_HALF + 96, DOWNTOWN_HALF - 90, 122):
-            out.extend(parked_car(along, sign * (GRID - ROAD_WIDTH / 2 - 6), 90, rng))
-            out.extend(parked_car(sign * (GRID - ROAD_WIDTH / 2 - 6), along, 0, rng))
-
-    # Plaza: raised a hair so it reads as its own surface, and the only place
-    # in the game where travel is free.
-    out.append(disc("Plaza", 1.2, PLAZA_RADIUS * 2, FLOOR_TOP + 0.2,
-                    [0.42, 0.41, 0.40], "Pavement"))
-    out.append(disc("PlazaInlay", 0.4, PLAZA_RADIUS * 1.1, FLOOR_TOP + 0.9,
-                    [0.55, 0.50, 0.38], "Marble", CanCollide=False))
-
-    for index in range(12):
-        angle = 360.0 * index / 12
-        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS + 3))
-        out.append(part("PlazaLamp", [1.4, 16, 1.4],
-                        cf(spot[0][0], FLOOR_TOP + 8, spot[0][2]),
-                        [0.16, 0.16, 0.18], "Metal"))
-        out.append(part("PlazaLampHead", [2.4, 1.2, 2.4],
-                        cf(spot[0][0], FLOOR_TOP + 16.4, spot[0][2]),
-                        [1.0, 0.93, 0.76], "Neon", CanCollide=False))
-
-    # The safe zone, sized to the plaza rather than to a 40-stud bubble. It is
-    # both the PvP shelter and the origin check for free travel, so its extent
-    # is a gameplay number, not decoration.
-    out.append(tagged(
-        part("SpawnSafeZone", [SAFE_ZONE_HALF * 2, 44, SAFE_ZONE_HALF * 2],
-             cf(0, FLOOR_TOP + 22, 0), [0.4, 0.8, 1.0], "ForceField",
-             CanCollide=False, Transparency=0.94, CastShadow=False),
-        tags=["SafeZone"],
-    ))
-
-    # Causeway out to the Docks, so the first three tiers stay walkable.
-    # Spans exactly the gap between the two square edges, with a short seat at
-    # each end — run it further and its railings end up crossing the city.
-    angle = math.radians(CAUSEWAY_BEARING)
-    inner = DOWNTOWN_HALF / max(abs(math.sin(angle)), abs(math.cos(angle)))
-    docks = next(r for r in DISTRICTS if r["zone"] == "Powerhouse")
-    outer = docks["radius"] - docks["half"]
-    span = (outer - inner) + 24
-    bridge = mul(rot_y(CAUSEWAY_BEARING), cf(0, FLOOR_TOP - 0.8, (inner + outer) / 2))
-    out.append(part("Causeway", [36, 1.6, span], bridge,
-                    [0.28, 0.28, 0.29], "Concrete"))
-    for side in (-1, 1):
-        out.append(part("CausewayRail", [1.6, 3.2, span],
-                        mul(bridge, cf(side * 17.2, 2.4, 0)),
-                        [0.20, 0.21, 0.23], "Metal"))
-
-    # Promenade railing around the island edge, and palms along it. The edge is
-    # a 300-stud drop into nothing now that the baseplate is gone, so it wants
-    # to be visibly an edge.
-    for sign in (-1, 1):
-        for axis in (0, 1):
-            at = cf(0, FLOOR_TOP + 2, sign * (DOWNTOWN_HALF - 2))
-            frame = mul(rot_y(90 * axis), at)
-            out.append(part("Railing", [DOWNTOWN_HALF * 2, 3.4, 1.2], frame,
-                            [0.24, 0.25, 0.27], "Metal"))
-        for along in range(-DOWNTOWN_HALF + 70, DOWNTOWN_HALF - 60, 96):
-            out.extend(palm(along, sign * (DOWNTOWN_HALF - 16), rng))
-            out.extend(palm(sign * (DOWNTOWN_HALF - 16), along, rng))
-
-    # Palms ring the starter gym rather than the plaza: between the two is where
-    # players walk, and a tree there is something to walk around.
-    for index in range(8):
-        angle = 360.0 * index / 8 + 22.5
-        spot = mul(rot_y(angle), cf(0, 0, 130))
-        out.extend(palm(spot[0][0], spot[0][2], rng))
-
-    out.extend(plaza_furniture())
-
-    out.extend(underside(row, rng, False))
-    return out
-
-
-def build_world():
-    structure = [folder("Downtown", downtown())]
-    machines = []
-
-    for row in DISTRICTS:
-        origin = district_origin(row)
-        rng = random.Random(row["zone"])
-
-        pieces = SHAPES[row["shape"]](row, rng)
-        pieces.append(spawn_pad(row))
-        pieces.extend(zone_volume(row))
-        children = [place(origin, piece) for piece in pieces]
-
-        # Props live in their own folder: it keeps Studio navigable, and it is
-        # what lets the layout check tell scenery from the island itself.
-        theme = row.get("props")
-        if theme is not None:
-            children.append(folder("Props", [
-                _decorate(place(origin, piece)) for piece in PROPS[theme](row, rng)
-            ]))
-
-        spots = machine_spots(row)
-        children.append(folder("TrainingAreas", [
-            group(f"{equipment_id}Area", [
-                place(mul(origin, spot), piece)
-                for piece in training_venue(equipment_id, row["accent"])
-            ], class_name="Folder")
-            for equipment_id, spot in zip(MACHINE_ORDER, spots)
-        ]))
-        structure.append(folder(row["zone"], children))
-
-        machines.append(folder(row["zone"], [
-            machine(f"{row['zone']}{equipment_id}", equipment_id, mul(origin, spot),
-                    BUILDERS[equipment_id](row["pad"], row["accent"]))
-            for equipment_id, spot in zip(MACHINE_ORDER, spots)
-        ]))
-
-    return ({"className": "Folder", "children": structure},
-            {"className": "Folder", "children": machines})
-
-
 # --------------------------------------------------------------------------
 # Scattered training archipelago.
 #
 # The original district geometry remains above as a record of the island pass
 # and as a library of props/builders. Shipping now uses a bridge-free field of
-# distant islands over walkable water. Tier and stat are deliberately shuffled,
-# so neither position nor island theme reveals progression. The map UI reveals
-# every location; physically finding its doorway remains the exploration layer.
+# distant islands over walkable water. One island is one multiplier tier: the
+# island you can see across the water IS the x8 gym, and you go there when your
+# Power lets you train in it. The map UI reveals every location; physically
+# reaching its doorway remains the exploration layer.
 # --------------------------------------------------------------------------
 
-THIRD_FLOOR_Y = 24
 MAP_FEATURE_TAG = "MapFeature"
-GROUND_STYLES = ["warehouse", "alley", "yard", "underpass", "bunker"]
 
 # The world is an irregular archipelago rather than a rectangular grid or ring.
-# A region is a visual landmark, not a progression tier: the 30 non-starter
-# tier/family pairs are shuffled across all ten. The large hidden foundation is
-# only a fall catcher; visible land remains ten unrelated island silhouettes.
+# A region IS a progression tier, and its theme names the zone standing on it, so
+# there is exactly one island per non-starter zone and the five muscles of that
+# tier are the five bays of its one gym. The large hidden foundation is only a
+# fall catcher; visible land is six unrelated island silhouettes.
 WORLD_FOUNDATION_SIZE = (10000, 9000)
 WORLD_WATER_SIZE = (9600, 8600)
 WATER_SURFACE_Y = FLOOR_TOP - 8.5
-REGION_SPECS = [
-    {"id": "OldTown", "theme": "Iron", "size": (1060, 830),
-     "shape": "Rect", "count": 6},
-    {"id": "Harbor", "theme": "Powerhouse", "size": (1260, 820),
-     "shape": "Rect", "count": 7},
-    {"id": "Beach", "theme": "Strongman", "size": (1060, 1060),
-     "shape": "Circle", "count": 3},
-    {"id": "Quarry", "theme": "Titan", "size": (1120, 1120),
-     "shape": "Circle", "count": 4},
-    {"id": "Highrise", "theme": "Skydeck", "size": (1260, 910),
-     "shape": "Rect", "count": 7},
-    {"id": "SolarWorks", "theme": "Solar", "size": (1200, 850),
-     "shape": "Rect", "count": 5},
-    {"id": "Stormworks", "theme": "Storm", "size": (1060, 1060),
-     "shape": "Circle", "count": 4},
-    {"id": "NeonMarket", "theme": "Nebula", "size": (1260, 880),
-     "shape": "Rect", "count": 6},
-    {"id": "Observatory", "theme": "Ascendant", "size": (1060, 1060),
-     "shape": "Circle", "count": 3},
-    {"id": "VoidRail", "theme": "Void", "size": (1200, 880),
-     "shape": "Rect", "count": 5},
+
+# The altitude Storm — the top tier — floats at. It has no shore steps, so the
+# only way onto it is to fly, which is what keeps flight worth levelling Legs for
+# now that no individual machine is flight-gated.
+STORM_ALTITUDE = 300
+
+# --------------------------------------------------------------------------
+# One mainland, and a promenade along its coast.
+#
+# The archipelago is gone. A player who has to swim between tiers spends the
+# session travelling, and an island you cannot see the next island from teaches
+# nothing about where to go next. Now there is a single beach, one paved path
+# running along it, and the tiers strung out down that path in order: the x2 yard
+# is the one you can see from spawn, and the x64 slab is the shape in the sky at
+# the far end. Progression is "keep walking", which needs no map to understand.
+# --------------------------------------------------------------------------
+
+# The promenade runs along world z = 0 in +X, starting at the spawn plaza at the
+# world origin. The island is offset so that lands where it should: the plaza sits
+# near the western end, and the sea is on the +Z side of the path the whole way.
+PROMENADE_Z = 0
+# Beach between the seaward fence and the water, so the yards look out over sand.
+BEACH_DEPTH = 350
+
+MAINLAND_SIZE = (5200, 2600)
+MAINLAND_CENTER = (2200, -(MAINLAND_SIZE[1] / 2 - BEACH_DEPTH))
+
+MAINLAND = {
+    "id": "Mainland",
+    # Which DISTRICTS row supplies the palette and the prop kit. The whole coast is
+    # one beach, so it reads from the sand district rather than from a tier.
+    "visual": "Strongman",
+    "clutter": "coast",
+    # Island-local x of each flight of shore steps: one near the spawn end of the
+    # promenade, one near the far end.
+    "shore_offsets": (-1800, 1200),
+    "size": MAINLAND_SIZE,
+    "shape": "Rect",
+    "count": 9,
+    "center": MAINLAND_CENTER,
+    "yaw": 0,
+    "altitude": 0,
+    "flight_only": False,
+}
+
+
+# How far apart consecutive tier yards stand along the promenade. Far enough that
+# arriving somewhere is an event and that a fight at one yard does not spill into
+# the next, close enough that the following tier is always visible down the path.
+TIER_AREA_SPACING = 600
+TIER_AREA_FIRST_X = 600
+
+# One area per non-starter tier, in order, walking east. Storm is the exception:
+# its yard is a slab in the air over the end of the promenade, with no ramp and no
+# stairs, so the last tier is the one thing on the coast you have to fly to.
+TIER_AREAS = [
+    {"zone": "Iron", "altitude": 0, "flight_only": False},
+    {"zone": "Powerhouse", "altitude": 0, "flight_only": False},
+    {"zone": "Strongman", "altitude": 0, "flight_only": False},
+    {"zone": "Titan", "altitude": 0, "flight_only": False},
+    {"zone": "Skydeck", "altitude": 0, "flight_only": False},
+    {"zone": "Storm", "altitude": STORM_ALTITUDE, "flight_only": True},
 ]
 
 
-def scattered_regions():
-    """Seeded rejection sampling: far-apart islands without a visible ring/grid."""
-    rng = random.Random("scattered-archipelago-v2")
-    centers = []
-    for _spec in REGION_SPECS:
-        for _attempt in range(100000):
-            x = round(rng.uniform(-3850, 3850) / 10) * 10
-            z = round(rng.uniform(-3350, 3350) / 10) * 10
-            if math.hypot(x, z) < 1350:
-                continue
-            if any(math.hypot(x - other_x, z - other_z) < 1750
-                   for other_x, other_z in centers):
-                continue
-            centers.append((x, z))
-            break
-        else:
-            raise RuntimeError("could not scatter all training islands")
-
+def tier_areas():
+    """Each tier's yard placed down the promenade, nearest tier first."""
     out = []
-    for spec, center in zip(REGION_SPECS, centers):
-        region = dict(spec)
-        region["center"] = center
-        region["yaw"] = rng.randrange(-35, 36)
-        out.append(region)
+    for index, spec in enumerate(TIER_AREAS):
+        area = dict(spec)
+        area["id"] = f"Area{spec['zone']}"
+        area["x"] = TIER_AREA_FIRST_X + index * TIER_AREA_SPACING
+        area["frame"] = cf(area["x"], area["altitude"], PROMENADE_Z)
+        out.append(area)
     return out
 
 
-REGIONS = scattered_regions()
-REGION_BY_ID = {region["id"]: region for region in REGIONS}
+AREAS = tier_areas()
 
-# How far a site must stay inside its island's edge. A SitePavement is 86x88 and
-# the shell around it reaches roughly 33 studs further on +Z, so anything closer to
-# the water than this hangs a building off the coastline.
-SITE_EDGE_INSET = 110
-# Minimum distance between two sites on the same island. The validator only demands
-# 48, which is less than one 88-stud pavement — that number stops two machines being
-# the same machine, not two gyms looking like one building. 220 keeps each site a
-# separate place you walk to.
-SITE_MIN_SEPARATION = 220
-# The shore ramp lands on local +Z, 22 studs wide, running from edge+38 to edge-2
-# (see shore_access). Sites inside this lane would put a wall across the only
-# walk-up from the water.
-SITE_SHORE_CORRIDOR_HALF_WIDTH = 70
-SITE_SHORE_CORRIDOR_DEPTH = 150
+
+# --------------------------------------------------------------------------
+# One gym per island.
+#
+# Every island used to scatter three small shells — a warehouse here, a fenced
+# yard three hundred studs away — with a machine hidden under each. Flying in,
+# that reads as an island with some sheds on it: the thing the game is about was
+# the least visible thing on the ground.
+#
+# Now each island is a single enclosed gym hall, and its five machines are five
+# bays inside it — one per muscle, one whole multiplier tier under one roof. The
+# access ladder moved up a level with them: a machine is not flight-gated by
+# sitting up a shaft, it is flight-gated by standing on an island that flies.
+# --------------------------------------------------------------------------
 
 
 def map_feature(node, kind, shape="Rect"):
@@ -2963,369 +3257,92 @@ def shore_access(frame, edge, accent):
 def world_boundary():
     """Persistent physical perimeter that cannot be outrun by fast flight."""
     width, depth = WORLD_WATER_SIZE
+    center_x, center_z = WORLD_CENTER
     wall_height = 2048
     wall_y = WATER_SURFACE_Y + wall_height / 2 - 32
+    x_segments = max(1, math.ceil(width / 1800))
+    z_segments = max(1, math.ceil(depth / 1800))
     out = []
     for side in (-1, 1):
-        for segment in range(5):
-            z = -depth / 2 + depth / 5 * (segment + 0.5)
+        for segment in range(z_segments):
+            z = center_z - depth / 2 + depth / z_segments * (segment + 0.5)
             out.append(part(
-                f"BoundaryX_{side}_{segment + 1}", [12, wall_height, depth / 5 + 4],
-                cf(side * width / 2, wall_y, z), [0.06, 0.10, 0.14], "ForceField",
+                f"BoundaryX_{side}_{segment + 1}",
+                [12, wall_height, depth / z_segments + 4],
+                cf(center_x + side * width / 2, wall_y, z),
+                [0.06, 0.10, 0.14], "ForceField",
                 Transparency=1, CanTouch=False, CanQuery=False, CastShadow=False,
             ))
-            x = -width / 2 + width / 5 * (segment + 0.5)
+        for segment in range(x_segments):
+            x = center_x - width / 2 + width / x_segments * (segment + 0.5)
             out.append(part(
-                f"BoundaryZ_{side}_{segment + 1}", [width / 5 + 4, wall_height, 12],
-                cf(x, wall_y, side * depth / 2), [0.06, 0.10, 0.14], "ForceField",
+                f"BoundaryZ_{side}_{segment + 1}",
+                [width / x_segments + 4, wall_height, 12],
+                cf(x, wall_y, center_z + side * depth / 2),
+                [0.06, 0.10, 0.14], "ForceField",
                 Transparency=1, CanTouch=False, CanQuery=False, CastShadow=False,
             ))
     return persistent_model("WorldBoundary", out, {
         "WorldBoundary": True,
+        "CenterX": center_x,
+        "CenterZ": center_z,
         "HalfWidth": width / 2,
         "HalfDepth": depth / 2,
+        "XSegments": x_segments,
+        "ZSegments": z_segments,
         "WaterSurfaceY": WATER_SURFACE_Y,
     })
 
 
 def region_frame(region):
+    """The frame every piece of an island hangs off, altitude included.
+
+    Raising the island here rather than at each builder is what makes a flying
+    island possible at all: ground, hall, bays, scenery and shore all compose off
+    this one frame, so they go up together and every local Y stays measured from
+    the island's own floor.
+    """
     x, z = region["center"]
-    return mul(cf(x, 0, z), rot_y(region["yaw"]))
+    return mul(cf(x, region["altitude"], z), rot_y(region["yaw"]))
 
 
-def region_footprint_contains(region, local_x, local_z, inset):
-    """Is this island-local point on solid ground, `inset` studs clear of the edge?
-
-    Mirrors the two branches of region_ground: a Circle island is a disc of the
-    shorter dimension, a Rect island is the full slab. Both the machine sites and
-    the scenery scatter test against this one function, so decoration cannot end up
-    on a piece of ground the layout does not consider part of the island.
-    """
-    width, depth = region["size"]
-    if region["shape"] == "Circle":
-        radius = min(width, depth) / 2 - inset
-        return radius > 0 and math.hypot(local_x, local_z) <= radius
-    return abs(local_x) <= width / 2 - inset and abs(local_z) <= depth / 2 - inset
+# A real gym is lit like an office: broad flush panels in a pale ceiling, throwing
+# even light everywhere, with no single fixture bright enough to stare at. That is
+# the opposite of a thin saturated batten, which is a bright line in a black room
+# and makes everything near it — a player especially — harder to see, not easier.
+# These colours are deliberately mid-tone, not white. A Neon part renders at its
+# colour's full value and the place runs Bloom on top, so a near-white panel face
+# is not a bright light in the render — it is a blown-out white smear that takes
+# the wall behind it with it. Pale surfaces compound it by bouncing the lot back.
+CEILING_LIGHT = [0.76, 0.74, 0.69]
+CEILING_LINER = [0.60, 0.59, 0.56]
 
 
-def region_in_shore_corridor(region, local_x, local_z):
-    """The walk-up lane from the water, which nothing may be built across."""
-    width, depth = region["size"]
-    edge = min(width, depth) / 2 if region["shape"] == "Circle" else depth / 2
-    return (abs(local_x) < SITE_SHORE_CORRIDOR_HALF_WIDTH
-            and local_z > edge - SITE_SHORE_CORRIDOR_DEPTH)
-
-
-# Cached per island id rather than per region dict, which is unhashable. The
-# validator builds the world twice in one process and compares the two results
-# byte for byte, so every consumer has to see the same sites both times.
-_REGION_SITES_CACHE = {}
-
-
-def region_sites(region):
-    """World-space site CFrames, scattered rather than stamped from one pattern.
-
-    Every island used to reuse the same seven offsets, scaled and rotated. That is
-    readable from the air after visiting two islands: the machines sit in the same
-    constellation every time. Here each island rejection-samples its own points
-    inside its own footprint, seeded by its id, so the arrangement differs from
-    island to island and still reproduces exactly on every rebuild.
-    """
-    cached = _REGION_SITES_CACHE.get(region["id"])
-    if cached is not None:
-        return cached
-
-    rng = random.Random(f"scattered-archipelago-sites-v1:{region['id']}")
-    width, depth = region["size"]
-    accepted = []
-    for _index in range(region["count"]):
-        for _attempt in range(4000):
-            if region["shape"] == "Circle":
-                # sqrt-corrected, or a uniform radius piles points into the middle.
-                radius = (min(width, depth) / 2 - SITE_EDGE_INSET) * math.sqrt(rng.random())
-                angle = rng.uniform(0, 2 * math.pi)
-                local_x, local_z = radius * math.cos(angle), radius * math.sin(angle)
-            else:
-                local_x = rng.uniform(-1, 1) * (width / 2 - SITE_EDGE_INSET)
-                local_z = rng.uniform(-1, 1) * (depth / 2 - SITE_EDGE_INSET)
-            if not region_footprint_contains(region, local_x, local_z, SITE_EDGE_INSET):
-                continue
-            if region_in_shore_corridor(region, local_x, local_z):
-                continue
-            if any(math.hypot(local_x - other_x, local_z - other_z) < SITE_MIN_SEPARATION
-                   for other_x, other_z in accepted):
-                continue
-            accepted.append((local_x, local_z))
-            break
-        else:
-            raise RuntimeError(f"could not scatter sites on {region['id']}")
-
-    frame = region_frame(region)
-    out = []
-    for local_x, local_z in accepted:
-        # Face the door roughly back toward the middle of the island, then throw it
-        # off by up to 40 degrees. Pointing every door at the centre is its own
-        # pattern; pure random yaw makes buildings look dropped rather than built.
-        inward = math.degrees(math.atan2(-local_x, -local_z))
-        yaw = inward + rng.uniform(-40, 40)
-        out.append(mul(mul(frame, cf(local_x, 0, local_z)), rot_y(yaw)))
-
-    _REGION_SITES_CACHE[region["id"]] = out
-    return out
-
-
-def _assignment_is_varied(assignments):
-    tier_regions = {}
-    family_regions = {family: set() for family in FAMILY_ORDER}
-    region_tiers = {}
-    region_families = {}
-    for record, region_id, _site_index, _site in assignments:
-        tier_regions.setdefault(record["zone"], set()).add(region_id)
-        family_regions[record["family"]].add(region_id)
-        key = (region_id, record["zone"])
-        region_tiers[key] = region_tiers.get(key, 0) + 1
-        key = (region_id, record["family"])
-        region_families[key] = region_families.get(key, 0) + 1
-    return (
-        all(len(regions) >= 4 for regions in tier_regions.values())
-        and all(len(regions) >= 5 for regions in family_regions.values())
-        and max(region_tiers.values()) <= 2
-        and max(region_families.values()) <= 2
-    )
-
-
-def connected_locations():
-    """Thirty-five destinations: seven doubling locations for every muscle.
-
-    The first five form a readable x1 ring around spawn. The other thirty are
-    deterministically shuffled over ten far-apart neighborhoods so multiplier,
-    muscle and scenery never collapse into rows. Each family keeps one recognizable
-    exercise at every tier, while the environment supplies the discovery fantasy.
-    """
-    tier_rows = DISTRICTS[:7]
-    starters = []
-    starter_sites = [
-        (-62, -42, 32), (54, -56, -24), (-70, 35, 112),
-        (12, 68, 188), (70, 20, 254),
-    ]
-    for family, equipment_id, (x, z, yaw) in zip(
-            FAMILY_ORDER, MACHINE_ORDER, starter_sites):
-        origin = mul(cf(x, 0, z), rot_y(yaw))
-        starters.append({
-            "id": f"Garage-{family}",
-            "zone": "Garage",
-            "family": family,
-            "slot": equipment_id,
-            "equipment": equipment_id,
-            "site_x": x,
-            "site_z": z,
-            "ground_origin": origin,
-            "origin": origin,
-            "style": "starter",
-            "seed": f"massive-city-v1:Garage:{family}",
-            "starter": True,
-            "landmark": False,
-            "region_id": "Hub",
-            "environment_id": "Hub",
-            "neighborhood": "Garage",
-            "requires_flight": False,
-            "altitude": 0,
-            "location_name": f"Starter {family} Yard",
-            "location_tagline": "The x1 training spot beside the central safe zone.",
-        })
-
-    records = []
-    for zone_index, zone_row in enumerate(tier_rows[1:], 1):
-        for family_index, family in enumerate(FAMILY_ORDER):
-            records.append({
-                "zone": zone_row["zone"],
-                "zone_index": zone_index,
-                "family": family,
-                "family_index": family_index,
-                "equipment": STAT_VARIANTS[family][zone_index],
-            })
-
-    # Three active sites per island makes the whole archipelago meaningful while
-    # avoiding the old tell of exactly five machines per progression district.
-    slots = [
-        (region["id"], site_index, site)
-        for region in REGIONS
-        for site_index, site in enumerate(region_sites(region)[:3])
-    ]
-    assignments = None
-    for attempt in range(2000):
-        shuffled = list(records)
-        random.Random(f"massive-city-v1:assignment:{attempt}").shuffle(shuffled)
-        candidate = [
-            (record, region_id, site_index, site)
-            for record, (region_id, site_index, site) in zip(shuffled, slots)
-        ]
-        if _assignment_is_varied(candidate):
-            assignments = candidate
-            break
-    if assignments is None:
-        raise RuntimeError("could not distribute the 30 outer training sites")
-
-    out = list(starters)
-    for index, (record, region_id, site_index, site) in enumerate(assignments):
-        zone_index = record["zone_index"]
-        family_index = record["family_index"]
-        requires_flight = zone_index == 6
-        # Each muscle has one intermediate third-floor secret, but its multiplier
-        # differs by muscle so a player cannot infer the whole progression from one.
-        third_floor = not requires_flight and zone_index == 1 + family_index
-        style = "sky" if requires_flight else (
-            "tower" if third_floor else GROUND_STYLES[(index + zone_index + family_index) % len(GROUND_STYLES)]
-        )
-        altitude = 0 if not requires_flight else 180 + family_index * 24
-        origin = mul(site, cf(0, altitude if requires_flight else (
-            THIRD_FLOOR_Y if third_floor else 0), 0))
-        region = REGION_BY_ID[region_id]
-        site_x, _, site_z = site[0]
-        travel_id = f"{record['zone']}-{record['family']}"
-        access_text = "Fly to the skyline platform." if requires_flight else (
-            "Find the entrance and climb to floor three." if third_floor
-            else "Search the street-level gym landmark."
-        )
-        out.append({
-            "id": travel_id,
-            "zone": record["zone"],
-            "family": record["family"],
-            "slot": record["equipment"],
-            "equipment": record["equipment"],
-            "site_x": site_x,
-            "site_z": site_z,
-            "ground_origin": site,
-            "origin": origin,
-            "style": style,
-            "seed": f"massive-city-v1:{travel_id}:{region_id}",
-            "starter": False,
-            "landmark": site_index == 0,
-            "region_id": region_id,
-            "environment_id": f"Sky-{travel_id}" if requires_flight else region_id,
-            "neighborhood": region["theme"],
-            "requires_flight": requires_flight,
-            "altitude": altitude,
-            "location_name": f"{region_id} {record['family']} Gym",
-            "location_tagline": access_text,
-        })
-    return out
-
-
-def hideout_shell(style, equipment_id, accent):
-    """Street-facing cover around a stat venue; the entrance always faces +Z."""
-    wall = [0.16, 0.17, 0.19]
-    trim = STAT_COLORS[equipment_id]
-    out = []
-
-    if style == "warehouse":
-        out.extend([
-            part("WarehouseBack", [48, 16, 1.2], cf(0, FLOOR_TOP + 8, -26), wall, "Brick"),
-            part("WarehouseSide", [1.2, 16, 56], cf(-24, FLOOR_TOP + 8, 2), wall, "Brick"),
-            part("WarehouseSide", [1.2, 16, 56], cf(24, FLOOR_TOP + 8, 2), wall, "Brick"),
-            part("WarehouseRoof", [48, 1.0, 56], cf(0, FLOOR_TOP + 16.5, 2), wall, "Metal"),
-            part("WarehouseSign", [28, 1.2, 1.0], cf(0, FLOOR_TOP + 14, 29), trim, "Neon"),
-        ])
-    elif style == "alley":
-        out.extend([
-            part("AlleyLeft", [18, 30, 62], cf(-24, FLOOR_TOP + 15, 0), wall, "Concrete"),
-            part("AlleyRight", [18, 24, 62], cf(24, FLOOR_TOP + 12, 0), [0.21, 0.18, 0.17], "Brick"),
-            part("AlleyBack", [30, 10, 1.0], cf(0, FLOOR_TOP + 5, -29), wall, "Concrete"),
-            part("AlleyLight", [20, 0.5, 0.8], cf(0, FLOOR_TOP + 12, -28), trim, "Neon"),
-        ])
-    elif style == "yard":
-        # A fenced construction yard: visible from the air, concealed from the street.
-        for x, z, sx, sz in ((0, -28, 54, 1), (-27, 0, 1, 56), (27, 0, 1, 56)):
-            out.append(part("YardFence", [sx, 8, sz], cf(x, FLOOR_TOP + 4, z), wall, "DiamondPlate"))
-        out.extend([
-            part("SiteOffice", [18, 10, 14], cf(-16, FLOOR_TOP + 5, -18),
-                 [0.37, 0.30, 0.22], "Metal"),
-            part("YardLamp", [3, 14, 3], cf(24, FLOOR_TOP + 7, -24), accent, "Neon"),
-        ])
-    elif style == "underpass":
-        out.extend([
-            part("Overpass", [62, 4, 64], cf(0, FLOOR_TOP + 17, 0), [0.27, 0.27, 0.28], "Concrete"),
-            part("Support", [5, 17, 5], cf(-26, FLOOR_TOP + 8.5, -25), wall, "Concrete"),
-            part("Support", [5, 17, 5], cf(26, FLOOR_TOP + 8.5, -25), wall, "Concrete"),
-            part("UnderpassStrip", [32, 0.7, 1.0], cf(0, FLOOR_TOP + 15, -28), trim, "Neon"),
-        ])
-    else:
-        out.extend([
-            part("BunkerBack", [52, 13, 4], cf(0, FLOOR_TOP + 6.5, -27), wall, "Concrete"),
-            part("BunkerSide", [4, 13, 58], cf(-26, FLOOR_TOP + 6.5, 0), wall, "Concrete"),
-            part("BunkerSide", [4, 13, 58], cf(26, FLOOR_TOP + 6.5, 0), wall, "Concrete"),
-            part("BunkerRoof", [56, 3, 60], cf(0, FLOOR_TOP + 14.5, 0), [0.23, 0.23, 0.24], "Concrete"),
-            part("BunkerHeader", [24, 1.2, 4.2], cf(0, FLOOR_TOP + 11.5, 29), trim, "Neon"),
-        ])
-    return out
-
-
-def enterable_training_tower(travel_id, equipment_id, accent):
-    """An atomic, enterable three-storey building with a floor-three gym."""
-    wall = [0.18, 0.19, 0.22]
-    glass = [0.12, 0.23, 0.30]
-    stat = STAT_COLORS[equipment_id]
-    out = [
-        # All surfaces line up with the builders' local FLOOR_TOP=1 contract.
-        # Upper slabs stop at x=16, leaving a 14-stud stairwell at the right wall.
-        part("Floor1", [60, 1, 66], cf(0, FLOOR_TOP - 0.5 + SURFACE_LIFT * 2, 0),
-             [0.34, 0.34, 0.35], "Concrete"),
-        part("Floor2", [46, 1, 62], cf(-7, FLOOR_TOP + 11.5, 0),
-             [0.30, 0.30, 0.32], "Concrete"),
-        part("Floor3", [46, 1, 62], cf(-7, FLOOR_TOP + 23.5, 0),
-             [0.30, 0.30, 0.32], "Concrete"),
-        # The first flight rises from the front door toward -Z. The second turns
-        # back and rises toward +Z. Both overlap their landings, eliminating the
-        # small edge gaps that make Roblox pathfinding reject a staircase.
-        part("LandingFloor2", [14, 1, 22], cf(23, FLOOR_TOP + 11.5, -13),
-             [0.30, 0.30, 0.32], "Concrete"),
-        part("LandingFloor3", [14, 1, 18], cf(23, FLOOR_TOP + 23.5, 7),
-             [0.30, 0.30, 0.32], "Concrete"),
-        part("Stair_L1", [10, 1.2, 30],
-             mul(cf(23, FLOOR_TOP + 5.5, 8), rot_x(23.6)),
-             [0.26, 0.27, 0.30], "DiamondPlate"),
-        part("Stair_L2", [10, 1.2, 30],
-             mul(cf(23, FLOOR_TOP + 17.5, -7), rot_x(-23.6)),
-             [0.26, 0.27, 0.30], "DiamondPlate"),
-        # Back and side walls, plus a real ground-floor doorway. Upper storeys
-        # are closed facades so the hidden machine is not exposed like a dollhouse.
-        part("TowerBack", [60, 44, 1.2], cf(0, 22, -33), wall, "Brick"),
-        part("TowerLeft", [1.2, 44, 66], cf(-30, 22, 0), wall, "Brick"),
-        part("TowerRight", [1.2, 44, 66], cf(30, 22, 0), wall, "Brick"),
-        part("TowerRoof", [62, 1.2, 68], cf(0, 44.6, 0), wall, "Metal"),
-        part("FrontGroundLeft", [23, 12, 1.2], cf(-18.5, 7, 33), wall, "Brick"),
-        part("FrontGroundRight", [23, 12, 1.2], cf(18.5, 7, 33), wall, "Brick"),
-        part("EntranceHeader", [14, 2, 1.5], cf(0, 12, 33), stat, "Neon"),
-        part("FrontFloor2", [60, 10.8, 1.2], cf(0, 19, 33), wall, "Brick"),
-        part("FrontFloor3", [60, 18.8, 1.2], cf(0, 34.6, 33), wall, "Brick"),
-        part("TierStrip", [58, 0.8, 1.5], cf(0, 42, 32.2), accent, "Neon"),
-        marker("Entrance", [12, 9, 2], cf(0, 5.5, 31.5)),
-        part("TrainingRoomFloor", [30, 0.12, 30],
-             cf(0, THIRD_FLOOR_Y + FLOOR_TOP + 0.06, 0), stat, "Neon",
-             CanCollide=False, Transparency=0.82, CastShadow=False),
-    ]
-
-    # Window bands make each storey readable from the street while keeping the
-    # machine itself out of sight until the player climbs inside.
-    for y in (7, 19, 31):
-        out.append(part("Window", [18, 6, 0.3], cf(-18, FLOOR_TOP + y, 33.7),
-                        glass, "Glass", Transparency=0.28, CanCollide=False))
-        out.append(part("Window", [18, 6, 0.3], cf(18, FLOOR_TOP + y, 33.7),
-                        glass, "Glass", Transparency=0.28, CanCollide=False))
-
-    return {
-        "name": f"Enterable_{travel_id}",
-        "className": "Model",
-        "attributes": {
-            "Enterable": True,
-            "FloorCount": 3,
-            "TrainingFloor": 3,
-            "TravelId": travel_id,
-            "AccessKind": "ThirdFloor",
+def ceiling_panel(frame):
+    """One flush ceiling panel: a wide soft face plus the light it stands for."""
+    node = part("CeilingPanel", [34, 0.5, 26], frame, CEILING_LIGHT, "Neon",
+                CanCollide=False, CanTouch=False, CanQuery=False, CastShadow=False)
+    node["children"] = [{
+        "name": "Light",
+        "className": "SurfaceLight",
+        "properties": {
+            "Face": "Bottom",
+            # Nine of these overlap in one hall, and the place already runs a
+            # global Brightness of 2.5 with positive exposure compensation. Each
+            # one only has to light the floor under itself.
+            "Brightness": 0.9,
+            "Range": 46,
+            "Angle": 140,
+            "Color": [1.0, 0.97, 0.92],
+            "Shadows": False,
         },
-        "properties": {"ModelStreamingMode": "Atomic"},
-        "children": out,
-    }
+    }]
+    return node
+
+
+# Furniture kinds, each returning parts in hall-local space around the point it is
+# given. A new piece of gym furniture is a new function and a new HALL_FURNITURE
+# entry — never an edit to hall_interior, which only decides where things stand.
 
 
 def environment_model(environment_id, kind, children, atomic=False,
@@ -3351,7 +3368,7 @@ def environment_model(environment_id, kind, children, atomic=False,
 
 def region_ground(region):
     """One non-uniform island whose top remains the shared ground Y=1."""
-    visual = next(row for row in DISTRICTS if row["zone"] == region["theme"])
+    visual = next(row for row in DISTRICTS if row["zone"] == region["visual"])
     width, depth = region["size"]
     frame = region_frame(region)
     out = []
@@ -3370,17 +3387,21 @@ def region_ground(region):
             visual["ground"], "Land", "Circle",
         )))
     else:
-        out.extend([
-            place(frame, map_feature(part(
-                "DistrictGround", [width, 4, depth],
-                cf(0, FLOOR_TOP - 2, 0),
-                visual["ground"], visual["ground_material"],
-            ), "Land")),
-            place(frame, part(
-                "DistrictFoundation", [width + 10, 5, depth + 10],
-                cf(0, FLOOR_TOP - 6.5, 0), visual["rock"], visual["rock_material"],
-            )),
-        ])
+        # Tiled, not one slab: the mainland is 5,200 studs across and a BasePart
+        # stops at 2,048. The tiles share edges exactly, so the seam is invisible
+        # and the top face stays the shared FLOOR_TOP.
+        columns = max(1, math.ceil(width / 1800))
+        rows = max(1, math.ceil(depth / 1800))
+        out.extend(place(frame, node) for node in tiled_surface(
+            "DistrictGround", width, depth, 4, FLOOR_TOP - 2,
+            visual["ground"], visual["ground_material"],
+            columns=columns, rows=rows, map_kind="Land",
+        ))
+        out.extend(place(frame, node) for node in tiled_surface(
+            "DistrictFoundation", width + 10, depth + 10, 5, FLOOR_TOP - 6.5,
+            visual["rock"], visual["rock_material"],
+            columns=columns, rows=rows, CanTouch=False, CanQuery=False,
+        ))
 
         # Two rounded lobes break the silhouette of each rotated slab and make
         # actual coves/peninsulas on both the world and its plan map.
@@ -3388,7 +3409,8 @@ def region_ground(region):
         for side in (-1, 1):
             lobe_frame = mul(frame, cf(side * width * 0.43, 0, side * depth * 0.22))
             out.append(place(lobe_frame, disc(
-                "DistrictLobe", 4, lobe_diameter, FLOOR_TOP - 2,
+                "DistrictLobe", 4, lobe_diameter,
+                FLOOR_TOP - 2 + SURFACE_LIFT / 2,
                 visual["ground"], visual["ground_material"],
             )))
             out.append(place(frame, map_footprint(
@@ -3397,419 +3419,2858 @@ def region_ground(region):
                 visual["ground"], "Land", "Circle",
             )))
     shore_edge = min(width, depth) / 2 if region["shape"] == "Circle" else depth / 2
-    out.extend(shore_access(frame, shore_edge, visual["accent"]))
+    # A five-thousand-stud coast needs more than one way up out of the sea, or a
+    # player knocked into the water at the far end swims the length of the map to
+    # get back on land. One flight of steps near each end of the promenade.
+    for offset in region.get("shore_offsets", (0,)):
+        out.extend(shore_access(
+            mul(frame, cf(offset, 0, 0)), shore_edge, visual["accent"]
+        ))
     return out
 
 
 def _decorate(node):
     """Make a scenery node non-blocking, in place, and return it.
 
-    Props exist to make each island look like a place. They are not obstacles, and
-    every one of them that collides is something to get snagged on while running a
-    hundred studs between machines or flying between districts — a shipping
-    container is 26 studs deep and a crane leg is 62 tall.
+    Props exist to make each island look like a place. Most of them are not
+    obstacles, and every one that collides is something to get snagged on while
+    running a hundred studs between machines or flying between districts — a
+    shipping container is 26 studs deep and a crane leg is 62 tall.
 
-    They keep their shadows and their looks; they simply stop being in the way.
-    Collision is reserved for the things the layout actually intends you to walk on
-    or around: ground, buildings, platforms and the machines themselves.
+    The exceptions are named in SOLID_CITY_PROPS: crates, barrels, rocks and pillars
+    keep their collision, because this is a PvP game and a fight on ground with
+    nothing to break line of sight is two players standing still trading hits. Those
+    four are short, compact and flush to the floor, so they read as cover rather than
+    as the snag hazard this function exists to remove.
+
+    Everything else keeps its shadows and its looks and simply stops being in the
+    way.
     """
     properties = node.setdefault("properties", {})
     if "Size" in properties or "CFrame" in properties:
-        properties["CanCollide"] = False
-        properties["CanTouch"] = False
-        properties["CanQuery"] = False
+        # Both branches are written out rather than one being left to Roblox's
+        # defaults. Rojo patches existing instances, so a property the payload does
+        # not mention keeps whatever the instance already had — and every one of
+        # these parts already exists in the place as non-colliding scenery. Stating
+        # the solid case is what actually turns it back on. CanQuery matters as much
+        # as CanCollide: cover that raycasts pass straight through is not cover.
+        solid = node.get("name") in SOLID_CITY_PROPS
+        properties["CanCollide"] = solid
+        properties["CanTouch"] = solid
+        properties["CanQuery"] = solid
     for child in node.get("children", []):
         _decorate(child)
     return node
 
 
-# Clearance around a machine that scenery may not occupy. A container placed at the
-# old 48 could still crowd the working space in front of a squat rack, which is the
-# one spot a player has to stand.
-PROP_CLEARANCE = 72
-
-
-def _node_hits_sites(node, sites, clearance=PROP_CLEARANCE):
-    properties = node.get("properties", {})
-    frame = properties.get("CFrame")
-    size = properties.get("Size", [0, 0, 0])
-    if frame is not None:
-        radius = max(size[0], size[2]) / 2
-        if any(math.hypot(frame[0] - x, frame[2] - z) < clearance + radius
-               for x, z in sites):
-            return True
-    return any(_node_hits_sites(child, sites, clearance)
-               for child in node.get("children", []))
-
-
-def region_scenery(region, locations):
-    """One old-island landmark kit per neighborhood, filtered around gyms."""
-    visual = next(row for row in DISTRICTS if row["zone"] == region["theme"])
-    theme = visual.get("props")
-    if theme is None:
-        return []
-    row = dict(visual)
-    row["half"] = min(region["size"]) * 0.43
-    row["layout"] = "ring"
-    rng = random.Random(f"irregular-city-v3:scenery:{region['id']}")
-    site_positions = [(location["site_x"], location["site_z"])
-                      for location in locations]
-    out = []
-    for piece in PROPS[theme](row, rng):
-        placed = place(region_frame(region), piece)
-        if not _node_hits_sites(placed, site_positions):
-            out.append(_decorate(placed))
-    return out
-
-
-def _count_parts(node):
-    properties = node.get("properties", {})
-    own = 1 if ("Size" in properties or "CFrame" in properties) else 0
-    return own + sum(_count_parts(child) for child in node.get("children", []))
-
-
-def region_clutter(region, locations):
-    """Scatter small scenery across a whole island, not just around its rim.
-
-    region_scenery places one landmark kit on a single circle near the coast, which
-    is what you steer by. This fills everything inside that circle, so the walk
-    between two gyms crosses ground that looks used.
-
-    Points are laid on a jittered grid rather than sampled freely: uniform random
-    points clump, and a clump of six shrubs beside forty studs of nothing reads as a
-    bug rather than as planting. Every point is filtered against the machine sites
-    with the same PROP_CLEARANCE the landmark pass uses, and everything that
-    survives goes through _decorate, so none of it can be walked into.
-    """
-    visual = next(row for row in DISTRICTS if row["zone"] == region["theme"])
-    kit = CLUTTER_KITS.get(visual.get("props")) or CLUTTER_KITS[None]
-    kinds = [kind for kind, weight in kit for _repeat in range(weight)]
-
-    rng = random.Random(f"archipelago-clutter-v1:{region['id']}")
-    width, depth = region["size"]
-    site_positions = [(location["site_x"], location["site_z"])
-                      for location in locations]
-    frame = region_frame(region)
-
-    # A grid just big enough to hold the requested point count, walked in a fixed
-    # order so the result is reproducible.
-    columns = max(1, int(round(math.sqrt(CLUTTER_PER_ISLAND * width / depth))))
-    rows = max(1, -(-CLUTTER_PER_ISLAND // columns))
-    cell_width, cell_depth = width / columns, depth / rows
-
-    out = []
-    parts = 0
-    for row_index in range(rows):
-        for column_index in range(columns):
-            local_x = -width / 2 + (column_index + 0.5) * cell_width
-            local_z = -depth / 2 + (row_index + 0.5) * cell_depth
-            local_x += rng.uniform(-0.42, 0.42) * cell_width
-            local_z += rng.uniform(-0.42, 0.42) * cell_depth
-            if not region_footprint_contains(region, local_x, local_z, 24):
-                continue
-            if region_in_shore_corridor(region, local_x, local_z):
-                continue
-
-            spot = mul(frame, cf(local_x, 0, local_z))
-            pieces = CLUTTER[rng.choice(kinds)](rng, visual["accent"], visual["ground"])
-            for piece in pieces:
-                placed = place(spot, piece)
-                if _node_hits_sites(placed, site_positions):
-                    continue
-                parts += _count_parts(placed)
-                out.append(_decorate(placed))
-
-    if parts > CLUTTER_PART_BUDGET:
-        raise RuntimeError(
-            f"{region['id']} clutter is {parts} parts, over the "
-            f"{CLUTTER_PART_BUDGET} budget"
-        )
-    return out
-
-
 def connected_ground():
-    """Persistent walkable water beneath a bridge-free scattered archipelago."""
-    foundation = persistent_model("WorldFoundation", tiled_surface(
+    """Persistent water and fall catcher beneath the enlarged coastal city."""
+    foundation_columns = max(1, math.ceil(WORLD_FOUNDATION_SIZE[0] / 1800))
+    foundation_rows = max(1, math.ceil(WORLD_FOUNDATION_SIZE[1] / 1800))
+    water_columns = max(1, math.ceil(WORLD_WATER_SIZE[0] / 1800))
+    water_rows = max(1, math.ceil(WORLD_WATER_SIZE[1] / 1800))
+    foundation = persistent_model("WorldFoundation", [
+        place(cf(WORLD_CENTER[0], 0, WORLD_CENTER[1]), node)
+        for node in tiled_surface(
         "FoundationTile", WORLD_FOUNDATION_SIZE[0], WORLD_FOUNDATION_SIZE[1],
         6, WATER_SURFACE_Y - 4, [0.055, 0.06, 0.07], "Rock",
-        columns=5, rows=5, CanTouch=False, CanQuery=False,
-    ), {
+        columns=foundation_columns, rows=foundation_rows,
+        CanTouch=False, CanQuery=False,
+    )], {
         "PlayableFoundation": True,
         "Purpose": "WorldBoundsAndFallCatcher",
-        "FoundationCenterX": 0,
-        "FoundationCenterZ": 0,
+        "FoundationCenterX": WORLD_CENTER[0],
+        "FoundationCenterZ": WORLD_CENTER[1],
         "FoundationWidth": WORLD_FOUNDATION_SIZE[0],
         "FoundationDepth": WORLD_FOUNDATION_SIZE[1],
-        "TileColumns": 5,
-        "TileRows": 5,
+        "TileColumns": foundation_columns,
+        "TileRows": foundation_rows,
     })
-    water = persistent_model("WorldWater", tiled_surface(
+    water = persistent_model("WorldWater", [
+        place(cf(WORLD_CENTER[0], 0, WORLD_CENTER[1]), node)
+        for node in tiled_surface(
         "OceanTile", WORLD_WATER_SIZE[0], WORLD_WATER_SIZE[1],
         3, WATER_SURFACE_Y - 1.5, [0.08, 0.20, 0.27], "Glass",
-        columns=5, rows=5, map_kind="Water", CanCollide=True,
+        columns=water_columns, rows=water_rows, map_kind="Water", CanCollide=True,
         CanTouch=False, CanQuery=True, Transparency=0.18,
-    ), {
+    )], {
         "WalkableWater": True,
         "WaterSurfaceY": WATER_SURFACE_Y,
-        "TileColumns": 5,
-        "TileRows": 5,
+        "CenterX": WORLD_CENTER[0],
+        "CenterZ": WORLD_CENTER[1],
+        "TileColumns": water_columns,
+        "TileRows": water_rows,
     })
-    hub_children = [
-        disc("HubGround", 5, 470, FLOOR_TOP - 2.5,
-             [0.22, 0.23, 0.23], "Ground"),
-        disc("HubFoundation", 5, 482, FLOOR_TOP - 7.5,
-             [0.13, 0.14, 0.15], "Rock"),
-        map_footprint("HubLandMap", 470, 470, cf(0, FLOOR_TOP + 0.1, 0),
-                      [0.22, 0.23, 0.23], "Land", "Circle"),
-    ]
-    hub_children.extend(shore_access(cf(), 235, ACCENT_STARTER))
+    # The hub no longer has an island of its own: spawn stands on the western end
+    # of the mainland, at the head of the promenade. A separate disc here would
+    # overlap the mainland's ground and share a top face with it, which z-fights.
     return [
         foundation,
         water,
         world_boundary(),
-        environment_model("Hub", "Ground", hub_children),
+        environment_model("Hub", "Ground", []),
     ]
+
+
+# --------------------------------------------------------------------------
+# Coastal city layout.
+#
+# The coast-only yard pass above is kept as a reusable kit, but the shipping
+# world is a mixed-use city.  The player starts at Muscle Beach, follows a
+# continuous boardwalk and a simple street grid inland, and learns the multiplier
+# ladder through six landmarks: park, boardwalk, docks, civic plaza, office gym,
+# and a flight-only rooftop.  Each tier still owns all five muscles so geography
+# remains an honest progression guide.
+# --------------------------------------------------------------------------
+
+# The previous 5,200 x 3,000 coast was only 15.6 million square studs.  This
+# 16,000 x 9,000 mainland is 9.23 times that land area: close to the requested
+# tenfold expansion without turning each axis into a tenfold, 100x-area world.
+CITY_MAINLAND_SIZE = (16000, 9000)
+CITY_MAINLAND_CENTER = (7600, -4200)
+
+# Global traversal surfaces sit slightly outside the land and share its offset
+# centre.  Every tile stays below Roblox's 2,048-stud BasePart limit.
+WORLD_CENTER = (7600, -4000)
+WORLD_FOUNDATION_SIZE = (18000, 12000)
+WORLD_WATER_SIZE = (17600, 11600)
+
+MAINLAND = {
+    "id": "Mainland",
+    "visual": "Iron",
+    "size": CITY_MAINLAND_SIZE,
+    "shape": "Rect",
+    "center": CITY_MAINLAND_CENTER,
+    "yaw": 0,
+    "altitude": 0,
+    "flight_only": False,
+    "shore_offsets": (-6900, -2500, 2000, 6500),
+}
+REGIONS = [MAINLAND]
+REGION_BY_ID = {MAINLAND["id"]: MAINLAND}
+
+
+# What survives of the six campuses: their positions and venue types, which still
+# decide the architectural character of the city around them. Their display names
+# are gone -- nothing read them once the campuses were dissolved, and leaving
+# names for demolished places in the source is how they crept back into the map.
+CITY_AREA_SPECS = (
+    {
+        "zone": "Iron", "sequence": 1, "venue_type": "Park", "x": 1750, "z": -2250, "yaw": 12,
+        "altitude": 0, "flight_only": False,
+        "tagline": "Train beneath the trees in the public fitness garden.",
+    },
+    {
+        "zone": "Powerhouse", "sequence": 2, "venue_type": "Beach", "x": 3850, "z": 105, "yaw": -7,
+        "altitude": 0, "flight_only": False,
+        "tagline": "An open-air club between the boardwalk and the surf.",
+    },
+    {
+        "zone": "Strongman", "sequence": 3, "venue_type": "Dock", "x": 6600, "z": -1050, "yaw": 9,
+        "altitude": 0, "flight_only": False,
+        "tagline": "Heavy steel in the working harbor district.",
+    },
+    {
+        "zone": "Titan", "sequence": 4, "venue_type": "City", "x": 8650, "z": -4300, "yaw": -14,
+        "altitude": 0, "flight_only": False,
+        "tagline": "A floodlit performance plaza in the downtown blocks.",
+    },
+    {
+        "zone": "Skydeck", "sequence": 5, "venue_type": "Office", "x": 12050, "z": -2050, "yaw": 8,
+        "altitude": 0, "flight_only": False,
+        "tagline": "A glass-walled executive gym inside Apex Tower.",
+    },
+    {
+        "zone": "Storm", "sequence": 6, "venue_type": "Sky", "x": 14500, "z": -6100, "yaw": 17,
+        "altitude": STORM_ALTITUDE, "flight_only": True,
+        "tagline": "The final rooftop platform; flight is the only way up.",
+    },
+)
+
+
+def city_areas():
+    out = []
+    for spec in CITY_AREA_SPECS:
+        area = dict(spec)
+        area["id"] = f"Area{area['zone']}"
+        area["frame"] = mul(
+            cf(area["x"], area["altitude"], area["z"]),
+            rot_y(area["yaw"]),
+        )
+        out.append(area)
+    return out
+
+
+AREAS = city_areas()
+
+COPY_OFFSETS = (0,)
+CITY_CAMPUS_WIDTH = 370
+CITY_CAMPUS_DEPTH = 270
+
+
+STARTER_CAMPUS_FRAME = mul(cf(0, 0, 150), rot_y(180))
+
+
+# Streaming and file-split units. One environment per machine would be 35 models
+# in the districts file and 35 streaming groups; one for the whole city would be a
+# single 28,000-part model. Six geographic bands is the middle: enough that a
+# player only ever holds a slice of the city, few enough that the tree stays
+# readable.
+SECTOR_COUNT = 6
+
+
+def sector_for(x):
+    """Which sector environment a point belongs to."""
+    span = (CITY_MAX_X - CITY_MIN_X) / SECTOR_COUNT
+    index = int((x - CITY_MIN_X) // span)
+    return f"Sector{min(max(index, 0), SECTOR_COUNT - 1) + 1}"
+
+
+# Stride used to walk the scattered sites when handing out tier/muscle pairs.
+# Coprime with 30, so stepping by it visits every scattered site exactly once and
+# lands each tier's five machines about six sites apart in distance from spawn.
+# That is what keeps the tiers genuinely interleaved: no band of the map belongs
+# to one multiplier, which is the point of scattering rather than zoning. The
+# starter tier is not in this pool at all -- it rings the plaza.
+SITE_STRIDE = 13
+
+
+# A fight is somewhere you choose to walk to, so a hostile site must never land
+# on a training court -- being anchored to a machine for minutes at a time is the
+# one thing in this game that has to be safe.
+HOSTILE_STATION_CLEARANCE = 320
+MIN_HOSTILE_SEPARATION = 650
+
+
+def scatter_hostile_sites(station_sites):
+    """Seven mob fields and seven boss arenas, spread across the city.
+
+    Drawn from the same ground pool as the machines and picked with the same
+    farthest-point routine, so fighting grounds are destinations in their own
+    right rather than a disc parked behind whatever campus owned them.
+    """
+    taken = list(station_sites)
+    free = [
+        candidate for candidate in site_candidates()
+        if candidate["kind"] == "ground"
+        and all(math.hypot(candidate["x"] - site["x"], candidate["z"] - site["z"])
+                > HOSTILE_STATION_CLEARANCE for site in station_sites)
+    ]
+    # Spread against the stations as well as against each other: a boss arena
+    # equidistant from two machines is more useful than one tucked in a corner.
+    picked = _spread_pick(free, len(taken) + 14, taken)
+    return picked[len(taken):]
+
+
+def connected_locations():
+    """Thirty-five machines, each its own destination somewhere in the city."""
+    tier_rows = DISTRICTS[:7]
+    # Nearest the spawn plaza first, which is the only ordering a player can
+    # perceive, and the one the stride below is meant to interleave.
+    scattered = sorted(scatter_sites(),
+                       key=lambda site: math.hypot(site["x"], site["z"] - 150))
+    ring = garage_ring_sites()
+
+    pairs = [(row["zone"], family) for row in tier_rows for family in FAMILY_ORDER]
+    out = []
+    scattered_index, ring_index = 0, 0
+    for zone, family in pairs:
+        if zone == STARTER_ZONE:
+            site = ring[ring_index]
+            ring_index += 1
+        else:
+            site = scattered[(scattered_index * SITE_STRIDE) % len(scattered)]
+            scattered_index += 1
+        tier_index = next(i for i, row in enumerate(tier_rows) if row["zone"] == zone)
+        equipment_id = STAT_VARIANTS[family][tier_index]
+
+        # Roof sites lift the whole court by the height of the roof they stand on;
+        # every builder places its geometry against FLOOR_TOP, so the offset goes
+        # on the origin rather than into 35 builders.
+        lift = site["top"] - FLOOR_TOP
+        origin = mul(cf(site["x"], lift, site["z"]), rot_y(site.get("yaw", 0)))
+
+        travel_id = f"{zone}-{family}"
+        out.append({
+            "id": travel_id,
+            "zone": zone,
+            "family": family,
+            "slot": equipment_id,
+            "equipment": equipment_id,
+            "site_x": site["x"],
+            "site_z": site["z"],
+            "site_kind": site["kind"],
+            "site_top": site["top"],
+            "site_width": site["width"],
+            "site_depth": site["depth"],
+            "site_base_depth": site["base_depth"],
+            "ground_origin": origin,
+            "origin": origin,
+            "style": "street",
+            "seed": f"scattered-city-v1:{travel_id}",
+            "starter": zone == "Garage",
+            "landmark": False,
+            "region_id": MAINLAND["id"],
+            "environment_id": sector_for(site["x"]),
+            "neighborhood": character_name_at(site["x"], site["z"]),
+            "requires_flight": False,
+            "altitude": 0,
+            "location_name": street_address(site["x"], site["z"]),
+            "location_tagline": SITE_TAGLINES[site["kind"]],
+        })
+    return out
+
+
+def _ordinal(number):
+    if 10 <= number % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(number % 10, "th")
+    return f"{number}{suffix}"
+
+
+def street_address(x, z):
+    """Where a machine is, as the crossing it stands nearest.
+
+    The map's job is to get a player to the machine, and the one thing it can say
+    that actually helps is an address on the grid they are looking at. This used
+    to name the muscle instead -- all seven Chest machines read "Press Point" --
+    which told them what they already knew from the pin colour and nothing about
+    where to walk.
+
+    Avenues are numbered west to east and streets from the coast inland, matching
+    the order the roads are laid, so the numbers agree with what the map draws.
+    """
+    if math.hypot(x, z) <= 320:
+        return "Spawn Plaza"
+
+    avenue = min(range(len(UPLAND_AVENUES)),
+                 key=lambda index: abs(x - UPLAND_AVENUES[index]))
+    street = min(range(len(CROSSTOWN_ROADS)),
+                 key=lambda index: abs(z - CROSSTOWN_ROADS[index]))
+    return f"{_ordinal(avenue + 1)} Avenue & {_ordinal(street + 1)} Street"
+
+
+SITE_NAMES = {
+    "Chest": "Press Point",
+    "Arms": "Curl Corner",
+    "Back": "Pull Yard",
+    "Core": "Core Deck",
+    "Legs": "Squat Stand",
+}
+
+SITE_TAGLINES = {
+    "ground": "A street-level training spot out in the city.",
+    "roof": "A rooftop training spot; take the fire escape up.",
+}
+
+
+def character_name_at(x, z):
+    """The neighbourhood label a site inherits from the architecture around it."""
+    for name, character in CITY_CHARACTER.items():
+        if character is character_at(x, z):
+            return name
+    return "City"
+
+
+def city_road(name, width, depth, x, z, surface_offset=0.0):
+    """A tiled asphalt road with a plan-map footprint and restrained markings."""
+    columns = max(1, math.ceil(width / 1750))
+    rows = max(1, math.ceil(depth / 1750))
+    out = [
+        place(cf(x, 0, z), node)
+        for node in tiled_surface(
+            name, width, depth, 0.16,
+            FLOOR_TOP - 0.08 + SURFACE_LIFT + surface_offset,
+            ROAD, "Asphalt", columns=columns, rows=rows, map_kind="Road",
+            CanCollide=False, CastShadow=False,
+        )
+    ]
+    # A road gets one long centre marking per legal-sized tile rather than hundreds
+    # of dashes.  It remains legible at flight speed and stays within the part budget.
+    if width >= depth:
+        segment = width / columns
+        for column in range(columns):
+            px = x - width / 2 + segment * (column + 0.5)
+            out.append(part(
+                "RoadLine", [segment - 12, 0.08, 1.0],
+                cf(px, FLOOR_TOP + 0.13 + surface_offset, z),
+                ROAD_LINE, "SmoothPlastic",
+                CanCollide=False, CastShadow=False,
+            ))
+    else:
+        segment = depth / rows
+        for row in range(rows):
+            pz = z - depth / 2 + segment * (row + 0.5)
+            out.append(part(
+                "RoadLine", [1.0, 0.08, segment - 12],
+                cf(x, FLOOR_TOP + 0.13 + surface_offset, pz),
+                ROAD_LINE, "SmoothPlastic",
+                CanCollide=False, CastShadow=False,
+            ))
+    return out
+
+
+def crosswalk(x, z, across_x):
+    out = []
+    for offset in (-18, -9, 0, 9, 18):
+        size = [5, 0.09, 26] if across_x else [26, 0.09, 5]
+        frame = cf(x + (offset if across_x else 0), FLOOR_TOP + 0.16,
+                   z + (0 if across_x else offset))
+        out.append(part(
+            "CrosswalkStripe", size, frame, [0.76, 0.76, 0.72], "SmoothPlastic",
+            CanCollide=False, CastShadow=False,
+        ))
+    return out
+
+
+# --------------------------------------------------------------------------
+# City blocks.
+#
+# The street grid was already here; what was missing was anything standing in
+# it. The old lattice put one building on each of 54 hand-picked centres, which
+# on a ~1,650-stud pitch left seven to ten hundred studs of bare ground between
+# every one of them -- the emptiness this whole pass exists to fix.
+#
+# A block is now derived from the roads themselves rather than from a separate
+# table of centres, so a block can never drift out of alignment with the street
+# it fronts: change a road and the blocks follow.
+# --------------------------------------------------------------------------
+
+# Half-widths of the two road classes, plus the gap between kerb and asphalt.
+CROSSTOWN_HALF = 29
+AVENUE_HALF = 27
+KERB_SETBACK = 10
+
+# Heights. Each surface gets its own band so nothing shares a top face with
+# anything else -- coplanar surfaces z-fight, and validate_no_coplanar_floors
+# exists because that shipped once already.
+SIDEWALK_Y = FLOOR_TOP + 0.10
+KERB_Y = FLOOR_TOP + 0.06
+ALLEY_Y = FLOOR_TOP + 0.03
+
+# The city's outer edge. Blocks are clipped to this so none runs off the
+# mainland into the sea.
+CITY_MIN_X, CITY_MAX_X = -200, 15500
+CITY_MIN_Z, CITY_MAX_Z = -8600, -180
+
+
+def _band_edges(centres, half, low, high):
+    """The gaps between consecutive roads, as (near, far) pairs.
+
+    Includes the two outer gaps -- between the map edge and the first road --
+    which is where a third of the bare ground was: the old centre table simply
+    stopped, leaving a margin hundreds of studs deep with nothing in it.
+    """
+    edges = []
+    ordered = sorted(centres)
+    bounds = [low] + [c for c in ordered] + [high]
+    for index in range(len(bounds) - 1):
+        near = bounds[index] + (half if index > 0 else 0)
+        far = bounds[index + 1] - (half if index + 1 < len(bounds) - 1 else 0)
+        if far - near >= 220:
+            edges.append((near, far))
+    return edges
+
+
+def city_block_rects(crosstown_roads, upland_avenues):
+    """Every rectangle the street grid encloses, as (x, z, width, depth).
+
+    Derived from the road centrelines that already exist rather than authored
+    separately, which is what guarantees a block fronts the street beside it.
+    """
+    rects = []
+    for near_x, far_x in _band_edges(upland_avenues, AVENUE_HALF, CITY_MIN_X, CITY_MAX_X):
+        for near_z, far_z in _band_edges(crosstown_roads, CROSSTOWN_HALF, CITY_MIN_Z, CITY_MAX_Z):
+            rects.append((
+                (near_x + far_x) / 2, (near_z + far_z) / 2,
+                far_x - near_x, far_z - near_z,
+            ))
+    return rects
+
+
+def block_seed(index):
+    """A block's own generator, keyed on its index rather than its coordinates.
+
+    Integers, not floats: seeding from an x/z centre would reshuffle every block
+    in the city the first time a road moved by a stud.
+    """
+    return random.Random(f"city-v3:block:{index}")
+
+
+def city_block_shell(rect, index, keep_out=(), catalogue=None):
+    """The ground a block stands on: pavement, kerb, service alley, map footprint.
+
+    Buildings arrive in a later pass; this is deliberately separable so the
+    rectangles can be checked against the streets before anything expensive is
+    placed on them.
+    """
+    x, z, width, depth = rect
+    rng = block_seed(index)
+    inner_w, inner_d = width - KERB_SETBACK * 2, depth - KERB_SETBACK * 2
+    out = []
+
+    def cleared(px, pz, reach):
+        """Whether a piece stands clear of every campus keep-out."""
+        return all(math.hypot(px - kx, pz - kz) >= radius + reach
+                   for kx, kz, radius in keep_out)
+
+    # The kerb is wider than the pavement and deliberately non-colliding: left
+    # solid it is a few hundred ankle-height ledges across the city for a
+    # sprinting player to catch on.
+    out.append(part("Kerb", [inner_w + 5, 0.5, inner_d + 5], cf(x, KERB_Y, z),
+                    [0.30, 0.30, 0.31], "Concrete", CanCollide=False,
+                    CastShadow=False))
+    out.append(part("Sidewalk", [inner_w, 0.6, inner_d], cf(x, SIDEWALK_Y, z),
+                    SIDEWALK, "Concrete", CanCollide=False, CastShadow=False))
+
+    # One service alley across the long axis of the bigger blocks, which is what
+    # gives a block a back as well as a front.
+    if max(inner_w, inner_d) >= 520:
+        if inner_w >= inner_d:
+            out.append(part("Alley", [22, 0.4, inner_d], cf(x + rng.uniform(-0.18, 0.18) * inner_w, ALLEY_Y, z),
+                            ROAD, "Asphalt", CanCollide=False, CastShadow=False))
+        else:
+            out.append(part("Alley", [inner_w, 0.4, 22], cf(x, ALLEY_Y, z + rng.uniform(-0.18, 0.18) * inner_d),
+                            ROAD, "Asphalt", CanCollide=False, CastShadow=False))
+
+    # Exactly one map footprint per block. Per building would put thousands of
+    # features on the wire; the minimap wants city blocks, not window ledges.
+    out.append(map_footprint("CityBlockMap", width, depth,
+                             cf(x, FLOOR_TOP + 0.12, z), SIDEWALK, "Block"))
+
+    # The buildable interior, inset again so nothing overhangs the pavement.
+    character = character_at(x, z)
+    out.extend(street_furniture(x, z, inner_w, inner_d, index,
+                                character["skins"][0]["trim"], SIDEWALK))
+
+    # A yard costs a whole band when the band is shallow. The coastal strip is
+    # barely 440 studs deep and is also the most-walked ground in the game -- the
+    # promenade every player follows from one tier to the next -- so thin blocks
+    # are built out rather than left to the usual mix, which was leaving stretches
+    # of the seafront with a lamp post and nothing behind it.
+    weights = character["weights"]
+    if min(inner_w, inner_d) < 600:
+        weights = tuple((kind, weight) for kind, weight in weights
+                        if kind not in ("yard", "parking"))
+
+    build_w, build_d = inner_w - 30, inner_d - 30
+    if build_w > 90 and build_d > 90:
+        for lot in subdivide(x, z, build_w, build_d, rng):
+            kind = weighted_kind(weights, rng)
+            # Tested per lot, not per block. A block is up to 1,650 studs across,
+            # so measuring its own corner reach against a 300-stud campus radius
+            # threw away the whole block -- three quarters of a million square
+            # studs of city to protect one circle. That put the emptiness this
+            # pass exists to remove straight back on the seafront, which is the
+            # most-walked ground in the game. Drawing the roll either way keeps
+            # the rest of the block identical whether a lot is dropped or not.
+            if cleared(lot[0], lot[1], math.hypot(lot[2], lot[3]) / 2):
+                out.extend(city_lot(lot, kind, character, rng, catalogue))
+    return out
+
+
+# Architectural character, keyed on the venue_type of the nearest campus. A city
+# where every block is the same is a texture, not a place; this is what makes the
+# walk from the park to the docks to the office towers read as going somewhere.
+#
+# Resolved by nearest campus with a blend band (see character_at), so the change
+# is gradual rather than a line ruled across the map.
+CITY_CHARACTER = {
+    "Park": {
+        "skins": [BUILDING_SKINS[1], BUILDING_SKINS[2]],
+        "heights": {"tower": (95, 155), "midrise": (48, 85), "shophouse": (16, 28)},
+        "weights": (("tower", 6), ("midrise", 4), ("shophouse", 2), ("yard", 1), ("parking", 1)),
+    },
+    "Beach": {
+        "skins": [BUILDING_SKINS[2], BUILDING_SKINS[0]],
+        "heights": {"tower": (115, 190), "midrise": (55, 95), "shophouse": (16, 28)},
+        "weights": (("tower", 7), ("midrise", 4), ("shophouse", 1), ("yard", 1), ("parking", 1)),
+    },
+    "Dock": {
+        "skins": [BUILDING_SKINS[3], BUILDING_SKINS[0]],
+        "heights": {"tower": (105, 170), "midrise": (48, 85), "shophouse": (14, 26)},
+        "weights": (("tower", 6), ("midrise", 4), ("shophouse", 1), ("yard", 2), ("parking", 2)),
+    },
+    "City": {
+        "skins": [BUILDING_SKINS[0], BUILDING_SKINS[3]],
+        "heights": {"tower": (180, 300), "midrise": (85, 150), "shophouse": (20, 34)},
+        "weights": (("tower", 9), ("midrise", 3), ("shophouse", 1), ("yard", 1), ("parking", 1)),
+    },
+    "Office": {
+        "skins": [BUILDING_SKINS[3], BUILDING_SKINS[0]],
+        "heights": {"tower": (230, 380), "midrise": (105, 185), "shophouse": (22, 36)},
+        "weights": (("tower", 10), ("midrise", 3), ("shophouse", 1), ("yard", 1), ("parking", 1)),
+    },
+}
+
+# The coast between campuses belongs to nobody in particular.
+DEFAULT_CHARACTER = CITY_CHARACTER["Beach"]
+
+
+def character_at(x, z):
+    """The architectural character governing a point, by nearest campus."""
+    best, best_distance = None, math.inf
+    for area in AREAS:
+        if area["flight_only"]:
+            continue
+        distance = math.hypot(x - area["x"], z - area["z"])
+        if distance < best_distance:
+            best, best_distance = area, distance
+    if best is None:
+        return DEFAULT_CHARACTER
+    return CITY_CHARACTER.get(best["venue_type"], DEFAULT_CHARACTER)
+
+
+def weighted_kind(weights, rng):
+    total = sum(weight for _, weight in weights)
+    roll = rng.uniform(0, total)
+    for kind, weight in weights:
+        roll -= weight
+        if roll <= 0:
+            return kind
+    return weights[-1][0]
+
+
+def subdivide(x, z, width, depth, rng, min_side=250, depth_limit=3):
+    """A block's interior cut into lots by recursive binary splitting.
+
+    Always splits the longer axis, which is what keeps lots roughly square
+    instead of degenerating into strips, and stops on size rather than on a
+    fixed count so a small edge block gets two lots and a full interior block
+    gets a dozen.
+    """
+    if depth_limit <= 0 or max(width, depth) < min_side * 2:
+        return [(x, z, width, depth)]
+
+    if width >= depth:
+        cut = width * rng.uniform(0.38, 0.62)
+        return (
+            subdivide(x - (width - cut) / 2, z, cut, depth, rng, min_side, depth_limit - 1)
+            + subdivide(x + cut / 2, z, width - cut, depth, rng, min_side, depth_limit - 1)
+        )
+    cut = depth * rng.uniform(0.38, 0.62)
+    return (
+        subdivide(x, z - (depth - cut) / 2, width, cut, rng, min_side, depth_limit - 1)
+        + subdivide(x, z + cut / 2, width, depth - cut, rng, min_side, depth_limit - 1)
+    )
+
+
+# --------------------------------------------------------------------------
+# Buildings, in three layers.
+#
+# A city of one archetype is what 438 buildings sharing two part-name signatures
+# looks like. Rather than a table of whole buildings -- which just moves the
+# problem from one signature to a dozen -- a building is composed:
+#
+#   mass    what it is in plan and bulk, and the volumes it stacks
+#   facade  how each of those volumes is dressed
+#   roof    what sits on top
+#
+# Layers multiply where archetypes only add: a handful of each gives far more
+# distinct buildings than the same amount of code spent on fixed recipes, and a
+# new roof form improves every mass that admits it.
+#
+# The mass drives the loop and asks the facade to dress each volume as it goes,
+# rather than the two running as separate passes. That is deliberate: it keeps
+# the facade able to see the volume's real size and level, and it is why this
+# split reproduces the previous generator exactly.
+# --------------------------------------------------------------------------
+
+
+def _facade_bands(ctx, volume):
+    """Glazing bands on all four faces, plus piers on the volume the street sees.
+
+    Bay rhythm, not a window grid. A band sits *on* each face rather than
+    spanning the mass: two crossed slabs would intersect through the corners,
+    which is real interpenetration and z-fights there. Bands carry a facade at
+    streaming distance for four parts, where a per-floor grid would cost hundreds
+    and read identically.
+    """
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share, level = (
+        volume["width"], volume["depth"], volume["base_y"],
+        volume["height"], volume["level"],
+    )
+    out = []
+    bands = 2 if (level == 0 and share >= 30) else 1
+    for band in range(bands):
+        band_y = base_y + share * (band + 0.5) / bands
+        band_h = max(3.5, min(share / bands - 6, 9))
+        for face in (-1, 1):
+            out.append(part("Glazing", [w - 8, band_h, 0.7],
+                            cf(x, band_y, z + face * d / 2),
+                            skin["glass"], "Glass", Transparency=0.3,
+                            CanCollide=False, CastShadow=False))
+            out.append(part("Glazing", [0.7, band_h, d - 8],
+                            cf(x + face * w / 2, band_y, z),
+                            skin["glass"], "Glass", Transparency=0.3,
+                            CanCollide=False, CastShadow=False))
+    # Piers only on the volume the street sees; higher setbacks are read as
+    # silhouette, not as facade.
+    if level == 0:
+        for side in (-1, 1):
+            out.append(part("Pier", [2.4, share, d * 0.62],
+                            cf(x + side * (w / 2 - 1.2), base_y + share / 2, z),
+                            skin["trim"], skin["material"], CanCollide=False))
+    return out
+
+
+def _mass_setback(ctx, facade):
+    """A podium with one to three tapering volumes stacked on it.
+
+    What actually reads at range is the silhouette, so the parts go there rather
+    than into a window grid nobody can resolve.
+    """
+    skin, brng = ctx["skin"], ctx["brng"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    ground_y = FLOOR_TOP
+    out = []
+
+    # Podium: the two-storey base a street actually meets.
+    podium = min(height * 0.35, 11)
+    out.append(part("Podium", [width, podium, depth],
+                    cf(x, ground_y + podium / 2, z), skin["trim"], skin["material"]))
+
+    volumes = 1 if height < 45 else (2 if height < 110 else 3)
+    remaining = height - podium
+    base_y = ground_y + podium
+    w, d = width - 3, depth - 3
+    for level in range(volumes):
+        share = remaining if level == volumes - 1 else remaining * brng.uniform(0.45, 0.65)
+        out.append(part("Shaft", [w, share, d],
+                        cf(x, base_y + share / 2, z), skin["wall"], skin["material"]))
+        # A cornice at every setback: the line that stops two stacked boxes
+        # reading as one badly-proportioned box.
+        out.append(part("Cornice", [w + 2.2, 1.6, d + 2.2],
+                        cf(x, base_y + share, z), skin["trim"], skin["material"],
+                        CanCollide=False))
+        out.extend(facade(ctx, {
+            "width": w, "depth": d, "base_y": base_y,
+            "height": share, "level": level,
+        }))
+
+        base_y += share
+        remaining -= share
+        w, d = w - brng.uniform(7, 15), d - brng.uniform(7, 15)
+        if w < 24 or d < 24:
+            break
+
+    return out, {"top": base_y, "width": w, "depth": d, "flat": True}
+
+
+def _roof_deck(ctx, cap):
+    """A flat deck that looks used: a stair head, a tank, vents.
+
+    Flight means players look down at these constantly, and a bare slab reads as
+    a lid.
+    """
+    skin = ctx["skin"]
+    x, z, height = ctx["x"], ctx["z"], ctx["height"]
+    w, d, roof_y = cap["width"], cap["depth"], cap["top"]
+    out = [
+        part("RoofDeck", [w + 3, 0.8, d + 3], cf(x, roof_y, z),
+             skin["trim"], skin["material"], CanCollide=False),
+        part("RoofHouse", [w * 0.3, 6, d * 0.3],
+             cf(x + w * 0.18, roof_y + 3, z - d * 0.16),
+             skin["trim"], skin["material"], CanCollide=False),
+    ]
+    if height > 60:
+        # Absolute size, not a fraction of the footprint. Scaled, a tank on a
+        # 250-stud tower came out 54 studs across -- a flying saucer parked on the
+        # roof. Water tanks are the same size on every building; that is what makes
+        # them read as a tank and give the roof its scale.
+        out.append(cylinder("RoofTank", 7, min(13.0, min(w, d) * 0.22),
+                            mul(cf(x - w * 0.2, roof_y + 5.5, z + d * 0.14), rot_z(90)),
+                            [0.32, 0.28, 0.24], "Metal", CanCollide=False))
+    for vent in (-1, 1):
+        out.append(tube("RoofVent",
+                        (x + vent * w * 0.12, roof_y, z + d * 0.28),
+                        (x + vent * w * 0.12, roof_y + 3.2, z + d * 0.28),
+                        1.5, [0.34, 0.34, 0.36], CanCollide=False))
+    return out
+
+
+def _shopfront(ctx):
+    """The lit window and awning a pedestrian actually meets."""
+    skin = ctx["skin"]
+    x, z, width, depth = ctx["x"], ctx["z"], ctx["width"], ctx["depth"]
+    return [
+        part("ShopGlass", [width - 14, 5, 0.5],
+             cf(x, FLOOR_TOP + 4.5, z + depth / 2 - 0.2),
+             [0.85, 0.72, 0.38], "Neon", CanCollide=False, CastShadow=False),
+        part("Awning", [width - 10, 0.5, 3.4],
+             cf(x, FLOOR_TOP + 8.2, z + depth / 2 + 1.2),
+             skin["glass"], "Fabric", CanCollide=False),
+    ]
+
+
+def _facade_pier_grid(ctx, volume):
+    """Vertical piers with glazing between them: the pre-war office rhythm."""
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    piers = 3 if w < 90 else 5
+    for index in range(piers):
+        px = x - w / 2 + w * (index + 0.5) / piers
+        out.append(part("Pier", [w / piers * 0.34, share, d + 1.2],
+                        cf(px, base_y + share / 2, z),
+                        skin["trim"], skin["material"], CanCollide=False))
+    for face in (-1, 1):
+        out.append(part("Glazing", [w - 4, share - 6, 0.7],
+                        cf(x, base_y + share / 2, z + face * d / 2),
+                        skin["glass"], "Glass", Transparency=0.32,
+                        CanCollide=False, CastShadow=False))
+    return out
+
+
+def _facade_curtain(ctx, volume):
+    """A glass skin on every face, banded by slim mullion courses.
+
+    Cheaper than the band facade and reads as a different building entirely:
+    where bands say masonry with windows punched in it, this says the wall *is*
+    the window.
+    """
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    for face in (-1, 1):
+        out.append(part("Curtain", [w - 1.5, share - 2, 0.6],
+                        cf(x, base_y + share / 2, z + face * d / 2),
+                        skin["glass"], "Glass", Transparency=0.22,
+                        CanCollide=False, CastShadow=False))
+        out.append(part("Curtain", [0.6, share - 2, d - 1.5],
+                        cf(x + face * w / 2, base_y + share / 2, z),
+                        skin["glass"], "Glass", Transparency=0.22,
+                        CanCollide=False, CastShadow=False))
+    for course in range(2):
+        # Mullions are the horizontal lines that stop a glass box reading as one
+        # undivided pane. Kept under 12 studs deep so they never count as floors.
+        my = base_y + share * (course + 1) / 3
+        out.append(part("Mullion", [w + 0.8, 0.9, d + 0.8], cf(x, my, z),
+                        skin["trim"], "Metal", CanCollide=False))
+    return out
+
+
+def _facade_spandrel(ctx, volume):
+    """Rings between drums: the only facade that suits a round building."""
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, base_y, share = volume["width"], volume["base_y"], volume["height"]
+    out = []
+    for course in range(2):
+        ry = base_y + share * (course + 0.5) / 2
+        out.append(cylinder("Spandrel", 3.4, w + 0.6,
+                            mul(cf(x, ry, z), rot_z(90)),
+                            skin["glass"], "Glass", Transparency=0.28,
+                            CanCollide=False, CastShadow=False))
+    return out
+
+
+def _facade_none(ctx, volume):
+    """A blank wall. Warehouses and bunkers have them and they read as such."""
+    return []
+
+
+def _mass_slab(ctx, facade):
+    """One broad block, no taper: the post-war housing slab."""
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    out = [part("Slab", [width, height, depth],
+                cf(x, FLOOR_TOP + height / 2, z), skin["wall"], skin["material"])]
+    out.extend(facade(ctx, {"width": width, "depth": depth, "base_y": FLOOR_TOP,
+                            "height": height, "level": 0}))
+    return out, {"top": FLOOR_TOP + height, "width": width, "depth": depth, "flat": True}
+
+
+def _mass_gable(ctx, facade):
+    """A low hall with a door and a couple of windows: the shophouse."""
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    out = [part("Hall", [width, height, depth],
+                cf(x, FLOOR_TOP + height / 2, z), skin["wall"], skin["material"])]
+    out.append(part("Door", [7, 9, 0.6], cf(x, FLOOR_TOP + 4.5, z + depth / 2),
+                    skin["trim"], skin["material"], CanCollide=False))
+    for side in (-1, 1):
+        out.append(part("Window", [10, 7, 0.6],
+                        cf(x + side * width * 0.28, FLOOR_TOP + 6, z + depth / 2),
+                        skin["glass"], "Glass", Transparency=0.3,
+                        CanCollide=False, CastShadow=False))
+    out.extend(facade(ctx, {"width": width, "depth": depth, "base_y": FLOOR_TOP,
+                            "height": height, "level": 0}))
+    return out, {"top": FLOOR_TOP + height, "width": width, "depth": depth, "flat": True}
+
+
+def _mass_cylinder(ctx, facade):
+    """Stacked drums. A round building is one part per storey where a boxed one
+    is a wall plus four faces of glazing, so this is the cheapest tall mass."""
+    skin, brng = ctx["skin"], ctx["brng"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    diameter = min(width, depth)
+    drums = 2 if height < 90 else 3
+    out = []
+    base_y = FLOOR_TOP
+    for level in range(drums):
+        share = height / drums
+        d_here = diameter * (1 - level * 0.08)
+        out.append(cylinder("Drum", share, d_here,
+                            mul(cf(x, base_y + share / 2, z), rot_z(90)),
+                            skin["wall"], skin["material"]))
+        out.extend(facade(ctx, {"width": d_here, "depth": d_here, "base_y": base_y,
+                                "height": share, "level": level}))
+        base_y += share
+    final = diameter * (1 - (drums - 1) * 0.08)
+    return out, {"top": base_y, "width": final, "depth": final, "flat": True}
+
+
+def _mass_prism(ctx, facade):
+    """A pure prism with no podium: the glass tower that meets the street as glass."""
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    out = [part("Prism", [width, height, depth],
+                cf(x, FLOOR_TOP + height / 2, z), skin["wall"], skin["material"])]
+    out.extend(facade(ctx, {"width": width, "depth": depth, "base_y": FLOOR_TOP,
+                            "height": height, "level": 0}))
+    return out, {"top": FLOOR_TOP + height, "width": width, "depth": depth, "flat": True}
+
+
+def _roof_clutter(ctx, cap):
+    """The plant a flat roof carries: a stair head, a tank, vents, an aerial.
+
+    Flight means players look down on these constantly, so a bare lid is the one
+    thing a flat roof must not be. Drawn from the building's own stream so two
+    neighbours are not wearing the same arrangement.
+    """
+    brng = ctx["brng"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, top = cap["width"], cap["depth"], cap["top"]
+    if min(w, d) < 18:
+        return []
+
+    skin = ctx["skin"]
+    out = [part("RoofHouse", [w * 0.26, 6, d * 0.26],
+                cf(x + w * 0.17, top + 3, z - d * 0.15),
+                skin["trim"], skin["material"], CanCollide=False)]
+    if brng.random() < 0.65:
+        out.append(cylinder("RoofTank", 7, min(13.0, min(w, d) * 0.22),
+                            mul(cf(x - w * 0.2, top + 5.5, z + d * 0.14), rot_z(90)),
+                            [0.32, 0.28, 0.24], "Metal", CanCollide=False))
+    for vent in (-1, 1):
+        out.append(tube("RoofVent",
+                        (x + vent * w * 0.12, top, z + d * 0.28),
+                        (x + vent * w * 0.12, top + 3.2, z + d * 0.28),
+                        1.5, [0.34, 0.34, 0.36], CanCollide=False))
+    if brng.random() < 0.4:
+        out.append(tube("RoofMast", (x - w * 0.28, top, z - d * 0.26),
+                        (x - w * 0.28, top + 16, z - d * 0.26),
+                        0.7, [0.30, 0.30, 0.33], CanCollide=False))
+    return out
+
+
+def _roof_parapet(ctx, cap):
+    """A flat top with a raised lip, and the plant a real roof carries."""
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, top = cap["width"], cap["depth"], cap["top"]
+    out = [part("Parapet", [w + 2, 2.6, d + 2], cf(x, top + 1.3, z),
+                skin["trim"], skin["material"], CanCollide=False)]
+    out.extend(_roof_clutter(ctx, cap))
+    return out
+
+
+def _roof_gable(ctx, cap):
+    return pitched_roof("Roof", ctx["x"], ctx["z"], cap["top"],
+                        cap["width"], cap["depth"],
+                        max(8.0, min(cap["width"], cap["depth"]) * 0.22),
+                        ctx["skin"]["trim"], ctx["skin"]["material"])
+
+
+def _roof_hipped(ctx, cap):
+    return hipped_roof("Roof", ctx["x"], ctx["z"], cap["top"],
+                       cap["width"], cap["depth"],
+                       max(8.0, min(cap["width"], cap["depth"]) * 0.2),
+                       ctx["skin"]["trim"], ctx["skin"]["material"])
+
+
+def _roof_sawtooth(ctx, cap):
+    return sawtooth_roof("Roof", ctx["x"], ctx["z"], cap["top"],
+                         cap["width"], cap["depth"], 3, 7.0,
+                         ctx["skin"]["trim"], ctx["skin"]["material"],
+                         ctx["skin"]["glass"])
+
+
+def _roof_vault(ctx, cap):
+    return barrel_vault("Roof", ctx["x"], ctx["z"], cap["top"],
+                        min(cap["width"], cap["depth"]), max(cap["width"], cap["depth"]),
+                        ctx["skin"]["trim"], ctx["skin"]["material"])
+
+
+def _roof_dome(ctx, cap):
+    diameter = min(cap["width"], cap["depth"])
+    return dome_roof("Roof", ctx["x"], ctx["z"], cap["top"], diameter,
+                     diameter * 0.42, ctx["skin"]["trim"], ctx["skin"]["material"])
+
+
+def _roof_crown(ctx, cap):
+    return stepped_crown("Roof", ctx["x"], ctx["z"], cap["top"],
+                         cap["width"], cap["depth"], 3,
+                         ctx["skin"]["trim"], ctx["skin"]["material"],
+                         spire=ctx["skin"]["glass"])
+
+
+def _facade_slots(ctx, volume):
+    """Deep recessed slots instead of glass: the concrete answer.
+
+    Reads as mass with holes cut in it rather than as a frame with glass hung on
+    it, which is the whole difference between a brutalist block and an office.
+    """
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    courses = max(1, min(3, int(share // 26)))
+    for course in range(courses):
+        sy = base_y + share * (course + 0.5) / courses
+        for face in (-1, 1):
+            out.append(part("Slot", [w * 0.62, 6.5, 2.2],
+                            cf(x, sy, z + face * (d / 2 - 1.1)),
+                            [0.06, 0.06, 0.07], "Slate",
+                            CanCollide=False, CastShadow=False))
+    return out
+
+
+def _facade_balconies(ctx, volume):
+    """Projecting balconies with rails: the residential read.
+
+    Kept to nine studs deep, and not for looks: a slab twelve studs or more in
+    both plan directions and under six thick counts as a floor to the coplanar
+    check, and several per building all overlap in plan. Nine studs is both the
+    right depth for a balcony and out of the check entirely.
+    """
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    tiers = max(1, min(3, int(share // 22)))
+    for tier in range(tiers):
+        by = base_y + share * (tier + 1) / (tiers + 1)
+        for face in (-1, 1):
+            out.append(part("Balcony", [w * 0.66, 0.7, 9.0],
+                            cf(x, by, z + face * (d / 2 + 4.0)),
+                            skin["trim"], skin["material"], CanCollide=False))
+            out.append(part("BalconyRail", [w * 0.66, 3.0, 0.4],
+                            cf(x, by + 1.8, z + face * (d / 2 + 8.2)),
+                            skin["glass"], "Glass", Transparency=0.35,
+                            CanCollide=False, CastShadow=False))
+    return out
+
+
+def _facade_arcade(ctx, volume):
+    """A colonnade at street level, glazing above it."""
+    skin = ctx["skin"]
+    x, z = ctx["x"], ctx["z"]
+    w, d, base_y, share = (
+        volume["width"], volume["depth"], volume["base_y"], volume["height"],
+    )
+    out = []
+    columns = 4 if w < 100 else 6
+    for index in range(columns):
+        cx = x - w / 2 + w * (index + 0.5) / columns
+        out.append(cylinder("Column", 13.0, 4.4,
+                            mul(cf(cx, base_y + 6.5, z + d / 2 + 2.4), rot_z(90)),
+                            skin["trim"], skin["material"]))
+    # The lintel is seven studs deep so it is a beam, not a lid -- under six it
+    # would register as a floor and collide with the podium top beneath it.
+    out.append(part("Lintel", [w + 6, 7.0, 7.0],
+                    cf(x, base_y + 16.5, z + d / 2 + 2.4),
+                    skin["trim"], skin["material"], CanCollide=False))
+    for face in (-1, 1):
+        out.append(part("Glazing", [w - 8, max(4.0, share - 26), 0.7],
+                        cf(x, base_y + 20 + max(4.0, share - 26) / 2, z + face * d / 2),
+                        skin["glass"], "Glass", Transparency=0.3,
+                        CanCollide=False, CastShadow=False))
+    return out
+
+
+def _mass_ziggurat(ctx, facade):
+    """Aggressive setbacks all the way up: the art-deco silhouette.
+
+    Each step is a real block rather than a thin lid, which is both how a
+    ziggurat looks and what keeps a stack of them out of the coplanar check.
+    """
+    skin, brng = ctx["skin"], ctx["brng"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    steps = 4 if height < 160 else 5
+    out = []
+    base_y = FLOOR_TOP
+    w, d = width, depth
+    for level in range(steps):
+        share = height / steps
+        out.append(part("Tier", [w, share, d],
+                        cf(x, base_y + share / 2, z), skin["wall"], skin["material"]))
+        if level == 0:
+            out.extend(facade(ctx, {"width": w, "depth": d, "base_y": base_y,
+                                    "height": share, "level": 0}))
+        for side in (-1, 1):
+            out.append(part("DecoPier", [2.6, share, d * 0.5],
+                            cf(x + side * (w / 2 - 1.3), base_y + share / 2, z),
+                            skin["trim"], skin["material"], CanCollide=False))
+        base_y += share
+        w, d = w * 0.78, d * 0.78
+        if w < 20 or d < 20:
+            break
+    return out, {"top": base_y, "width": w, "depth": d, "flat": True}
+
+
+def _mass_courtyard(ctx, facade):
+    """Two or three bars around an open middle: the perimeter block.
+
+    The inner faces are never seen, so only the outer ones are dressed -- which
+    is what makes an L-plan cost little more than the slab it is built from.
+    """
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    arm = 0.34
+    out = []
+    bars = (
+        (x, z - depth * (0.5 - arm / 2), width, depth * arm),
+        (x - width * (0.5 - arm / 2), z + depth * arm / 2, width * arm, depth * (1 - arm)),
+    )
+    for index, (bx, bz, bw, bd) in enumerate(bars):
+        out.append(part("Wing", [bw, height, bd],
+                        cf(bx, FLOOR_TOP + height / 2, bz),
+                        skin["wall"], skin["material"]))
+        if index == 0:
+            out.extend(facade(ctx, {"width": bw, "depth": bd, "base_y": FLOOR_TOP,
+                                    "height": height, "level": 0}))
+    return out, {"top": FLOOR_TOP + height,
+                 "width": width * arm, "depth": depth * arm, "flat": True}
+
+
+def _mass_brutalist(ctx, facade):
+    """A heavy monolith with a cantilevered upper box."""
+    skin = ctx["skin"]
+    x, z, width, depth, height = (
+        ctx["x"], ctx["z"], ctx["width"], ctx["depth"], ctx["height"],
+    )
+    lower = height * 0.62
+    upper = height - lower
+    out = [
+        part("Monolith", [width * 0.82, lower, depth * 0.82],
+             cf(x, FLOOR_TOP + lower / 2, z), skin["wall"], skin["material"]),
+        # Cantilevered: wider than what carries it, which is the whole gesture.
+        part("Cantilever", [width, upper, depth],
+             cf(x, FLOOR_TOP + lower + upper / 2, z), skin["wall"], skin["material"]),
+    ]
+    out.extend(facade(ctx, {"width": width, "depth": depth,
+                            "base_y": FLOOR_TOP + lower, "height": upper, "level": 0}))
+    return out, {"top": FLOOR_TOP + height, "width": width, "depth": depth, "flat": True}
+
+
+BUILDING_ROOFS = {
+    "deck": (_roof_deck, True),
+    "parapet": (_roof_parapet, True),
+    "gable": (_roof_gable, False),
+    "hipped": (_roof_hipped, False),
+    "sawtooth": (_roof_sawtooth, False),
+    "vault": (_roof_vault, False),
+    "dome": (_roof_dome, False),
+    "crown": (_roof_crown, False),
+}
+
+
+# Which masses accept which roofs and facades, and at what sizes. A dome does not
+# belong on a warehouse, so the combinations are named rather than crossed.
+#
+# `kinds` gates on the lot's zoning, `height` on what the lot can carry, and
+# `weight` biases the mix. Cheap archetypes are weighted up so the fleet average
+# stays near where it was while the range widens.
+BUILDING_ARCHETYPES = (
+    {"id": "setback", "mass": _mass_setback, "weight": 3, "flat_ok": True,
+     "roofs": ("deck",), "facades": ("bands",),
+     "kinds": ("tower", "midrise"), "height": (45, 400)},
+    {"id": "slab", "mass": _mass_slab, "weight": 3, "flat_ok": True,
+     "roofs": ("parapet", "deck"), "facades": ("piers", "bands"),
+     "kinds": ("tower", "midrise"), "height": (40, 260)},
+    {"id": "curtain", "mass": _mass_prism, "weight": 3,
+     "roofs": ("parapet", "crown"), "facades": ("curtain",),
+     "kinds": ("tower", "midrise"), "height": (60, 400)},
+    {"id": "drum", "mass": _mass_cylinder, "weight": 2, "flat_ok": True,
+     "roofs": ("dome", "parapet"), "facades": ("spandrel",),
+     "kinds": ("tower", "midrise"), "height": (40, 300)},
+    {"id": "shophouse", "mass": _mass_gable, "weight": 3,
+     "roofs": ("gable", "hipped"), "facades": ("none",),
+     "kinds": ("shophouse", "midrise"), "height": (12, 46)},
+    {"id": "lowblock", "mass": _mass_slab, "weight": 3, "flat_ok": True,
+     "roofs": ("parapet", "deck"), "facades": ("piers", "bands"),
+     "kinds": ("shophouse", "midrise"), "height": (12, 46)},
+    {"id": "shed", "mass": _mass_slab, "weight": 2,
+     "roofs": ("sawtooth", "vault"), "facades": ("none",),
+     "kinds": ("shophouse", "midrise"), "height": (12, 44)},
+    {"id": "deco", "mass": _mass_ziggurat, "weight": 3,
+     "roofs": ("crown", "parapet"), "facades": ("bands", "piers"),
+     "kinds": ("tower", "midrise"), "height": (70, 400)},
+    {"id": "perimeter", "mass": _mass_courtyard, "weight": 2, "flat_ok": True,
+     "roofs": ("parapet", "deck"), "facades": ("bands", "piers"),
+     "kinds": ("tower", "midrise"), "height": (45, 200)},
+    {"id": "brutalist", "mass": _mass_brutalist, "weight": 2,
+     "roofs": ("parapet",), "facades": ("slots",),
+     "kinds": ("tower", "midrise"), "height": (50, 260)},
+    {"id": "residential", "mass": _mass_slab, "weight": 3, "flat_ok": True,
+     "roofs": ("parapet", "deck"), "facades": ("balconies",),
+     "kinds": ("tower", "midrise"), "height": (45, 220)},
+    {"id": "arcade", "mass": _mass_slab, "weight": 2, "flat_ok": True,
+     "roofs": ("parapet", "hipped"), "facades": ("arcade",),
+     "kinds": ("midrise", "shophouse"), "height": (30, 120)},
+)
+
+BUILDING_FACADES = {
+    "bands": _facade_bands,
+    "piers": _facade_pier_grid,
+    "curtain": _facade_curtain,
+    "spandrel": _facade_spandrel,
+    "none": _facade_none,
+    "slots": _facade_slots,
+    "balconies": _facade_balconies,
+    "arcade": _facade_arcade,
+}
+
+
+def _pick_archetype(kind, height, brng, prefer_flat=False):
+    """The archetypes legal for this lot, weighted.
+
+    `prefer_flat` narrows the field to archetypes that can finish flat. Rooftop
+    training courts need somewhere level to stand, and once the short archetypes
+    all grew gables and sawtooths the flat-roof pool emptied and every rooftop
+    site silently moved to the ground -- the build does not fail when that
+    happens, it just quietly stops having rooftop gyms.
+    """
+    legal = [
+        entry for entry in BUILDING_ARCHETYPES
+        if kind in entry["kinds"] and entry["height"][0] <= height <= entry["height"][1]
+    ]
+    if prefer_flat:
+        flat = [entry for entry in legal if entry.get("flat_ok")]
+        if flat:
+            legal = flat
+    if not legal:
+        return BUILDING_ARCHETYPES[0]
+    total = sum(entry["weight"] for entry in legal)
+    roll = brng.uniform(0, total)
+    for entry in legal:
+        roll -= entry["weight"]
+        if roll <= 0:
+            return entry
+    return legal[-1]
+
+
+def procedural_building(x, z, width, depth, height, skin, rng, kind="midrise",
+                        prefer_flat=False):
+    """One building, composed from a mass, a facade and a roof.
+
+    Everything here is capped by MAX_BUILDING_PARTS in the validator.
+
+    Draws from its own stream, seeded on where the building stands rather than on
+    the block's rng. Interior detail and block layout are separate concerns, and
+    while they shared a stream every tweak in here consumed a different number of
+    rolls and reshuffled every building after it -- which is how an earlier pass
+    made a part-*saving* change increase the part count. Seeded on position, not
+    on an index, so the seed survives a lot being subdivided differently.
+    """
+    ctx = {
+        "x": x, "z": z, "width": width, "depth": depth, "height": height,
+        "skin": skin,
+        "brng": random.Random(f"city-v4:building:{round(x, 1)}:{round(z, 1)}"),
+    }
+
+    archetype = _pick_archetype(kind, height, ctx["brng"], prefer_flat)
+    # The skin the lot picked is replaced by one from an era that suits the
+    # archetype. Choosing it here rather than in city_lot keeps every draw that
+    # shapes a building inside this building's own stream.
+    eras = ARCHETYPE_ERAS.get(archetype["id"])
+    if eras:
+        ctx["skin"] = ctx["brng"].choice(ctx["brng"].choice(eras))
+    facade = BUILDING_FACADES[ctx["brng"].choice(archetype["facades"])]
+    roof_builder, roof_flat = BUILDING_ROOFS[ctx["brng"].choice(archetype["roofs"])]
+
+    out, cap = archetype["mass"](ctx, facade)
+    out.extend(roof_builder(ctx, cap))
+    # A shopfront belongs on something a pedestrian meets, not on a warehouse or
+    # the base of a glass tower that meets the street as glass.
+    if archetype["id"] in ("setback", "slab", "shophouse"):
+        out.extend(_shopfront(ctx))
+    cap["flat"] = cap["flat"] and roof_flat
+
+    # The roof is reported alongside the geometry rather than recomputed later.
+    # Its numbers are known here and nowhere else; a second function deriving them
+    # from the finished parts would be a copy of this arithmetic free to drift.
+    #
+    # `flat` says whether a training court could stand on it -- a pitched or domed
+    # roof cannot host one, and site_candidates filters on it.
+    #
+    # base_* is the podium footprint, which is wider than the roof by every
+    # setback the stack took. A fire escape has to clear the *building*, not the
+    # roof: placed off the roof edge it starts life inside the podium.
+    return out, {"x": x, "z": z, "top": cap["top"],
+                 "width": cap["width"] + 3, "depth": cap["depth"] + 3,
+                 "base_width": width, "base_depth": depth,
+                 "flat": cap["flat"]}
+
+
+# Nothing may grow into a platform that floats over the city. Storm's slab sits
+# at STORM_ALTITUDE with no ramp and no stairs, and flight being the only way up
+# is the whole reason it is up there -- a tower punched through it would be both
+# a hole in the geometry and a staircase to the top tier.
+FLIGHT_PLATFORM_CLEARANCE = 45
+
+
+def height_ceiling(x, z):
+    """The tallest a building at this point may be."""
+    ceiling = math.inf
+    for area in AREAS:
+        if not area["flight_only"]:
+            continue
+        # Generous horizontally: a tower merely *near* the underside still reads
+        # as scaffolding up to a place you are supposed to have to fly to.
+        if math.hypot(x - area["x"], z - area["z"]) < 1100:
+            ceiling = min(ceiling, area["altitude"] - FLIGHT_PLATFORM_CLEARANCE)
+    return ceiling
+
+
+# A tower is allowed to be slender, but not a needle: past roughly six times its
+# own footprint a building stops reading as a building and starts reading as a
+# post. Small lots therefore get shorter towers rather than being excluded from
+# having one.
+MAX_SLENDERNESS = 6.0
+
+
+def city_lot(lot, kind, character, rng, catalogue=None):
+    """One subdivided lot, built according to what it was zoned.
+
+    `catalogue` collects the open ground and the rooftops this lot produces, so a
+    later pass can put a training site on them. Recording only -- nothing here
+    reads it, and passing None builds exactly the same geometry.
+    """
+    x, z, width, depth = lot
+    # Inset off the lot boundary so neighbours do not share walls and the alley
+    # and pavement stay walkable between them.
+    width, depth = width - 26, depth - 26
+    if width < 34 or depth < 34:
+        return []
+
+    if kind == "parking":
+        if catalogue is not None:
+            catalogue["ground"].append({"x": x, "z": z, "width": width, "depth": depth})
+        return parking_lot(x, z, width, depth, rng)
+
+    if kind == "yard":
+        # Deliberately empty ground, but finished: a yard reads as a place, a
+        # gap in the lattice reads as unfinished.
+        # Sat at +0.16 this topped out at exactly the height of a machine's rubber
+        # mat, which never mattered while yards and machines were in different
+        # places. Scattered sites stand on yards, so the two now meet -- and two
+        # surfaces sharing a top face is the z-fighting the coplanar check exists
+        # to catch.
+        out = [part("Yard", [width, 0.35, depth], cf(x, FLOOR_TOP + 0.12, z),
+                    [0.29, 0.31, 0.27], "Slate", CanCollide=False, CastShadow=False)]
+        for corner in (-1, 1):
+            out.append(part("YardFence", [width, 3.2, 0.6],
+                            cf(x, FLOOR_TOP + 1.6, z + corner * depth / 2),
+                            [0.26, 0.26, 0.28], "Metal", CanCollide=False))
+        if catalogue is not None:
+            catalogue["ground"].append({"x": x, "z": z, "width": width, "depth": depth})
+        return out
+
+    low, high = character["heights"][kind]
+    height = rng.uniform(low, high)
+    # Rolled first and clamped after, so a lot that happens to sit under the sky
+    # platform or on a small footprint does not reshuffle every building after it.
+    height = min(height, min(width, depth) * MAX_SLENDERNESS, height_ceiling(x, z))
+    if height < 12:
+        return []
+    skin = rng.choice(character["skins"])
+    # Grouped into a Model rather than left as loose parts: it is what lets the
+    # validator hold a single building to a part budget, and it gives streaming a
+    # unit to load a building as, instead of forty unrelated slabs.
+    # A lot short enough and wide enough to carry a rooftop court is asked for a
+    # flat roof, so the pool those courts are chosen from never runs dry.
+    prefer_flat = (
+        height <= MAX_ROOF_SITE_HEIGHT
+        and width >= SITE_CLEAR_WIDTH + 10
+        and depth >= SITE_CLEAR_DEPTH + 10
+    )
+    parts, roof = procedural_building(x, z, width, depth, height, skin, rng, kind,
+                                      prefer_flat)
+    if catalogue is not None:
+        catalogue["roofs"].append(roof)
+    # The building's own footprint on the map. Blocks were the finest thing the
+    # map drew, so it showed solid rectangles where the city has masses, yards and
+    # gaps -- it did not match the place you walk through. Tinted with the wall
+    # colour, so the material variety reads on the map too.
+    return [
+        group("Building", parts),
+        map_footprint("BuildingMap", width, depth,
+                      cf(x, FLOOR_TOP + 0.14, z), skin["wall"], "Building"),
+    ]
+
+
+# How far apart kerbside furniture stations sit. Fixed stations with a random
+# choice at each, rather than random positions: scattering by position clumps and
+# leaves gaps, and a street reads as a street precisely because its lamps and
+# benches are evenly spaced.
+FURNITURE_PITCH = 260
+
+
+def _scenery(pieces, x, z):
+    """Places a prop kit at a point and strips its collision.
+
+    SOLID_CITY_PROPS is empty on purpose -- nothing scattered on a pavement is
+    cover -- so a crate the player can run through is the rule rather than the
+    exception, and the validator enforces it.
+    """
+    out = []
+    for piece in pieces:
+        node = place(cf(x, 0, z), piece)
+        node["properties"]["CanCollide"] = False
+        out.append(node)
+    return out
+
+
+def street_furniture(x, z, width, depth, index, accent, ground):
+    """What stands along a block's kerb: lamps, trees, props, cars.
+
+    Draws from its own stream rather than the block's. Sharing one meant every
+    tweak to the furniture pitch consumed a different number of rolls and
+    reshuffled every building in the city behind it -- so tuning the street
+    silently redesigned the skyline, and no change could be judged on its own.
+    """
+    rng = random.Random(f"city-v3:furniture:{index}")
+    out = []
+    half_w, half_d = width / 2, depth / 2
+
+    # Walk the two long kerbs. One side per axis is enough -- both sides of every
+    # block would double the cost to say the same thing.
+    stations = []
+    steps = max(1, int(width // FURNITURE_PITCH))
+    for step in range(steps):
+        px = -half_w + width * (step + 0.5) / steps
+        stations.append((x + px, z + half_d, 0))
+        stations.append((x + px, z - half_d, 180))
+    steps = max(1, int(depth // FURNITURE_PITCH))
+    for step in range(steps):
+        pz = -half_d + depth * (step + 0.5) / steps
+        stations.append((x + half_w, z + pz, 90))
+        stations.append((x - half_w, z + pz, -90))
+
+    for sx, sz, facing in stations:
+        roll = rng.random()
+        if roll < 0.22:
+            out.extend(street_light(sx, sz, facing))
+        elif roll < 0.44:
+            out.extend(city_tree(sx, sz, rng))
+        elif roll < 0.50:
+            out.extend(_scenery(CITY_PROPS["crate"](rng, accent, ground), sx, sz))
+        elif roll < 0.56:
+            out.extend(_scenery(CITY_PROPS["barrel"](rng, accent, ground), sx, sz))
+        elif roll < 0.64:
+            out.append(part("Bollard", [1.1, 3.2, 1.1], cf(sx, FLOOR_TOP + 1.6, sz),
+                            [0.22, 0.22, 0.24], "Metal", CanCollide=False))
+        elif roll < 0.72:
+            # Kerbside parking. Cars are the cheapest thing that gives a street
+            # its scale -- a road with nothing on it could be any width.
+            out.extend(parked_car(sx, sz, facing + 90, rng))
+        # The remainder is deliberately nothing: furniture at every station is
+        # as wrong as furniture at none.
+    return out
+
+
+def parking_lot(x, z, width, depth, rng):
+    """An asphalt lot with bay markings and a few cars.
+
+    One stripe per row rather than per bay: at the distance a lot is read from,
+    the rows are the pattern and the individual bays are not.
+    """
+    out = [part("Parking", [width, 0.3, depth], cf(x, FLOOR_TOP + 0.14, z),
+                ROAD, "Asphalt", CanCollide=False, CastShadow=False)]
+    rows = max(1, int(depth // 46))
+    for row in range(rows):
+        rz = z - depth / 2 + depth * (row + 0.5) / rows
+        out.append(part("BayLine", [width - 8, 0.12, 0.6], cf(x, FLOOR_TOP + 0.32, rz),
+                        [0.72, 0.70, 0.62], "SmoothPlastic",
+                        CanCollide=False, CastShadow=False))
+        for slot in range(max(1, int(width // 34))):
+            if rng.random() < 0.28:
+                sx = x - width / 2 + width * (slot + 0.5) / max(1, int(width // 34))
+                out.extend(parked_car(sx, rz + 8, 0, rng))
+    return out
+
+
+def district_approach(area):
+    """The paved ring a campus stands in, in world space.
+
+    Every campus sits inside a 300-380 stud keep-out that strips blocks away so
+    the gym stays visible and its entrances stay clear. That radius is right, but
+    it was left as bare ground, so each destination stood in a bald circle -- the
+    one place in the city with neither buildings nor anything else.
+
+    This keeps the clearance and fills it: paving out to the ring, an approach
+    axis pointing back at the street, planters marking the edge, and lamps. The
+    campus still reads as arriving somewhere rather than as a clearing.
+    """
+    radius = 380 if area["venue_type"] == "Office" else 300
+    x, z = area["x"], area["z"]
+    rng = random.Random(f"city-v3:approach:{area['id']}")
+    out = []
+
+    # Paving, as a ring of tiles rather than one disc: a single 760-stud part
+    # would z-fight the campus floor it surrounds and swamp the block beside it.
+    # Heights are picked so no surface here shares a top face with the campus
+    # floor, its running lane or a muscle court edge: paving tops out at +0.15,
+    # the axis at +0.36.
+    out.append(disc("ApproachPaving", 0.24, radius * 2, FLOOR_TOP + 0.03,
+                    [0.34, 0.34, 0.36], "Concrete",
+                    CanCollide=False, CastShadow=False))
+
+    # No map footprint. The campus already puts itself on the minimap, and a
+    # second feature the size of the whole approach would only smear over it --
+    # its square corners also run off the world foundation at the edge campuses.
+
+    # An axis from the street to the front of the campus, so the approach has a
+    # direction rather than being a uniform apron.
+    out.append(part("ApproachAxis", [46, 0.20, radius], cf(0, FLOOR_TOP + 0.26, radius / 2),
+                    [0.28, 0.28, 0.30], "Concrete", CanCollide=False, CastShadow=False))
+
+    # The edge: planters and lamps around the ring, and two banner pylons where
+    # the axis meets it.
+    for step in range(12):
+        angle = math.radians(step * 30 + 15)
+        px, pz = math.sin(angle) * (radius - 26), math.cos(angle) * (radius - 26)
+        if step % 3 == 0:
+            out.extend(street_light(px, pz, math.degrees(angle) + 180))
+        else:
+            out.append(part("Planter", [11, 2.6, 11], cf(px, FLOOR_TOP + 1.3, pz),
+                            [0.30, 0.29, 0.27], "Concrete", CanCollide=False))
+            out.append(part("PlanterShrub", [8, 3.4, 8], cf(px, FLOOR_TOP + 3.6, pz),
+                            [0.20, 0.34, 0.19], "Grass", CanCollide=False))
+    for side in (-1, 1):
+        out.append(part("BannerPylon", [3.2, 26, 3.2],
+                        cf(side * 30, FLOOR_TOP + 13, radius - 40),
+                        [0.20, 0.20, 0.22], "Metal"))
+        out.append(part("Banner", [1.0, 16, 8],
+                        cf(side * 30, FLOOR_TOP + 17, radius - 36),
+                        rng.choice([[0.72, 0.24, 0.22], [0.22, 0.44, 0.72]]),
+                        "Fabric", CanCollide=False))
+    return [place(mul(cf(x, area["altitude"], z), rot_y(area.get("yaw", 0))), piece)
+            for piece in out]
+
+
+# Every buildable surface the last city build produced: open ground worth
+# standing a machine on, and rooftops wide and low enough to carry one.
+#
+# Rebuilt from scratch on every call to city_grid rather than memoised. The
+# validator builds the whole world twice in one process to prove the output is
+# deterministic, and `place()` rewrites node CFrames in place -- so a cache would
+# hand the second build already-transformed geometry and make the determinism
+# check compare a world against itself.
+CITY_CATALOGUE = {"ground": [], "roofs": []}
+
+# The street grid, hoisted out of city_grid so site selection can keep machines
+# off the roads without a second copy of these numbers drifting from the first.
+CROSSTOWN_ROADS = (-650, -1850, -3150, -4550, -6150, -7850)
+UPLAND_AVENUES = (350, 1800, 3300, 4900, 6600, 8400, 10100, 11900, 13600, 15100)
+
+
+# --------------------------------------------------------------------------
+# Rooftop access.
+#
+# A machine on a roof has to be reachable on foot. Flight exists, but gating a
+# training machine behind it would strand exactly the players who have not
+# trained Legs yet -- which is to say, the ones who most need a machine.
+# --------------------------------------------------------------------------
+
+# Ramps rather than steps. Nothing in this project sets StepHeight or
+# MaxSlopeAngle, so Roblox defaults apply: a humanoid walks any slope under 89
+# degrees, which makes a ramp walkable by construction. Treads have to be kept
+# individually under the ~2-stud auto-step or they silently become a wall, and
+# they cost five times the parts to say the same thing.
+# A comfortable, unambiguous walking pitch, and the width to walk it without
+# aiming. Both matter more than they look: Roblox's navmesh ignores geometry that
+# is too narrow, and a player who has to steer up a ramp will fall off it.
+RAMP_PITCH_DEGREES = 26.0
+RAMP_WIDTH = 16.0
+# The travel of one ramp, measured between the landings it joins -- not between
+# their centres. Spanning centre to centre put the last third of every ramp
+# underneath the landing above it, so a climbing player met the landing's edge as
+# a three-stud vertical face and stopped dead. Measured: the character reached
+# x=563.6 of a 571 target and stayed there.
+RAMP_RUN = 16.0
+# Wide enough to turn around on. At 8 studs a walking player arriving at a
+# switchback carried straight off the edge and fell the height they had just
+# climbed -- measured, not guessed. The run is the one piece of this world a
+# player has to negotiate rather than walk across, so it gets the room.
+STAIR_WIDTH = 12.0
+LANDING_SIZE = 14.0
+# Centre to centre, so the ramp between them is exactly RAMP_RUN long.
+FLIGHT_RUN = LANDING_SIZE + RAMP_RUN
+STAIR_THICKNESS = 0.6
+
+# How far the run stands off the wall it climbs. The landing is only half its own
+# depth clear of the facade otherwise, which puts its inside edge exactly on the
+# podium face -- close enough to catch a walking player on the corner.
+STAIR_STANDOFF = 9.0
+
+# How far below the pavement the ramp's low end is buried, so it surfaces without
+# an edge.
+STAIR_BASE_SINK = 2.5
+
+
+def ramp_between(name, start, end, width, color, material="Concrete", **props):
+    """A walkable slab spanning two points, given as the two *top-face* ends.
+
+    Taking the ends as inputs rather than deriving them from a centre and a pitch
+    is the whole point: a ramp built from an angle and a length has to have its
+    endpoints kept in agreement with the landings it serves by arithmetic done
+    somewhere else, and the failure mode is a gap you only find by walking into
+    it. Here the ends are given, so they cannot drift.
+    """
+    span = tuple(e - s for s, e in zip(start, end))
+    forward, length = _unit(span)
+    # Horizontal and perpendicular to the run. Any ramp with a pitch under 90
+    # degrees has a well-defined one.
+    right, _ = _unit(cross((0.0, 1.0, 0.0), forward))
+    up = cross(forward, right)
+
+    middle = tuple((s + e) / 2 for s, e in zip(start, end))
+    centre = tuple(m - u * STAIR_THICKNESS / 2 for m, u in zip(middle, up))
+    return part(name, [width, STAIR_THICKNESS, length],
+                axes(centre, right, up), color, material, **props)
+
+
+def roof_access_stair(x, z, roof_y, roof_depth, color, accent):
+    """A single straight ramp from the pavement to a roof.
+
+    This was a switchback, and it did not work. Roblox's own pathfinder could not
+    find a route between two *adjacent* landings on it while happily pathing forty
+    studs of open pavement, and a walking character oscillated between the first
+    two landings forever: a switchback stacks its up-ramp and its down-ramp at the
+    same two spots, so "toward the next landing" and "back down the way I came"
+    are the same direction. Clever geometry that a player cannot climb is worse
+    than none.
+
+    One straight run has none of that. There is exactly one way to go, it is wide
+    enough to walk without aiming, and it costs four parts instead of twenty-five.
+    Roof sites are capped low enough that a single flight reaches them.
+    """
+    # The ramp starts *below* the pavement and rises out of it. Starting on top of
+    # the ground leaves a leading edge, and a leading edge is a lip: the character
+    # walked into it, ragdolled, and sat in GettingUp forever instead of climbing.
+    # Buried, there is no edge to catch -- the walkable surface simply emerges.
+    base = FLOOR_TOP - STAIR_BASE_SINK
+    rise = roof_y - base
+    run = rise / math.tan(math.radians(RAMP_PITCH_DEGREES))
+    face_z = z + roof_depth / 2 + STAIR_STANDOFF
+    start_z = face_z + run
+
+    return [
+        # A flat pad where the ramp breaks the surface, so the approach reads as a
+        # deliberate entrance rather than a slab sticking out of the pavement. The
+        # roof-access check reads it to prove the climb starts at ground level.
+        part("StairLanding", [RAMP_WIDTH + 4, 0.4, LANDING_SIZE],
+             cf(x, FLOOR_TOP + 0.1, start_z + LANDING_SIZE / 2),
+             color, "Concrete"),
+        ramp_between("StairFlight",
+                     (x, base, start_z), (x, roof_y, face_z),
+                     RAMP_WIDTH, color),
+        # The top landing reaches back onto the roof so there is no lip to clear.
+        part("StairTopLanding",
+             [RAMP_WIDTH + 4, STAIR_THICKNESS, LANDING_SIZE * 2],
+             cf(x, roof_y - STAIR_THICKNESS / 2, face_z - LANDING_SIZE),
+             color, "Concrete"),
+        # Solid kerbs either side, so a player who drifts is turned back onto the
+        # ramp rather than off it.
+        part("StairRail", [0.8, 3.0, run + LANDING_SIZE],
+             mul(cf(x - RAMP_WIDTH / 2, base + rise / 2 + 1.5, face_z + run / 2),
+                 rot_x(0)),
+             accent, "Metal"),
+        part("StairRail", [0.8, 3.0, run + LANDING_SIZE],
+             mul(cf(x + RAMP_WIDTH / 2, base + rise / 2 + 1.5, face_z + run / 2),
+                 rot_x(0)),
+             accent, "Metal"),
+    ]
+
+
+# --------------------------------------------------------------------------
+# Scattered training sites.
+#
+# The gym used to be seven campuses of five machines: a 16,000 x 9,000 stud
+# world with all of its gameplay inside about half a percent of its area. Every
+# machine is now its own destination somewhere in the city.
+#
+# Sites are *chosen from* the city rather than authored beside it, which is why
+# city_grid runs first and records what it built. A machine therefore always
+# stands on ground the city generator actually made -- a yard, a parking lot, a
+# rooftop -- instead of hovering wherever a hand-written coordinate happened to
+# land.
+# --------------------------------------------------------------------------
+
+# A court is 44 x 42. Anything hosting one needs room for it plus a margin.
+SITE_CLEAR_WIDTH = 50
+SITE_CLEAR_DEPTH = 48
+
+# Roofs above this are not worth reaching: the ramp to a 376-stud roof costs more
+# parts than the site it serves, and a fire escape taller than its own building
+# stops reading as a fire escape.
+# One straight ramp has to reach it, and a ramp long enough for a tall roof would
+# run across the street. 30 studs is about 55 studs of run -- the depth of a
+# pavement and a front yard -- and 38 roofs still qualify.
+MAX_ROOF_SITE_HEIGHT = 30
+
+# Machines must not sit in the roadway, and must leave the spawn plaza alone.
+ROAD_SITE_CLEARANCE = 70
+HUB_SITE_CLEARANCE = 460
+
+# Five muscles across seven tiers: one site per machine.
+# The starter tier no longer draws from the scattered pool: its five machines ring
+# the spawn plaza instead, so a new player has something to train on before they
+# have any way to travel.
+STARTER_ZONE = "Garage"
+SCATTERED_SITE_COUNT = len(FAMILY_ORDER) * (len(STAT_VARIANTS["Chest"]) - 1)
+
+# How many of those stand on rooftops. The rest are street and park level.
+ROOF_SITE_QUOTA = 10
+
+# The starter ring, as a horseshoe open toward the campus rather than a full
+# circle. The +z half of the plaza is not free: the campus floor begins at z 15,
+# the coach stands at (0, 32) and the entrance beacons at (+/-52, 28). A ring
+# through them would put a court on the campus slab, whose top face is 0.02 studs
+# from a court's own -- the tight kind of coplanar pair that z-fights.
+#
+# So the arc runs from due east round through south to due west, into the empty
+# band between the plaza and the first city block at z -180.
+GARAGE_RING_CENTER = (0, -25)
+GARAGE_RING_RADIUS = 120
+GARAGE_RING_ANGLES = (90, 135, 180, 225, 270)
+# Reported to the builders as the site's footprint. Comfortably larger than the
+# 44x42 court so nothing reads as crowded.
+GARAGE_RING_SITE_SPAN = 60
+
+
+def _off_road(x, z):
+    """Whether a point clears every road centreline."""
+    if any(abs(z - centre) < CROSSTOWN_HALF + ROAD_SITE_CLEARANCE
+           for centre in CROSSTOWN_ROADS):
+        return False
+    if any(abs(x - centre) < AVENUE_HALF + ROAD_SITE_CLEARANCE
+           for centre in UPLAND_AVENUES):
+        return False
+    return True
+
+
+def garage_ring_sites():
+    """The five starter machines, ringing the spawn plaza.
+
+    Authored rather than selected. Every other machine is chosen from whatever the
+    city generator happened to build, which is what makes the world feel found; the
+    starter five are the one place that has to be somewhere specific, because a
+    player who has just spawned has no Tokens, no travel and no reason to walk
+    eight thousand studs on faith.
+
+    Deliberately *outside* the spawn safe zone. Safe zones block Token accrual --
+    "no pay where you cannot be hit" -- so a protected starter gym would grow
+    stats while paying nothing, and Tokens are what buy the multipliers. Outside
+    also means the first five machines still teach that this is a PvP game.
+
+    Returns the same shape site_candidates does, so connected_locations needs no
+    special case beyond choosing which pool a tier draws from.
+    """
+    centre_x, centre_z = GARAGE_RING_CENTER
+    out = []
+    for angle in GARAGE_RING_ANGLES:
+        theta = math.radians(angle)
+        out.append({
+            "kind": "ground",
+            "x": centre_x + GARAGE_RING_RADIUS * math.sin(theta),
+            "z": centre_z + GARAGE_RING_RADIUS * math.cos(theta),
+            "top": FLOOR_TOP,
+            "width": GARAGE_RING_SITE_SPAN,
+            "depth": GARAGE_RING_SITE_SPAN,
+            "base_depth": GARAGE_RING_SITE_SPAN,
+            # Facing the plaza, so a player walking out of spawn meets the front of
+            # each machine rather than its back.
+            "yaw": angle,
+        })
+    return out
+
+
+def site_candidates():
+    """Every place in the built city that could carry a training court."""
+    catalogue = CITY_CATALOGUE
+    out = []
+
+    for lot in catalogue["ground"]:
+        if lot["width"] < SITE_CLEAR_WIDTH or lot["depth"] < SITE_CLEAR_DEPTH:
+            continue
+        out.append({"kind": "ground", "x": lot["x"], "z": lot["z"], "top": FLOOR_TOP,
+                    "width": lot["width"], "depth": lot["depth"],
+                    "base_depth": lot["depth"]})
+
+    for roof in catalogue["roofs"]:
+        # A court needs somewhere flat to stand. Pitched, vaulted and domed roofs
+        # report flat=False and are simply not candidates.
+        if not roof.get("flat", True):
+            continue
+        if roof["width"] < SITE_CLEAR_WIDTH or roof["depth"] < SITE_CLEAR_DEPTH:
+            continue
+        if roof["top"] - FLOOR_TOP > MAX_ROOF_SITE_HEIGHT:
+            continue
+        out.append({"kind": "roof", "x": roof["x"], "z": roof["z"], "top": roof["top"],
+                    "width": roof["width"], "depth": roof["depth"],
+                    "base_depth": roof["base_depth"]})
+
+    kept = [
+        site for site in out
+        if _off_road(site["x"], site["z"])
+        and math.hypot(site["x"], site["z"] - 150) > HUB_SITE_CLEARANCE
+    ]
+    # Sorted so selection below is reproducible regardless of the order the city
+    # generator happened to emit blocks in.
+    kept.sort(key=lambda site: (round(site["x"], 3), round(site["z"], 3), site["kind"]))
+    return kept
+
+
+def _spread_pick(candidates, count, chosen=()):
+    """Farthest-point selection: repeatedly take whatever is furthest from the
+    set already taken.
+
+    Deliberately not random. A seeded shuffle gives clumps and voids at these
+    counts and needs tuning to look even; this is the standard greedy
+    maximin construction, is within a factor of two of the optimal spread, and
+    -- being a pure function of a sorted list -- is reproducible with no seed at
+    all.
+    """
+    picked = list(chosen)
+    pool = list(candidates)
+    if not picked and pool:
+        # Start from the candidate nearest the spawn plaza, so the first site is
+        # somewhere a new player will actually walk past.
+        first = min(pool, key=lambda s: math.hypot(s["x"], s["z"] - 150))
+        picked.append(first)
+        pool.remove(first)
+
+    while len(picked) < count and pool:
+        best, best_distance = None, -1.0
+        for site in pool:
+            nearest = min(math.hypot(site["x"] - p["x"], site["z"] - p["z"])
+                          for p in picked)
+            if nearest > best_distance:
+                best, best_distance = site, nearest
+        picked.append(best)
+        pool.remove(best)
+    return picked
+
+
+def scatter_sites():
+    """The 35 places the machines stand, spread across the whole city."""
+    candidates = site_candidates()
+    roofs = [site for site in candidates if site["kind"] == "roof"]
+    ground = [site for site in candidates if site["kind"] == "ground"]
+
+    # Roofs first and ground second against one shared set, so the two pools
+    # spread against each other rather than each spreading only against itself.
+    picked = _spread_pick(roofs, min(ROOF_SITE_QUOTA, len(roofs)))
+    picked = _spread_pick(ground, SCATTERED_SITE_COUNT, picked)
+    if len(picked) < SCATTERED_SITE_COUNT:
+        # Falling back to roofs rather than failing: a short ground pool is a
+        # tuning problem, and a world that refuses to build is a worse way to
+        # find out about it than a validator that names the shortfall.
+        picked = _spread_pick(candidates, SCATTERED_SITE_COUNT, picked)
+    return picked
+
+
+# --------------------------------------------------------------------------
+# Roof forms.
+#
+# Every roof in the city was a flat slab, which is most of why 438 buildings read
+# as one building. These are the shapes that give a skyline a vocabulary, and all
+# of them are reachable with the primitives this project already allows: a pitch
+# is two wedges, a vault is a half-buried cylinder, a dome is a single ball.
+#
+# The wedge maths comes from the gym halls, which have had working pitched and
+# sawtooth roofs all along -- hard-coded to their own constants. Promoted here to
+# arguments so any building can use them.
+# --------------------------------------------------------------------------
+
+
+def pitched_roof(name, x, z, top, width, depth, rise, colour, material,
+                 ridge_colour=None, along_x=False):
+    """Two slopes meeting at a ridge down the middle of the span.
+
+    The wedge convention is the one documented on `wedge`: Roblox slopes a
+    WedgePart down along +Z from the top of its -Z face, so the two halves face
+    opposite ways and each covers half the depth.
+    """
+    half = depth / 2 if not along_x else width / 2
+    out = []
+    for side, yaw in ((-1, 0), (1, 180)):
+        if along_x:
+            size = [depth, rise, half]
+            frame = mul(cf(x + side * half / 2, top + rise / 2, z),
+                        rot_y(yaw + 90))
+        else:
+            size = [width, rise, half]
+            frame = mul(cf(x, top + rise / 2, z + side * half / 2), rot_y(yaw))
+        out.append(wedge(f"{name}Pitch", size, frame, colour, material))
+    ridge_span = width if not along_x else depth
+    out.append(part(f"{name}Ridge", [ridge_span, 1.4, 3] if not along_x else [3, 1.4, ridge_span],
+                    cf(x, top + rise, z), ridge_colour or colour, "Metal"))
+    return out
+
+
+def hipped_roof(name, x, z, top, width, depth, rise, colour, material):
+    """A pitch that also falls to the two ends, so the roof has four slopes.
+
+    The difference from a gable is only visible in silhouette -- which is exactly
+    where a roof does its work.
+    """
+    out = pitched_roof(name, x, z, top, width * 0.72, depth, rise, colour, material)
+    for side, yaw in ((-1, 90), (1, 270)):
+        out.append(wedge(f"{name}Hip", [depth, rise, width * 0.14],
+                         mul(cf(x + side * width * 0.43, top + rise / 2, z), rot_y(yaw)),
+                         colour, material))
+    return out
+
+
+def sawtooth_roof(name, x, z, top, width, depth, bays, rise, colour, material, glass):
+    """North-light sawtooth: the freight-shed roof, glazed on every riser."""
+    out = []
+    bay_depth = depth / bays
+    for index in range(bays):
+        bz = z - depth / 2 + bay_depth * (index + 0.5)
+        out.append(wedge(f"{name}Saw", [width, rise, bay_depth],
+                         cf(x, top + rise / 2, bz), colour, material))
+        out.append(part(f"{name}SawGlass", [width, rise, 0.8],
+                        cf(x, top + rise / 2, bz - bay_depth / 2),
+                        glass, "Glass", Transparency=0.4, CanCollide=False))
+    return out
+
+
+def barrel_vault(name, x, z, top, width, depth, colour, material):
+    """A half-cylinder lying along the building, the cheapest curve available.
+
+    One part. A cylinder's axis is its local X, so this is turned to lie along the
+    depth and sunk by its own radius so only the upper half shows.
+    """
+    radius = width / 2
+    return [cylinder(f"{name}Vault", depth, width,
+                     mul(cf(x, top, z), rot_y(90)), colour, material)]
+
+
+def dome_roof(name, x, z, top, diameter, rise, colour, material, lantern=None):
+    """A dome, as a ball sunk to its equator, with a drum ring at the springing.
+
+    Shape="Ball" is a plain Roblox part shape and the first use of it in this
+    project -- a dome is otherwise a great many small rotated boxes.
+    """
+    out = [
+        part(f"{name}Dome", [diameter, rise * 2, diameter],
+             cf(x, top, z), colour, material, Shape="Ball"),
+        # A drum, not a rim. At 1.6 thick and fifty across this registered as a
+        # floor to the coplanar check, which would have needed a height band for
+        # what is really just a shape problem: the springing of a dome sits on a
+        # drum, and a drum is tall.
+        cylinder(f"{name}DomeRing", 7.0, diameter * 1.04,
+                 mul(cf(x, top - 2.5, z), rot_z(90)), colour, material),
+    ]
+    if lantern is not None:
+        out.append(cylinder(f"{name}Lantern", 6, diameter * 0.16,
+                            mul(cf(x, top + rise, z), rot_z(90)), lantern, "Neon",
+                            CanCollide=False))
+    return out
+
+
+def stepped_crown(name, x, z, top, width, depth, steps, colour, material, spire=None):
+    """The art-deco answer: shrinking blocks, optionally topped with a spire.
+
+    Each step is a genuine block rather than a thin lid. That is partly how a
+    ziggurat should look and partly deliberate: a slab under six studs tall and
+    over twelve across counts as a floor to the coplanar check, and a stack of
+    those inside one building would all overlap in plan.
+    """
+    out = []
+    w, d, y = width, depth, top
+    for index in range(steps):
+        height = 7.2 + index * 0.6
+        w, d = w * 0.74, d * 0.74
+        out.append(part(f"{name}Crown", [w, height, d],
+                        cf(x, y + height / 2, z), colour, material))
+        y += height
+    if spire is not None:
+        out.append(cylinder(f"{name}Spire", 14, max(2.0, w * 0.10),
+                            mul(cf(x, y + 7, z), rot_z(90)), spire, "Metal",
+                            CanCollide=False))
+    return out
+
+
+def city_grid(locations=None):
+    """A dense but readable street hierarchy with varied, human-scale blocks."""
+    global CITY_CATALOGUE
+    catalogue = {"ground": [], "roofs": []}
+    CITY_CATALOGUE = catalogue
+    out = []
+    crosstown_roads, upland_avenues = CROSSTOWN_ROADS, UPLAND_AVENUES
+    for z in crosstown_roads:
+        out.extend(city_road("CrosstownRoad", 15400, 58, 7600, z))
+    for x in upland_avenues:
+        # A one-hundredth lift at crossings prevents two independent asphalt parts
+        # from occupying the same top face.  It is visually imperceptible and keeps
+        # the intersections free of flicker.
+        out.extend(city_road("UplandAvenue", 54, 8300, x, -4350, 0.01))
+        for z in crosstown_roads:
+            out.extend(crosswalk(x, z, True))
+
+    # Blocks fill the rectangles between streets. A radial keep-out around every
+    # training district preserves clear entrances and skyline views.
+    keep_out = [(0, 150, 260)] + [
+        (area["x"], area["z"], 380 if area["venue_type"] == "Office" else 300)
+        for area in AREAS if not area["flight_only"]
+    ]
+    for index, rect in enumerate(city_block_rects(crosstown_roads, upland_avenues)):
+        x, z, width, depth = rect
+        # Only a block whose *centre* is inside a keep-out is dropped outright;
+        # everything else keeps its pavement and hands the clearance decision to
+        # the individual lots, which are small enough for the question to have a
+        # sensible answer.
+        if any(math.hypot(x - kx, z - kz) < radius for kx, kz, radius in keep_out):
+            continue
+        out.extend(city_block_shell(rect, index, keep_out, catalogue))
+
+    # Street trees reinforce the main boulevard and make the park district visible
+    # from several blocks away without adding random ground clutter.
+    # Each campus keeps its clearance, and now stands in something.
+    for area in AREAS:
+        if not area["flight_only"]:
+            out.extend(district_approach(area))
+
+    rng = random.Random("coastal-city-v2:boulevard-trees")
+    for x in range(-150, 15450, 210):
+        if all(math.hypot(x - area["x"], -520 - area["z"]) > 300 for area in AREAS):
+            out.extend(city_tree(x, -520, rng))
+    return out
+
+
+SHOP_X = 140
+# Pushed south from -103 when the districts gained gym halls. The shop is 54 deep with
+# an awning in front of that, so at -103 its canopy reached to about z -70 and lapped
+# over the hall's south wall -- caught by GetPartsInPart, not by eye. It belongs in the
+# forecourt, so it moves rather than the wall.
+SHOP_Z = -124
+
+
+def campus_shop(accent, x=None, z=None):
+    """The shopkeeper's stall, and the counter and signage that mark it.
+
+    This was a 74 x 54 walled room with a roof, sitting in a corner of the forecourt.
+    Inside a gym there is nothing for a second building to do -- the hall is already the
+    room -- so what is left is the furniture: a counter to stand behind, a shelf, and a
+    sign high enough to spot from the door.
+
+    `x`/`z` are campus-local. City districts put the stall in the middle of their hall;
+    the starter beach, which has no hall, leaves it out in the open where the room was.
+    """
+    dark = [0.10, 0.12, 0.15]
+    x = SHOP_X if x is None else x
+    z = SHOP_Z if z is None else z
+    pieces = [
+        part("ShopCounter", [22, 4, 5], cf(x, FLOOR_TOP + 2, z),
+             [0.30, 0.22, 0.16], "WoodPlanks"),
+        part("ShopCounterTop", [23, 0.4, 6], cf(x, FLOOR_TOP + 4.2, z),
+             [0.42, 0.32, 0.22], "WoodPlanks"),
+        part("ShopShelf", [22, 1.2, 4], cf(x, FLOOR_TOP + 7.5, z - 4),
+             [0.40, 0.31, 0.22], "WoodPlanks", CanCollide=False),
+        # A sign on posts rather than on a facade there no longer is.
+        part("ShopSignPost", [0.8, 12, 0.8], cf(x - 9, FLOOR_TOP + 6, z - 4.4),
+             dark, "Metal"),
+        part("ShopSignPost", [0.8, 12, 0.8], cf(x + 9, FLOOR_TOP + 6, z - 4.4),
+             dark, "Metal"),
+        part("ShopSign", [20, 5, 1.2], cf(x, FLOOR_TOP + 12, z - 4.4),
+             dark, "Metal", CanCollide=False),
+    ]
+    # Primitive dumbbell logo: readable from farther away than text on a small sign.
+    pieces.extend([
+        part("ShopLogoBar", [11, 1.0, 1.0], cf(x, FLOOR_TOP + 12, z - 5.2),
+             accent, "SmoothPlastic", CanCollide=False),
+        part("ShopLogoPlate", [2.2, 4, 1.6], cf(x - 4.5, FLOOR_TOP + 12, z - 5.2),
+             accent, "SmoothPlastic", CanCollide=False),
+        part("ShopLogoPlate", [2.2, 4, 1.6], cf(x + 4.5, FLOOR_TOP + 12, z - 5.2),
+             accent, "SmoothPlastic", CanCollide=False),
+        npc("Shopkeeper", "Shopkeeper", x, z - 3.5, accent),
+    ])
+    return group("CampusShop", pieces)
+
+
+# --- The gym hall -----------------------------------------------------------------
+#
+# Every city district used to be an open slab: five training courts on a paved
+# rectangle under the sky, lit by neon floor strips and corner floods. It read as a
+# car park with equipment on it rather than as a gym.
+#
+# This wraps the courts in an actual building. One generator, one theme table: the six
+# districts differ by data, not by six copies of the same function, so a new venue type
+# is an entry here and nothing else.
+#
+# The envelope is fixed by what it has to contain and avoid, not chosen for looks:
+#
+#   * the five bays span x +/-162 and z -46..+81, so the walls sit outside that
+#   * the rope climb tops out at FLOOR_TOP + 13.6, and the GymZone multiplier volumes
+#     reach local y 27, so the ceiling has to clear both
+#   * the shop sits at (140, -103) and the monument at z -95..-126, the plate trees at
+#     (+/-170, 92-97) and the entrance pylons at (+/-52, 122) -- all of which stay
+#     outside in the forecourt, so the south wall stops at -80 and the north at 88.
+#     -80 rather than -72 because the shop's awning reaches to about z -70: measured
+#     with GetPartsInPart, the wall and its service lintel were clipping ShopRoof and
+#     ShopAwning at -72
+GYM_HALL_HALF_WIDTH = 180
+GYM_HALL_SOUTH_Z = -80
+GYM_HALL_NORTH_Z = 88
+GYM_HALL_WALL = 3
+GYM_HALL_HEIGHT = 32
+GYM_HALL_DOOR_WIDTH = 60
+GYM_HALL_DOOR_HEIGHT = 24
+# The forecourt approach is from +Z, where the entrance pylons already stand, so the
+# main doors face that way and a service opening on -Z keeps the shop reachable.
+GYM_HALL_SERVICE_X = 140
+GYM_HALL_SERVICE_WIDTH = 44
+
+GYM_HALL_DEPTH = GYM_HALL_NORTH_Z - GYM_HALL_SOUTH_Z
+GYM_HALL_CENTRE_Z = (GYM_HALL_NORTH_Z + GYM_HALL_SOUTH_Z) / 2
+
+
+def _hall_wall_run(name, x_from, x_to, z, theme, height=None, y=None):
+    """One straight length of wall between two x positions."""
+    height = height or GYM_HALL_HEIGHT
+    width = abs(x_to - x_from)
+    if width < 0.5:
+        return []
+    return [part(name, [width, height, GYM_HALL_WALL],
+                 cf((x_from + x_to) / 2, (y if y is not None else FLOOR_TOP + height / 2), z),
+                 theme["wall"], theme["wall_material"])]
+
+
+def _hall_roof_flat(theme, accent):
+    """A flat deck with a parapet lip, the civic-sports-hall answer."""
+    out = [part("HallRoof", [GYM_HALL_HALF_WIDTH * 2, 1.6, GYM_HALL_DEPTH],
+                cf(0, FLOOR_TOP + GYM_HALL_HEIGHT + 0.8, GYM_HALL_CENTRE_Z),
+                theme["roof"], theme["roof_material"])]
+    for z in (GYM_HALL_SOUTH_Z, GYM_HALL_NORTH_Z):
+        out.append(part("HallParapet", [GYM_HALL_HALF_WIDTH * 2, 3, 2],
+                        cf(0, FLOOR_TOP + GYM_HALL_HEIGHT + 3, z),
+                        theme["roof"], theme["roof_material"]))
+    return out
+
+
+def _hall_roof_pitched(theme, accent):
+    """Two slopes meeting at a ridge down the middle of the span."""
+    half = GYM_HALL_DEPTH / 2
+    rise = 10
+    out = []
+    for side, yaw in ((-1, 0), (1, 180)):
+        out.append(wedge(
+            "HallRoofPitch", [GYM_HALL_HALF_WIDTH * 2, rise, half],
+            mul(cf(0, FLOOR_TOP + GYM_HALL_HEIGHT + rise / 2,
+                   GYM_HALL_CENTRE_Z + side * half / 2), rot_y(yaw)),
+            theme["roof"], theme["roof_material"]))
+    out.append(part("HallRidge", [GYM_HALL_HALF_WIDTH * 2, 1.4, 3],
+                    cf(0, FLOOR_TOP + GYM_HALL_HEIGHT + rise, GYM_HALL_CENTRE_Z),
+                    theme["trim"], "Metal"))
+    return out
+
+
+def _hall_roof_sawtooth(theme, accent):
+    """North-light sawtooth: the freight-shed roof, glazed on every riser."""
+    out = []
+    bays = 3
+    depth = GYM_HALL_DEPTH / bays
+    for index in range(bays):
+        z = GYM_HALL_SOUTH_Z + depth * (index + 0.5)
+        out.append(wedge("HallSawtooth", [GYM_HALL_HALF_WIDTH * 2, 7, depth],
+                         cf(0, FLOOR_TOP + GYM_HALL_HEIGHT + 3.5, z),
+                         theme["roof"], theme["roof_material"]))
+        out.append(part("HallSawtoothGlass", [GYM_HALL_HALF_WIDTH * 2, 7, 0.8],
+                        cf(0, FLOOR_TOP + GYM_HALL_HEIGHT + 3.5, z - depth / 2),
+                        theme["glass"], "Glass", Transparency=0.4, CanCollide=False))
+    return out
+
+
+def _hall_roof_truss(theme, accent):
+    """Open steel trusses with non-colliding glazing between them.
+
+    Storm is flight-only and sits at altitude, so players arrive from above. A solid
+    deck would mean flying into a ceiling; this reads as a roof and lets them through.
+    """
+    out = []
+    for z in range(int(GYM_HALL_SOUTH_Z) + 16, int(GYM_HALL_NORTH_Z), 32):
+        out.append(part("HallTruss", [GYM_HALL_HALF_WIDTH * 2, 2.2, 2.2],
+                        cf(0, FLOOR_TOP + GYM_HALL_HEIGHT + 1, z),
+                        theme["roof"], theme["roof_material"]))
+    out.append(part("HallCanopy", [GYM_HALL_HALF_WIDTH * 2, 0.4, GYM_HALL_DEPTH],
+                    cf(0, FLOOR_TOP + GYM_HALL_HEIGHT + 2.4, GYM_HALL_CENTRE_Z),
+                    theme["glass"], "Glass",
+                    Transparency=0.55, CanCollide=False, CastShadow=False))
+    return out
+
+
+GYM_ROOF_BUILDERS = {
+    "flat": _hall_roof_flat,
+    "pitched": _hall_roof_pitched,
+    "sawtooth": _hall_roof_sawtooth,
+    "truss": _hall_roof_truss,
+}
+
+
+# Wall colour, material, roof style, glazing and light colour per venue type. Adding a
+# seventh district means adding a row here; it means editing nothing else.
+GYM_HALL_THEMES = {
+    "Park": {
+        "wall": [0.78, 0.76, 0.70], "wall_material": "Concrete",
+        "roof": [0.34, 0.22, 0.18], "roof_material": "Slate", "roof_style": "pitched",
+        "trim": [0.45, 0.33, 0.22], "glass": [0.62, 0.74, 0.72],
+        "column": [0.42, 0.30, 0.20], "column_material": "Wood",
+        "light": [0.60, 0.58, 0.52], "sign": "CIVIC PARK GYM",
+    },
+    "Beach": {
+        "wall": [0.62, 0.46, 0.30], "wall_material": "WoodPlanks",
+        "roof": [0.40, 0.28, 0.18], "roof_material": "WoodPlanks", "roof_style": "pitched",
+        "trim": [0.72, 0.58, 0.36], "glass": [0.68, 0.80, 0.82],
+        "column": [0.46, 0.32, 0.20], "column_material": "Wood",
+        "light": [0.62, 0.57, 0.46], "sign": "BOARDWALK BARBELL",
+    },
+    "Dock": {
+        "wall": [0.36, 0.34, 0.31], "wall_material": "CorrodedMetal",
+        "roof": [0.28, 0.28, 0.30], "roof_material": "CorrodedMetal", "roof_style": "sawtooth",
+        "trim": [0.55, 0.40, 0.24], "glass": [0.55, 0.62, 0.66],
+        "column": [0.24, 0.25, 0.28], "column_material": "Metal",
+        "light": [0.54, 0.56, 0.58], "sign": "FREIGHT YARD STRENGTH",
+    },
+    "City": {
+        "wall": [0.52, 0.51, 0.48], "wall_material": "Concrete",
+        "roof": [0.34, 0.34, 0.34], "roof_material": "Concrete", "roof_style": "flat",
+        "trim": [0.66, 0.58, 0.36], "glass": [0.50, 0.62, 0.70],
+        "column": [0.44, 0.44, 0.42], "column_material": "Concrete",
+        "light": [0.58, 0.58, 0.54], "sign": "TITAN SQUARE",
+    },
+    "Office": {
+        "wall": [0.16, 0.18, 0.22], "wall_material": "Metal",
+        "roof": [0.14, 0.16, 0.20], "roof_material": "Metal", "roof_style": "flat",
+        "trim": [0.42, 0.60, 0.70], "glass": [0.28, 0.50, 0.60],
+        "column": [0.26, 0.28, 0.32], "column_material": "Metal",
+        "light": [0.56, 0.59, 0.62], "sign": "APEX OFFICE GYM",
+    },
+    "Sky": {
+        "wall": [0.22, 0.24, 0.30], "wall_material": "DiamondPlate",
+        "roof": [0.26, 0.28, 0.34], "roof_material": "Metal", "roof_style": "truss",
+        "trim": [0.58, 0.62, 0.78], "glass": [0.46, 0.56, 0.78],
+        "column": [0.24, 0.26, 0.32], "column_material": "Metal",
+        "light": [0.54, 0.57, 0.64], "sign": "STORMLINE ROOFTOP",
+    },
+}
+
+
+def gym_building(area, theme):
+    """The hall around one district's five training courts.
+
+    Returns campus-local pieces, like every other builder here; the caller places
+    them by the area frame.
+    """
+    accent = next(item for item in DISTRICTS if item["zone"] == area["zone"])["accent"]
+    half = GYM_HALL_HALF_WIDTH
+    door = GYM_HALL_DOOR_WIDTH / 2
+    out = []
+
+    # North face: the way in, split around a wide central opening with a lintel over.
+    out.extend(_hall_wall_run("HallWallNorth", -half, -door, GYM_HALL_NORTH_Z, theme))
+    out.extend(_hall_wall_run("HallWallNorth", door, half, GYM_HALL_NORTH_Z, theme))
+    lintel = GYM_HALL_HEIGHT - GYM_HALL_DOOR_HEIGHT
+    out.extend(_hall_wall_run(
+        "HallLintel", -door, door, GYM_HALL_NORTH_Z, theme,
+        height=lintel, y=FLOOR_TOP + GYM_HALL_DOOR_HEIGHT + lintel / 2))
+
+    # South face: solid except a service opening lined up with the shop outside.
+    service_from = GYM_HALL_SERVICE_X - GYM_HALL_SERVICE_WIDTH / 2
+    service_to = GYM_HALL_SERVICE_X + GYM_HALL_SERVICE_WIDTH / 2
+    out.extend(_hall_wall_run("HallWallSouth", -half, service_from, GYM_HALL_SOUTH_Z, theme))
+    out.extend(_hall_wall_run("HallWallSouth", service_to, half, GYM_HALL_SOUTH_Z, theme))
+    out.extend(_hall_wall_run(
+        "HallLintel", service_from, service_to, GYM_HALL_SOUTH_Z, theme,
+        height=lintel, y=FLOOR_TOP + GYM_HALL_DOOR_HEIGHT + lintel / 2))
+
+    # Side walls, and a glazed strip high on each so the hall is not a windowless box.
+    for side in (-1, 1):
+        out.append(part("HallWallSide", [GYM_HALL_WALL, GYM_HALL_HEIGHT, GYM_HALL_DEPTH],
+                        cf(side * half, FLOOR_TOP + GYM_HALL_HEIGHT / 2, GYM_HALL_CENTRE_Z),
+                        theme["wall"], theme["wall_material"]))
+        out.append(part("HallClerestory", [1.0, 7, GYM_HALL_DEPTH - 24],
+                        cf(side * half, FLOOR_TOP + GYM_HALL_HEIGHT - 6, GYM_HALL_CENTRE_Z),
+                        theme["glass"], "Glass",
+                        Transparency=0.42, CanCollide=False, CastShadow=False))
+
+    # Columns land in the concourse gaps between bays, never on a court.
+    for x in (-54, 54):
+        for z in (GYM_HALL_SOUTH_Z + 10, GYM_HALL_NORTH_Z - 10):
+            out.append(part("HallColumn", [3.5, GYM_HALL_HEIGHT, 3.5],
+                            cf(x, FLOOR_TOP + GYM_HALL_HEIGHT / 2, z),
+                            theme["column"], theme["column_material"]))
+
+    out.extend(GYM_ROOF_BUILDERS[theme["roof_style"]](theme, accent))
+
+    # A soffit so the interior has a ceiling rather than the roof's underside, except
+    # under an open truss where seeing the sky is the point.
+    if theme["roof_style"] != "truss":
+        out.append(part("HallSoffit",
+                        [half * 2 - GYM_HALL_WALL, 0.5, GYM_HALL_DEPTH - GYM_HALL_WALL],
+                        cf(0, FLOOR_TOP + GYM_HALL_HEIGHT - 0.6, GYM_HALL_CENTRE_Z),
+                        CEILING_LINER, "Concrete",
+                        CanCollide=False, CastShadow=False))
+
+    # Interior lighting. ceiling_panel is already tuned for this place's Bloom and
+    # global brightness -- see the note above it -- so only the colour is theme data.
+    for x in (-120, -40, 40, 120):
+        for z in (GYM_HALL_SOUTH_Z + 44, GYM_HALL_NORTH_Z - 44):
+            panel = ceiling_panel(cf(x, FLOOR_TOP + GYM_HALL_HEIGHT - 2, z))
+            panel["properties"]["Color"] = theme["light"]
+            # Their ranges already overlap at this spacing, and the place runs Bloom on
+            # top of a global Brightness of 2.5, so each panel only has to light the
+            # floor beneath it. Left at ceiling_panel's own value they stacked into a
+            # white ceiling.
+            panel["children"][0]["properties"]["Brightness"] = 0.55
+            out.append(panel)
+
+    # Fascia over the entrance, in the district's own colour.
+    out.append(part("HallFascia", [half * 2, 6, 2],
+                    cf(0, FLOOR_TOP + GYM_HALL_HEIGHT - 3, GYM_HALL_NORTH_Z + 2.2),
+                    theme["trim"], "Metal", CanCollide=False))
+    out.append(part("HallSignBand", [136, 4, 1],
+                    cf(0, FLOOR_TOP + GYM_HALL_HEIGHT - 3, GYM_HALL_NORTH_Z + 3.4),
+                    accent, "SmoothPlastic", CanCollide=False))
+
+    out.append(map_footprint(
+        "GymHallMap", half * 2, GYM_HALL_DEPTH,
+        cf(0, FLOOR_TOP + 0.16, GYM_HALL_CENTRE_Z), theme["wall"], "Building"))
+    return out
+
+
+def campus_shell(area, surface, material, map_kind="Building"):
+    """Shared readable composition: courts, concourse, entrance, and focal stage."""
+    accent = next(item for item in DISTRICTS if item["zone"] == area["zone"])["accent"]
+    dark = [0.10, 0.12, 0.15]
+    # Where the shop stall goes. A district with a hall puts it inside, in the gap the
+    # five bays leave in the middle -- the bays sit at x -108/0/108 and z -25/60, so
+    # x -54..54 at z 39..81 is free, and it is straight ahead of the north door.
+    # The starter beach has no hall, so its stall stays out in the forecourt.
+    theme = GYM_HALL_THEMES.get(area.get("venue_type"))
+    shop_x, shop_z = (0, 60) if theme is not None else (SHOP_X, SHOP_Z)
+    out = [
+        # Solid, unlike everything stacked on it. The whole campus surface used to be
+        # decoration over the world's 4-stud ground slab, so a player standing anywhere
+        # on a district was at y 1.0 while the floor they could see was at 1.18 and a
+        # training pad's mat was at 1.34 -- feet a third of a stud inside every pad they
+        # walked onto. Making the one broad surface collide puts the visible floor and
+        # the real floor in the same place; the courts and pads sitting 0.03-0.04 above
+        # it are flush enough to walk over.
+        map_feature(part(
+            "CampusFloor", [CITY_CAMPUS_WIDTH, 0.18, CITY_CAMPUS_DEPTH],
+            cf(0, FLOOR_TOP + 0.09, 0), surface, material,
+            # Stated rather than left to the class default: dropping the CanCollide key
+            # from the model JSON does not reset an instance Rojo has already synced,
+            # so the flag has to be written for the change to reach a live place.
+            CanCollide=True,
+        ), map_kind),
+        part("CentralConcourse", [52, 0.10, CITY_CAMPUS_DEPTH - 24],
+             cf(0, FLOOR_TOP + 0.20, 0), dark, "Slate",
+             CanCollide=False, CastShadow=False),
+        # Painted, not lit. This was Neon: a glowing accent line running the length
+        # of every campus, which together with the court stripes was most of the
+        # "random lightning" look. The marking is still useful, the glow was not.
+        part("ConcourseLine", [1.4, 0.08, CITY_CAMPUS_DEPTH - 50],
+             cf(0, FLOOR_TOP + 0.27, 0),
+             [c * 0.55 for c in accent], "SmoothPlastic",
+             CanCollide=False, CastShadow=False),
+        part("ShowStage", [120, 1.2, 34], cf(0, FLOOR_TOP + 0.6, -112),
+             dark, "DiamondPlate"),
+        part("StageAccent", [108, 0.18, 25], cf(0, FLOOR_TOP + 1.28, -112),
+             accent, "SmoothPlastic", CanCollide=False),
+        campus_shop(accent, shop_x, shop_z),
+        # The quest giver, on the open concourse at the entrance end -- south of every
+        # court, clear of the bays, and the first thing a player walks past on arrival.
+        # One per campus so an objective is never a trip back to spawn.
+        npc("Coach", "Coach", 0, 118, accent, style="coach", ring_color=QUEST_RING_COLOR),
+    ]
+
+    # A district-scale strength monument gives every arrival one thing to steer at.
+    for x in (-60, 60):
+        out.append(part("StageTruss", [4, 32, 4], cf(x, FLOOR_TOP + 17, -124),
+                        dark, "Metal"))
+    # Signage now, not a lamp: the gym itself is lit from inside, and a 55-stud
+    # point light on a board 250 studs from the courts only washed out the monument.
+    out.append(part("DistrictMarquee", [124, 7, 4], cf(0, FLOOR_TOP + 32, -124),
+                    accent, "SmoothPlastic", CanCollide=False, CastShadow=False))
+    out.extend([
+        part("MonumentBar", [46, 3, 3], cf(0, FLOOR_TOP + 17, -121),
+             [0.68, 0.70, 0.74], "Metal", CanCollide=False),
+        cylinder("MonumentPlate", 5, 16,
+                 mul(cf(-18, FLOOR_TOP + 17, -121), rot_z(90)),
+                 accent, "Metal", CanCollide=False),
+        cylinder("MonumentPlate", 5, 16,
+                 mul(cf(18, FLOOR_TOP + 17, -121), rot_z(90)),
+                 accent, "Metal", CanCollide=False),
+    ])
+
+    # Lit entrance pylons and corner floods frame the campus without fencing players in.
+    for x in (-52, 52):
+        out.extend(beacon({"accent": accent}, x, 122, 20))
+    for x in (-170, 170):
+        for z in (-115, 115):
+            out.append(part("CampusFloodMast", [2, 28, 2],
+                            cf(x, FLOOR_TOP + 14, z), dark, "Metal"))
+            # Kept, and still lit: these are outdoor masts over the forecourt, shop
+            # and monument, not floor strips, and with the courts indoors they are the
+            # only thing lighting the approach. The head is no longer emissive.
+            lamp = part("CampusFloodHead", [7, 2, 4],
+                        cf(x, FLOOR_TOP + 28, z), [0.84, 0.82, 0.74], "SmoothPlastic",
+                        CanCollide=False, CastShadow=False)
+            lamp["children"] = [{
+                "name": "CourtLight", "className": "PointLight",
+                "properties": {"Brightness": 0.8, "Range": 45,
+                               "Color": [1.0, 0.95, 0.84], "Shadows": False},
+            }]
+            out.append(lamp)
+
+    # The hall around the courts, if this district has a venue type to build one from.
+    #
+    # The lookup is the switch: every city area carries a venue_type, and the Muscle
+    # Beach starter campus -- the one caller that passes a bare {"zone": "Garage"} --
+    # does not. So the starter stays an open-air beach by construction rather than by
+    # a special case somebody has to remember, and it goes on reading as the "before"
+    # that makes the first real gym feel like progress.
+    if theme is not None:
+        out.append(group("GymHall", gym_building(area, theme)))
+    return out
 
 
 def connected_plaza():
-    out = [
-        # Top surface is exactly FLOOR_TOP, matching every machine builder.
-        disc("Plaza", 1.2, PLAZA_RADIUS * 2, FLOOR_TOP - 0.6 + SURFACE_LIFT,
-             [0.42, 0.41, 0.40], "Pavement"),
-        disc("PlazaInlay", 0.08, PLAZA_RADIUS * 1.1, FLOOR_TOP + 0.04,
-             [0.55, 0.50, 0.38], "Marble", CanCollide=False),
-        tagged(
-            part("SpawnSafeZone", [SAFE_ZONE_HALF * 2, 44, SAFE_ZONE_HALF * 2],
-                 cf(0, FLOOR_TOP + 22, 0), [0.4, 0.8, 1.0], "ForceField",
-                 CanCollide=False, Transparency=1, CastShadow=False),
-            tags=["SafeZone"],
-        ),
-        map_footprint("PlazaMap", PLAZA_RADIUS * 2, PLAZA_RADIUS * 2,
-                      cf(0, FLOOR_TOP + 0.1, 0), [0.48, 0.47, 0.45],
-                      "Plaza", "Circle"),
+    """Muscle Beach spawn: safe pavilion, boardwalk furniture and palms."""
+    rng = random.Random("coastal-city-v2:starter-beach")
+    starter_area = {"zone": "Garage"}
+    out = [place(STARTER_CAMPUS_FRAME, piece) for piece in campus_shell(
+        starter_area, [0.39, 0.28, 0.18], "WoodPlanks"
+    )]
+    out.extend([
+        tagged(part("SpawnSafeZone", [SAFE_ZONE_HALF * 2, 44, SAFE_ZONE_HALF * 2],
+                    cf(0, FLOOR_TOP + 22, 0), [0.30, 0.80, 1.0], "ForceField",
+                    CanCollide=False, Transparency=1, CastShadow=False),
+               tags=["SafeZone"]),
         map_footprint("SafeZoneMap", SAFE_ZONE_HALF * 2, SAFE_ZONE_HALF * 2,
-                      cf(0, FLOOR_TOP + 0.15, 0), [0.30, 0.86, 1.0],
-                      "SafeZone"),
-    ]
-
-    # The safe volume remains invisible and authoritative; these four luminous
-    # ForceField walls make its exact boundary obvious without blocking movement.
-    barrier_color = [0.30, 0.86, 1.0]
-    for x, z, sx, sz in (
-        (0, -SAFE_ZONE_HALF, SAFE_ZONE_HALF * 2, 1.2),
-        (0, SAFE_ZONE_HALF, SAFE_ZONE_HALF * 2, 1.2),
-        (-SAFE_ZONE_HALF, 0, 1.2, SAFE_ZONE_HALF * 2),
-        (SAFE_ZONE_HALF, 0, 1.2, SAFE_ZONE_HALF * 2),
-    ):
-        out.append(part("SafeBarrier", [sx, 20, sz], cf(x, FLOOR_TOP + 10, z),
-                        barrier_color, "ForceField", CanCollide=False,
-                        Transparency=0.58, CastShadow=False))
-        out.append(part("SafeBoundary", [sx, 0.5, sz], cf(x, FLOOR_TOP + 0.35, z),
-                        barrier_color, "Neon", CanCollide=False, CastShadow=False))
-    for index in range(12):
-        angle = 360.0 * index / 12
-        spot = mul(rot_y(angle), cf(0, 0, PLAZA_RADIUS + 22))
-        out.append(part("PlazaLamp", [1.4, 16, 1.4],
-                        cf(spot[0][0], FLOOR_TOP + 8, spot[0][2]),
-                        [0.16, 0.16, 0.18], "Metal"))
-        out.append(part("PlazaLampHead", [2.4, 1.2, 2.4],
-                        cf(spot[0][0], FLOOR_TOP + 16.4, spot[0][2]),
-                        [1.0, 0.93, 0.76], "Neon", CanCollide=False))
+                      cf(0, FLOOR_TOP + 0.15, 0), [0.30, 0.80, 1.0], "SafeZone"),
+    ])
+    # The lifeguard pavilion is gone: a pale 28x18x20 cabin on a deck, with an emissive
+    # sign over it. It was the last Neon part at spawn and, being a plain block, read as
+    # a stray box on the sand rather than as a landmark.
+    for x in (-175, 175):
+        out.extend(_decorate(piece) for piece in palm(x, 260, rng))
+        out.extend(_decorate(piece) for piece in palm(x, 38, rng))
     out.extend(plaza_furniture())
     return out
 
 
-def starter_training_area(location, zone_row):
-    """One of all five x1 machines openly grouped around the spawn campus."""
+def scattered_training_area(location, tier_row):
+    """One machine's site: its court, its tier volume, its sign, and its access.
+
+    The zone volume is what makes a machine's tier real -- ZoneConfig.AtPosition
+    reads the volume the player is standing in, not the machine -- so it travels
+    with the court wherever the court goes.
+    """
     origin = location["origin"]
-    out = [
-        place(origin, piece)
-        for piece in training_venue(location["equipment"], zone_row["accent"])
-    ]
+    accent = tier_row["accent"]
+    out = [place(origin, piece) for piece in training_court(
+        location["equipment"], accent
+    )]
     out.append(place(origin, volume(
-        location["zone"], f"{location['id']}Volume", [54, 40, 54], cf(0, 19, 0)
+        location["zone"], f"{location['id']}Volume", [48, 28, 58], cf(0, 13, 0)
     )))
-    out.append(place(origin, map_footprint(
-        "StarterVenueMap", 30, 30, cf(0, FLOOR_TOP + 0.1, 0),
-        FAMILY_COLORS[location["family"]], "Building"
-    )))
+    out.extend(place(origin, piece) for piece in site_marker(location, accent))
+
+    # A rooftop court needs a way up and a floor that holds you. The deck the
+    # building generator lays is CanCollide=False -- fine for scenery nobody
+    # stands on, and a hole to fall through the moment a machine is up there.
+    if location["site_kind"] == "roof":
+        # Sized to the roof it covers rather than to a fixed number: roofs vary,
+        # and a fixed slab either floats past the parapet or leaves the court
+        # standing on the non-collidable deck underneath it.
+        width, depth = location["site_width"], location["site_depth"]
+        out.append(part(f"{location['id']}RoofFloor", [width, 1.0, depth],
+                        cf(location["site_x"], location["site_top"] - 0.5,
+                           location["site_z"]),
+                        [0.30, 0.30, 0.32], "Concrete"))
+        out.extend(roof_access_stair(
+            location["site_x"], location["site_z"], location["site_top"],
+            location["site_base_depth"], [0.34, 0.34, 0.36], accent))
     return out
 
 
-def connected_block(location, zone_row, visual_row):
-    """One irregular ground site: pavement, secret shell and private zone."""
-    ground_origin = location["ground_origin"]
-    out = [
-        place(ground_origin, map_feature(part(
-            "SitePavement", [86, 1, 88],
-            cf(0, FLOOR_TOP - 0.5 + SURFACE_LIFT, 0),
-            visual_row["ground"], visual_row["ground_material"],
-        ), "Block")),
-    ]
-    for x, z, sx, sz in (
-        (-44, 0, 2, 90), (44, 0, 2, 90),
-        (0, -45, 90, 2), (0, 45, 90, 2),
-    ):
-        out.append(place(ground_origin, part(
-            "Kerb", [sx, 0.3, sz], cf(x, FLOOR_TOP + 0.15, z), KERB, "Concrete",
-            CanCollide=False,
-        )))
+def site_marker(location, accent):
+    """The pylon that says a machine is here, in site-local space.
 
-    origin = location["origin"]
-    if location["style"] == "tower":
-        out.append(place(ground_origin, enterable_training_tower(
-            location["id"], location["equipment"], visual_row["accent"]
-        )))
-        out.append(place(ground_origin, map_footprint(
-            "TowerMap", 60, 66, cf(0, FLOOR_TOP + 0.2, 0),
-            [0.18, 0.19, 0.22], "Building"
-        )))
-    else:
-        out.extend(place(origin, piece) for piece in hideout_shell(
-            location["style"], location["equipment"], visual_row["accent"]
+    Thirty-five destinations scattered over sixteen thousand studs are only worth
+    having if they can be found. The board carries the muscle colour and the
+    beacon is lit, so a site reads from street level and from the air.
+    """
+    family_color = FAMILY_COLORS[location["family"]]
+    return [
+        part("SitePost", [1.6, 26, 1.6], cf(-24, FLOOR_TOP + 13, -20),
+             [0.20, 0.20, 0.22], "Metal"),
+        part("SiteBoard", [12, 6, 0.6], cf(-24, FLOOR_TOP + 23, -20),
+             family_color, "SmoothPlastic", CanCollide=False),
+        part("SiteBeacon", [3, 3, 3], cf(-24, FLOOR_TOP + 27.5, -20),
+             accent, "Neon", CanCollide=False),
+    ]
+
+
+def training_court(equipment_id, district_accent):
+    """One readable muscle court framing a single machine.
+
+    Sized to the one venue pad it contains (30 studs plus a walkable margin) rather
+    than to the three-pad row it used to hold, so the painted floor ends where the
+    equipment does instead of running 108 studs across the concourse.
+    """
+    family = EQUIPMENT_FAMILY[equipment_id]
+    family_color = FAMILY_COLORS[family]
+    out = [
+        # Spaced 0.06 apart, not 0.01. A hundredth of a stud z-fights outright at
+        # any distance; it survived review only because the coplanar check buckets
+        # heights to the nearest hundredth and Python rounds halves to even, so
+        # 1.205 and 1.215 landed in different buckets while 23.235 and 23.245 --
+        # the same court lifted onto a roof -- landed in the same one.
+        part("MuscleCourtEdge", [44, 0.04, 42], cf(0, FLOOR_TOP + 0.18, 0),
+             district_accent, "SmoothPlastic", CanCollide=False, CastShadow=False),
+        part("MuscleCourt", [40, 0.04, 38], cf(0, FLOOR_TOP + 0.25, 0),
+             [0.17, 0.19, 0.22], "Slate", CanCollide=False),
+        # Painted floor marking. This was Neon in the muscle family's colour -- the
+        # bright green and orange bars visible from across the map -- and it is what
+        # made the areas read as lit by lasers. MuscleCourtEdge above is already
+        # SmoothPlastic and stays: it is the painted court boundary.
+        part("MuscleStripe", [36, 0.02, 1.0], cf(0, FLOOR_TOP + 0.32, -17.2),
+             family_color, "SmoothPlastic", CanCollide=False, CastShadow=False),
+    ]
+    for offset in COPY_OFFSETS:
+        out.extend(place(cf(offset, 0, 0), piece)
+                   for piece in training_venue(equipment_id, district_accent))
+    return out
+
+
+MOB_FIELD_RADIUS = 90
+BOSS_ARENA_RADIUS = 70
+# Sickly green for the field, dried blood for the arena. Both read as "not the gym" at
+# a glance, which is the whole job of the ground colour.
+MOB_FIELD_COLOR = [0.24, 0.34, 0.18]
+BOSS_ARENA_COLOR = [0.32, 0.13, 0.14]
+
+
+def mob_site(name_prefix, zone_id, offset_z, radius, ground_color, tag, map_kind):
+    """One hostile site: visible ground, an invisible spawn marker, and a map icon.
+
+    The marker rather than the ground carries the tag, for the same reason ZoneSpawn
+    does: the ground is decoration that may be restyled or split into several parts,
+    while the marker is a single stable point the server resolves a spawn area from.
+    """
+    origin = cf(0, 0, offset_z)
+    pieces = [
+        # Collidable, unlike the court markings. On the ground tiers this is a
+        # redundant 0.1-stud step over the campus floor, but Skydeck and Storm are
+        # flight-only platforms and their arenas sit past the edge of the deck: with a
+        # non-colliding disc the boss spawned and immediately fell out of the world.
+        disc(f"{name_prefix}Ground", 0.3, radius * 2, FLOOR_TOP + 0.10,
+             ground_color, "Ground", CanCollide=True, CastShadow=False),
+        # A ring of the same colour, brighter, so the boundary reads from inside it.
+        disc(f"{name_prefix}Edge", 0.24, radius * 2 + 8, FLOOR_TOP + 0.08,
+             [min(1.0, c * 1.7) for c in ground_color], "SmoothPlastic",
+             CanCollide=False, CastShadow=False),
+        tagged(
+            part(f"{name_prefix}Marker", [3, 3, 3], cf(0, FLOOR_TOP + 1.5, 0),
+                 ground_color, "SmoothPlastic",
+                 CanCollide=False, CanTouch=False, CanQuery=False,
+                 Transparency=1, CastShadow=False),
+            tags=[tag],
+            attributes={"ZoneId": zone_id, "Radius": radius},
+        ),
+        map_footprint(f"{name_prefix}Map", radius * 2, radius * 2,
+                      cf(0, FLOOR_TOP + 0.15, 0), ground_color, map_kind,
+                      shape="Circle"),
+    ]
+    return [place(origin, piece) for piece in pieces]
+
+
+def mob_field(zone_id):
+    """One tier's mob field, in site-local space."""
+    return mob_site("MobField", zone_id, 0, MOB_FIELD_RADIUS,
+                    MOB_FIELD_COLOR, "MobField", "MobField")
+
+
+def boss_arena(zone_id):
+    """One tier's boss arena, in site-local space."""
+    return mob_site("BossArena", zone_id, 0, BOSS_ARENA_RADIUS,
+                    BOSS_ARENA_COLOR, "BossArena", "BossArena")
+
+
+def single_user_equipment(pieces):
+    """Prune authored multi-user spots so one physical copy seats one player.
+
+    A few legacy silhouettes (the starter dumbbell rack and pull-up rig) contain
+    several sibling Spot models. The map now repeats the entire silhouette three
+    times, so retaining those internal spots would make one visible copy serve two
+    or three people. Keep the anchor nearest the equipment's local centre and remove
+    every sibling branch that owns another anchor, including its held weights.
+    """
+    anchors = []
+
+    def collect(node):
+        if node.get("name") == "TrainAnchor":
+            anchors.append(node)
+        for child in node.get("children", []):
+            collect(child)
+
+    for piece in pieces:
+        collect(piece)
+    if len(anchors) <= 1:
+        return pieces
+
+    def centre_distance(anchor):
+        frame = anchor.get("properties", {}).get("CFrame", [0, 0, 0])
+        return frame[0] * frame[0] + frame[2] * frame[2]
+
+    chosen = min(anchors, key=centre_distance)
+
+    def contains_chosen(node):
+        if node is chosen:
+            return True
+        return any(contains_chosen(child) for child in node.get("children", []))
+
+    def anchor_count(node):
+        return (1 if node.get("name") == "TrainAnchor" else 0) + sum(
+            anchor_count(child) for child in node.get("children", [])
+        )
+
+    def prune(node):
+        kept = []
+        for child in node.get("children", []):
+            if child.get("name") == "TrainAnchor" and child is not chosen:
+                continue
+            if anchor_count(child) > 0 and not contains_chosen(child):
+                continue
+            prune(child)
+            kept.append(child)
+        if "children" in node:
+            node["children"] = kept
+
+    kept_pieces = []
+    for piece in pieces:
+        if anchor_count(piece) > 0 and not contains_chosen(piece):
+            continue
+        prune(piece)
+        kept_pieces.append(piece)
+    return kept_pieces
+
+
+def machine_copies(equipment_id, row):
+    """The spots that stand on one destination's court -- one, as of the single-machine
+    layout. Kept as a loop over COPY_OFFSETS so capacity is a constant, not a rewrite."""
+    copies = []
+    for index, offset in enumerate(COPY_OFFSETS, start=1):
+        pieces = single_user_equipment(
+            BUILDERS[equipment_id](*machine_palette(equipment_id, row))
+        )
+        copies.append(group(
+            f"Spot{index:02d}",
+            [place(cf(offset, 0, 0), piece) for piece in pieces],
         ))
-        out.append(place(origin, map_footprint(
-            "HideoutMap", 58, 64, cf(0, FLOOR_TOP + 0.2, 0),
-            [0.20, 0.21, 0.23], "Building"
-        )))
-    out.extend(place(origin, piece) for piece in training_venue(
-        location["equipment"], visual_row["accent"]
-    ))
-    out.append(place(origin, volume(
-        location["zone"], f"{location['id']}Volume", [78, 54, 84], cf(0, 25, 0)
-    )))
-    return out
+    return copies
 
 
-def sky_training_environment(location, zone_row, visual_row):
-    """An atomic, flight-only crane deck with rails and a recovery scaffold."""
-    accent = visual_row["accent"]
-    platform = [0.20, 0.22, 0.25]
-    out = [
-        part("LandingSurface", [96, 2, 88], cf(0, 0, 0), platform, "DiamondPlate"),
-        part("RecoveryDeck", [128, 2, 120], cf(0, -26, 0),
-             [0.16, 0.18, 0.21], "DiamondPlate"),
-        map_footprint("SkyPlatformMap", 96, 88, cf(0, 0.25, 0),
-                      platform, "SkyPlatform"),
-        marker("AccessEnd", [18, 10, 4], cf(0, 7, 45)),
-        part("CraneMast", [6, location["altitude"], 6],
-             cf(-39, -location["altitude"] / 2, -34),
-             [0.34, 0.30, 0.22], "DiamondPlate"),
-        part("CraneBeacon", [8, 3, 8], cf(-39, 5, -34), accent, "Neon",
-             CanCollide=False),
-    ]
-    tagged(out[3], tags=["VenueAccess"], attributes={
-        "TravelId": location["id"], "Role": "AccessEnd",
-    })
-    for x, z, sx, sz in (
-        (0, -43, 96, 2), (-47, 0, 2, 88), (47, 0, 2, 88),
-        (-35, 43, 26, 2), (35, 43, 26, 2),
-    ):
-        out.append(part("SkyRail", [sx, 5, sz], cf(x, 3.5, z),
-                        accent, "ForceField", Transparency=0.28))
-    for x, z, sx, sz in (
-        (0, -58, 128, 2), (-63, 0, 2, 120), (63, 0, 2, 120),
-        (0, 58, 128, 2),
-    ):
-        out.append(part("RecoveryRail", [sx, 4, sz], cf(x, -23, z),
-                        [0.34, 0.36, 0.40], "Metal"))
-    out.extend(training_venue(location["equipment"], visual_row["accent"]))
-    out.append(volume(
-        location["zone"], f"{location['id']}Volume", [112, 76, 104], cf(0, 30, 0)
-    ))
-    placed = [place(location["origin"], piece) for piece in out]
-    return environment_model(
-        location["environment_id"], "Sky", placed, atomic=True,
-        requires_flight=True, travel_id=location["id"],
+def district_plate_storage():
+    """Two commercial plate trees kept outside the five training mats."""
+    out = []
+    plate_colors = (
+        [0.10, 0.46, 0.20],
+        [0.91, 0.72, 0.10],
+        [0.10, 0.34, 0.73],
+        [0.72, 0.08, 0.10],
     )
-
-
-def sky_launch_site(location, visual_row):
-    """A visible ground tether and access marker below every aerial gym."""
-    origin = location["ground_origin"]
-    out = [
-        place(origin, map_feature(part(
-            "LaunchPad", [82, 1, 82],
-            cf(0, FLOOR_TOP - 0.5 + SURFACE_LIFT, 0),
-            [0.22, 0.24, 0.27], "Concrete",
-        ), "Park")),
-        place(origin, disc("LaunchRing", 0.18, 48, FLOOR_TOP + 0.1,
-                           visual_row["accent"], "Neon", CanCollide=False)),
-        place(origin, marker("AccessStart", [18, 8, 18],
-                             cf(0, FLOOR_TOP + 4, 18))),
-    ]
-    tagged(out[2], tags=["VenueAccess"], attributes={
-        "TravelId": location["id"], "Role": "AccessStart",
-    })
-    for x, z in ((-28, -28), (28, -28), (-28, 28), (28, 28)):
-        out.append(place(origin, part(
-            "FlightBeacon", [2.2, 18, 2.2], cf(x, FLOOR_TOP + 9, z),
-            visual_row["accent"], "Neon", CanCollide=False,
-        )))
+    for rack_x in (-170, 170):
+        out.extend([
+            part("PlateTreeBase", [22, 0.7, 9], cf(rack_x, FLOOR_TOP + 0.35, 95),
+                 STEEL, "DiamondPlate"),
+            part("PlateTreePost", [2, 10, 2], cf(rack_x, FLOOR_TOP + 5, 95),
+                 STEEL_LIGHT, "Metal"),
+            part("PlateTreeHeader", [2.5, 2.5, 10], cf(rack_x, FLOOR_TOP + 10, 95),
+                 STEEL, "Metal"),
+        ])
+        for level, color in enumerate(plate_colors):
+            y = FLOOR_TOP + 2.0 + level * 2.15
+            out.append(cylinder(
+                "StorageHorn", 8.0, 0.38,
+                mul(cf(rack_x, y, 95), rot_y(90)), CHROME, "Metal",
+            ))
+            for plate_index in range(3):
+                z = 92.2 + plate_index * 0.48
+                out.append(cylinder(
+                    "StoredPlate", 0.38, 2.7 + level * 0.28,
+                    mul(cf(rack_x, y, z), rot_y(90)), color, "SmoothPlastic",
+                    CanCollide=False,
+                ))
     return out
 
 
 def build_connected_world():
-    locations = connected_locations()
     zone_rows = {row["zone"]: row for row in DISTRICTS}
     structure = connected_ground()
     machines = []
+
+    # The city is built before anything is placed in it. Scattered sites are
+    # chosen from what the city generator actually produced -- its yards, its
+    # parking lots, its rooftops -- so the catalogue has to exist before a single
+    # location does. This ordering is the whole reason a machine always stands on
+    # real ground instead of wherever a hand-written coordinate happened to land.
+    mainland_children = region_ground(MAINLAND)
+    mainland_children.extend(coastal_public_realm())
+    mainland_children.extend(city_grid())
+    structure.append(environment_model(
+        MAINLAND["id"], "Ground", mainland_children
+    ))
+
+    locations = connected_locations()
+    # Measured against all 35 courts, not just the scattered thirty. The starter
+    # ring is where brand-new players train, and a boss arena landing beside it is
+    # the last thing that should happen.
+    hostile = scatter_hostile_sites(scatter_sites() + garage_ring_sites())
+
+    # The hub is now the only place with a shop and a coach. Seven campuses each
+    # carrying their own was seven walks to the same conversation.
     hub_children = connected_plaza()
-    region_children = {region["id"]: region_ground(region) for region in REGIONS}
-    sky_environments = []
+    hub_children.extend(place(STARTER_CAMPUS_FRAME, piece)
+                        for piece in district_plate_storage())
+
+    sector_children = {f"Sector{index + 1}": [] for index in range(SECTOR_COUNT)}
 
     for location in locations:
         row = zone_rows[location["zone"]]
-        visual_row = zone_rows[location["neighborhood"]]
-        if location["starter"]:
-            hub_children.append(folder(location["id"], starter_training_area(location, row)))
-        elif location["style"] == "sky":
-            region_children[location["region_id"]].append(folder(
-                f"Launch_{location['id']}", sky_launch_site(location, visual_row)
-            ))
-            sky_environments.append(sky_training_environment(location, row, visual_row))
-        else:
-            region_children[location["region_id"]].append(folder(
-                location["id"], connected_block(location, row, visual_row)
-            ))
-
-        access_kind = "Sky" if location["style"] == "sky" else (
-            "ThirdFloor" if location["style"] == "tower" else "Street"
+        sector_children[location["environment_id"]].append(
+            folder(location["id"], scattered_training_area(location, row))
         )
         machines.append(machine(
-            location["id"], location["equipment"], location["origin"],
-            BUILDERS[location["equipment"]](row["pad"], row["accent"]),
+            location["id"], location["equipment"],
+            mul(location["origin"], cf(0, VENUE_PAD_RISE, 0)),
+            machine_copies(location["equipment"], row),
             travel_id=location["id"],
-            access_kind=access_kind,
-            floor_index=3 if location["style"] == "tower" else 1,
+            # Nothing is flight-gated any more: every rooftop site carries its own
+            # fire escape, so the whole gym is reachable on foot.
+            access_kind="Street",
+            floor_index=1,
             exercise_family=location["family"],
             environment_id=location["environment_id"],
-            requires_flight=location["requires_flight"],
+            requires_flight=False,
             location_name=location["location_name"],
             location_tagline=location["location_tagline"],
         ))
 
+    # One mob field and one boss arena per tier, spread like the machines. The
+    # server finds both purely through their tags, so moving them is placement
+    # only -- MobService never learns they used to sit behind a campus.
+    for index, row in enumerate(DISTRICTS[:7]):
+        field_site = hostile[index]
+        arena_site = hostile[index + 7]
+        for site, builder in ((field_site, mob_field), (arena_site, boss_arena)):
+            pieces = [place(cf(site["x"], 0, site["z"]), piece)
+                      for piece in builder(row["zone"])]
+            sector_children[sector_for(site["x"])].append(
+                folder(f"{row['zone']}{'Field' if builder is mob_field else 'Arena'}",
+                       pieces)
+            )
+
     # connected_ground creates Hub first, so extend that environment with its
-    # complete plaza and starter campus while preserving global water/boundary siblings.
+    # complete plaza while preserving global water/boundary siblings.
     for index, node in enumerate(structure):
         if node.get("name") == "Environment_Hub":
             node["children"].extend(hub_children)
             structure[index] = node
             break
 
-    for region in REGIONS:
-        region_locations = [location for location in locations
-                            if location.get("region_id") == region["id"]]
-        region_children[region["id"]].extend(region_scenery(region, region_locations))
-        region_children[region["id"]].extend(region_clutter(region, region_locations))
+    for index in range(SECTOR_COUNT):
+        sector_id = f"Sector{index + 1}"
         structure.append(environment_model(
-            region["id"], "Ground", region_children[region["id"]]
+            sector_id, "Ground", sector_children[sector_id]
         ))
-    structure.extend(sky_environments)
 
     return (
-        {"className": "Folder", "children": [folder("ScatteredTrainingArchipelago", structure)]},
+        {"className": "Folder", "children": [folder("CoastTrainingMainland", structure)]},
         {"className": "Folder", "children": machines},
+    )
+
+
+# Which environments belong in which half of the split output. The city is the one
+# that grows without bound as blocks fill in; the districts are seven small, mostly
+# static models, so keeping them in their own file means editing a campus does not
+# rewrite the multi-megabyte city blob next to it.
+CITY_ENVIRONMENTS = ("WorldFoundation", "WorldWater", "WorldBoundary", "Environment_Mainland")
+
+
+def split_structure(payload):
+    """The world's environments, sorted into the two committed files.
+
+    Takes the payload `build_connected_world` returns rather than the raw list, so
+    that function keeps the one shape every validator check already walks. The
+    `CoastTrainingMainland` wrapper it carries existed only to group the
+    environments; the two files do that job now, so the tree ends up the same depth
+    it was.
+
+    Shared with the validator rather than reimplemented there: a validator that
+    sorted the environments its own way would be checking a world that is never
+    written.
+    """
+    environments = []
+    for wrapper in payload["children"]:
+        environments.extend(wrapper["children"])
+
+    city = [node for node in environments if node.get("name") in CITY_ENVIRONMENTS]
+    districts = [node for node in environments if node.get("name") not in CITY_ENVIRONMENTS]
+    missing = [name for name in CITY_ENVIRONMENTS if not any(n.get("name") == name for n in city)]
+    if missing:
+        raise ValueError(f"split_structure: no environment named {missing}")
+    return (
+        {"className": "Folder", "children": city},
+        {"className": "Folder", "children": districts},
     )
 
 
@@ -3817,7 +6278,10 @@ def write(name, payload):
     path = os.path.abspath(os.path.join(OUT_DIR, name))
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as handle:
-        json.dump(payload, handle, indent=2)
+        # Compact, not pretty-printed. At three megabytes and a million lines this
+        # file passed the point of human review long ago, and the indentation was
+        # costing roughly half the bytes of every commit that touches the world.
+        json.dump(payload, handle, separators=(",", ":"), sort_keys=False)
         handle.write("\n")
     print(f"wrote {os.path.relpath(path)} ({count_instances(payload)} instances)")
 
@@ -3832,8 +6296,11 @@ def count_instances(node):
 
 def main():
     structure, machines = build_connected_world()
+    city, districts = split_structure(structure)
     write("init.meta.json", {"className": "Model"})
-    write("Structure.model.json", structure)
+    write("Structure/init.meta.json", {"className": "Folder"})
+    write("Structure/City.model.json", city)
+    write("Structure/Districts.model.json", districts)
     write("Machines.model.json", machines)
 
 

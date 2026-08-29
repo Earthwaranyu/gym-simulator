@@ -27,6 +27,9 @@
 ]]
 
 local Formulas = require("../src/ReplicatedStorage/Modules/Formulas")
+local TokenMultiplierConfig = require("../src/ReplicatedStorage/Modules/TokenMultiplierConfig")
+local MuscleClassConfig = require("../src/ReplicatedStorage/Modules/MuscleClassConfig")
+local WeightConfig = require("../src/ReplicatedStorage/Modules/WeightConfig")
 local Inputs = require("./_balance_inputs")
 
 local STATS = { "Arms", "Chest", "Back", "Core", "Legs" }
@@ -34,7 +37,16 @@ local STATS = { "Arms", "Chest", "Back", "Core", "Legs" }
 -- Simulation resolution. Small enough to place one-second stat ticks and interruptions
 -- accurately, large enough that a full day of play runs in a moment.
 local STEP = 0.25
-local HORIZON_HOURS = 24
+-- Pass a different horizon after `-a` for a long-run audit, for example:
+-- `luau scripts/simulate.luau -a 168` for seven continuous days.
+local firstArgument = ...
+local requestedHours = tonumber(firstArgument)
+local HORIZON_HOURS = if requestedHours ~= nil and requestedHours > 0 then requestedHours else 24
+
+local zonesById = {}
+for _, zone in Inputs.Zones do
+	zonesById[zone.Id] = zone
+end
 
 --[[
 	A play style is a policy, not a personality. Each field is a lever a real player
@@ -163,6 +175,8 @@ type Result = {
 	TokensEarned: number,
 	TokensSpent: number,
 	Upgrades: number,
+	PhysiqueLevel: number,
+	PhysiqueAt: { [number]: number },
 	ComboTicksLost: number,
 	Deaths: number,
 	LongestStallSeconds: number,
@@ -187,10 +201,7 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 		stats[statId] = 0
 	end
 
-	local levels: { [string]: number } = {}
-	for _, statId in STATS do
-		levels[statId] = 0
-	end
+	local multiplierLevels = { Arms = 0, Chest = 0, Back = 0, Core = 0, Legs = 0 }
 
 	local result: Result = {
 		Style = style,
@@ -201,6 +212,8 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 		TokensEarned = 0,
 		TokensSpent = 0,
 		Upgrades = 0,
+		PhysiqueLevel = 0,
+		PhysiqueAt = {},
 		ComboTicksLost = 0,
 		Deaths = 0,
 		LongestStallSeconds = 0,
@@ -219,6 +232,7 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 	local downUntil = -1
 	local lastProgressAt = 0
 	local lastUpgradeCount = 0
+	local physiqueLevel = 0
 
 	-- Uptime is applied as a duty cycle rather than as a random coin flip, so the
 	-- model stays deterministic: the player trains for `Uptime` of every minute.
@@ -236,18 +250,31 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 			result.PowerAtOneHour = power
 		end
 
-		-- Zone and machine selection, both gated on total power. Every unlocked zone is
-		-- recorded, not just improving ones: the starter zone's multiplier is 1, and a
-		-- "best so far" test would report it as never reached.
-		local zoneMultiplier = 1
-		for _, zone in Inputs.Zones do
-			if power >= zone.RequiredPower then
-				zoneMultiplier = math.max(zoneMultiplier, zone.GainMultiplier)
-				if result.ZoneAt[zone.Id] == nil then
-					result.ZoneAt[zone.Id] = time
-					table.insert(result.Timeline, { At = time, What = `zone {zone.Id}` })
-					lastProgressAt = time
-				end
+		-- Transform immediately when the next ordered total-Power gate is met. Lifetime
+		-- stats survive; only the visual-growth baselines move. Training stops during the
+		-- transformation, so the current combo still ends.
+		local nextPhysique = MuscleClassConfig.Next(physiqueLevel)
+		if nextPhysique ~= nil and power >= nextPhysique.RequiredPower then
+			physiqueLevel = nextPhysique.Level
+			result.PhysiqueLevel = physiqueLevel
+			result.PhysiqueAt[physiqueLevel] = time
+			table.insert(result.Timeline, { At = time, What = `physique {nextPhysique.DisplayName}` })
+			combo = 0
+			lastProgressAt = time
+		end
+
+		-- A district unlock is muscle-specific in the live game. Record the point where
+		-- the balanced route has opened that district for all five muscles; this is a
+		-- stronger and more useful milestone than pretending total Power opens it.
+		local lowestStat = stats[STATS[1]]
+		for _, statId in STATS do
+			lowestStat = math.min(lowestStat, stats[statId])
+		end
+		for _, tier in WeightConfig.List do
+			if lowestStat >= tier.RequiredStat and result.ZoneAt[tier.ZoneId] == nil then
+				result.ZoneAt[tier.ZoneId] = time
+				table.insert(result.Timeline, { At = time, What = `zone {tier.ZoneId}` })
+				lastProgressAt = time
 			end
 		end
 
@@ -294,7 +321,10 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 		-- not while dead. That is what TokenService does.
 		if time >= nextTokenAt then
 			nextTokenAt += Formulas.TOKEN_TICK_SECONDS
-			local awarded = Formulas.TokensPerTick()
+			-- Scaled by the physique class, the same way TokenService does it. Modelling
+			-- a flat tick would understate every projection past the first
+			-- transformation by the whole prestige ladder.
+			local awarded = Formulas.TokensPerTick() * MuscleClassConfig.Get(physiqueLevel).TokenMultiplier
 			tokens += awarded
 			result.TokensEarned += awarded
 		end
@@ -307,6 +337,20 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 					targetStat = statId
 				end
 			end
+
+			-- Use the best district currently unlocked for this exact muscle and the
+			-- heaviest load its current stat can support, matching Auto Load/manual best
+			-- play. Weight is a modest x1..x2 bonus inside a district, not another tier.
+			local trainingTier = WeightConfig.List[1]
+			for _, tier in WeightConfig.List do
+				if stats[targetStat] >= tier.RequiredStat then
+					trainingTier = tier
+				end
+			end
+			local zone = zonesById[trainingTier.ZoneId]
+			local zoneMultiplier = if zone ~= nil then zone.GainMultiplier else 1
+			local recommendedKg = WeightConfig.Recommended(trainingTier, stats[targetStat])
+			local weightMultiplier = WeightConfig.GainMultiplier(trainingTier, recommendedKg)
 
 			local best = nil
 			for _, machine in Inputs.Equipment do
@@ -321,44 +365,58 @@ local function run(style: Style, gainScale: number, costScale: number): Result
 			end
 
 			if best ~= nil and time >= nextRepAt then
-				nextRepAt = time + Inputs.STAT_TICK_SECONDS
+				local repSeconds = best.RepInterval
+					* WeightConfig.TempoMultiplier(trainingTier, recommendedKg)
+				nextRepAt = time + repSeconds
 				combo += 1
 				local comboMultiplier = if combo >= Inputs.COMBO_GOAL then Inputs.MAX_COMBO_MULTIPLIER else 1
-				local multiplier = Formulas.MultiplierValue(levels[targetStat])
+				local multiplier = TokenMultiplierConfig.Multiplier(multiplierLevels[targetStat])
 					* comboMultiplier
 					* style.GainBoost
 					* gainScale
+					* weightMultiplier
 
 				local equipmentPerSecond = best.BaseGain / best.RepInterval
 				local rawRate = Formulas.MachineTrainingRate(equipmentPerSecond, zoneMultiplier)
-				stats[targetStat] += Formulas.GainPerRep(rawRate * Inputs.STAT_TICK_SECONDS, multiplier)
+				stats[targetStat] += Formulas.GainPerRep(rawRate * repSeconds, multiplier)
 			end
 		else
 			-- Dismounting to walk around resets the combo, same as in game.
 			combo = 0
 		end
 
-		-- Spend. Greedy: cheapest affordable upgrade, as often as it is affordable.
+		-- Buy the cheapest per-muscle upgrade. There is deliberately no stat or Power
+		-- gate; ties favor the lowest level so a balanced player spreads purchases.
 		while true do
-			local cheapestStat = nil
-			local cheapestCost = math.huge
+			local chosenStat = nil
+			local chosen = nil
 			for _, statId in STATS do
-				local cost = Formulas.MultiplierCost(levels[statId]) * costScale
-				if cost < cheapestCost then
-					cheapestCost = cost
-					cheapestStat = statId
+				local candidate = TokenMultiplierConfig.Next(multiplierLevels[statId])
+				if candidate ~= nil then
+					if
+						chosen == nil
+						or candidate.CostToUnlock < chosen.CostToUnlock
+						or (
+							candidate.CostToUnlock == chosen.CostToUnlock
+							and multiplierLevels[statId] < multiplierLevels[chosenStat]
+						)
+					then
+						chosenStat = statId
+						chosen = candidate
+					end
 				end
 			end
-			if cheapestStat == nil or tokens < cheapestCost then
+			if chosen == nil or tokens < chosen.CostToUnlock * costScale then
 				break
 			end
-			tokens -= cheapestCost
-			result.TokensSpent += cheapestCost
-			levels[cheapestStat] += 1
+			local cost = chosen.CostToUnlock * costScale
+			tokens -= cost
+			result.TokensSpent += cost
+			multiplierLevels[chosenStat] += 1
 			result.Upgrades += 1
 			if result.FirstUpgradeAt == nil then
 				result.FirstUpgradeAt = time
-				table.insert(result.Timeline, { At = time, What = "first upgrade" })
+				table.insert(result.Timeline, { At = time, What = "first muscle multiplier" })
 			end
 			lastProgressAt = time
 		end
@@ -394,6 +452,7 @@ local results: { Result } = {}
 for _, style in STYLES do
 	table.insert(results, run(style, 1, 1))
 end
+local baseline = results[1]
 
 header("Time to the first things that matter")
 print(
@@ -420,24 +479,135 @@ for _, result in results do
 	)
 end
 
-header("Economy after 24h")
-print(string.format("%-20s %10s %10s %10s %8s %10s", "Style", "earned", "spent", "held", "upgrades", "power"))
+header(`Economy after {HORIZON_HOURS}h`)
+print(
+	string.format(
+		"%-20s %10s %10s %10s %8s %10s %10s",
+		"Style",
+		"earned",
+		"spent",
+		"held",
+		"upgrades",
+		"physique",
+		"power"
+	)
+)
 for _, result in results do
 	print(
 		string.format(
-			"%-20s %10s %10s %10s %8d %10s",
+			"%-20s %10s %10s %10s %8d %10d %10s",
 			result.Style.Name,
 			short(result.TokensEarned),
 			short(result.TokensSpent),
 			short(result.Tokens),
 			result.Upgrades,
+			result.PhysiqueLevel,
 			short(result.Power)
 		)
 	)
 end
 
-header("Cost of being killed")
-local baseline = results[1]
+header("Physique transformation pacing")
+for _, class in MuscleClassConfig.List do
+	if class.Level > 0 then
+		print(
+			string.format(
+				"  %-12s needs %10s total power   reached %s",
+				class.DisplayName,
+				short(class.RequiredPower),
+				duration(baseline.PhysiqueAt[class.Level])
+			)
+		)
+	end
+end
+
+--[[
+	Fight Token income, and what a physique class really costs in fighting time.
+
+	BALANCE_MODEL listed this as its known gap — transformation timestamps assumed the
+	Fight Tokens were simply available — and that assumption hid the fact that the whole
+	2,555-token ladder was worth about four minutes of farming.
+
+	The chain is: a punch deals the attacker's Arms one-for-one, a balanced player's Arms
+	is a fifth of their total Power, and a thief's health is set per tier. That gives
+	time-to-kill; population and respawn give how many are available; the tier's reward
+	gives the rate.
+]]
+local PUNCH_CHAIN_SECONDS = 0.38 + 0.4 + 0.52
+local PUNCHES_PER_CHAIN = 3
+local RETARGET_SECONDS = 0.5
+local TARGET_MINUTES = 12
+
+local function thiefFor(zoneId: string)
+	for _, row in Inputs.Thieves do
+		if row.ZoneId == zoneId then
+			return row
+		end
+	end
+	return nil
+end
+
+-- The richest field a player of this Power is allowed into.
+local function bestFieldAt(power: number)
+	local best, bestZone = nil, nil
+	for _, zone in Inputs.Zones do
+		if power >= zone.RequiredPower then
+			local row = thiefFor(zone.Id)
+			if row ~= nil and (best == nil or row.FightTokenReward > best.FightTokenReward) then
+				best, bestZone = row, zone
+			end
+		end
+	end
+	return best, bestZone
+end
+
+local function tokensPerMinute(power: number): (number, string, number)
+	local row, zone = bestFieldAt(power)
+	if row == nil then
+		return 0, "none", 0
+	end
+	local damage = Formulas.AttackDamage(power / 5)
+	local punches = math.max(1, math.ceil(row.Health / damage))
+	local killSeconds = punches / PUNCHES_PER_CHAIN * PUNCH_CHAIN_SECONDS + RETARGET_SECONDS
+	-- With six in a field a kill is normally limited by how fast you can swing. The
+	-- respawn only binds once you clear the field faster than it refills, which is
+	-- exactly the case a player who has out-levelled a tier is in.
+	local fieldCycle = Inputs.THIEF_RESPAWN_SECONDS / Inputs.THIEF_POPULATION
+	local perKill = math.max(killSeconds, fieldCycle)
+	return 60 / perKill * row.FightTokenReward, zone.Id, perKill
+end
+
+header("Fight Token income, and what a class-up costs in fighting time")
+print(
+	string.format(
+		"  %-12s %-11s %10s %9s %8s %10s",
+		"class",
+		"field",
+		"tokens/min",
+		"cost",
+		"minutes",
+		`for {TARGET_MINUTES}min`
+	)
+)
+for _, class in MuscleClassConfig.List do
+	if class.Level > 0 then
+		local rate, zoneId = tokensPerMinute(class.RequiredPower)
+		local minutes = if rate > 0 then class.FightTokenCost / rate else math.huge
+		print(
+			string.format(
+				"  %-12s %-11s %10s %9s %8.1f %10s",
+				class.DisplayName,
+				zoneId,
+				short(rate),
+				short(class.FightTokenCost),
+				minutes,
+				short(math.floor(rate * TARGET_MINUTES))
+			)
+		)
+	end
+end
+
+header("Cost of being killed (lifetime Power persists through physique changes)")
 for _, result in results do
 	if result.Deaths > 0 then
 		local lost = 1 - (result.Power / baseline.Power)
@@ -480,7 +650,7 @@ end
 
 header("Sensitivity — how much do the levers actually move things?")
 print("Each row re-runs the Active player with one number scaled.")
-print(string.format("%-28s %14s %14s %10s", "Change", "1st upgrade", "24h power", "upgrades"))
+print(string.format("%-28s %14s %14s %10s", "Change", "1st upgrade", `{HORIZON_HOURS}h power`, "upgrades"))
 local SENSITIVITY = {
 	{ Label = "baseline", Gain = 1, Cost = 1 },
 	{ Label = "gains -25%", Gain = 0.75, Cost = 1 },

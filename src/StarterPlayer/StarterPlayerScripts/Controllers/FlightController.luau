@@ -2,12 +2,16 @@
 --[[
 	FlightController — the "fly" rung of the movement ladder.
 
-	Q takes off and lands, once the server has said this character may. WASD steers
-	relative to the camera, Space climbs, and Control drops. Shift is reserved for
+	Double-tapping Space takes off and lands, once the server has said this character
+	may — it is the only way in and out of the air, because Q became the dash. WASD
+	steers relative to the camera, Space climbs, and Control drops. Shift toggles
 	Legs-scaled sprinting while grounded. The server publishes
 	permission as a character attribute (see FlightService); this file never asks for
 	it and never argues when it is taken away mid-flight — losing permission drops
 	you, which is exactly what happens when somebody punches you out of the sky.
+
+	Two of those inputs are the same key doing different jobs, and the tap detector
+	below is what keeps them apart: held, Space climbs; tapped twice, it lands.
 
 	Flight is held by a LinearVelocity on the root rather than by moving the character
 	directly. That keeps it inside the physics engine, so a flying player still
@@ -40,7 +44,19 @@ local mover: LinearVelocity? = nil
 local orienter: AlignOrientation? = nil
 local attachment: Attachment? = nil
 local velocity = Vector3.zero
-local lastJumpTapAt = 0
+local sprinting = false
+-- When the current Space press began, or 0 if the key is up. Paired with the time of
+-- the last completed *tap*, these two are the whole double-tap detector.
+local spaceHeldSince = 0
+local lastSpaceTapAt = 0
+-- The last silhouette reported to the server, so only a genuine band change crosses
+-- the wire. Nil means "on the ground", which is also what is published on landing.
+local reportedState: string? = nil
+-- Heading last frame, and the eased bank angle. Bank comes from how fast the heading
+-- is turning, so it needs the previous frame to compare against, and it is eased
+-- rather than tracked so a twitchy camera does not make the body flicker.
+local lastHeading: Vector3? = nil
+local bankDegrees = 0
 
 local ToastController: any = nil
 local ProfileController: any = nil
@@ -64,6 +80,38 @@ local function flightSpeed(): number
 	return Formulas.FlightSpeed(legs)
 end
 
+--[[
+	Turns sprinting on or off, telling the server only when it actually changed.
+
+	Sprint is a toggle rather than a held key, so the client owns a piece of state the
+	server also keeps (CombatService applies the speed). Guarding on change keeps one
+	keypress to one remote call instead of one per frame, and keeps the two in step.
+]]
+local function setSprint(value: boolean)
+	if sprinting == value then
+		return
+	end
+	sprinting = value
+	Net.Event("SprintChanged"):FireServer(value)
+end
+
+--[[
+	Tells the server which flight silhouette we are in, when it changes.
+
+	Only band changes are sent. The exact speed is not: a float republished as it
+	changed would be a property write to every client in the server, every frame, for
+	every player in the air. The band is all anybody else needs, because they are
+	blending toward a pose rather than steering it — and this client never reads its own
+	attribute back, so the coarseness costs the person actually flying nothing.
+]]
+local function setFlightState(state: string?)
+	if reportedState == state then
+		return
+	end
+	reportedState = state
+	Net.Event("FlightChanged"):FireServer(state)
+end
+
 local function isAllowed(): boolean
 	local model = character
 	if model == nil or model.Parent == nil then
@@ -73,12 +121,59 @@ local function isAllowed(): boolean
 end
 
 --[[
+	Where the root may not descend past, at a given spot.
+
+	The sea used to be the only floor flight knew about, which is wrong everywhere the
+	world is land. On a city district the solid ground is a four-stud slab topping out at
+	y = 1, and every surface above it — the campus floor, the courts, the training pads,
+	each machine's mat — is CanCollide=false decoration. Flight's mover is a
+	LinearVelocity with an infinite MaxForce and it flies with PlatformStand set, so the
+	humanoid does no standing correction: holding descend simply pushed the avatar
+	through that slab, and the water clamp then parked it at y -4.5, five studs under the
+	district. Inside a sealed gym there is nothing below to land on and nothing to walk
+	out through.
+
+	So ask the world what is underneath instead of assuming. The sea clamp stays as the
+	answer for when the ray finds nothing, which is what happens out over open water.
+]]
+local function floorBelow(part: BasePart, model: Model, hum: Humanoid?): number
+	local waterFloor = MovementConfig.WATER_SURFACE_Y + MovementConfig.FLIGHT_WATER_CLEARANCE
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { model }
+	params.IgnoreWater = true
+	-- Only surfaces the player could actually stand on. A raycast hits CanCollide=false
+	-- parts unless told otherwise, and the world is full of them — court markings,
+	-- machine mats, the ropes on a battle-rope rig — so without this, flight would stop
+	-- against decoration and leave the avatar hovering over a floor mat.
+	params.RespectCanCollide = true
+
+	-- From a little above the root, so a root that has already sunk into geometry still
+	-- finds the surface it should be standing on rather than starting below it.
+	local from = part.Position + Vector3.new(0, 6, 0)
+	local hit = workspace:Raycast(from, Vector3.new(0, -4096, 0), params)
+	if hit == nil then
+		return waterFloor
+	end
+
+	local standing = hit.Position.Y + (if hum ~= nil then hum.HipHeight else 2) + part.Size.Y / 2
+	return math.max(waterFloor, standing)
+end
+
+--[[
 	Stops flying and hands the body back to the humanoid. Safe to call at any time,
 	including when never airborne.
 ]]
 function FlightController:Stop()
 	flying = false
 	velocity = Vector3.zero
+	lastHeading = nil
+	bankDegrees = 0
+	-- Told before anything is torn down. Landing has to reach the other clients even if
+	-- the teardown below throws, because the failure mode is a body left cruising on
+	-- every screen but this one.
+	setFlightState(nil)
 
 	if mover ~= nil then
 		mover:Destroy()
@@ -92,6 +187,22 @@ function FlightController:Stop()
 		attachment:Destroy()
 		attachment = nil
 	end
+	-- Put the avatar back on top of the world before handing it to the humanoid.
+	--
+	-- Landing used to just stop forcing a velocity and let gravity take over, which is
+	-- right in the air and useless below the ground: there is nothing under a district
+	-- to fall onto, so anyone who got under one stayed there. This costs one raycast on
+	-- a keypress and means no landing can strand a player inside the map.
+	local part = root
+	local model = character
+	if part ~= nil and part.Parent ~= nil and model ~= nil then
+		local floor = floorBelow(part, model, humanoid)
+		if part.Position.Y < floor then
+			part.CFrame += Vector3.new(0, floor - part.Position.Y, 0)
+			part.AssemblyLinearVelocity = Vector3.zero
+		end
+	end
+
 	if humanoid ~= nil and humanoid.Parent ~= nil then
 		humanoid.PlatformStand = false
 	end
@@ -140,7 +251,15 @@ function FlightController:_takeOff()
 	orienter = orient
 	velocity = part.AssemblyLinearVelocity
 	flying = true
-	Net.Event("SprintChanged"):FireServer(false)
+	-- Sprint is deliberately left alone.
+	--
+	-- Takeoff used to clear it, on the theory that you are not running any more. But
+	-- the toggle is the player's standing intent, not a description of the current
+	-- animation, and clearing it is what made landing drop you to a walk and made the
+	-- first Shift press afterwards read as dead. Flight never consults WalkSpeed
+	-- anyway — the body is under PlatformStand, moved by a LinearVelocity paced by
+	-- Formulas.FlightSpeed — so a sprint-speed WalkSpeed sitting unused through the
+	-- flight costs nothing and is correct again the instant the humanoid takes over.
 
 	-- The humanoid would otherwise keep trying to walk, and fight the velocity every
 	-- frame while standing on nothing.
@@ -226,31 +345,34 @@ end
 local function constrainToWorld(part: BasePart, requested: Vector3): Vector3
 	local at = part.Position
 	local x, y, z = requested.X, requested.Y, requested.Z
-	local minRootY = MovementConfig.WATER_SURFACE_Y + MovementConfig.FLIGHT_WATER_CLEARANCE
+	local minRootY = floorBelow(part, part.Parent :: Model, humanoid)
+	local centerX = MovementConfig.FLIGHT_WORLD_CENTER_X
+	local centerZ = MovementConfig.FLIGHT_WORLD_CENTER_Z
 	local halfWidth = MovementConfig.FLIGHT_WORLD_HALF_WIDTH
 	local halfDepth = MovementConfig.FLIGHT_WORLD_HALF_DEPTH
-	local corrected = Vector3.new(
-		math.clamp(at.X, -halfWidth, halfWidth),
-		math.max(at.Y, minRootY),
-		math.clamp(at.Z, -halfDepth, halfDepth)
-	)
+	local minX, maxX = centerX - halfWidth, centerX + halfWidth
+	local minZ, maxZ = centerZ - halfDepth, centerZ + halfDepth
+	local corrected =
+		Vector3.new(math.clamp(at.X, minX, maxX), math.max(at.Y, minRootY), math.clamp(at.Z, minZ, maxZ))
 	if (corrected - at).Magnitude > 1e-3 then
 		part.CFrame += corrected - at
 		part.AssemblyLinearVelocity = Vector3.zero
 		at = corrected
 	end
 
-	-- Collision stops the rig physically; this removes the downward force just before
-	-- contact so LinearVelocity cannot keep pressing the avatar through the water seam.
-	if at.Y <= minRootY + 1.5 and y < 0 then
+	-- Cut the downward force just before contact so an infinite-MaxForce mover cannot
+	-- keep pressing the avatar into whatever it has landed on. The margin used to be
+	-- 1.5, which was sized for the water seam; against a real floor that left the
+	-- player hovering more than a stud up, so it is tight enough now to settle.
+	if at.Y <= minRootY + 0.4 and y < 0 then
 		y = 0
 	end
 
-	if (at.X <= -halfWidth + 2 and x < 0) or (at.X >= halfWidth - 2 and x > 0) then
+	if (at.X <= minX + 2 and x < 0) or (at.X >= maxX - 2 and x > 0) then
 		x = 0
 	end
 
-	if (at.Z <= -halfDepth + 2 and z < 0) or (at.Z >= halfDepth - 2 and z > 0) then
+	if (at.Z <= minZ + 2 and z < 0) or (at.Z >= maxZ - 2 and z > 0) then
 		z = 0
 	end
 
@@ -276,18 +398,53 @@ function FlightController:_step(delta: number)
 	velocity = constrainToWorld(part, velocity)
 	force.VectorVelocity = velocity
 
-	-- Face the way you are moving, upright. Held level rather than banked into the
-	-- dive: a rig with no flight animation looks like a falling body when pitched, and
-	-- an upright one reads as flight even while descending.
+	-- Face the way you are moving, pitched into the climb and banked into the turn.
+	--
+	-- This used to be held rigidly level, and the comment here said why: a rig with no
+	-- flight animation looks like a falling body when pitched, so upright was the least
+	-- bad option. FlightConfig is what removed that constraint — there is a flight pose
+	-- now, and a body that lies along its own velocity with a fist out in front reads as
+	-- flying at any angle. Attitude and silhouette are separate halves of the same
+	-- effect: this sets how the character is held, the pose sets what shape they hold.
 	local orient = orienter
+	local topSpeed = flightSpeed()
+	local speed = velocity.Magnitude
 	if orient ~= nil then
 		local heading = Vector3.new(velocity.X, 0, velocity.Z)
 		if heading.Magnitude > 1 then
-			orient.CFrame = CFrame.lookAt(Vector3.zero, heading.Unit)
+			local flat = heading.Unit
+
+			-- Bank from how fast the heading is swinging, not from the input: a player
+			-- turning by dragging the camera and one turning by holding A are doing the
+			-- same thing to the body, and only the resulting heading knows that.
+			local previous = lastHeading
+			local turnRate = 0
+			if previous ~= nil and delta > 1e-4 then
+				-- Signed by which side the turn went to, so a left turn drops the left
+				-- shoulder. The Y of the cross product is the sign of the sweep.
+				local sweep = previous:Cross(flat).Y
+				local angle = math.asin(math.clamp(sweep, -1, 1))
+				turnRate = angle / delta
+			end
+			lastHeading = flat
+
+			local targetBank = Formulas.FlightBank(turnRate)
+			-- Eased toward, never snapped to. Turn rate is noisy frame to frame and an
+			-- un-eased bank reads as the character shivering.
+			bankDegrees += (targetBank - bankDegrees) * math.min(
+				1,
+				MovementConfig.FLIGHT_BANK_RESPONSIVENESS * delta
+			)
+
+			local pitchDegrees = Formulas.FlightPitch(velocity.Y, speed)
+			orient.CFrame = CFrame.lookAt(Vector3.zero, flat)
+				* CFrame.Angles(math.rad(pitchDegrees), 0, math.rad(bankDegrees))
 		else
 			-- Hovering: keep whatever heading we had, just level. Deriving it from the
 			-- current CFrame rather than leaving it alone is what stops a residual
 			-- tilt from persisting for the whole flight.
+			lastHeading = nil
+			bankDegrees += (0 - bankDegrees) * math.min(1, MovementConfig.FLIGHT_BANK_RESPONSIVENESS * delta)
 			local current = part.CFrame.LookVector
 			local flat = Vector3.new(current.X, 0, current.Z)
 			if flat.Magnitude > 1e-3 then
@@ -295,10 +452,22 @@ function FlightController:_step(delta: number)
 			end
 		end
 	end
+
+	-- Published last, from the speed this frame actually settled on rather than from the
+	-- one that was requested — the eased velocity is what the body is doing, and it is
+	-- what every other client will be posing.
+	setFlightState(Formulas.FlightBand(speed, topSpeed))
 end
 
 function FlightController:_bind(model: Model)
 	self:Stop()
+
+	-- CombatService clears sprint for every new character. Mirror it rather than
+	-- announce it: if the client stayed "on" after a respawn, the first Shift press
+	-- would toggle it off and read as a dead key.
+	sprinting = false
+	spaceHeldSince = 0
+	lastSpaceTapAt = 0
 
 	character = model
 	root = model:WaitForChild("HumanoidRootPart", 10) :: BasePart?
@@ -336,34 +505,41 @@ function FlightController:Start()
 			return
 		end
 
-		if input.KeyCode == MovementConfig.TOGGLE_KEY then
-			self:Toggle()
+		-- Live in the air too, where it chooses what you land into. Shift has nothing
+		-- else to do up there: descent is on Ctrl precisely so the two never collide.
+		if input.KeyCode == MovementConfig.SPRINT_KEY then
+			setSprint(not sprinting)
 			return
 		end
 
-		if input.KeyCode == MovementConfig.SPRINT_KEY and not flying then
-			Net.Event("SprintChanged"):FireServer(true)
-			return
-		end
-
-		-- Double-tap jump to take off. Only while grounded: in the air Space is
-		-- already the climb key, and turning a climb into a landing would make
-		-- ascending impossible to hold.
-		if input.KeyCode == Enum.KeyCode.Space and not flying then
+		-- Double-tap jump to take off, and again to land. The second tap fires on the
+		-- key going down, because waiting for the release would make the gesture feel
+		-- late; the first tap only counts if it was short (see InputEnded), which is
+		-- what stops a held climb from arming a landing.
+		if input.KeyCode == Enum.KeyCode.Space then
 			local now = os.clock()
-			if now - lastJumpTapAt <= MovementConfig.DOUBLE_TAP_SECONDS then
-				lastJumpTapAt = 0
+			if lastSpaceTapAt > 0 and now - lastSpaceTapAt <= MovementConfig.DOUBLE_TAP_SECONDS then
+				spaceHeldSince = 0
+				lastSpaceTapAt = 0
 				self:Toggle()
 			else
-				lastJumpTapAt = now
+				spaceHeldSince = now
 			end
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input: InputObject)
-		if input.KeyCode == MovementConfig.SPRINT_KEY then
-			Net.Event("SprintChanged"):FireServer(false)
+		if input.KeyCode ~= Enum.KeyCode.Space then
+			return
 		end
+
+		-- A quick press arms the second half of a double-tap. A long one — the ascend
+		-- control, or a held jump — disarms it, so climbing can never turn into
+		-- falling out of the sky.
+		local now = os.clock()
+		local wasTap = spaceHeldSince > 0 and now - spaceHeldSince <= MovementConfig.TAP_HOLD_SECONDS
+		lastSpaceTapAt = if wasTap then now else 0
+		spaceHeldSince = 0
 	end)
 
 	RunService.Heartbeat:Connect(function(delta: number)
